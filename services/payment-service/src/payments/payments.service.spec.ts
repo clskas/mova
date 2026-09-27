@@ -87,6 +87,10 @@ describe('PaymentsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.servicePayment.findUnique.mockResolvedValue(null);
+    prisma.payment.findUnique.mockResolvedValue(null);
+    driverPayouts.fetchRidePayout.mockResolvedValue(null);
+    driverPayouts.creditPayout.mockResolvedValue({ credited: false });
     redis.client.get.mockResolvedValue(null);
     redis.client.set.mockResolvedValue('OK');
     redis.client.del.mockResolvedValue(1);
@@ -223,6 +227,68 @@ describe('PaymentsService', () => {
         data: expect.objectContaining({ status: 'COMPLETED' }),
       }),
     );
+  });
+
+  it('Pool : confirmCashRide confirme le booking RIDE_SHARE (compat app)', async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: 'pool-ride',
+          isShared: true,
+          driverId: 'driver-1',
+          status: 'COMPLETED',
+          passengers: [{ id: 'booking-1', status: 'DROPPED_OFF', fareCdf: 4000 }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          referenceType: 'RIDE_SHARE',
+          referenceId: 'booking-1',
+          userId: 'pass-1',
+          amountCdf: 4000,
+          paymentReady: true,
+          status: 'DROPPED_OFF',
+          driverId: 'driver-1',
+          parentRideId: 'pool-ride',
+        }),
+      })
+      .mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ driverId: 'driver-1', driverNetCdf: 3200, grossCdf: 4000 }),
+      });
+    prisma.servicePayment.findUnique.mockResolvedValue({
+      id: 'spay-pool',
+      referenceType: 'RIDE_SHARE',
+      referenceId: 'booking-1',
+      userId: 'pass-1',
+      amountCdf: 4000,
+      method: PaymentMethod.CASH,
+      status: 'PENDING',
+    });
+    prisma.servicePayment.update.mockResolvedValue({
+      id: 'spay-pool',
+      status: 'COMPLETED',
+      method: PaymentMethod.CASH,
+      amountCdf: 4000,
+      userId: 'pass-1',
+      referenceType: 'RIDE_SHARE',
+      referenceId: 'booking-1',
+    });
+
+    const result = await service.confirmCashRide('pool-ride', 'driver-1');
+    expect(result.success).toBe(true);
+    expect(result).toMatchObject({ confirmedCount: 1 });
+    expect(prisma.servicePayment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'COMPLETED' }),
+      }),
+    );
+    expect(redis.publish).toHaveBeenCalled();
   });
 
   it('cash + promo plateforme : dette commission = payé − net (SENGA absorbe)', async () => {

@@ -41,6 +41,16 @@ export class DeliveryPaymentEventsService implements OnModuleInit {
           this.gateway.broadcastDeliveryPaymentCompleted(payload.referenceId, paymentPayload);
           return;
         }
+        // Pool : payment sur booking RIDE_SHARE — notifier la room de la course parente.
+        if (referenceType === 'RIDE_SHARE' && (payload.rideId || payload.referenceId)) {
+          const rideId = payload.rideId ?? payload.referenceId!;
+          this.logger.log(`PAYMENT_COMPLETED for RIDE_SHARE/${payload.referenceId} ride=${rideId} -> broadcasting`);
+          this.gateway.broadcastRidePaymentCompleted(rideId, {
+            ...paymentPayload,
+            bookingId: payload.referenceId,
+          });
+          return;
+        }
         const rideId = payload.rideId ?? (referenceType === 'RIDE' ? payload.referenceId : undefined);
         if (rideId) {
           this.logger.log(`PAYMENT_COMPLETED for RIDE/${rideId} -> broadcasting`);

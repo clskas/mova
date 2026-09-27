@@ -242,8 +242,11 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.emit(event, { ...payload, ts: Date.now() });
   }
 
-  /** Notifie la room de la course qu'un paiement espèces est en attente de confirmation PIN. */
-  broadcastRideCashPending(rideId: string, payload: { amountCdf?: number }) {
+  /** Notifie la room de la course qu'un paiement espèces est en attente de confirmation. */
+  broadcastRideCashPending(
+    rideId: string,
+    payload: { amountCdf?: number; bookingId?: string; driverId?: string },
+  ) {
     const adapter = (this.server as unknown as { adapter?: { rooms?: Map<string, Set<string>> } }).adapter;
     const clients = adapter?.rooms?.get(`ride:${rideId}`)?.size ?? 0;
     this.logger.log(`emit ride:cash-pending to room ride:${rideId} (${clients} client(s))`);
@@ -289,13 +292,14 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   broadcastRidePaymentCompleted(
     rideId: string,
-    payload: { isPaid?: boolean; paymentStatus?: string; method?: string },
+    payload: { isPaid?: boolean; paymentStatus?: string; method?: string; bookingId?: string },
   ) {
     const adapter = (this.server as unknown as { adapter?: { rooms?: Map<string, Set<string>> } }).adapter;
     const clients = adapter?.rooms?.get(`ride:${rideId}`)?.size ?? 0;
     this.logger.log(`emit ride:payment-completed to room ride:${rideId} (${clients} client(s))`);
     this.server.to(`ride:${rideId}`).emit('ride:payment-completed', {
       rideId,
+      bookingId: payload.bookingId,
       isPaid: payload.isPaid ?? true,
       paymentStatus: payload.paymentStatus ?? 'COMPLETED',
       method: payload.method,

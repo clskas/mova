@@ -191,6 +191,7 @@ export class PaymentsService {
     driverId?: string;
     userId?: string;
     amountCdf: number;
+    rideId?: string;
   }) {
     try {
       this.logger.log(
@@ -552,6 +553,7 @@ export class PaymentsService {
         guaranteed?: boolean;
         escrowCollect?: boolean;
         cashAllowed?: boolean;
+        parentRideId?: string | null;
       }>;
     } catch (e) {
       if (e instanceof MovaHttpException) throw e;
@@ -772,7 +774,14 @@ export class PaymentsService {
           failureReason: null,
         },
       });
-      await this.publishPaymentCompleted({ referenceType: type, referenceId, userId, amountCdf, method: method.toString() });
+      await this.publishPaymentCompleted({
+        referenceType: type,
+        referenceId,
+        rideId: info.parentRideId ?? undefined,
+        userId,
+        amountCdf,
+        method: method.toString(),
+      });
       await this.creditDriverAfterServicePayment(type, referenceId);
       await this.releasePayLock(type, referenceId);
       return {
@@ -798,6 +807,7 @@ export class PaymentsService {
         driverId: info.driverId ?? undefined,
         userId,
         amountCdf,
+        rideId: info.parentRideId ?? undefined,
       });
       await this.releasePayLock(type, referenceId);
       return {
@@ -805,7 +815,9 @@ export class PaymentsService {
         payment,
         pendingCash: true,
         message:
-          'Paiement espèces en attente — remettez l\'argent au livreur ; il confirmera « Cash reçu ».',
+          type === 'RIDE_SHARE'
+            ? 'Paiement espèces en attente — remettez l\'argent au chauffeur ; il confirmera « Cash reçu ».'
+            : 'Paiement espèces en attente — remettez l\'argent au livreur ; il confirmera « Cash reçu ».',
         amountCdf,
         currency: 'CDF',
       };
@@ -926,6 +938,7 @@ export class PaymentsService {
     await this.publishPaymentCompleted({
       referenceType: type,
       referenceId,
+      rideId: info.parentRideId ?? undefined,
       userId: existing.userId,
       amountCdf: existing.amountCdf,
       method: 'CASH',
@@ -990,11 +1003,9 @@ export class PaymentsService {
   async confirmCashRide(rideId: string, driverUserId: string) {
     const ride = await this.fetchRide(rideId);
     if (ride.isShared === true || ride.shared === true || ride.type === 'RIDE_SHARE') {
-      throw new MovaHttpException(
-        MovaErrorCode.RIDE_INVALID_STATUS,
-        undefined,
-        'Course Pool : confirmez le cash passager via le paiement booking (RIDE_SHARE).',
-      );
+      // Apps anciennes appellent encore cash/confirm sur le ride parent — confirmer
+      // chaque booking Pool avec espèces PENDING.
+      return this.confirmCashRideSharePool(ride, driverUserId);
     }
     if (ride.driverId !== driverUserId) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
@@ -1021,6 +1032,55 @@ export class PaymentsService {
     });
     await this.creditDriverAfterRidePayment(rideId);
     return { success: true, payment, message: 'Paiement espèces confirmé' };
+  }
+
+  /** Pool : confirmer les ServicePayment CASH PENDING des bookings de la course. */
+  private async confirmCashRideSharePool(ride: Record<string, unknown>, driverUserId: string) {
+    if (ride.driverId !== driverUserId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const rawPassengers =
+      (ride.sharePassengers as Array<{ id?: string; bookingId?: string; status?: string }> | undefined) ??
+      (ride.passengers as Array<{ id?: string; bookingId?: string; status?: string }> | undefined) ??
+      [];
+    const bookingIds = [
+      ...new Set(
+        rawPassengers
+          .filter((p) => (p.status ?? '').toUpperCase() !== 'CANCELLED')
+          .map((p) => p.bookingId ?? p.id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (bookingIds.length === 0) {
+      throw new MovaHttpException(
+        MovaErrorCode.PAYMENT_FAILED,
+        undefined,
+        'Course Pool : aucun booking passager à confirmer.',
+      );
+    }
+    const confirmed: unknown[] = [];
+    let lastError: unknown;
+    for (const bookingId of bookingIds) {
+      try {
+        const result = await this.confirmCashService('RIDE_SHARE', bookingId, driverUserId);
+        confirmed.push(result);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    if (confirmed.length === 0) {
+      if (lastError instanceof MovaHttpException) throw lastError;
+      throw new MovaHttpException(
+        MovaErrorCode.PAYMENT_FAILED,
+        undefined,
+        'Aucun paiement espèces Pool en attente pour cette course.',
+      );
+    }
+    return {
+      success: true,
+      confirmedCount: confirmed.length,
+      message: `Paiement espèces confirmé (${confirmed.length} passager${confirmed.length > 1 ? 's' : ''})`,
+    };
   }
 
   /**
@@ -1478,9 +1538,18 @@ export class PaymentsService {
         };
       }
       if (effectiveOutcome === 'COMPLETED') {
+        let parentRideId: string | undefined;
+        if (servicePayment.referenceType.toUpperCase() === 'RIDE_SHARE') {
+          const info = await this.fetchServicePaymentInfo(
+            servicePayment.referenceType,
+            servicePayment.referenceId,
+          ).catch(() => null);
+          parentRideId = info?.parentRideId ?? undefined;
+        }
         await this.publishPaymentCompleted({
           referenceType: servicePayment.referenceType,
           referenceId: servicePayment.referenceId,
+          rideId: parentRideId,
           userId: servicePayment.userId,
           amountCdf: servicePayment.amountCdf,
           method: servicePayment.method.toString(),

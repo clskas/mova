@@ -37,6 +37,8 @@ export interface ServicePaymentInfo {
   guaranteed?: boolean;
   escrowCollect?: boolean;
   cashAllowed?: boolean;
+  /** Course parente (Pool) — pour events socket ride:* */
+  parentRideId?: string | null;
 }
 
 @Injectable()
@@ -122,6 +124,7 @@ export class PaymentInfoService {
       driverId: booking.ride.driverId,
       cashPin: booking.ride.completionPin,
       title: `Pool · ${booking.pickupAddress ?? 'Départ'} → ${booking.dropoffAddress ?? 'Arrivée'}`,
+      parentRideId: booking.rideId,
     };
   }
 

@@ -65,6 +65,8 @@ export interface ServiceCashPendingPayload {
   driverId?: string;
   userId?: string;
   amountCdf: number;
+  /** Course parente pour RIDE_SHARE (room socket ride:). */
+  rideId?: string;
 }
 
 export interface IncidentCreatedPayload {

@@ -31,6 +31,14 @@ export class ServiceCashEventsService implements OnModuleInit {
         if (!payload.referenceId) return;
         const type = (payload.referenceType ?? 'DELIVERY').toUpperCase();
         this.logger.log(`SERVICE_CASH_PENDING received for ${type}/${payload.referenceId} -> broadcasting`);
+        if (type === 'RIDE_SHARE' && payload.rideId) {
+          this.gateway.broadcastRideCashPending(payload.rideId, {
+            amountCdf: payload.amountCdf,
+            bookingId: payload.referenceId,
+            driverId: payload.driverId,
+          });
+          return;
+        }
         this.gateway.broadcastDeliveryCashPending(payload.referenceId, {
           amountCdf: payload.amountCdf,
           referenceType: type,

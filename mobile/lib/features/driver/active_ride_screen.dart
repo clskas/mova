@@ -812,6 +812,28 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       passengerTotalCdf: _passengerCashTotalCdf,
       driverNetCdf: _driverNetCdf,
       confirm: () async {
+        if (_isSharedPool) {
+          // Pool : un ServicePayment par booking — pas confirmCashRide(rideId).
+          final pending = _sharePassengers.where((p) {
+            final paid = p['isPaid'] == true;
+            final status = p['paymentStatus']?.toString().toUpperCase();
+            final method = p['paymentMethod']?.toString().toUpperCase();
+            if (paid) return false;
+            return status == 'PENDING' || method == 'CASH';
+          }).toList();
+          if (pending.isEmpty) {
+            return (ok: false, message: 'Aucun paiement espèces Pool en attente.');
+          }
+          for (final p in pending) {
+            final bookingId = (p['bookingId'] ?? p['id'])?.toString() ?? '';
+            if (bookingId.isEmpty) continue;
+            final result = await api.confirmCashService('RIDE_SHARE', bookingId);
+            if (result case Failure(:final error)) {
+              return (ok: false, message: error.message);
+            }
+          }
+          return (ok: true, message: null);
+        }
         final result = await api.confirmCashRide(_rideId);
         return switch (result) {
           Success() => (ok: true, message: null),

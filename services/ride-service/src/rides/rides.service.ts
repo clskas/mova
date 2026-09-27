@@ -40,7 +40,7 @@ import { fetchDriverDebtStatus, filterDriversNotDebtBlocked } from '../common/dr
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
 import { publishDriverJobAlert } from '../common/driver-job-alert.util';
-import { fetchRidePaymentStatus, fetchRidePaymentStatuses } from '../common/payment-status.util';
+import { fetchRidePaymentStatus, fetchRidePaymentStatuses, fetchServicePaymentStatus } from '../common/payment-status.util';
 import { applyPromoCode } from '../common/promo-apply.util';
 import { rideDriverGrossCdf, rideShareBookingDriverGrossCdf } from '../common/ride-driver-gross.util';
 import { PromoService } from './surcharge.service';
@@ -832,21 +832,58 @@ export class RidesService {
     if (ride.isShared) {
       const shared = this.ridePool.formatSharedRide(ride);
       const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId) : null;
+      const activeBookings = ride.sharePassengers.filter((p) => p.status !== 'CANCELLED');
+      const payEntries = await Promise.all(
+        activeBookings.map(async (p) => {
+          const pay = await fetchServicePaymentStatus('RIDE_SHARE', p.id).catch(() => ({
+            referenceType: 'RIDE_SHARE',
+            referenceId: p.id,
+            isPaid: false,
+            paymentStatus: null as string | null,
+            paymentMethod: null as string | null,
+          }));
+          return [p.id, pay] as const;
+        }),
+      );
+      const payByBooking = Object.fromEntries(payEntries);
       const myBooking = participantUserId
-        ? ride.sharePassengers.find((p) => p.userId === participantUserId && p.status !== 'CANCELLED')
+        ? activeBookings.find((p) => p.userId === participantUserId)
         : null;
-      const payment = myBooking
-        ? await fetchRidePaymentStatus(myBooking.id).catch(() => ({ isPaid: false, paymentStatus: null }))
-        : await fetchRidePaymentStatus(rideId).catch(() => ({ isPaid: false, paymentStatus: null }));
+      const myPay = myBooking ? payByBooking[myBooking.id] : null;
+      const allPaid =
+        activeBookings.length > 0 && activeBookings.every((p) => payByBooking[p.id]?.isPaid === true);
+      const anyCashPending = activeBookings.some(
+        (p) =>
+          payByBooking[p.id]?.paymentStatus === 'PENDING' &&
+          (payByBooking[p.id]?.paymentMethod === 'CASH' ||
+            String(payByBooking[p.id]?.paymentMethod ?? '').toUpperCase() === 'CASH'),
+      );
+      const passengers = shared.passengers.map((p) => {
+        const pay = payByBooking[p.id];
+        return {
+          ...p,
+          isPaid: pay?.isPaid === true,
+          paymentStatus: pay?.paymentStatus ?? null,
+          paymentMethod: pay?.paymentMethod ?? null,
+        };
+      });
       return {
         ...shared,
+        passengers,
         type: 'RIDE_SHARE',
         driver,
-        isPaid: payment.isPaid,
-        paymentStatus: payment.paymentStatus,
+        isPaid: myBooking ? myPay?.isPaid === true : allPaid,
+        paymentStatus: myBooking
+          ? (myPay?.paymentStatus ?? null)
+          : anyCashPending
+            ? 'PENDING'
+            : allPaid
+              ? 'COMPLETED'
+              : null,
         paymentReady: myBooking
-          ? (myBooking.status === 'DROPPED_OFF' || ride.status === RideStatus.COMPLETED) && !payment.isPaid
-          : shared.passengers.some((p) => p.paymentReady) && !payment.isPaid,
+          ? (myBooking.status === 'DROPPED_OFF' || ride.status === RideStatus.COMPLETED) &&
+            !(myPay?.isPaid === true)
+          : passengers.some((p) => p.paymentReady && !p.isPaid),
         paymentReferenceId: myBooking?.id ?? rideId,
         events: ride.events.map((e) => ({ ...e, status: e.event })),
         ratings: ride.ratings,

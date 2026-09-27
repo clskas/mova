@@ -118,5 +118,6 @@ export async function loginAsStaff(page: Page, phone: string): Promise<void> {
   await otp.fill(DEV_OTP);
   await page.getByRole("button", { name: "Se connecter" }).click();
   await skipPinSetupIfPresent(page);
-  await expect(page.getByRole("button", { name: "Déconnexion" })).toBeVisible({ timeout: 15_000 });
+  // UI desktop : Déconnexion dans la sidebar ET le bandeau — éviter strict mode (2 matches).
+  await expect(page.getByRole("button", { name: "Déconnexion" }).first()).toBeVisible({ timeout: 15_000 });
 }

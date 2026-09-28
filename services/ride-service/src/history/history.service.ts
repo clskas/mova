@@ -3,7 +3,7 @@ import { RentalInquiryStatus, ScheduledRideStatus } from '@prisma/client';
 import { toRideSummary } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatParcelDelivery } from '../deliveries/parcel.util';
-import { fetchRidePaymentStatuses, fetchServicePaymentStatus } from '../common/payment-status.util';
+import { fetchRidePaymentStatuses, fetchServicePaymentStatus, fetchServicePaymentStatuses } from '../common/payment-status.util';
 
 export type HistoryType = 'RIDE' | 'PARCEL' | 'FOOD' | 'EXPRESS' | 'ERRAND' | 'SCHEDULED' | 'CARPOOL' | 'RENTAL' | 'MOVING';
 
@@ -34,11 +34,38 @@ export class HistoryService {
         orderBy: { createdAt: 'desc' },
         take: fetchPerType,
       });
-      const paymentMap = await fetchRidePaymentStatuses(rides.map((r) => r.id));
+      const soloIds = rides.filter((r) => !r.isShared).map((r) => r.id);
+      const sharedIds = rides.filter((r) => r.isShared).map((r) => r.id);
+      const paymentMap = await fetchRidePaymentStatuses(soloIds);
+      const bookings =
+        sharedIds.length > 0
+          ? await this.prisma.rideSharePassenger.findMany({
+              where: {
+                rideId: { in: sharedIds },
+                userId,
+                status: { not: 'CANCELLED' },
+              },
+              select: { id: true, rideId: true },
+            })
+          : [];
+      const bookingByRide = Object.fromEntries(bookings.map((b) => [b.rideId, b]));
+      const servicePayMap = await fetchServicePaymentStatuses(
+        'RIDE_SHARE',
+        bookings.map((b) => b.id),
+      );
       for (const r of rides) {
         const summary = toRideSummary(r);
-        const payment = paymentMap[r.id];
-        const isPaid = payment?.isPaid ?? false;
+        let isPaid = false;
+        let paymentReferenceId: string | undefined = r.id;
+        if (r.isShared) {
+          const booking = bookingByRide[r.id];
+          if (booking) {
+            isPaid = servicePayMap[booking.id]?.isPaid === true;
+            paymentReferenceId = booking.id;
+          }
+        } else {
+          isPaid = paymentMap[r.id]?.isPaid ?? false;
+        }
         items.push({
           type: 'RIDE',
           id: r.id,
@@ -58,6 +85,9 @@ export class HistoryService {
             dropoffLat: r.dropoffLat,
             dropoffLng: r.dropoffLng,
             durationMin: r.durationMin,
+            ...(r.isShared
+              ? { isShared: true, type: 'RIDE_SHARE', paymentReferenceId }
+              : { paymentReferenceId }),
           },
         });
       }

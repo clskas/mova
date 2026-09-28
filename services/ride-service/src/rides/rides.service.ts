@@ -40,7 +40,13 @@ import { fetchDriverDebtStatus, filterDriversNotDebtBlocked } from '../common/dr
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
 import { publishDriverJobAlert } from '../common/driver-job-alert.util';
-import { fetchRidePaymentStatus, fetchRidePaymentStatuses, fetchServicePaymentStatus } from '../common/payment-status.util';
+import {
+  fetchRidePaymentStatus,
+  fetchRidePaymentStatuses,
+  fetchServicePaymentStatus,
+  fetchServicePaymentStatuses,
+  type RidePaymentStatus,
+} from '../common/payment-status.util';
 import { applyPromoCode } from '../common/promo-apply.util';
 import { rideDriverGrossCdf, rideShareBookingDriverGrossCdf } from '../common/ride-driver-gross.util';
 import { PromoService } from './surcharge.service';
@@ -970,7 +976,25 @@ export class RidesService {
       where: role === 'passenger' ? { passengerId: userId } : { driverId: userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
+      include: { sharePassengers: true },
     });
+    const sharedCompleted = rides.filter((r) => r.isShared && r.status === RideStatus.COMPLETED);
+    const bookingIds =
+      role === 'passenger'
+        ? sharedCompleted
+            .map((r) => r.sharePassengers?.find((p) => p.userId === userId && p.status !== RideSharePassengerStatus.CANCELLED)?.id)
+            .filter((id): id is string => Boolean(id))
+        : sharedCompleted.flatMap((r) =>
+            (r.sharePassengers ?? [])
+              .filter((p) => p.status !== RideSharePassengerStatus.CANCELLED)
+              .map((p) => p.id),
+          );
+    const servicePayMap = await fetchServicePaymentStatuses('RIDE_SHARE', bookingIds);
+    const soloCompletedIds = rides
+      .filter((r) => !r.isShared && r.status === RideStatus.COMPLETED)
+      .map((r) => r.id);
+    const ridePayMap = await fetchRidePaymentStatuses(soloCompletedIds);
+
     const data = await Promise.all(
       rides.map(async (ride) => {
         const summary = toRideSummary(ride);
@@ -986,7 +1010,35 @@ export class RidesService {
         if (ride.status !== RideStatus.COMPLETED) {
           return driverNetCdf != null ? { ...summary, driverNetCdf } : summary;
         }
-        const payment = await fetchRidePaymentStatus(ride.id);
+        if (ride.isShared) {
+          if (role === 'passenger') {
+            const booking = ride.sharePassengers?.find(
+              (p) => p.userId === userId && p.status !== RideSharePassengerStatus.CANCELLED,
+            );
+            const pay = booking ? servicePayMap[booking.id] : undefined;
+            return {
+              ...summary,
+              ...(driverNetCdf != null ? { driverNetCdf } : {}),
+              isPaid: pay?.isPaid === true,
+              paymentStatus: pay?.paymentStatus ?? null,
+              type: 'RIDE_SHARE',
+              paymentReferenceId: booking?.id,
+            };
+          }
+          const active = (ride.sharePassengers ?? []).filter(
+            (p) => p.status !== RideSharePassengerStatus.CANCELLED,
+          );
+          const allPaid =
+            active.length > 0 && active.every((p) => servicePayMap[p.id]?.isPaid === true);
+          return {
+            ...summary,
+            ...(driverNetCdf != null ? { driverNetCdf } : {}),
+            isPaid: allPaid,
+            paymentStatus: allPaid ? 'COMPLETED' : 'PENDING',
+            type: 'RIDE_SHARE',
+          };
+        }
+        const payment = ridePayMap[ride.id] ?? { isPaid: false, paymentStatus: null };
         return {
           ...summary,
           ...(driverNetCdf != null ? { driverNetCdf } : {}),
@@ -1124,16 +1176,71 @@ export class RidesService {
     }
   }
 
+  /**
+   * Pool : le paiement vit sur ServicePayment(RIDE_SHARE, bookingId), pas Payment(rideId).
+   * Solo : Payment(rideId).
+   */
+  private async resolvePassengerCompletedPayment(
+    ride: { id: string; isShared: boolean },
+    passengerId: string,
+    bookingId?: string | null,
+  ): Promise<RidePaymentStatus & { paymentReferenceId?: string }> {
+    if (ride.isShared) {
+      let booking =
+        bookingId ??
+        (
+          await this.prisma.rideSharePassenger.findFirst({
+            where: {
+              rideId: ride.id,
+              userId: passengerId,
+              status: { not: RideSharePassengerStatus.CANCELLED },
+            },
+            select: { id: true },
+          })
+        )?.id;
+      if (!booking) {
+        // Pas de booking actif pour cet utilisateur → ne pas bloquer sur Payment parent.
+        return { rideId: ride.id, isPaid: true, paymentStatus: null };
+      }
+      const pay = await fetchServicePaymentStatus('RIDE_SHARE', booking);
+      return {
+        rideId: ride.id,
+        isPaid: pay.isPaid === true,
+        paymentStatus: pay.paymentStatus,
+        paymentReferenceId: booking,
+      };
+    }
+    const pay = await fetchRidePaymentStatus(ride.id);
+    return { ...pay, paymentReferenceId: ride.id };
+  }
+
   private async assertNoUnpaidCompletedRide(passengerId: string) {
     const completed = await this.prisma.ride.findMany({
       where: { passengerId, status: RideStatus.COMPLETED },
       orderBy: { completedAt: 'desc' },
       take: 5,
-      select: { id: true },
+      select: { id: true, isShared: true },
     });
     for (const ride of completed) {
-      const { isPaid } = await fetchRidePaymentStatus(ride.id);
+      const { isPaid } = await this.resolvePassengerCompletedPayment(ride, passengerId);
       if (!isPaid) {
+        throw new MovaHttpException(MovaErrorCode.RIDE_UNPAID_PENDING, HttpStatus.CONFLICT);
+      }
+    }
+    // Joiners Pool (pas host) : bookings DROPPED_OFF / course terminée
+    const joinerBookings = await this.prisma.rideSharePassenger.findMany({
+      where: {
+        userId: passengerId,
+        status: RideSharePassengerStatus.DROPPED_OFF,
+        ride: { status: RideStatus.COMPLETED, passengerId: { not: passengerId } },
+      },
+      orderBy: { droppedOffAt: 'desc' },
+      take: 5,
+      select: { id: true, rideId: true },
+    });
+    for (const booking of joinerBookings) {
+      const pay = await fetchServicePaymentStatus('RIDE_SHARE', booking.id);
+      if (!pay.isPaid) {
         throw new MovaHttpException(MovaErrorCode.RIDE_UNPAID_PENDING, HttpStatus.CONFLICT);
       }
     }
@@ -1146,13 +1253,43 @@ export class RidesService {
       take: 5,
     });
     for (const ride of rides) {
-      const payment = await fetchRidePaymentStatus(ride.id);
+      const payment = await this.resolvePassengerCompletedPayment(
+        { id: ride.id, isShared: ride.isShared },
+        passengerId,
+      );
       if (!payment.isPaid) {
         return {
           ride: {
             ...this.formatRideDetail(ride),
             isPaid: false,
             paymentStatus: payment.paymentStatus,
+            ...(ride.isShared
+              ? { type: 'RIDE_SHARE', paymentReferenceId: payment.paymentReferenceId }
+              : {}),
+          },
+        };
+      }
+    }
+    const joinerBookings = await this.prisma.rideSharePassenger.findMany({
+      where: {
+        userId: passengerId,
+        status: RideSharePassengerStatus.DROPPED_OFF,
+        ride: { status: RideStatus.COMPLETED, passengerId: { not: passengerId } },
+      },
+      orderBy: { droppedOffAt: 'desc' },
+      take: 5,
+      include: { ride: true },
+    });
+    for (const booking of joinerBookings) {
+      const pay = await fetchServicePaymentStatus('RIDE_SHARE', booking.id);
+      if (!pay.isPaid) {
+        return {
+          ride: {
+            ...this.formatRideDetail(booking.ride),
+            isPaid: false,
+            paymentStatus: pay.paymentStatus,
+            type: 'RIDE_SHARE',
+            paymentReferenceId: booking.id,
           },
         };
       }

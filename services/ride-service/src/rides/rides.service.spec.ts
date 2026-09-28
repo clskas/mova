@@ -18,6 +18,10 @@ describe('RidesService', () => {
       count: jest.fn(),
       aggregate: jest.fn(),
     },
+    rideSharePassenger: {
+      findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     rideEvent: { create: jest.fn(), count: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     cancellationPolicy: { findUnique: jest.fn() },
   };
@@ -572,5 +576,106 @@ describe('RidesService', () => {
       MOVA_EVENTS.RIDE_COMPLETED,
       expect.objectContaining({ rideId: 'ride-ar-1' }),
     );
+  });
+
+  it('findPassengerUnpaidRide: Pool payé via ServicePayment ne bloque plus', async () => {
+    const sharedRide = {
+      id: 'pool-1',
+      passengerId: 'p1',
+      driverId: 'd1',
+      vehicleId: null,
+      status: RideStatus.COMPLETED,
+      vehicleType: VehicleType.STANDARD,
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      pickupAddress: 'Gombe',
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      dropoffAddress: 'Limete',
+      estimatedFareCdf: 4000,
+      finalFareCdf: 4000,
+      distanceKm: 3,
+      durationMin: 10,
+      isShared: true,
+      acceptedAt: new Date(),
+      startedAt: new Date(),
+      completedAt: new Date(),
+      cancelledAt: null,
+      cancelReason: null,
+      completionPin: '1111',
+      roundTrip: false,
+      roundTripLeg: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prisma.ride.findMany.mockResolvedValue([sharedRide]);
+    prisma.rideSharePassenger.findFirst.mockResolvedValue({ id: 'booking-1' });
+    prisma.rideSharePassenger.findMany.mockResolvedValue([]);
+    global.fetch = jest.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/internal/services/RIDE_SHARE/booking-1/payment-status')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            referenceType: 'RIDE_SHARE',
+            referenceId: 'booking-1',
+            isPaid: true,
+            paymentStatus: 'COMPLETED',
+          }),
+        });
+      }
+      return Promise.resolve({ ok: false });
+    });
+
+    const result = await service.findPassengerUnpaidRide('p1');
+    expect(result.ride).toBeNull();
+    expect(prisma.rideSharePassenger.findFirst).toHaveBeenCalled();
+  });
+
+  it('findPassengerUnpaidRide: Pool non payé reste bloquant', async () => {
+    const sharedRide = {
+      id: 'pool-2',
+      passengerId: 'p1',
+      driverId: 'd1',
+      vehicleId: null,
+      status: RideStatus.COMPLETED,
+      vehicleType: VehicleType.STANDARD,
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      pickupAddress: 'Gombe',
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      dropoffAddress: 'Limete',
+      estimatedFareCdf: 4000,
+      finalFareCdf: 4000,
+      distanceKm: 3,
+      durationMin: 10,
+      isShared: true,
+      acceptedAt: new Date(),
+      startedAt: new Date(),
+      completedAt: new Date(),
+      cancelledAt: null,
+      cancelReason: null,
+      completionPin: '1111',
+      roundTrip: false,
+      roundTripLeg: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prisma.ride.findMany.mockResolvedValue([sharedRide]);
+    prisma.rideSharePassenger.findFirst.mockResolvedValue({ id: 'booking-2' });
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        referenceType: 'RIDE_SHARE',
+        referenceId: 'booking-2',
+        isPaid: false,
+        paymentStatus: 'PENDING',
+      }),
+    });
+
+    const result = await service.findPassengerUnpaidRide('p1');
+    expect(result.ride).not.toBeNull();
+    expect(result.ride?.isPaid).toBe(false);
+    expect(result.ride?.type).toBe('RIDE_SHARE');
   });
 });

@@ -228,11 +228,13 @@ export class SeedService implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    try {
-      await this.ensureSeedData();
-    } catch (err) {
-      this.logger.warn('Seed skipped (DB may not be ready yet)', err);
-    }
+    // Never block Nest bootstrap / HTTP bind — Render kills instances that
+    // miss health checks while Prisma waits on a waking Postgres (P1001/P1017).
+    setTimeout(() => {
+      void this.ensureSeedData().catch((err) => {
+        this.logger.warn('Seed skipped (DB may not be ready yet)', err);
+      });
+    }, 2_000);
   }
 
   private async seedSection(label: string, fn: () => Promise<void>) {

@@ -110,8 +110,14 @@ export class AdminController {
   @Get('metrics')
   @RequirePermissions(AdminPermission.METRICS_READ)
   @ApiOperation({ summary: 'Tableau de bord métriques' })
-  metrics(@Request() req: { user: AdminJwtUser }) {
-    return this.adminService.getMetrics(resolveManagedCityScope(req.user));
+  metrics(
+    @Request() req: { user: AdminJwtUser },
+    @Query('city') city?: string,
+    @Query('days') days?: string,
+  ) {
+    const scoped = resolveManagedCityScope(req.user) ?? city;
+    const period = Number(days ?? 30);
+    return this.adminService.getMetrics(scoped, Number.isFinite(period) ? period : 30);
   }
 
   @Get('reports')

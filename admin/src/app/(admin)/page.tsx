@@ -40,8 +40,14 @@ export default function DashboardPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
+      const metricsQs = new URLSearchParams();
+      if (scopedCity) metricsQs.set("city", scopedCity);
+      if (period) metricsQs.set("days", String(period));
+      const metricsPath = metricsQs.toString()
+        ? `/api/admin/metrics?${metricsQs}`
+        : "/api/admin/metrics";
       const [m, r] = await Promise.all([
-        apiFetch<AdminMetrics>("/api/admin/metrics"),
+        apiFetch<AdminMetrics>(metricsPath),
         fetchAdminReports(period, scopedCity || null),
       ]);
       setMetrics(m);
@@ -78,8 +84,7 @@ export default function DashboardPage() {
 
   const chartData = useMemo(() => {
     if (!reports) return [];
-    const slice = reports.daily.slice(-14);
-    return slice.map((d) => ({
+    return reports.daily.map((d) => ({
       label: d.date,
       value:
         chartMode === "rides"

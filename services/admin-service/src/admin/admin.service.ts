@@ -83,17 +83,18 @@ export class AdminService {
     );
   }
 
-  async getMetrics(managedCity?: string | null) {
+  async getMetrics(managedCity?: string | null, days = 30) {
     if (!managedCity) {
       return this.getMetricsNational();
     }
     const city = managedCity.trim();
+    const reportDays = Math.min(90, Math.max(7, Math.floor(days) || 30));
     const [driversRes, rides, deliveries, incidents, reports] = await Promise.all([
       this.listDrivers(0, 500, { includeHidden: false }, city).catch(() => ({ data: [] as Array<Record<string, unknown>> })),
       this.listRides({ skip: 0, take: 200 }, city).catch(() => [] as Array<Record<string, unknown>>),
       this.listDeliveries({ skip: 0, take: 200 }, city).catch(() => [] as Array<Record<string, unknown>>),
       this.fetchJson<{ status?: string; type?: string; lat?: number; lng?: number }[]>('driver', '/internal/incidents').catch(() => []),
-      this.getReports(30, city).catch(() => null),
+      this.getReports(reportDays, city).catch(() => null),
     ]);
     const drivers = Array.isArray(driversRes) ? driversRes : (driversRes as { data?: Array<Record<string, unknown>> }).data ?? [];
     const availableDrivers = drivers.filter((d) => d.isAvailable === true).length;

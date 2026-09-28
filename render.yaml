@@ -105,7 +105,7 @@ services:
     dockerContext: .
     dockerCommand: sh -c "/app/scripts/migrate-with-backup.sh && node dist/main.js"
     plan: starter
-    # Liveness only — /health hits Postgres and times out during DB wake → crash loop.
+    # DB-free liveness (also available at /api/health/live until prefix exclude ships).
     healthCheckPath: /health/live
     envVars:
       - key: DATABASE_URL

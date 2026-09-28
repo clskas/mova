@@ -128,6 +128,9 @@ services:
         value: "production"
       - key: APP_ENV
         value: "production"
+      # Deploy workflow already backs up DBs; skip pg_dump on every container start (renders crash loops).
+      - key: MOVA_SKIP_BACKUP
+        value: "1"
       - key: SKIP_DEMO_SEED
         value: "true"
       - key: RUN_SEED

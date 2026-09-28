@@ -50,16 +50,22 @@ fi
 echo "=== prisma migrate deploy ==="
 # Retry on transient Postgres startup (P1017 / "database system is starting up").
 migrate_ok=0
-for attempt in 1 2 3 4 5; do
+for attempt in 1 2 3 4 5 6 7 8; do
   if ./node_modules/.bin/prisma migrate deploy; then
     migrate_ok=1
     break
   fi
-  echo "WARN: prisma migrate deploy failed (attempt $attempt/5) — retry in ${attempt}s…" >&2
-  sleep "$attempt"
+  wait_s=$((attempt * 5))
+  echo "WARN: prisma migrate deploy failed (attempt $attempt/8) — retry in ${wait_s}s…" >&2
+  sleep "$wait_s"
 done
 if [ "$migrate_ok" != "1" ]; then
-  echo "ERROR: prisma migrate deploy failed after retries" >&2
-  exit 1
+  if [ -n "${RENDER:-}" ] || [ -n "${RENDER_SERVICE_ID:-}" ] || [ -n "${RENDER_INSTANCE_ID:-}" ]; then
+    # Prefer a running service over a crash loop while Postgres wakes; CI deploy already backs up.
+    echo "ERROR: prisma migrate deploy failed after retries — starting app anyway on Render" >&2
+  else
+    echo "ERROR: prisma migrate deploy failed after retries" >&2
+    exit 1
+  fi
 fi
 # Do not run `prisma db seed` here. Production must never create demo users.

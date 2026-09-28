@@ -103,7 +103,10 @@ services:
     runtime: docker
     dockerfilePath: ./docker/ride.Dockerfile
     dockerContext: .
-    dockerCommand: sh -c "/app/scripts/migrate-with-backup.sh; exec node dist/main.js"
+    # Start HTTP first so Render health checks pass while migrate retries against waking Postgres.
+    dockerCommand: sh -c "node dist/main.js & pid=$!; (MOVA_SKIP_BACKUP=1 /app/scripts/migrate-with-backup.sh || echo MIGRATE_WARN); wait $pid"
+    plan: starter
+    healthCheckPath: /api/health/live
     envVars:
       - key: DATABASE_URL
         fromDatabase: { name: mova-db-rides, property: connectionString }

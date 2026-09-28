@@ -17,7 +17,7 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, transformOptions: { enableImplicitConversion: true } }));
   app.useGlobalFilters(new HttpExceptionFilter());
   app.enableCors({ origin: resolveCorsOrigin(), credentials: true });
-  app.setGlobalPrefix('api', { exclude: ['health', 'internal/(.*)'] });
+  app.setGlobalPrefix('api', { exclude: ['health', 'health/live', 'internal/(.*)'] });
   const port = process.env.PORT ?? 3002;
   await app.listen(port);
   console.log('SENGA ride-service on port ' + port);

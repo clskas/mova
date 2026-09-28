@@ -49,5 +49,18 @@ if [ "${NODE_ENV:-}" = "production" ] || [ "${APP_ENV:-}" = "production" ] \
 fi
 
 echo "=== prisma migrate deploy ==="
-./node_modules/.bin/prisma migrate deploy
+# Retry on transient Postgres startup (P1017 / "database system is starting up").
+migrate_ok=0
+for attempt in 1 2 3 4 5; do
+  if ./node_modules/.bin/prisma migrate deploy; then
+    migrate_ok=1
+    break
+  fi
+  echo "WARN: prisma migrate deploy failed (attempt $attempt/5) — retry in ${attempt}s…" >&2
+  sleep "$attempt"
+done
+if [ "$migrate_ok" != "1" ]; then
+  echo "ERROR: prisma migrate deploy failed after retries" >&2
+  exit 1
+fi
 # Do not run `prisma db seed` here. Production must never create demo users.

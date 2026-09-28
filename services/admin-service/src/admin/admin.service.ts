@@ -42,10 +42,14 @@ export class AdminService {
       );
     }
     if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      const snippet = detail.trim().slice(0, 180);
       throw new MovaHttpException(
         MovaErrorCode.INTERNAL_ERROR,
         HttpStatus.BAD_GATEWAY,
-        `Admin proxy failed: ${service}${path}`,
+        snippet
+          ? `Admin proxy failed: ${service}${path} (${res.status}) — ${snippet}`
+          : `Admin proxy failed: ${service}${path} (${res.status})`,
       );
     }
     const text = await res.text();

@@ -46,13 +46,27 @@ export default function DashboardPage() {
       const metricsPath = metricsQs.toString()
         ? `/api/admin/metrics?${metricsQs}`
         : "/api/admin/metrics";
-      const [m, r] = await Promise.all([
+      const [mRes, rRes] = await Promise.allSettled([
         apiFetch<AdminMetrics>(metricsPath),
         fetchAdminReports(period, scopedCity || null),
       ]);
-      setMetrics(m);
-      setReports(r);
-      setLastUpdate(new Date());
+      if (mRes.status === "fulfilled") {
+        setMetrics(mRes.value);
+      }
+      if (rRes.status === "fulfilled") {
+        setReports(rRes.value);
+      }
+      const parts: string[] = [];
+      if (mRes.status === "rejected") {
+        parts.push(mRes.reason instanceof Error ? mRes.reason.message : "Métriques indisponibles");
+      }
+      if (rRes.status === "rejected") {
+        parts.push(rRes.reason instanceof Error ? rRes.reason.message : "Rapports indisponibles");
+      }
+      setError(parts.length ? parts.join(" · ") : null);
+      if (mRes.status === "fulfilled" || rRes.status === "fulfilled") {
+        setLastUpdate(new Date());
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Impossible de charger le tableau de bord");
     } finally {

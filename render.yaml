@@ -105,7 +105,8 @@ services:
     dockerContext: .
     dockerCommand: sh -c "/app/scripts/migrate-with-backup.sh && node dist/main.js"
     plan: starter
-    healthCheckPath: /health
+    # Liveness only — /health hits Postgres and times out during DB wake → crash loop.
+    healthCheckPath: /health/live
     envVars:
       - key: DATABASE_URL
         fromDatabase: { name: mova-db-rides, property: connectionString }

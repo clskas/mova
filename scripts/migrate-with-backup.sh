@@ -18,17 +18,16 @@ if [ "${MOVA_SKIP_BACKUP:-}" != "1" ]; then
     export BACKUP_DIR="${BACKUP_DIR:-/tmp/mova-backups}"
     mkdir -p "$BACKUP_DIR"
     echo "=== migrate-with-backup: backup $MOVA_SERVICE ==="
-    "$SCRIPT_DIR/backup-db.sh" || {
-      echo "ERROR: backup failed, aborting migration" >&2
-      exit 1
-    }
+    if ! "$SCRIPT_DIR/backup-db.sh"; then
+      # Render Postgres often flaps "starting up" on restart; aborting here causes crash loops (exit 1).
+      echo "WARN: backup failed — continuing with migrate (do not block service start)" >&2
+    fi
   elif [ -n "${DATABASE_URL:-}" ]; then
     echo "=== migrate-with-backup: backup (DATABASE_URL) ==="
     export BACKUP_ONLY="${BACKUP_ONLY:-auth}"
-    "$SCRIPT_DIR/backup-db.sh" || {
-      echo "ERROR: backup failed, aborting migration" >&2
-      exit 1
-    }
+    if ! "$SCRIPT_DIR/backup-db.sh"; then
+      echo "WARN: backup failed — continuing with migrate (do not block service start)" >&2
+    fi
   else
     if [ "${ALLOW_MIGRATE_WITHOUT_BACKUP:-}" = "1" ]; then
       echo "WARN: MOVA_SERVICE/DATABASE_URL unset — migrate without backup (ALLOW_MIGRATE_WITHOUT_BACKUP=1)" >&2

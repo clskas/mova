@@ -70,13 +70,16 @@ export class CashVirtualEarningsService {
       const net = Math.round(item.driverNetCdf ?? 0);
       if (net <= 0) continue;
       if (method === PaymentMethod.CASH) {
-        cashEarningsCdf += net;
+        // Espèces en poche = min(net, cash reçu). Si promo > commission, le manque
+        // est en wallet (PROMO_TOPUP) — ne pas le compter aussi en « gains espèces ».
+        const paid = await this.passengerPaidCdf(item.referenceType, item.referenceId);
+        cashEarningsCdf += paid != null ? Math.min(net, paid) : net;
       } else if (method != null) {
         prepaidEarningsCdf += net;
       }
     }
 
-    // Retirable = solde wallet − fonds bloqués. Les gains CASH ne sont jamais crédités ici.
+    // Retirable = solde wallet − fonds bloqués (inclut compensations promo cash).
     const balance = wallet?.balanceCdf ?? 0;
     const held = wallet?.heldBalanceCdf ?? 0;
     return {
@@ -87,6 +90,24 @@ export class CashVirtualEarningsService {
       prepaidEarningsCdf,
       currency: 'CDF',
     };
+  }
+
+  /** Montant réellement encaissé du client (Payment / ServicePayment). */
+  private async passengerPaidCdf(
+    referenceType: string,
+    referenceId: string,
+  ): Promise<number | null> {
+    const type = referenceType.toUpperCase();
+    if (type === 'RIDE') {
+      const pay = await this.prisma.payment.findUnique({ where: { rideId: referenceId } });
+      if (pay?.status === PaymentStatus.COMPLETED) return Math.max(0, pay.amountCdf);
+      return null;
+    }
+    const sp = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (sp?.status === PaymentStatus.COMPLETED) return Math.max(0, sp.amountCdf);
+    return null;
   }
 
   async getPartnerCashVirtual(beneficiaryUserId: string) {

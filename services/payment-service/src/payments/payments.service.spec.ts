@@ -47,6 +47,7 @@ describe('PaymentsService', () => {
     fetchRidePayout: jest.fn().mockResolvedValue(null),
     creditRidePayoutFromPayment: jest.fn().mockResolvedValue({ credited: false }),
     creditPayout: jest.fn().mockResolvedValue({ credited: false }),
+    creditCashPromoTopUp: jest.fn().mockResolvedValue({ credited: false }),
   };
   const foodPayouts = {
     creditFromServicePayment: jest.fn().mockResolvedValue({ credited: false }),
@@ -59,6 +60,7 @@ describe('PaymentsService', () => {
   const debtLedger = {
     recordCashDebt: jest.fn().mockResolvedValue(undefined),
     recordDebt: jest.fn().mockResolvedValue({ recorded: true }),
+    settleAvailableFromWallet: jest.fn().mockResolvedValue({ settled: false, amountCdf: 0 }),
   };
   const redis = {
     publish: jest.fn().mockResolvedValue(undefined),
@@ -346,6 +348,7 @@ describe('PaymentsService', () => {
       }),
     );
     expect(driverPayouts.creditPayout).not.toHaveBeenCalled();
+    expect(driverPayouts.creditCashPromoTopUp).not.toHaveBeenCalled();
     expect(wallet.creditPlatformFee).not.toHaveBeenCalled();
   });
 
@@ -388,14 +391,16 @@ describe('PaymentsService', () => {
       driverNetCdf: 8000,
       grossCdf: 10000,
     });
-    driverPayouts.creditPayout.mockResolvedValueOnce({ credited: true, amountCdf: 3000 });
+    driverPayouts.creditCashPromoTopUp.mockResolvedValueOnce({ credited: true, amountCdf: 3000 });
 
     await service.confirmCashRide('ride-big', 'driver-1');
     expect(debtLedger.recordDebt).not.toHaveBeenCalled();
-    expect(driverPayouts.creditPayout).toHaveBeenCalledWith(
+    expect(driverPayouts.creditPayout).not.toHaveBeenCalled();
+    expect(driverPayouts.creditCashPromoTopUp).toHaveBeenCalledWith(
       'driver-1',
-      expect.objectContaining({ referenceType: 'RIDE', referenceId: 'ride-big', driverNetCdf: 3000 }),
+      expect.objectContaining({ referenceType: 'RIDE', referenceId: 'ride-big', amountCdf: 3000 }),
     );
+    expect(debtLedger.settleAvailableFromWallet).toHaveBeenCalledWith('driver-1');
   });
 
   it('rejette le paiement service si non terminé', async () => {

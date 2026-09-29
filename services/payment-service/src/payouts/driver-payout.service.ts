@@ -25,6 +25,11 @@ export class DriverPayoutService {
     return `${referenceType.toUpperCase()}_PAYOUT:${referenceId}`;
   }
 
+  /** Compensation SENGA quand le cash reçu < net (promo > commission). Ne pas clawback. */
+  private promoTopUpReference(referenceType: string, referenceId: string) {
+    return `PROMO_TOPUP:${referenceType.toUpperCase()}:${referenceId}`;
+  }
+
   private async alreadyCredited(reference: string) {
     const existing = await this.prisma.walletTransaction.findFirst({
       where: { reference, type: 'CREDIT' },
@@ -60,6 +65,31 @@ export class DriverPayoutService {
                     : `Revenu course ${item.referenceId}`;
 
     const wallet = await this.wallet.credit(driverUserId, amount, label, reference);
+    return { credited: true, amountCdf: amount, reference, balanceCdf: wallet.balanceCdf };
+  }
+
+  /**
+   * Top-up wallet cash-promo (réf. distincte des gains PAYOUT pour ne pas être
+   * repris par syncDriverPayouts / clawbackCashPayoutIfNeeded).
+   */
+  async creditCashPromoTopUp(
+    driverUserId: string,
+    item: { referenceType: string; referenceId: string; amountCdf: number },
+  ) {
+    const amount = Math.round(item.amountCdf);
+    if (amount <= 0) return { credited: false, reason: 'zero_amount' as const };
+
+    const reference = this.promoTopUpReference(item.referenceType, item.referenceId);
+    if (await this.alreadyCredited(reference)) {
+      return { credited: false, reason: 'already_credited' as const, reference, amountCdf: amount };
+    }
+
+    const type = item.referenceType.toUpperCase();
+    const label = `Compensation promo SENGA (${type} ${item.referenceId.slice(0, 8)})`;
+    const wallet = await this.wallet.credit(driverUserId, amount, label, reference);
+    this.logger.log(
+      `Cash promo top-up ${amount} CDF → driver ${driverUserId} (${reference})`,
+    );
     return { credited: true, amountCdf: amount, reference, balanceCdf: wallet.balanceCdf };
   }
 

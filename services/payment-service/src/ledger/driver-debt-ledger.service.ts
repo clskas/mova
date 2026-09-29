@@ -198,6 +198,100 @@ export class DriverDebtLedgerService {
     };
   }
 
+  /**
+   * Applique le solde wallet disponible sur les dettes ouvertes (FIFO).
+   * Partiel OK : réduit amountCdf ou marque SETTLED. Utilisé après top-up promo cash.
+   */
+  async settleAvailableFromWallet(driverUserId: string) {
+    const openDebts = await this.prisma.driverCashDebt.findMany({
+      where: { driverUserId, status: CashDebtStatus.OPEN },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (openDebts.length === 0) {
+      return { settled: false as const, amountCdf: 0, settledCount: 0, message: 'Aucune dette ouverte' };
+    }
+
+    const wallet = await this.wallet.getWallet(driverUserId);
+    let available = Math.max(
+      0,
+      Math.round(Number(wallet.availableBalanceCdf ?? wallet.balanceCdf - (wallet.heldBalanceCdf ?? 0))),
+    );
+    if (available <= 0) {
+      return { settled: false as const, amountCdf: 0, settledCount: 0, message: 'Solde insuffisant' };
+    }
+
+    let settledTotal = 0;
+    let settledCount = 0;
+    const fullySettled: typeof openDebts = [];
+
+    for (const debt of openDebts) {
+      if (available <= 0) break;
+      const portion = Math.min(debt.amountCdf, available);
+      if (portion <= 0) continue;
+
+      const settlementRef = `CASH_DEBT_PARTIAL:${debt.id}:${Date.now()}:${portion}`;
+      try {
+        await this.wallet.debit(
+          driverUserId,
+          portion,
+          `Règlement dette espèces (${debt.category}) ${debt.referenceId.slice(0, 8)}`,
+          settlementRef,
+        );
+      } catch (e) {
+        this.logger.warn(`settleAvailableFromWallet debit failed for debt ${debt.id}`, e);
+        break;
+      }
+
+      available -= portion;
+      settledTotal += portion;
+
+      if (portion >= debt.amountCdf) {
+        const updated = await this.prisma.driverCashDebt.update({
+          where: { id: debt.id },
+          data: {
+            status: CashDebtStatus.SETTLED,
+            settledAt: new Date(),
+            settlementRef,
+          },
+        });
+        fullySettled.push(updated);
+        settledCount += 1;
+      } else {
+        await this.prisma.driverCashDebt.update({
+          where: { id: debt.id },
+          data: {
+            amountCdf: debt.amountCdf - portion,
+            description: [debt.description, `Partiel −${portion} CDF`].filter(Boolean).join(' · '),
+          },
+        });
+        // Crédit trésorerie / partenaire au prorata de la part encaissée.
+        await this.applyCashDebtSettlementCredits([
+          {
+            category: debt.category,
+            referenceType: debt.referenceType,
+            referenceId: `${debt.referenceId}:partial:${portion}`,
+            amountCdf: portion,
+            beneficiaryUserId: debt.beneficiaryUserId,
+          },
+        ]);
+      }
+    }
+
+    if (fullySettled.length > 0) {
+      await this.applyCashDebtSettlementCredits(fullySettled);
+    }
+
+    return {
+      settled: settledTotal > 0,
+      amountCdf: settledTotal,
+      settledCount,
+      message:
+        settledTotal > 0
+          ? `Dettes réduites de ${settledTotal} CDF depuis le portefeuille`
+          : 'Aucun règlement effectué',
+    };
+  }
+
   async adminSettleDebt(debtId: string, settlementRef?: string) {
     const debt = await this.prisma.driverCashDebt.findUnique({ where: { id: debtId } });
     if (!debt) return { settled: false as const, message: 'Dette introuvable' };

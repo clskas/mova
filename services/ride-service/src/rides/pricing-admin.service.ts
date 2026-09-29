@@ -184,8 +184,8 @@ export class PricingAdminService {
   async updatePromoCode(
     id: string,
     data: Partial<{
-      discountPercent: number;
-      discountCdf: number;
+      discountPercent: number | null;
+      discountCdf: number | null;
       maxUses: number;
       validUntil: Date | null;
       isActive: boolean;
@@ -197,6 +197,18 @@ export class PricingAdminService {
     if (data.cityNames !== undefined) {
       patch.cityNames = [...new Set(data.cityNames.map((c) => String(c).trim()).filter(Boolean))];
     }
+    const nextPercent = data.discountPercent !== undefined ? data.discountPercent : undefined;
+    const nextCdf = data.discountCdf !== undefined ? data.discountCdf : undefined;
+    if (nextPercent != null && nextCdf != null) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Choisissez soit un pourcentage, soit un montant fixe — pas les deux.',
+      );
+    }
+    // Si on passe à % , effacer le montant fixe (et inversement).
+    if (nextPercent != null) patch.discountCdf = null;
+    if (nextCdf != null) patch.discountPercent = null;
     return this.prisma.promoCode.update({ where: { id }, data: patch });
   }
 

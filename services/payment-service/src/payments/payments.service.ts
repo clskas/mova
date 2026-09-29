@@ -239,11 +239,21 @@ export class PaymentsService {
       });
     } else if (cashPromoTopUp > 0) {
       // Promo > marge commission : le cash reçu ne couvre pas le net — SENGA complète.
-      await this.driverPayouts.creditPayout(driverId, {
+      // Réf. PROMO_TOPUP (pas *_PAYOUT) pour éviter le clawback sync espèces.
+      await this.driverPayouts.creditCashPromoTopUp(driverId, {
         referenceType: referenceType.toUpperCase(),
         referenceId,
-        driverNetCdf: cashPromoTopUp,
+        amountCdf: cashPromoTopUp,
       });
+      // Si dettes ouvertes : le top-up réduit la dette (FIFO, partiel OK).
+      try {
+        await this.debtLedger.settleAvailableFromWallet(driverId);
+      } catch (e) {
+        this.logger.warn(
+          `settleAvailableFromWallet after promo top-up failed for ${driverId}`,
+          e,
+        );
+      }
     }
     if (paymentMethod === PaymentMethod.CASH && platformFee > 0) {
       // Espèces : dette seulement — la trésorerie est créditée au règlement guichet.

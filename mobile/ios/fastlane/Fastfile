@@ -73,16 +73,36 @@ platform :ios do
 
   desc "TestFlight passager + chauffeur puis tentative soumission production"
   lane :release_both do |options|
-    passenger_ipa = options[:passenger_ipa].to_s.strip
-    driver_ipa = options[:driver_ipa].to_s.strip
+    # Prefer env (safe with spaces in "Senga Driver.ipa"); CLI options as fallback.
+    passenger_ipa = ENV["PASSENGER_IPA"].to_s.strip
+    passenger_ipa = options[:passenger_ipa].to_s.strip if passenger_ipa.empty?
+    driver_ipa = ENV["DRIVER_IPA"].to_s.strip
+    driver_ipa = options[:driver_ipa].to_s.strip if driver_ipa.empty?
     passenger_ipa = nil if passenger_ipa.empty?
     driver_ipa = nil if driver_ipa.empty?
+
+    # Resolve relative paths from cwd AND from fastlane/ (CI often differs).
+    [passenger_ipa, driver_ipa].each_with_index do |p, i|
+      next if p.nil?
+      candidates = [File.expand_path(p), File.expand_path(p, __dir__), File.expand_path(p, File.join(__dir__, ".."))]
+      resolved = candidates.find { |c| File.file?(c) }
+      if i == 0
+        passenger_ipa = resolved || p
+      else
+        driver_ipa = resolved || p
+      end
+    end
+
+    passenger_ipa = nil unless passenger_ipa && File.file?(passenger_ipa)
+    driver_ipa = nil unless driver_ipa && File.file?(driver_ipa)
 
     passenger_ipa ||= find_ipa("../../build/ios/ipa/passenger/*.ipa")
     passenger_ipa ||= find_ipa("../../build/ios/ipa/*passenger*.ipa")
     passenger_ipa ||= find_ipa("../../build/ios/ipa/*.ipa")
     driver_ipa ||= find_ipa("../../build/ios/ipa/driver/*.ipa")
     driver_ipa ||= find_ipa("../../build/ios/ipa/*driver*.ipa")
+    # Space in "Senga Driver.ipa" — glob under driver/
+    driver_ipa ||= find_ipa("../../build/ios/ipa/driver/**/*.ipa")
 
     uploaded_any = false
 

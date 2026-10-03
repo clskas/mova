@@ -622,15 +622,17 @@ jobs:
             echo "::notice::APP_STORE_CONNECT_API_KEY non configuré — publication iOS ignorée."
             exit 0
           fi
-          PASSENGER_IPA="$(ls ../build/ios/ipa/passenger/*.ipa 2>/dev/null | head -1 || true)"
-          DRIVER_IPA="$(ls ../build/ios/ipa/driver/*.ipa 2>/dev/null | head -1 || true)"
+          # Absolute paths — Fastlane cwd can be fastlane/; also "Senga Driver.ipa" has a space.
+          PASSENGER_IPA="$(find "$(pwd)/../build/ios/ipa/passenger" -name '*.ipa' 2>/dev/null | head -1 || true)"
+          DRIVER_IPA="$(find "$(pwd)/../build/ios/ipa/driver" -name '*.ipa' 2>/dev/null | head -1 || true)"
           if [ -z "${PASSENGER_IPA}" ] && [ -z "${DRIVER_IPA}" ]; then
             echo "::error::Aucun IPA téléchargé — build iOS a échoué."
+            find ../build/ios/ipa -type f 2>/dev/null || true
             exit 1
           fi
           echo "SUBMIT_APP_STORE=${SUBMIT_APP_STORE}"
           echo "passenger_ipa=${PASSENGER_IPA:-<none>}"
           echo "driver_ipa=${DRIVER_IPA:-<none>}"
-          bundle exec fastlane release_both \
-            passenger_ipa:"${PASSENGER_IPA:-}" \
-            driver_ipa:"${DRIVER_IPA:-}"
+          # Prefer env vars over CLI options so spaces in filenames are safe.
+          export PASSENGER_IPA DRIVER_IPA
+          bundle exec fastlane release_both

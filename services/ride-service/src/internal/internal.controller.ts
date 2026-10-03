@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
   CarpoolStatus,
@@ -15,6 +15,7 @@ import {
   VehicleType,
   SurchargeType,
 } from '@prisma/client';
+import type { Response } from 'express';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { InternalApiGuard } from '../common/internal-api.guard';
 import { CarpoolService } from '../carpool/carpool.service';
@@ -949,5 +950,25 @@ export class InternalController {
       limit: body?.limit,
       category: body?.category,
     });
+  }
+
+  /**
+   * Inter-service media read (selfie KYC gate, OCR). Avoids JWT on public GET /uploads/kyc.
+   */
+  @Get('uploads/:category/:filename')
+  serveUpload(
+    @Param('category') category: string,
+    @Param('filename') filename: string,
+    @Res() res: Response,
+  ) {
+    const allowed = new Set(['parcels', 'menu', 'vehicles', 'moving', 'kyc']);
+    if (!allowed.has(category)) {
+      throw new NotFoundException('Fichier introuvable');
+    }
+    return this.uploads.serveUploadedFile(
+      category as 'parcels' | 'menu' | 'vehicles' | 'moving' | 'kyc',
+      filename,
+      res,
+    );
   }
 }

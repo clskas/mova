@@ -7,6 +7,7 @@ import {
   parseSelfieIdMatchResponse,
   parseSelfieVisionResponse,
   profileExpiryFieldForKycType,
+  resolveInternalApiKey,
   serviceUrl,
   SELFIE_ID_MATCH_PROMPT,
   SELFIE_VISION_PROMPT,
@@ -14,7 +15,7 @@ import {
   type KycOcrStatus as SharedKycOcrStatus,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { hostnameFromUrl, parseAllowedOcrMediaUrl } from './ocr-media-url';
+import { hostnameFromUrl, parseAllowedOcrMediaUrl, parseUploadsMediaPath } from './ocr-media-url';
 
 const OCR_VISION_PROMPT = `Tu analyses une photo de document officiel (permis de conduire, assurance véhicule ou visite technique) en République Démocratique du Congo.
 
@@ -243,16 +244,40 @@ export class OcrService {
     return `${gatewayBase}${path}`;
   }
 
+  /**
+   * KYC media is stored under ride-service; public GET /uploads/kyc requires JWT,
+   * so inter-service selfie verification must use the internal route + API key.
+   */
   private async fetchImageBuffer(url: string): Promise<{ buffer: Buffer; contentType: string } | null> {
     try {
+      const upload = parseUploadsMediaPath(url);
+      if (upload) {
+        const absolute = serviceUrl('ride', `/internal/uploads/${upload.category}/${upload.filename}`);
+        const res = await fetch(absolute, {
+          headers: { 'x-internal-api-key': resolveInternalApiKey() },
+          redirect: 'error',
+        });
+        if (!res.ok) {
+          this.logger.warn(`Selfie/OCR media fetch ${res.status} via ride internal: ${upload.category}/${upload.filename}`);
+          return null;
+        }
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const contentType = res.headers.get('content-type') ?? 'image/jpeg';
+        return { buffer, contentType };
+      }
+
       const absolute = this.resolveMediaUrl(url);
       if (!absolute) return null;
       const res = await fetch(absolute, { redirect: 'error' });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        this.logger.warn(`Selfie/OCR media fetch ${res.status}: ${absolute.slice(0, 120)}`);
+        return null;
+      }
       const buffer = Buffer.from(await res.arrayBuffer());
       const contentType = res.headers.get('content-type') ?? 'image/jpeg';
       return { buffer, contentType };
-    } catch {
+    } catch (err) {
+      this.logger.warn(`Selfie/OCR media fetch failed: ${err instanceof Error ? err.message : err}`);
       return null;
     }
   }

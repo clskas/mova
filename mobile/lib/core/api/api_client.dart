@@ -2062,14 +2062,19 @@ class ApiClient {
       'mimeType': 'image/jpeg',
     });
     return switch (result) {
-      Success(:final data) => Success(
-          data['photoUrl']?.toString() ??
-              data['cloudinaryMockUrl']?.toString() ??
-              data['url']?.toString() ??
-              '',
-        ),
+      Success(:final data) => Success(_preferAbsoluteUploadUrl(data)),
       Failure(:final error) => Failure(error),
     };
+  }
+
+  /// Prefers a fetchable absolute URL (Supabase signed) for KYC selfie verification.
+  String _preferAbsoluteUploadUrl(Map<String, dynamic> data) {
+    final signed = data['cloudinaryMockUrl']?.toString() ?? '';
+    final photo = data['photoUrl']?.toString() ?? '';
+    final fallback = data['url']?.toString() ?? '';
+    if (signed.startsWith('http://') || signed.startsWith('https://')) return signed;
+    if (photo.isNotEmpty) return photo;
+    return fallback;
   }
 
   /// Upload photo colis (base64) — retourne l'URL à passer à `photoUrl`.

@@ -31,3 +31,20 @@ export function hostnameFromUrl(raw?: string | null): string | null {
     return null;
   }
 }
+
+/** Relative or absolute `/api/uploads/{category}/{filename}` (or `/uploads/...`). */
+export function parseUploadsMediaPath(url: string): { category: string; filename: string } | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  try {
+    const path =
+      trimmed.startsWith('http://') || trimmed.startsWith('https://')
+        ? new URL(trimmed).pathname
+        : (trimmed.split('?')[0] ?? trimmed);
+    const m = path.match(/\/(?:api\/)?uploads\/([a-z]+)\/([^/]+)$/i);
+    if (!m?.[1] || !m[2]) return null;
+    return { category: m[1].toLowerCase(), filename: decodeURIComponent(m[2]) };
+  } catch {
+    return null;
+  }
+}

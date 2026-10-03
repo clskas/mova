@@ -1,4 +1,26 @@
-import { isAllowedOcrMediaHostname, parseAllowedOcrMediaUrl } from './ocr-media-url';
+import { isAllowedOcrMediaHostname, parseAllowedOcrMediaUrl, parseUploadsMediaPath } from './ocr-media-url';
+
+describe('parseUploadsMediaPath', () => {
+  it('parses relative and absolute upload paths', () => {
+    expect(parseUploadsMediaPath('/api/uploads/kyc/abc.jpg')).toEqual({
+      category: 'kyc',
+      filename: 'abc.jpg',
+    });
+    expect(parseUploadsMediaPath('/uploads/kyc/abc.jpg')).toEqual({
+      category: 'kyc',
+      filename: 'abc.jpg',
+    });
+    expect(parseUploadsMediaPath('https://cdn.mova.cd/api/uploads/kyc/abc.jpg')).toEqual({
+      category: 'kyc',
+      filename: 'abc.jpg',
+    });
+  });
+
+  it('returns null for non-upload URLs', () => {
+    expect(parseUploadsMediaPath('https://xyz.supabase.co/storage/v1/object/sign/kyc/a.jpg')).toBeNull();
+    expect(parseUploadsMediaPath('')).toBeNull();
+  });
+});
 
 describe('OCR media URL allowlist', () => {
   it('allows known SENGA / AfriSoft / Supabase hosts', () => {

@@ -398,7 +398,8 @@ jobs:
       (startsWith(github.ref, 'refs/tags/v') ||
        (github.event_name == 'workflow_dispatch' &&
         (inputs.build_ios == true || inputs.upload_ios_testflight == true || inputs.submit_ios_app_store == true)))
-    runs-on: macos-14
+    # macos-15 / Xcode 16 required (Swift `sending` / Flutter plugins).
+    runs-on: macos-15
     # Parallel passenger/driver — hang on one must not block the other forever.
     timeout-minutes: 90
     strategy:

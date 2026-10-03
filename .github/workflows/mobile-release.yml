@@ -447,22 +447,39 @@ jobs:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          # First bootstrap creates certs; set repo variable MATCH_READONLY=true later.
+          MATCH_READONLY: ${{ vars.MATCH_READONLY || 'false' }}
         run: |
           cd mobile/ios
           bundle install
-          bundle exec fastlane match appstore --readonly
+          bundle exec fastlane sync_certificates
 
       - name: Build passenger IPA
         id: build_ipa
         if: steps.ios_creds.outputs.available == 'true'
         working-directory: mobile
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         run: |
+          set -euo pipefail
           WEB_CLIENT="58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com"
+          # Ensure exportOptions / automatic signing via match profiles already installed.
           flutter build ipa --release \
             -t lib/main_passenger.dart \
+            --build-name=1.0.17 \
+            --build-number=${{ github.run_number }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
-            --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT
+            --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT \
+            --export-options-plist=ios/ExportOptions.plist
 
       - name: Upload IPA artifact
         if: steps.ios_creds.outputs.available == 'true'

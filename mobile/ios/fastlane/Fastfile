@@ -1,15 +1,31 @@
-# Fastlane — TestFlight (app passager)
-# L'app chauffeur iOS nécessite un schéma Xcode / bundle ID dédié (non configuré).
+# Fastlane — certificats (match) + TestFlight (app passager).
+# Chauffeur iOS : Bundle ID cd.mova.mova.driver créé dans ASC ; schéma Xcode à ajouter.
 
 default_platform(:ios)
 
+def asc_api_key
+  app_store_connect_api_key(
+    key_id: ENV.fetch("APP_STORE_CONNECT_KEY_ID"),
+    issuer_id: ENV.fetch("APP_STORE_CONNECT_ISSUER_ID"),
+    key_content: ENV.fetch("APP_STORE_CONNECT_API_KEY"),
+    is_key_content_base64: true
+  )
+end
+
 platform :ios do
-  desc "Importe certificats via match (lecture seule en CI)"
+  desc "Crée / synchronise certificats App Store via match + API ASC"
   lane :sync_certificates do
+    # Premier run CI : readonly=false pour générer certs + profils dans le dépôt match.
+    # Ensuite MATCH_READONLY=true suffit.
+    readonly = ENV["MATCH_READONLY"].to_s.strip == "true"
     match(
       type: "appstore",
-      readonly: true,
-      app_identifier: "cd.mova.mova"
+      readonly: readonly,
+      api_key: asc_api_key,
+      app_identifier: ["cd.mova.mova"],
+      git_url: ENV["MATCH_GIT_URL"] || "https://github.com/clskas/mova-ios-certificates",
+      git_basic_authorization: ENV["MATCH_GIT_BASIC_AUTHORIZATION"],
+      team_id: "SW53MG3W9P"
     )
   end
 
@@ -18,15 +34,8 @@ platform :ios do
     ipa = options[:ipa] || Dir[File.expand_path("../../build/ios/ipa/*.ipa", __dir__)].first
     UI.user_error!("IPA introuvable — exécuter flutter build ipa d'abord") if ipa.nil? || !File.exist?(ipa)
 
-    api_key = app_store_connect_api_key(
-      key_id: ENV.fetch("APP_STORE_CONNECT_KEY_ID"),
-      issuer_id: ENV.fetch("APP_STORE_CONNECT_ISSUER_ID"),
-      key_content: ENV.fetch("APP_STORE_CONNECT_API_KEY"),
-      is_key_content_base64: true
-    )
-
     upload_to_testflight(
-      api_key: api_key,
+      api_key: asc_api_key,
       ipa: ipa,
       skip_waiting_for_build_processing: true,
       distribute_external: false

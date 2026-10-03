@@ -1,2 +1,4 @@
 app_identifier("cd.mova.mova")
-apple_id(ENV["APPLE_ID"]) # optionnel — compte développeur Apple
+team_id("SW53MG3W9P")
+# Apple ID optionnel — la CI utilise la clé API App Store Connect.
+apple_id(ENV["APPLE_ID"]) if ENV["APPLE_ID"].to_s.strip != ""

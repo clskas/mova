@@ -11,12 +11,17 @@ on:
   workflow_dispatch:
     inputs:
       upload_ios_testflight:
-        description: "iOS seulement — publier l'IPA sur TestFlight (Play internal est toujours tenté après AAB si secret Play présent)"
+        description: "iOS — publier les IPA (Senga + Senga Driver) sur TestFlight / ASC"
+        required: false
+        type: boolean
+        default: false
+      submit_ios_app_store:
+        description: "iOS — après TestFlight, soumettre Senga + Senga Driver pour review App Store (production). Métadonnées ASC requises."
         required: false
         type: boolean
         default: false
       build_ios:
-        description: Construire IPA (macOS + certificats Apple requis)
+        description: Construire IPA passager + chauffeur (macOS + certificats Apple requis)
         required: false
         type: boolean
         default: false
@@ -58,7 +63,7 @@ jobs:
        (github.event_name == 'workflow_dispatch' &&
         inputs.promote_only != true &&
         (inputs.promote_to_production == true ||
-         (inputs.build_ios != true && inputs.upload_ios_testflight != true))))
+         (inputs.build_ios != true && inputs.upload_ios_testflight != true && inputs.submit_ios_app_store != true))))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -392,12 +397,12 @@ jobs:
       github.repository != 'afri-soft-com/mova' &&
       (startsWith(github.ref, 'refs/tags/v') ||
        (github.event_name == 'workflow_dispatch' &&
-        (inputs.build_ios == true || inputs.upload_ios_testflight == true)))
+        (inputs.build_ios == true || inputs.upload_ios_testflight == true || inputs.submit_ios_app_store == true)))
     runs-on: macos-latest
-    # First IPA + match cert bootstrap regularly exceeds 60m (SPM/Xcode fetch).
-    timeout-minutes: 120
+    # Passenger + driver IPA (+ match) regularly exceeds 60m.
+    timeout-minutes: 180
     outputs:
-      ipa_built: ${{ steps.build_ipa.outcome == 'success' }}
+      ipa_built: ${{ steps.build_passenger_ipa.outcome == 'success' || steps.build_driver_ipa.outcome == 'success' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -487,21 +492,14 @@ jobs:
           bundle install
           bundle exec fastlane sync_certificates
 
-      - name: Build passenger IPA
-        id: build_ipa
+      - name: Build passenger IPA (Senga)
+        id: build_passenger_ipa
         if: steps.ios_creds.outputs.available == 'true'
         working-directory: mobile
-        env:
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
-          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         run: |
           set -euo pipefail
           WEB_CLIENT="58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com"
-          # Ensure exportOptions / automatic signing via match profiles already installed.
+          bash ios/ci_set_flavor.sh passenger
           flutter build ipa --release \
             -t lib/main_passenger.dart \
             --build-name=1.0.17 \
@@ -510,25 +508,69 @@ jobs:
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT \
             --export-options-plist=ios/ExportOptions.plist
+          # Stash outside mobile/build — flutter clean (driver step) wipes build/.
+          mkdir -p "$RUNNER_TEMP/mova-ipa/passenger"
+          shopt -s nullglob
+          for f in build/ios/ipa/*.ipa; do
+            mv "$f" "$RUNNER_TEMP/mova-ipa/passenger/"
+          done
+          ls -la "$RUNNER_TEMP/mova-ipa/passenger/"
 
-      - name: Upload IPA artifact
-        if: steps.ios_creds.outputs.available == 'true'
+      - name: Upload passenger IPA artifact
+        if: steps.build_passenger_ipa.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: mova-passenger-ipa
-          path: mobile/build/ios/ipa/*.ipa
+          path: ${{ runner.temp }}/mova-ipa/passenger/*.ipa
+          retention-days: 30
+
+      - name: Build driver IPA (Senga Driver)
+        id: build_driver_ipa
+        if: steps.ios_creds.outputs.available == 'true'
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          WEB_CLIENT="58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com"
+          bash ios/ci_set_flavor.sh driver
+          # Clean previous Runner.app product so bundle id / signing switch sticks.
+          flutter clean
+          flutter pub get
+          (cd ios && pod install)
+          flutter build ipa --release \
+            -t lib/main_driver.dart \
+            --build-name=1.0.17 \
+            --build-number=${{ github.run_number }} \
+            --dart-define=API_URL=${{ steps.urls.outputs.api }} \
+            --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
+            --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT \
+            --export-options-plist=ios/ExportOptions-driver.plist
+          mkdir -p "$RUNNER_TEMP/mova-ipa/driver"
+          shopt -s nullglob
+          for f in build/ios/ipa/*.ipa; do
+            mv "$f" "$RUNNER_TEMP/mova-ipa/driver/"
+          done
+          ls -la "$RUNNER_TEMP/mova-ipa/driver/"
+          bash ios/ci_set_flavor.sh passenger
+
+      - name: Upload driver IPA artifact
+        if: steps.build_driver_ipa.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mova-driver-ipa
+          path: ${{ runner.temp }}/mova-ipa/driver/*.ipa
           retention-days: 30
 
   upload-ios:
-    name: Upload TestFlight
+    name: Upload TestFlight + App Store
     needs: build-ios
     if: >
       needs.build-ios.outputs.ipa_built == 'true' &&
       (startsWith(github.ref, 'refs/tags/v') ||
-       (github.event_name == 'workflow_dispatch' && inputs.upload_ios_testflight == true))
+       (github.event_name == 'workflow_dispatch' &&
+        (inputs.upload_ios_testflight == true || inputs.submit_ios_app_store == true)))
     runs-on: macos-latest
     environment: production-mobile
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -538,21 +580,38 @@ jobs:
           bundler-cache: true
           working-directory: mobile/ios
 
-      - name: Download IPA
+      - name: Download passenger IPA
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: mova-passenger-ipa
-          path: mobile/build/ios/ipa/
+          path: mobile/build/ios/ipa/passenger/
 
-      - name: Upload to TestFlight
+      - name: Download driver IPA
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: mova-driver-ipa
+          path: mobile/build/ios/ipa/driver/
+
+      - name: Upload TestFlight + submit App Store production
         working-directory: mobile/ios
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          SUBMIT_APP_STORE: ${{ (github.event_name == 'workflow_dispatch' && inputs.submit_ios_app_store == true) || startsWith(github.ref, 'refs/tags/v') }}
         run: |
-          if [ -z "$APP_STORE_CONNECT_API_KEY" ]; then
-            echo "::notice::APP_STORE_CONNECT_API_KEY non configuré — publication TestFlight ignorée."
+          set -euo pipefail
+          if [ -z "${APP_STORE_CONNECT_API_KEY:-}" ]; then
+            echo "::notice::APP_STORE_CONNECT_API_KEY non configuré — publication iOS ignorée."
             exit 0
           fi
-          bundle exec fastlane beta
+          echo "SUBMIT_APP_STORE=${SUBMIT_APP_STORE}"
+          PASSENGER_IPA="$(ls ../build/ios/ipa/passenger/*.ipa 2>/dev/null | head -1 || true)"
+          DRIVER_IPA="$(ls ../build/ios/ipa/driver/*.ipa 2>/dev/null | head -1 || true)"
+          echo "passenger_ipa=${PASSENGER_IPA:-<none>}"
+          echo "driver_ipa=${DRIVER_IPA:-<none>}"
+          bundle exec fastlane release_both \
+            passenger_ipa:"${PASSENGER_IPA:-}" \
+            driver_ipa:"${DRIVER_IPA:-}"

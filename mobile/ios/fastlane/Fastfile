@@ -1,7 +1,9 @@
-# Fastlane — certificats (match) + TestFlight (app passager).
-# Chauffeur iOS : Bundle ID cd.mova.mova.driver créé dans ASC ; schéma Xcode à ajouter.
+# Fastlane — match + TestFlight + soumission App Store (passager + chauffeur).
 
 default_platform(:ios)
+
+PASSENGER_ID = "cd.mova.mova"
+DRIVER_ID = "cd.mova.mova.driver"
 
 def asc_api_key
   app_store_connect_api_key(
@@ -12,33 +14,120 @@ def asc_api_key
   )
 end
 
+def find_ipa(glob_hint)
+  Dir[File.expand_path(glob_hint, __dir__)].max_by { |p| File.mtime(p) }
+end
+
 platform :ios do
-  desc "Crée / synchronise certificats App Store via match + API ASC"
+  desc "Crée / synchronise certificats App Store (passager + chauffeur)"
   lane :sync_certificates do
-    # Premier run CI : readonly=false pour générer certs + profils dans le dépôt match.
-    # Ensuite MATCH_READONLY=true suffit.
     readonly = ENV["MATCH_READONLY"].to_s.strip == "true"
     match(
       type: "appstore",
       readonly: readonly,
       api_key: asc_api_key,
-      app_identifier: ["cd.mova.mova"],
+      app_identifier: [PASSENGER_ID, DRIVER_ID],
       git_url: ENV["MATCH_GIT_URL"] || "https://github.com/clskas/mova-ios-certificates",
       git_basic_authorization: ENV["MATCH_GIT_BASIC_AUTHORIZATION"],
       team_id: "SW53MG3W9P"
     )
   end
 
-  desc "Publie l'IPA passager sur TestFlight"
+  desc "Publie un IPA sur TestFlight"
   lane :beta do |options|
-    ipa = options[:ipa] || Dir[File.expand_path("../../build/ios/ipa/*.ipa", __dir__)].first
+    ipa = options[:ipa] || find_ipa("../../build/ios/ipa/*.ipa")
     UI.user_error!("IPA introuvable — exécuter flutter build ipa d'abord") if ipa.nil? || !File.exist?(ipa)
 
     upload_to_testflight(
       api_key: asc_api_key,
       ipa: ipa,
       skip_waiting_for_build_processing: true,
-      distribute_external: false
+      distribute_external: false,
+      changelog: options[:changelog] || "SENGA — build CI"
     )
+  end
+
+  desc "Soumet le dernier build App Store Connect pour review (production)"
+  lane :submit_production do |options|
+    app_id = options[:app_identifier] || PASSENGER_ID
+    # Requires App Store listing metadata already filled in ASC (privacy, screenshots, etc.).
+    # skip_metadata/screenshots: use what is already on App Store Connect.
+    deliver(
+      api_key: asc_api_key,
+      app_identifier: app_id,
+      submit_for_review: true,
+      automatic_release: true,
+      force: true,
+      skip_binary_upload: true,
+      skip_metadata: true,
+      skip_screenshots: true,
+      run_precheck_before_submit: false,
+      submission_information: {
+        add_id_info_uses_idfa: false
+      }
+    )
+  end
+
+  desc "TestFlight passager + chauffeur puis tentative soumission production"
+  lane :release_both do |options|
+    passenger_ipa = options[:passenger_ipa].to_s.strip
+    driver_ipa = options[:driver_ipa].to_s.strip
+    passenger_ipa = nil if passenger_ipa.empty?
+    driver_ipa = nil if driver_ipa.empty?
+
+    passenger_ipa ||= find_ipa("../../build/ios/ipa/passenger/*.ipa")
+    passenger_ipa ||= find_ipa("../../build/ios/ipa/*passenger*.ipa")
+    passenger_ipa ||= find_ipa("../../build/ios/ipa/*.ipa")
+    driver_ipa ||= find_ipa("../../build/ios/ipa/driver/*.ipa")
+    driver_ipa ||= find_ipa("../../build/ios/ipa/*driver*.ipa")
+
+    uploaded_any = false
+
+    if passenger_ipa && File.exist?(passenger_ipa)
+      UI.message("Upload TestFlight Senga: #{passenger_ipa}")
+      upload_to_testflight(
+        api_key: asc_api_key,
+        ipa: passenger_ipa,
+        app_identifier: PASSENGER_ID,
+        skip_waiting_for_build_processing: true,
+        distribute_external: false
+      )
+      uploaded_any = true
+    else
+      UI.important("IPA passager absent — TestFlight Senga ignoré")
+    end
+
+    if driver_ipa && File.exist?(driver_ipa)
+      UI.message("Upload TestFlight Senga Driver: #{driver_ipa}")
+      upload_to_testflight(
+        api_key: asc_api_key,
+        ipa: driver_ipa,
+        app_identifier: DRIVER_ID,
+        skip_waiting_for_build_processing: true,
+        distribute_external: false
+      )
+      uploaded_any = true
+    else
+      UI.important("IPA chauffeur absent — TestFlight Senga Driver ignoré")
+    end
+
+    UI.user_error!("Aucun IPA à publier") unless uploaded_any
+
+    if ENV["SUBMIT_APP_STORE"].to_s.strip == "true"
+      if passenger_ipa && File.exist?(passenger_ipa)
+        begin
+          submit_production(app_identifier: PASSENGER_ID)
+        rescue => e
+          UI.error("Soumission App Store Senga (passager) : #{e.message}")
+        end
+      end
+      if driver_ipa && File.exist?(driver_ipa)
+        begin
+          submit_production(app_identifier: DRIVER_ID)
+        rescue => e
+          UI.error("Soumission App Store Senga Driver : #{e.message}")
+        end
+      end
+    end
   end
 end

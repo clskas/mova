@@ -3,3 +3,4 @@ storage_mode("git")
 type("appstore")
 app_identifier(["cd.mova.mova", "cd.mova.mova.driver"])
 team_id("SW53MG3W9P")
+# Profiles créés pour les deux apps ASC (Senga + Senga Driver).

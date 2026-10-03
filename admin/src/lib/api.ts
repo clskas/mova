@@ -1576,6 +1576,40 @@ export async function seedPoiCatalog(city = "RDC") {
   );
 }
 
+export type CatalogPoi = {
+  id: string;
+  name: string;
+  category: string;
+  lat: number;
+  lng: number;
+  city: string;
+  address?: string | null;
+  source?: string;
+  osmId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function fetchPoiCatalog(opts: { city?: string; q?: string; skip?: number; take?: number } = {}) {
+  const params = new URLSearchParams({
+    skip: String(opts.skip ?? 0),
+    take: String(opts.take ?? 80),
+  });
+  if (opts.city) params.set("city", opts.city);
+  if (opts.q?.trim()) params.set("q", opts.q.trim());
+  return apiFetch<{ items: CatalogPoi[]; total: number }>(`/api/admin/poi-catalog?${params}`);
+}
+
+export async function updatePoiCatalog(
+  id: string,
+  body: Partial<Pick<CatalogPoi, "name" | "address" | "category" | "city" | "lat" | "lng">>,
+) {
+  return apiFetch<CatalogPoi>(`/api/admin/poi-catalog/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
 export async function fetchCities(provinceId?: string): Promise<AdminCity[]> {
   const q = provinceId ? `?provinceId=${encodeURIComponent(provinceId)}` : "";
   return apiFetch<AdminCity[]>(`/api/admin/cities${q}`);

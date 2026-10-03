@@ -51,6 +51,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   final _payoutPhone = TextEditingController();
   String _vehicleType = 'STANDARD';
   String _payoutProvider = 'ORANGE_MONEY';
+  String _operatingCity = '';
+  List<String> _cities = const [];
   bool _charterAccepted = false;
   bool _trainingCompleted = false;
   bool _cguAccepted = false;
@@ -93,6 +95,68 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     'CRIMINAL_RECORD',
   };
   static const _requiredDocCount = 0;
+  static const _fallbackCities = [
+    'Kinshasa',
+    'Lubumbashi',
+    'Goma',
+    'Bukavu',
+    'Kisangani',
+    'Mbuji-Mayi',
+    'Kananga',
+    'Matadi',
+    'Boma',
+    'Kolwezi',
+    'Likasi',
+    'Tshikapa',
+    'Mbandaka',
+    'Kindu',
+    'Bunia',
+    'Butembo',
+    'Beni',
+    'Uvira',
+    'Kalemie',
+    'Kamina',
+    'Gbadolite',
+    'Gemena',
+    'Boende',
+    'Lisala',
+    'Isiro',
+    'Buta',
+    'Inongo',
+    'Bandundu',
+    'Kikwit',
+    'Kenge',
+    'Kabinda',
+    'Lusambo',
+  ];
+
+  Future<void> _loadCities() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/geo/service-areas');
+    final names = <String>[];
+    if (result is Success) {
+      final data = result.data;
+      final list = data is List
+          ? data
+          : (data is Map && data['data'] is List)
+              ? data['data'] as List
+              : const [];
+      for (final row in list) {
+        if (row is Map && row['name'] != null) {
+          names.add(row['name'].toString());
+        }
+      }
+    }
+    names.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    if (!mounted) return;
+    setState(() {
+      _cities = names.isNotEmpty ? names : List<String>.from(_fallbackCities);
+      if (_operatingCity.isNotEmpty && !_cities.contains(_operatingCity)) {
+        _cities = [..._cities, _operatingCity]..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      }
+    });
+  }
+
   Future<void> _restoreOnboardingStep() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getInt(_stepStorageKey);
@@ -153,6 +217,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         });
         await _restoreOnboardingStep();
         await _restoreCguAccepted();
+        await _loadCities();
         final done = data['profile']?['onboardingCompleted'] == true;
         if (done && !widget.canSkipToHome && mounted) {
           Navigator.of(context).pushReplacement(
@@ -184,6 +249,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           return 'Renseignez prénom et nom.';
         }
         if (_idNumber.text.trim().isEmpty) return 'Renseignez le numéro de pièce d\'identité.';
+        if (_operatingCity.trim().isEmpty) return 'Choisissez votre ville d\'opération.';
         return null;
       case 1:
         if (_licenseNumber.text.trim().isEmpty) return 'Renseignez le numéro de permis.';
@@ -226,6 +292,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     _fiscalStickerExpiry.text = _dateOnly(profile?['fiscalStickerExpiry']);
     _payoutProvider = profile?['payoutProvider']?.toString() ?? 'ORANGE_MONEY';
     _payoutPhone.text = profile?['payoutPhone']?.toString() ?? user?['phone']?.toString() ?? '';
+    _operatingCity = profile?['operatingCity']?.toString() ?? '';
     _plate.text = vehicle?['plateNumber']?.toString() ?? '';
     _make.text = vehicle?['make']?.toString() ?? '';
     _model.text = vehicle?['model']?.toString() ?? '';
@@ -326,6 +393,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     }));
     await _requirePatch(api.patch('/drivers/onboarding', {
       'idDocumentNumber': _idNumber.text.trim(),
+      'operatingCity': _operatingCity.trim(),
     }));
   }
 
@@ -670,6 +738,38 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     );
   }
 
+  Widget _cityCombobox() {
+    final options = _cities.isNotEmpty ? _cities : _fallbackCities;
+    return Autocomplete<String>(
+      initialValue: TextEditingValue(text: _operatingCity),
+      optionsBuilder: (TextEditingValue text) {
+        final q = text.text.trim().toLowerCase();
+        if (q.isEmpty) return options;
+        return options.where((c) => c.toLowerCase().contains(q));
+      },
+      onSelected: (value) {
+        setState(() => _operatingCity = value);
+      },
+      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+        if (controller.text != _operatingCity && _operatingCity.isNotEmpty && !focusNode.hasFocus) {
+          controller.text = _operatingCity;
+        }
+        return TextField(
+          controller: controller,
+          focusNode: focusNode,
+          scrollPadding: _fieldScrollPadding,
+          decoration: const InputDecoration(
+            labelText: 'Ville d\'opération',
+            hintText: 'Rechercher une ville de la RDC',
+            suffixIcon: Icon(Icons.arrow_drop_down),
+          ),
+          onChanged: (v) => _operatingCity = v,
+          onSubmitted: (_) => onFieldSubmitted(),
+        );
+      },
+    );
+  }
+
   Widget _kycTextField({
     required TextEditingController controller,
     required String label,
@@ -785,6 +885,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         _kycTextField(controller: _email, label: 'Email', keyboardType: TextInputType.emailAddress),
         const SizedBox(height: _fieldGap),
         _kycTextField(controller: _idNumber, label: 'N° carte d\'identité / passeport'),
+        const SizedBox(height: _fieldGap),
+        _cityCombobox(),
         const SizedBox(height: 20),
         _docButton('ID_PHOTO', 'Carte d\'identité / passeport'),
         _docButton('SELFIE', 'Photo récente (profil)'),

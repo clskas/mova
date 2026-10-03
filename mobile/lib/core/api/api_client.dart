@@ -364,6 +364,9 @@ class ApiClient {
     if (path.contains('/geo/communes')) {
       return Success({'data': MockData.communes()});
     }
+    if (path.contains('/geo/service-areas')) {
+      return Success(MockData.serviceAreas());
+    }
     if (path.contains('/geo/places')) {
       final uri = Uri.parse('http://x$path');
       return Success({

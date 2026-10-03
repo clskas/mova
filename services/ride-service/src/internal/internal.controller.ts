@@ -790,6 +790,42 @@ export class InternalController {
     return this.geo.importPois(city ?? 'RDC', false);
   }
 
+  @Get('poi-catalog')
+  listPoiCatalog(
+    @Query('city') city?: string,
+    @Query('q') q?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.geo.listCatalogPlaces({
+      city,
+      q,
+      skip: Number(skip ?? 0),
+      take: Number(take ?? 80),
+    });
+  }
+
+  @Get('poi-catalog/:id')
+  getPoiCatalog(@Param('id') id: string) {
+    return this.geo.getCatalogPlace(id);
+  }
+
+  @Patch('poi-catalog/:id')
+  updatePoiCatalog(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      name?: string;
+      address?: string | null;
+      category?: string;
+      city?: string;
+      lat?: number;
+      lng?: number;
+    },
+  ) {
+    return this.geo.updateCatalogPlace(id, body);
+  }
+
   @Get('poi-suggestions')
   listPoiSuggestions(
     @Query('status') status?: string,

@@ -344,6 +344,17 @@ abstract final class MockData {
           .map((name) => {'name': name, 'city': 'Kinshasa'})
           .toList();
 
+  static List<Map<String, dynamic>> serviceAreas() => [
+        {'id': 'kinshasa', 'name': 'Kinshasa'},
+        {'id': 'lubumbashi', 'name': 'Lubumbashi'},
+        {'id': 'goma', 'name': 'Goma'},
+        {'id': 'bukavu', 'name': 'Bukavu'},
+        {'id': 'kisangani', 'name': 'Kisangani'},
+        {'id': 'mbuji-mayi', 'name': 'Mbuji-Mayi'},
+        {'id': 'matadi', 'name': 'Matadi'},
+        {'id': 'kolwezi', 'name': 'Kolwezi'},
+      ];
+
   static Map<String, dynamic> createRide(Map<String, dynamic> body) => {
         'id': 'ride-mock-${DateTime.now().millisecondsSinceEpoch}',
         'status': 'SEARCHING',

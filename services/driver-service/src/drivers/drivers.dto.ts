@@ -16,6 +16,10 @@ export class KycUploadDto {
 export class UpdateOnboardingDto {
   @ApiPropertyOptional() @IsOptional() @IsString() licenseNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() idDocumentNumber?: string;
+  @ApiPropertyOptional({ description: 'Ville d’opération (catalogue SENGA RDC)' })
+  @IsOptional()
+  @IsString()
+  operatingCity?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() licenseExpiry?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() insuranceExpiry?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() technicalInspectionExpiry?: string;

@@ -16,6 +16,7 @@ import {
   allDriverJustificatifsApproved,
   kycDocumentLabel,
   driverVehicleTypesForRide,
+  findServiceAreaByName,
   formatMovaPublicId,
   maskPhoneRdc,
   evaluateDriverDocuments,
@@ -493,6 +494,7 @@ export class DriversService {
       profile: {
         licenseNumber: profile?.licenseNumber,
         idDocumentNumber: profile?.idDocumentNumber,
+        operatingCity: profile?.operatingCity,
         licenseExpiry: profile?.licenseExpiry,
         insuranceExpiry: profile?.insuranceExpiry,
         technicalInspectionExpiry: profile?.technicalInspectionExpiry,
@@ -535,6 +537,17 @@ export class DriversService {
     const profileData: Record<string, unknown> = {};
     if (dto.licenseNumber !== undefined) profileData.licenseNumber = dto.licenseNumber;
     if (dto.idDocumentNumber !== undefined) profileData.idDocumentNumber = dto.idDocumentNumber;
+    if (dto.operatingCity !== undefined) {
+      const area = findServiceAreaByName(dto.operatingCity);
+      if (!area) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'Choisissez une ville SENGA de la RDC.',
+        );
+      }
+      profileData.operatingCity = area.name;
+    }
     if (dto.licenseExpiry !== undefined) profileData.licenseExpiry = new Date(dto.licenseExpiry);
     if (dto.insuranceExpiry !== undefined) profileData.insuranceExpiry = new Date(dto.insuranceExpiry);
     if (dto.technicalInspectionExpiry !== undefined) {

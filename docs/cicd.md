@@ -109,13 +109,34 @@ flutter build appbundle --release --flavor passenger -t lib/main_passenger.dart 
 
 Sans keystore, le workflow produit des AAB signés debug (téléchargeables mais **non publiables** sur Play Store).
 
-### iOS (macOS requis)
+### iOS (sans Mac physique — GitHub Actions)
 
-- Build IPA : runner `macos-latest` (coût ×10 vs Linux)
-- Certificats : [fastlane match](https://docs.fastlane.tools/actions/match/) + dépôt privé certificats
-- Alternative : [Codemagic](https://codemagic.io) ou Xcode Cloud si pas de runner macOS GitHub
+Le job `build-ios` tourne sur `macos-latest`. Un Mac local n’est pas requis.
 
-Secrets App Store Connect requis pour TestFlight — voir tableau ci-dessous.
+1. Compte **Apple Developer** (déjà créé).
+2. App Store Connect : créer l’app passager, Bundle ID `cd.mova.mova`.
+3. Clé API App Store Connect (Users and Access → Keys) : `.p8` + Key ID + Issuer ID.
+4. Dépôt privé de certificats pour [fastlane match](https://docs.fastlane.tools/actions/match/) (`MATCH_GIT_URL`). Le **premier** `match` peut tourner sur le runner GitHub (pas besoin de Mac perso).
+5. Secrets GitHub (repo `clskas/mova`) :
+
+| Secret | Contenu |
+|--------|---------|
+| `APP_STORE_CONNECT_KEY_ID` | Key ID |
+| `APP_STORE_CONNECT_ISSUER_ID` | Issuer ID |
+| `APP_STORE_CONNECT_API_KEY` | Fichier `.p8` en **base64** |
+| `MATCH_PASSWORD` | Mot de passe du coffre match |
+| `MATCH_GIT_BASIC_AUTHORIZATION` | base64 `user:token` lecture/écriture du dépôt certificats |
+| `MATCH_GIT_URL` | URL du dépôt privé certificats (optionnel si déjà dans Matchfile) |
+
+6. **Actions → Mobile Release → Run workflow** : cocher **build_ios** et/ou **upload_ios_testflight** (TestFlight déclenche aussi le build IPA).
+
+L’app chauffeur iOS n’a pas encore de schéma / Bundle ID dédié — seul le **passager** part sur TestFlight.
+
+### iOS (détail technique)
+
+- Build IPA : runner `macos-latest`
+- Certificats : fastlane match
+- Alternative : Codemagic ou Xcode Cloud
 
 ## Local CI
 

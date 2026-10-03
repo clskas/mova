@@ -1478,6 +1478,52 @@ export class AdminService {
     return this.proxy('ride', `/internal/poi/seed${q}`, { method: 'POST' });
   }
 
+  listPoiCatalog(opts: { city?: string | null; q?: string; skip?: number; take?: number } = {}) {
+    const params = new URLSearchParams({
+      skip: String(opts.skip ?? 0),
+      take: String(opts.take ?? 80),
+    });
+    if (opts.city?.trim()) params.set('city', opts.city.trim());
+    if (opts.q?.trim()) params.set('q', opts.q.trim());
+    return this.fetchJson('ride', `/internal/poi-catalog?${params.toString()}`);
+  }
+
+  async updatePoiCatalog(
+    id: string,
+    body: {
+      name?: string;
+      address?: string | null;
+      category?: string;
+      city?: string;
+      lat?: number;
+      lng?: number;
+    },
+    managedCity?: string | null,
+  ) {
+    if (managedCity) {
+      const existing = await this.fetchJson<{ city?: string; lat?: number; lng?: number }>(
+        'ride',
+        `/internal/poi-catalog/${id}`,
+      );
+      const byName = (existing.city?.trim().toLowerCase() ?? '') === managedCity.trim().toLowerCase();
+      if (!byName) {
+        assertCoordsInManagedCity(
+          managedCity,
+          existing.lat,
+          existing.lng,
+          'Lieu hors de votre ville gérée.',
+        );
+      }
+      if (body.city && body.city.trim().toLowerCase() !== managedCity.trim().toLowerCase()) {
+        assertCityMatch(managedCity, body.city, `Vous ne pouvez modifier que les lieux de ${managedCity}.`);
+      }
+    }
+    return this.proxy('ride', `/internal/poi-catalog/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  }
+
   listCarpool(take = 50, managedCity?: string | null) {
     return this.fetchJson<{ fromCity?: string; pickupLat?: number; pickupLng?: number; [key: string]: unknown }[]>(
       'ride',

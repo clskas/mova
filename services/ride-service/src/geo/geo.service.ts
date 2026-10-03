@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
   DRC_SERVICE_AREAS,
   findServiceAreaByName,
@@ -17,7 +17,7 @@ import { CityActivationService } from './city-activation.service';
 import { resolveDrcProximity } from './drc-proximity';
 import { GeocodeProvider } from './geocode.provider';
 import { rankAutocompleteResults, type AutocompleteResult } from './geo-autocomplete.rank';
-import { TAXI_POI_CHIP_CATEGORIES, type PoiCategory } from './poi-category.map';
+import { parsePoiCategory, TAXI_POI_CHIP_CATEGORIES, type PoiCategory } from './poi-category.map';
 import { PoiImportService } from './poi-import.service';
 
 @Injectable()
@@ -714,6 +714,117 @@ export class GeoService implements OnModuleInit {
       out.sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
     }
     return out.slice(0, opts.limit);
+  }
+
+  async listCatalogPlaces(opts: {
+    city?: string;
+    q?: string;
+    skip?: number;
+    take?: number;
+  }) {
+    const skip = Math.max(0, Math.round(opts.skip ?? 0));
+    const take = Math.min(200, Math.max(1, Math.round(opts.take ?? 80)));
+    const city = opts.city?.trim();
+    const q = opts.q?.trim();
+    const where: Record<string, unknown> = {};
+    if (city) {
+      where.city = { equals: city, mode: 'insensitive' };
+    }
+    if (q) {
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { address: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+    const [items, total] = await Promise.all([
+      this.prisma.placeOfInterest.findMany({
+        where,
+        orderBy: [{ city: 'asc' }, { name: 'asc' }],
+        skip,
+        take,
+      }),
+      this.prisma.placeOfInterest.count({ where }),
+    ]);
+    return { items, total, skip, take };
+  }
+
+  async getCatalogPlace(id: string) {
+    const existing = await this.prisma.placeOfInterest.findUnique({ where: { id } });
+    if (!existing) {
+      throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'Lieu introuvable.');
+    }
+    return existing;
+  }
+
+  async updateCatalogPlace(
+    id: string,
+    data: {
+      name?: string;
+      address?: string | null;
+      category?: string;
+      city?: string;
+      lat?: number;
+      lng?: number;
+    },
+  ) {
+    const existing = await this.prisma.placeOfInterest.findUnique({ where: { id } });
+    if (!existing) {
+      throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'Lieu introuvable.');
+    }
+
+    const patch: Record<string, unknown> = {};
+    if (data.name !== undefined) {
+      const name = data.name.trim();
+      if (name.length < 2 || name.length > 120) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.BAD_REQUEST,
+          'Le nom du lieu doit faire entre 2 et 120 caractères.',
+        );
+      }
+      patch.name = name;
+    }
+    if (data.address !== undefined) {
+      const address = data.address == null ? null : String(data.address).trim();
+      patch.address = address ? address.slice(0, 200) : null;
+    }
+    if (data.category !== undefined) {
+      const category = parsePoiCategory(data.category);
+      if (!category) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.BAD_REQUEST,
+          'Catégorie de lieu invalide.',
+        );
+      }
+      patch.category = category;
+    }
+    if (data.city !== undefined) {
+      const city = data.city.trim();
+      if (city.length < 2 || city.length > 80) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.BAD_REQUEST,
+          'Ville invalide.',
+        );
+      }
+      patch.city = city;
+    }
+    if (data.lat !== undefined) {
+      if (!Number.isFinite(data.lat) || data.lat < -90 || data.lat > 90) {
+        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Latitude invalide.');
+      }
+      patch.lat = data.lat;
+    }
+    if (data.lng !== undefined) {
+      if (!Number.isFinite(data.lng) || data.lng < -180 || data.lng > 180) {
+        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Longitude invalide.');
+      }
+      patch.lng = data.lng;
+    }
+    if (Object.keys(patch).length === 0) return existing;
+
+    return this.prisma.placeOfInterest.update({ where: { id }, data: patch });
   }
 
   async importPois(city = 'Kinshasa', useOverpass = false) {

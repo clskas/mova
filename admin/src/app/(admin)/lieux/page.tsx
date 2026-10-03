@@ -3,9 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   approvePoiSuggestion,
+  fetchPoiCatalog,
   fetchPoiSuggestions,
   rejectPoiSuggestion,
   seedPoiCatalog,
+  updatePoiCatalog,
+  type CatalogPoi,
   type PoiSuggestion,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
@@ -18,6 +21,7 @@ import {
   LoadingState,
   Modal,
   PageHeader,
+  SelectInput,
   TextInput,
 } from "@/components/ui";
 
@@ -25,6 +29,7 @@ const STATUS_LABELS: Record<string, string> = {
   PENDING: "En attente",
   APPROVED: "Publié",
   REJECTED: "Refusé",
+  CATALOG: "Catalogue",
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -37,6 +42,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   TRANSPORT: "Transport",
   OTHER: "Autre",
 };
+
+const CATEGORY_OPTIONS = Object.entries(CATEGORY_LABELS).map(([value, label]) => ({ value, label }));
 
 type OsmContribution = {
   editUrl: string;
@@ -104,8 +111,11 @@ export default function LieuxPage() {
   const { canWrite, role, user } = useAdmin();
   const readOnly = !canWrite("lieux");
   const managedCity = role === "CITY_ADMIN" ? user?.managedCity?.trim() || null : null;
-  const [status, setStatus] = useState("PENDING");
+  const [tab, setTab] = useState<"PENDING" | "APPROVED" | "REJECTED" | "CATALOG">("PENDING");
   const [items, setItems] = useState<PoiSuggestion[]>([]);
+  const [catalog, setCatalog] = useState<CatalogPoi[]>([]);
+  const [catalogTotal, setCatalogTotal] = useState(0);
+  const [catalogQ, setCatalogQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
@@ -114,23 +124,74 @@ export default function LieuxPage() {
   const [osmModal, setOsmModal] = useState<OsmContribution | null>(null);
   const [seedingPoi, setSeedingPoi] = useState(false);
   const [seedResult, setSeedResult] = useState<string | null>(null);
+  const [editPoi, setEditPoi] = useState<CatalogPoi | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editCategory, setEditCategory] = useState("OTHER");
+  const [editCity, setEditCity] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchPoiSuggestions(status);
-      setItems(data.items ?? []);
+      if (tab === "CATALOG") {
+        const data = await fetchPoiCatalog({
+          city: managedCity ?? undefined,
+          q: catalogQ,
+          take: 120,
+        });
+        setCatalog(data.items ?? []);
+        setCatalogTotal(data.total ?? 0);
+        setItems([]);
+      } else {
+        const data = await fetchPoiSuggestions(tab);
+        setItems(data.items ?? []);
+        setCatalog([]);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, [tab, catalogQ, managedCity]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  function openEdit(poi: CatalogPoi) {
+    setEditPoi(poi);
+    setEditName(poi.name);
+    setEditAddress(poi.address ?? "");
+    setEditCategory(poi.category);
+    setEditCity(poi.city);
+  }
+
+  async function handleSaveEdit() {
+    if (!editPoi) return;
+    const name = editName.trim();
+    if (name.length < 2) {
+      setError("Le nom du lieu doit faire au moins 2 caractères.");
+      return;
+    }
+    setSavingEdit(true);
+    setError(null);
+    try {
+      await updatePoiCatalog(editPoi.id, {
+        name,
+        address: editAddress.trim() || null,
+        category: editCategory,
+        city: editCity.trim(),
+      });
+      setEditPoi(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec modification");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
   async function handleApprove(id: string) {
     setActing(id);
@@ -181,11 +242,9 @@ export default function LieuxPage() {
     setSeedResult(null);
     setError(null);
     try {
-      // CITY_ADMIN: backend force managedCity even if client sends RDC.
       const result = await seedPoiCatalog(managedCity ?? "RDC");
-      setSeedResult(
-        `${result.imported} ajouté(s), ${result.skipped} déjà présent(s) — ${cityLabel}`,
-      );
+      setSeedResult(`${result.imported} ajouté(s), ${result.skipped} déjà présent(s) — ${cityLabel}`);
+      if (tab === "CATALOG") await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec synchronisation POI");
     } finally {
@@ -215,9 +274,8 @@ export default function LieuxPage() {
         <p className="text-sm text-gray-800 leading-relaxed">
           <strong>Publier</strong> ajoute le lieu dans la base SENGA (recherche d&apos;adresses, carte Taxi).
           <br />
-          <strong>OpenStreetMap</strong> n&apos;est pas mis à jour automatiquement : le lien « Éditeur OSM » permet à un
-          contributeur de créer le point manuellement. Tant que ce n&apos;est pas fait, « Carte OSM » ne montre que les
-          coordonnées, pas le nom du lieu.
+          L&apos;onglet <strong>Catalogue</strong> liste les lieux déjà en base (table places_of_interest) — vous pouvez y
+          modifier le nom affiché dans l&apos;app.
         </p>
       </Card>
 
@@ -237,13 +295,13 @@ export default function LieuxPage() {
       )}
 
       <div className="flex flex-wrap gap-2 mb-4">
-        {(["PENDING", "APPROVED", "REJECTED"] as const).map((s) => (
+        {(["PENDING", "APPROVED", "REJECTED", "CATALOG"] as const).map((s) => (
           <button
             key={s}
             type="button"
-            onClick={() => setStatus(s)}
+            onClick={() => setTab(s)}
             className={`px-3 py-1.5 rounded-full text-sm border ${
-              status === s ? "bg-[#6C63FF] text-white border-[#6C63FF]" : "bg-white border-gray-200"
+              tab === s ? "bg-[#6C63FF] text-white border-[#6C63FF]" : "bg-white border-gray-200"
             }`}
           >
             {STATUS_LABELS[s]}
@@ -251,10 +309,48 @@ export default function LieuxPage() {
         ))}
       </div>
 
+      {tab === "CATALOG" && (
+        <div className="mb-4 max-w-md">
+          <TextInput
+            value={catalogQ}
+            onChange={setCatalogQ}
+            placeholder="Rechercher un lieu (nom ou adresse)…"
+          />
+          <p className="text-xs text-gray-500 mt-1">{catalogTotal} lieu{catalogTotal > 1 ? "x" : ""} dans le catalogue</p>
+        </div>
+      )}
+
       {loading ? (
         <LoadingState />
+      ) : tab === "CATALOG" ? (
+        catalog.length === 0 ? (
+          <EmptyState message="Aucun lieu dans le catalogue. Utilisez « Synchroniser catalogue POI »." />
+        ) : (
+          <div className="space-y-3">
+            {catalog.map((poi) => (
+              <Card key={poi.id}>
+                <div className="flex flex-wrap justify-between gap-3">
+                  <div className="flex-1 min-w-[240px]">
+                    <p className="font-semibold text-lg">{poi.name}</p>
+                    <p className="text-sm text-gray-600">
+                      {CATEGORY_LABELS[poi.category] ?? poi.category} · {poi.city}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {poi.lat.toFixed(5)}, {poi.lng.toFixed(5)}
+                      {poi.address ? ` · ${poi.address}` : ""}
+                    </p>
+                    {poi.source && <p className="text-xs text-gray-400 mt-1">Source : {poi.source}</p>}
+                  </div>
+                  {!readOnly && (
+                    <BtnPrimary onClick={() => openEdit(poi)}>Modifier</BtnPrimary>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )
       ) : items.length === 0 ? (
-        <EmptyState message={`Aucune suggestion ${STATUS_LABELS[status]?.toLowerCase() ?? ""}.`} />
+        <EmptyState message={`Aucune suggestion ${STATUS_LABELS[tab]?.toLowerCase() ?? ""}.`} />
       ) : (
         <div className="space-y-3">
           {items.map((item) => (
@@ -285,10 +381,7 @@ export default function LieuxPage() {
                 </div>
                 {item.status === "PENDING" && !readOnly && (
                   <div className="flex flex-col gap-2 min-w-[140px]">
-                    <BtnPrimary
-                      onClick={() => handleApprove(item.id)}
-                      disabled={acting != null}
-                    >
+                    <BtnPrimary onClick={() => handleApprove(item.id)} disabled={acting != null}>
                       {acting === item.id ? "…" : "Publier dans SENGA"}
                     </BtnPrimary>
                     <button
@@ -318,6 +411,31 @@ export default function LieuxPage() {
           </button>
           <BtnPrimary onClick={handleReject} disabled={acting != null}>
             Confirmer le refus
+          </BtnPrimary>
+        </div>
+      </Modal>
+
+      <Modal open={editPoi != null} title="Modifier le lieu" onClose={() => setEditPoi(null)}>
+        <FieldLabel>Nom affiché dans l&apos;app</FieldLabel>
+        <TextInput value={editName} onChange={setEditName} placeholder="Ex. Marché Central" />
+        <div className="mt-3">
+          <FieldLabel>Adresse (optionnel)</FieldLabel>
+          <TextInput value={editAddress} onChange={setEditAddress} placeholder="Quartier, avenue…" />
+        </div>
+        <div className="mt-3">
+          <FieldLabel>Catégorie</FieldLabel>
+          <SelectInput value={editCategory} onChange={setEditCategory} options={CATEGORY_OPTIONS} />
+        </div>
+        <div className="mt-3">
+          <FieldLabel>Ville</FieldLabel>
+          <TextInput value={editCity} onChange={setEditCity} disabled={managedCity != null} />
+        </div>
+        <div className="flex gap-2 mt-4 justify-end">
+          <button type="button" className="px-4 py-2 text-sm" onClick={() => setEditPoi(null)}>
+            Annuler
+          </button>
+          <BtnPrimary onClick={() => void handleSaveEdit()} disabled={savingEdit}>
+            {savingEdit ? "Enregistrement…" : "Enregistrer"}
           </BtnPrimary>
         </div>
       </Modal>

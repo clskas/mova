@@ -983,6 +983,43 @@ export class AdminController {
     return this.adminService.seedPois(managed ?? city);
   }
 
+  @Get('poi-catalog')
+  @RequirePermissions(AdminPermission.POI_READ, AdminPermission.ZONES_READ)
+  @ApiOperation({ summary: 'Catalogue POI SENGA (places_of_interest)' })
+  listPoiCatalog(
+    @Request() req: { user: AdminJwtUser },
+    @Query('city') city?: string,
+    @Query('q') q?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.adminService.listPoiCatalog({
+      city: resolveManagedCityScope(req.user) ?? city,
+      q,
+      skip: Number(skip ?? 0),
+      take: Number(take ?? 80),
+    });
+  }
+
+  @Patch('poi-catalog/:id')
+  @RequirePermissions(AdminPermission.POI_WRITE, AdminPermission.ZONES_WRITE)
+  @ApiOperation({ summary: 'Modifier un lieu du catalogue SENGA (nom, adresse, catégorie…)' })
+  updatePoiCatalog(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body()
+    body: {
+      name?: string;
+      address?: string | null;
+      category?: string;
+      city?: string;
+      lat?: number;
+      lng?: number;
+    },
+  ) {
+    return this.adminService.updatePoiCatalog(id, body, resolveManagedCityScope(req.user));
+  }
+
   @Get('cities')
   @RequirePermissions(AdminPermission.ZONES_READ)
   @ApiOperation({ summary: 'Villes SENGA' })

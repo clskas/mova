@@ -21,6 +21,9 @@ end
 platform :ios do
   desc "Crée / synchronise certificats App Store (passager + chauffeur)"
   lane :sync_certificates do
+    # Required on GitHub Actions: temp keychain so codesign never waits on a GUI prompt
+    # (silent hang during `flutter build ipa` / xcodebuild archive).
+    setup_ci if ENV["CI"]
     readonly = ENV["MATCH_READONLY"].to_s.strip == "true"
     match(
       type: "appstore",

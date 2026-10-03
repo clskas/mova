@@ -490,6 +490,21 @@ jobs:
           test -f Podfile || { echo "::error::Podfile manquant dans mobile/ios — commit requis."; exit 1; }
           pod install --verbose
 
+      - name: Select Xcode 16 + CI signing prep
+        if: steps.ios_creds.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          # Prefer Xcode 16.4 when present (Swift `sending` + Flutter plugins).
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app
+          elif [ -d /Applications/Xcode_16.3.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.3.app
+          fi
+          xcodebuild -version
+          # Avoid Xcode package-plugin / macro fingerprint stalls on CI.
+          defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidatation -bool YES || true
+          defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES || true
+
       - name: Import signing certificates (match)
         if: steps.ios_creds.outputs.available == 'true'
         env:
@@ -500,10 +515,13 @@ jobs:
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
           MATCH_READONLY: ${{ vars.MATCH_READONLY || 'false' }}
+          CI: 'true'
         run: |
           cd mobile/ios
           bundle install
           bundle exec fastlane sync_certificates
+          security list-keychains -d user
+          security find-identity -v -p codesigning || true
 
       - name: Build ${{ matrix.flavor }} IPA
         id: build_ipa
@@ -511,15 +529,17 @@ jobs:
         working-directory: mobile
         timeout-minutes: 75
         env:
-          # Surface xcodebuild progress; avoid silent archive stalls.
           VERBOSE_SCRIPT_LOGGING: 'YES'
+          # Keep match CI keychain available for codesign during archive.
+          CI: 'true'
         run: |
           set -euo pipefail
           WEB_CLIENT="58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com"
           bash ios/ci_set_flavor.sh "${{ matrix.flavor }}"
           rm -rf ~/Library/Developer/Xcode/DerivedData/* || true
           echo "::group::flutter build ipa (${{ matrix.flavor }})"
-          flutter build ipa --release --verbose \
+          # No --verbose: huge showBuildSettings dumps hide real archive progress.
+          flutter build ipa --release \
             -t ${{ matrix.entry }} \
             --build-name=1.0.17 \
             --build-number=${{ github.run_number }} \
@@ -563,7 +583,7 @@ jobs:
       (startsWith(github.ref, 'refs/tags/v') ||
        (github.event_name == 'workflow_dispatch' &&
         (inputs.upload_ios_testflight == true || inputs.submit_ios_app_store == true)))
-    runs-on: macos-14
+    runs-on: macos-15
     environment: production-mobile
     timeout-minutes: 45
     steps:

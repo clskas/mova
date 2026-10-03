@@ -392,17 +392,30 @@ jobs:
           bundle exec fastlane promote_internal_to_production
 
   build-ios:
-    name: Build iOS (IPA)
+    name: Build iOS IPA (${{ matrix.flavor }})
     if: >
       github.repository != 'afri-soft-com/mova' &&
       (startsWith(github.ref, 'refs/tags/v') ||
        (github.event_name == 'workflow_dispatch' &&
         (inputs.build_ios == true || inputs.upload_ios_testflight == true || inputs.submit_ios_app_store == true)))
-    runs-on: macos-latest
-    # Passenger + driver IPA (+ match) regularly exceeds 60m.
-    timeout-minutes: 180
+    runs-on: macos-14
+    # Parallel passenger/driver — hang on one must not block the other forever.
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: passenger
+            entry: lib/main_passenger.dart
+            export_plist: ios/ExportOptions.plist
+            artifact: mova-passenger-ipa
+          - flavor: driver
+            entry: lib/main_driver.dart
+            export_plist: ios/ExportOptions-driver.plist
+            artifact: mova-driver-ipa
     outputs:
-      ipa_built: ${{ steps.build_passenger_ipa.outcome == 'success' || steps.build_driver_ipa.outcome == 'success' }}
+      # true if either matrix leg uploaded an IPA (upload job tolerates missing artifacts).
+      ipa_built: ${{ steps.mark.outputs.built }}
     steps:
       - uses: actions/checkout@v4
 
@@ -474,7 +487,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f Podfile || { echo "::error::Podfile manquant dans mobile/ios — commit requis."; exit 1; }
-          pod install
+          pod install --verbose
 
       - name: Import signing certificates (match)
         if: steps.ios_creds.outputs.available == 'true'
@@ -485,90 +498,71 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-          # First bootstrap creates certs; set repo variable MATCH_READONLY=true later.
           MATCH_READONLY: ${{ vars.MATCH_READONLY || 'false' }}
         run: |
           cd mobile/ios
           bundle install
           bundle exec fastlane sync_certificates
 
-      - name: Build passenger IPA (Senga)
-        id: build_passenger_ipa
+      - name: Build ${{ matrix.flavor }} IPA
+        id: build_ipa
         if: steps.ios_creds.outputs.available == 'true'
         working-directory: mobile
+        timeout-minutes: 75
+        env:
+          # Surface xcodebuild progress; avoid silent archive stalls.
+          VERBOSE_SCRIPT_LOGGING: 'YES'
         run: |
           set -euo pipefail
           WEB_CLIENT="58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com"
-          bash ios/ci_set_flavor.sh passenger
-          flutter build ipa --release \
-            -t lib/main_passenger.dart \
+          bash ios/ci_set_flavor.sh "${{ matrix.flavor }}"
+          rm -rf ~/Library/Developer/Xcode/DerivedData/* || true
+          echo "::group::flutter build ipa (${{ matrix.flavor }})"
+          flutter build ipa --release --verbose \
+            -t ${{ matrix.entry }} \
             --build-name=1.0.17 \
             --build-number=${{ github.run_number }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT \
-            --export-options-plist=ios/ExportOptions.plist
-          # Stash outside mobile/build — flutter clean (driver step) wipes build/.
-          mkdir -p "$RUNNER_TEMP/mova-ipa/passenger"
+            --export-options-plist=${{ matrix.export_plist }}
+          echo "::endgroup::"
+          mkdir -p "$RUNNER_TEMP/mova-ipa/${{ matrix.flavor }}"
           shopt -s nullglob
           for f in build/ios/ipa/*.ipa; do
-            mv "$f" "$RUNNER_TEMP/mova-ipa/passenger/"
+            mv "$f" "$RUNNER_TEMP/mova-ipa/${{ matrix.flavor }}/"
           done
-          ls -la "$RUNNER_TEMP/mova-ipa/passenger/"
+          ls -la "$RUNNER_TEMP/mova-ipa/${{ matrix.flavor }}/"
+          test -n "$(ls -A "$RUNNER_TEMP/mova-ipa/${{ matrix.flavor }}/"*.ipa 2>/dev/null)"
 
-      - name: Upload passenger IPA artifact
-        if: steps.build_passenger_ipa.outcome == 'success'
+      - name: Upload ${{ matrix.flavor }} IPA artifact
+        if: steps.build_ipa.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: mova-passenger-ipa
-          path: ${{ runner.temp }}/mova-ipa/passenger/*.ipa
+          name: ${{ matrix.artifact }}
+          path: ${{ runner.temp }}/mova-ipa/${{ matrix.flavor }}/*.ipa
           retention-days: 30
 
-      - name: Build driver IPA (Senga Driver)
-        id: build_driver_ipa
-        if: steps.ios_creds.outputs.available == 'true'
-        working-directory: mobile
+      - name: Mark IPA built
+        id: mark
+        if: always()
         run: |
-          set -euo pipefail
-          WEB_CLIENT="58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com"
-          bash ios/ci_set_flavor.sh driver
-          # Clean previous Runner.app product so bundle id / signing switch sticks.
-          flutter clean
-          flutter pub get
-          (cd ios && pod install)
-          flutter build ipa --release \
-            -t lib/main_driver.dart \
-            --build-name=1.0.17 \
-            --build-number=${{ github.run_number }} \
-            --dart-define=API_URL=${{ steps.urls.outputs.api }} \
-            --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
-            --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT \
-            --export-options-plist=ios/ExportOptions-driver.plist
-          mkdir -p "$RUNNER_TEMP/mova-ipa/driver"
-          shopt -s nullglob
-          for f in build/ios/ipa/*.ipa; do
-            mv "$f" "$RUNNER_TEMP/mova-ipa/driver/"
-          done
-          ls -la "$RUNNER_TEMP/mova-ipa/driver/"
-          bash ios/ci_set_flavor.sh passenger
-
-      - name: Upload driver IPA artifact
-        if: steps.build_driver_ipa.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: mova-driver-ipa
-          path: ${{ runner.temp }}/mova-ipa/driver/*.ipa
-          retention-days: 30
+          if [ "${{ steps.build_ipa.outcome }}" = "success" ]; then
+            echo "built=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "built=false" >> "$GITHUB_OUTPUT"
+          fi
 
   upload-ios:
     name: Upload TestFlight + App Store
     needs: build-ios
     if: >
-      needs.build-ios.outputs.ipa_built == 'true' &&
+      always() &&
+      needs.build-ios.result != 'cancelled' &&
       (startsWith(github.ref, 'refs/tags/v') ||
        (github.event_name == 'workflow_dispatch' &&
         (inputs.upload_ios_testflight == true || inputs.submit_ios_app_store == true)))
-    runs-on: macos-latest
+    runs-on: macos-14
     environment: production-mobile
     timeout-minutes: 45
     steps:
@@ -607,9 +601,13 @@ jobs:
             echo "::notice::APP_STORE_CONNECT_API_KEY non configuré — publication iOS ignorée."
             exit 0
           fi
-          echo "SUBMIT_APP_STORE=${SUBMIT_APP_STORE}"
           PASSENGER_IPA="$(ls ../build/ios/ipa/passenger/*.ipa 2>/dev/null | head -1 || true)"
           DRIVER_IPA="$(ls ../build/ios/ipa/driver/*.ipa 2>/dev/null | head -1 || true)"
+          if [ -z "${PASSENGER_IPA}" ] && [ -z "${DRIVER_IPA}" ]; then
+            echo "::error::Aucun IPA téléchargé — build iOS a échoué."
+            exit 1
+          fi
+          echo "SUBMIT_APP_STORE=${SUBMIT_APP_STORE}"
           echo "passenger_ipa=${PASSENGER_IPA:-<none>}"
           echo "driver_ipa=${DRIVER_IPA:-<none>}"
           bundle exec fastlane release_both \

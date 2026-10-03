@@ -133,7 +133,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   Future<void> _loadCities() async {
     final api = ref.read(apiClientProvider);
     final result = await api.get('/geo/service-areas');
-    final names = <String>[];
+    final names = <String>{..._fallbackCities};
     if (result is Success) {
       final data = result.data;
       final list = data is List
@@ -143,14 +143,16 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
               : const [];
       for (final row in list) {
         if (row is Map && row['name'] != null) {
-          names.add(row['name'].toString());
+          final n = row['name'].toString().trim();
+          if (n.isNotEmpty) names.add(n);
         }
       }
     }
-    names.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final sorted = names.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     if (!mounted) return;
     setState(() {
-      _cities = names.isNotEmpty ? names : List<String>.from(_fallbackCities);
+      _cities = sorted;
       if (_operatingCity.isNotEmpty && !_cities.contains(_operatingCity)) {
         _cities = [..._cities, _operatingCity]..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
       }
@@ -742,9 +744,14 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     final options = _cities.isNotEmpty ? _cities : _fallbackCities;
     return Autocomplete<String>(
       initialValue: TextEditingValue(text: _operatingCity),
+      optionsMaxHeight: 280,
       optionsBuilder: (TextEditingValue text) {
         final q = text.text.trim().toLowerCase();
-        if (q.isEmpty) return options;
+        // Champ prérempli (ex. Kinshasa) : montrer toutes les villes pour pouvoir changer.
+        if (q.isEmpty ||
+            (_operatingCity.isNotEmpty && q == _operatingCity.trim().toLowerCase())) {
+          return options;
+        }
         return options.where((c) => c.toLowerCase().contains(q));
       },
       onSelected: (value) {
@@ -758,10 +765,19 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           controller: controller,
           focusNode: focusNode,
           scrollPadding: _fieldScrollPadding,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Ville d\'opération',
-            hintText: 'Rechercher une ville de la RDC',
-            suffixIcon: Icon(Icons.arrow_drop_down),
+            hintText: 'Rechercher parmi ${options.length} villes RDC',
+            helperText: 'Capitales provinciales et grandes villes',
+            suffixIcon: IconButton(
+              tooltip: 'Effacer pour voir toutes les villes',
+              icon: const Icon(Icons.clear),
+              onPressed: () {
+                controller.clear();
+                setState(() => _operatingCity = '');
+                focusNode.requestFocus();
+              },
+            ),
           ),
           onChanged: (v) => _operatingCity = v,
           onSubmitted: (_) => onFieldSubmitted(),

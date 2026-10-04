@@ -541,9 +541,16 @@ jobs:
           VERBOSE_SCRIPT_LOGGING: 'YES'
           # Keep match CI keychain available for codesign during archive.
           CI: 'true'
+          GOOGLE_IOS_CLIENT_ID_PASSENGER: ${{ secrets.GOOGLE_IOS_CLIENT_ID_PASSENGER }}
+          GOOGLE_IOS_CLIENT_ID_DRIVER: ${{ secrets.GOOGLE_IOS_CLIENT_ID_DRIVER }}
         run: |
           set -euo pipefail
           WEB_CLIENT="58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com"
+          if [ "${{ matrix.flavor }}" = "driver" ]; then
+            IOS_CLIENT="${GOOGLE_IOS_CLIENT_ID_DRIVER:-}"
+          else
+            IOS_CLIENT="${GOOGLE_IOS_CLIENT_ID_PASSENGER:-}"
+          fi
           bash ios/ci_set_flavor.sh "${{ matrix.flavor }}"
           rm -rf ~/Library/Developer/Xcode/DerivedData/* || true
           echo "::group::flutter build ipa (${{ matrix.flavor }})"
@@ -555,6 +562,7 @@ jobs:
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT \
+            --dart-define=GOOGLE_IOS_CLIENT_ID=$IOS_CLIENT \
             --export-options-plist=${{ matrix.export_plist }}
           echo "::endgroup::"
           mkdir -p "$RUNNER_TEMP/mova-ipa/${{ matrix.flavor }}"

@@ -44,6 +44,9 @@ export const PRODUCTION_GOOGLE_CLIENT_IDS = [
   '58917716638-9ljd3pbhhlshe7vqmivla9vic5tjb692.apps.googleusercontent.com',
   '58917716638-puc6hs2tlpv93qan7qmv7d0v53jjf72g.apps.googleusercontent.com',
   '58917716638-picm13g7u9td6vjuljjuknfvf90pp6up.apps.googleusercontent.com',
+  // iOS — Senga (cd.mova.mova) + Senga Driver (cd.mova.mova.driver)
+  '58917716638-9qupcijrhjr7dvd5v1efmi9elitmndnd.apps.googleusercontent.com',
+  '58917716638-q5i6cr1hv085ri1k7tpot6sggvcv9qih.apps.googleusercontent.com',
 ] as const;
 
 export function collectGoogleAudiences(env: NodeJS.ProcessEnv = process.env): string[] {

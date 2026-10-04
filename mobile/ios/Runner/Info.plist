@@ -59,6 +59,19 @@
 	<string>SENGA utilise votre position en arrière-plan pour que les chauffeurs restent localisables pendant une course ou une livraison active.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>SENGA utilise votre position en arrière-plan pour que les chauffeurs restent localisables pendant une course ou une livraison active.</string>
-	<!-- Google Sign-In (iOS): add GIDClientID + URL scheme from GOOGLE_IOS_CLIENT_ID when shipping iOS. -->
+	<!-- Google Sign-In (iOS): ci_set_flavor.sh sets GIDClientID + URL scheme per flavor. -->
+	<key>GIDClientID</key>
+	<string>GOOGLE_IOS_CLIENT_ID_PLACEHOLDER</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>GOOGLE_IOS_URL_SCHEME_PLACEHOLDER</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

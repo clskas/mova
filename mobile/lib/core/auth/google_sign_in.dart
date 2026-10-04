@@ -9,6 +9,10 @@ import '../config/market_config.dart';
 /// SDK returns an ID token the backend can verify (`GOOGLE_CLIENT_ID`).
 /// Do not pass an Android OAuth client ID here (that yields a missing idToken).
 ///
+/// iOS: pass the **iOS** OAuth client as `clientId` (also `GIDClientID` +
+/// reversed URL scheme in Info.plist). Keep `serverClientId` = Web so the
+/// ID token `aud` matches mova-auth.
+///
 /// DEVELOPER_ERROR / ApiException 10 is Play Services (package + SHA-1), not
 /// our API. Rebuild AAB does not fix it. Google Cloud allows **one SHA-1 per
 /// Android OAuth client**. Create a separate Android client per fingerprint,
@@ -22,12 +26,18 @@ import '../config/market_config.dart';
 ///
 /// Missing Play App Signing SHA-1 → error 10 on Play-installed builds.
 GoogleSignIn? _googleSignInInstance;
-GoogleSignIn get _googleSignIn =>
-    _googleSignInInstance ??= GoogleSignIn(
-      serverClientId: MarketConfig.googleServerClientId.isEmpty
-          ? null
-          : MarketConfig.googleServerClientId,
-    );
+GoogleSignIn get _googleSignIn {
+  if (_googleSignInInstance != null) return _googleSignInInstance!;
+  final serverId = MarketConfig.googleServerClientId.trim();
+  final iosId = MarketConfig.googleIosClientId.trim();
+  final useIosClient =
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS && iosId.isNotEmpty;
+  _googleSignInInstance = GoogleSignIn(
+    clientId: useIosClient ? iosId : null,
+    serverClientId: serverId.isEmpty ? null : serverId,
+  );
+  return _googleSignInInstance!;
+}
 
 /// User-facing Google Sign-In error. Never use this on the SMS/PIN path.
 String googleSignInErrorMessage(Object error) {
@@ -41,7 +51,12 @@ String googleSignInErrorMessage(Object error) {
       return 'Connexion Google annulée.';
     }
     if (error.code == 'id_token_missing') {
-      return 'Google n\'a pas renvoyé de jeton. Le client OAuth Web (serverClientId) est requis, pas un client Android. Utilisez le SMS.';
+      return 'Google n\'a pas renvoyé de jeton. Client OAuth Web (serverClientId) requis ; sur iOS aussi GIDClientID + URL scheme. Utilisez le SMS.';
+    }
+    if (error.code == 'google_sign_in' ||
+        blob.contains('no active configuration') ||
+        blob.contains('gidclientid')) {
+      return 'Google Sign-In iOS non configuré (client OAuth iOS manquant). Utilisez le SMS.';
     }
     if (error.code == '12500' || blob.contains('12500')) {
       return 'Connexion Google indisponible sur cet appareil. Utilisez le SMS.';

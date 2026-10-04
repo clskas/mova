@@ -53,6 +53,16 @@ class MarketConfig {
     defaultValue: '58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com',
   );
 
+  /// iOS OAuth client ID (Google Cloud → Credentials → iOS). Required for
+  /// native Google Sign-In on iPhone; must match the app bundle ID flavor.
+  /// `--dart-define=GOOGLE_IOS_CLIENT_ID=….apps.googleusercontent.com`
+  /// Also set `GIDClientID` + reversed URL scheme in `ios/Runner/Info.plist`
+  /// (patched per flavor by `ios/ci_set_flavor.sh`).
+  static const googleIosClientId = String.fromEnvironment(
+    'GOOGLE_IOS_CLIENT_ID',
+    defaultValue: '',
+  );
+
   /// `--dart-define=API_URL=...` (vide = défaut selon mode).
   static const _apiFromEnv = String.fromEnvironment('API_URL', defaultValue: '');
 

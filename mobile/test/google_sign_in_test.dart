@@ -12,6 +12,10 @@ void main() {
     expect(MarketConfig.googleServerClientId.contains('-h0rc1c3nej5n68clebbriph4nftprr09'), isFalse);
   });
 
+  test('iOS client id defaults empty until OAuth iOS clients are wired', () {
+    expect(MarketConfig.googleIosClientId, isEmpty);
+  });
+
   test('maps Play Services DEVELOPER_ERROR 10 to SHA-1 copy, not a rebuild hint', () {
     final msg = googleSignInErrorMessage(
       PlatformException(code: 'sign_in_failed', message: 'ApiException: 10', details: 'DEVELOPER_ERROR'),

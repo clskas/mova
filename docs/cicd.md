@@ -130,7 +130,8 @@ Le job `build-ios` tourne sur `macos-latest`. Un Mac local n’est pas requis.
 
 6. **Actions → Mobile Release → Run workflow** : cocher **build_ios** et/ou **upload_ios_testflight** (TestFlight déclenche aussi le build IPA).
 
-L’app chauffeur iOS n’a pas encore de schéma / Bundle ID dédié — seul le **passager** part sur TestFlight.
+Apps ASC : **Senga** (`cd.mova.mova`) + **Senga Driver** (`cd.mova.mova.driver`).  
+CI matrix IPA pour les deux flavors ; Google Sign-In iOS via clients OAuth + `ci_set_flavor.sh` (`GIDClientID` / URL scheme).
 
 ### iOS (détail technique)
 

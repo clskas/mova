@@ -39,7 +39,7 @@ Les **client IDs OAuth** (`….apps.googleusercontent.com`) sont **publics** (pa
 
 Côté Nest (sans préfixe gateway) : `/auth/google`, `/auth/google/verify`, etc.
 
-**iOS :** le repo prévoit `GOOGLE_IOS_CLIENT_ID` côté auth, mais la production SENGA est centrée **Android + Web**. Adapter iOS = client OAuth iOS + URL schemes / `GoogleService-Info.plist` (hors scope Flutter actuel).
+**iOS :** clients OAuth iOS (un par bundle ID) + `GIDClientID` / URL scheme via `mobile/ios/ci_set_flavor.sh`, `GOOGLE_IOS_CLIENT_ID` (dart-define) et Render `GOOGLE_IOS_CLIENT_ID` (audiences). SMS OTP fonctionne sans cette config.
 
 ---
 
@@ -143,12 +143,16 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=VOTRE_CLIENT_WEB.apps.googleusercontent.com
 
 Doit être **identique** au `GOOGLE_CLIENT_ID` du backend (même client Web).
 
-### 3.3 iOS (si vous l’ajoutez)
+### 3.3 iOS (Senga + Senga Driver)
 
-1. Client OAuth iOS dans Google Cloud (bundle ID).  
-2. Configurer URL scheme / `GIDClientID` selon la doc `google_sign_in`.  
-3. Ajouter l’ID client à `GOOGLE_IOS_CLIENT_ID` (audiences backend).  
-4. Utiliser le **même** `serverClientId` Web pour obtenir un ID token vérifiable.
+1. Google Cloud → **APIs & Services → Credentials → Create credentials → OAuth client ID → iOS**  
+   - Passager : bundle ID `cd.mova.mova`  
+   - Chauffeur : bundle ID `cd.mova.mova.driver`  
+   - Team ID Apple : `SW53MG3W9P`  
+2. Secrets GitHub (`production-mobile`) : `GOOGLE_IOS_CLIENT_ID_PASSENGER`, `GOOGLE_IOS_CLIENT_ID_DRIVER`  
+   → `ci_set_flavor.sh` écrit `GIDClientID` + scheme `com.googleusercontent.apps.…` dans `Info.plist` ; le build IPA passe `--dart-define=GOOGLE_IOS_CLIENT_ID=…`.  
+3. Render `mova-auth` : `GOOGLE_IOS_CLIENT_ID` = les deux IDs (CSV) — aussi ajoutés à `PRODUCTION_GOOGLE_CLIENT_IDS` si stables.  
+4. Garder `serverClientId` = client **Web** (même qu’Android) pour un ID token vérifiable.
 
 ---
 

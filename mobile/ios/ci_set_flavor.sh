@@ -10,10 +10,22 @@ if [[ "$FLAVOR" == "driver" ]]; then
   BUNDLE_ID="cd.mova.mova.driver"
   DISPLAY_NAME="Senga Driver"
   PROFILE='match AppStore cd.mova.mova.driver'
+  ICON_SET="AppIcon-driver.appiconset"
 else
   BUNDLE_ID="cd.mova.mova"
   DISPLAY_NAME="Senga"
   PROFILE='match AppStore cd.mova.mova'
+  ICON_SET="AppIcon-passenger.appiconset"
+fi
+
+# Swap App Store / home-screen icon (ASC list icon comes from the IPA AppIcon).
+ICON_SRC="$ROOT/Runner/Assets.xcassets/${ICON_SET}"
+ICON_DST="$ROOT/Runner/Assets.xcassets/AppIcon.appiconset"
+if [[ -d "$ICON_SRC" ]]; then
+  cp -f "$ICON_SRC"/*.png "$ICON_DST/"
+  echo "AppIcon ← ${ICON_SET}"
+else
+  echo "WARNING: missing ${ICON_SRC} — AppIcon not updated" >&2
 fi
 
 # Only the app target uses PRODUCT_BUNDLE_IDENTIFIER = cd.mova.mova; (tests use .RunnerTests).

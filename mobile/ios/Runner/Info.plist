@@ -53,7 +53,12 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>SENGA accède à vos photos pour joindre une image au colis.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>SENGA utilise votre position pour définir le point de départ ou d'enlèvement.</string>
+	<string>SENGA utilise votre position pour définir le point de départ ou d'enlèvement, et pour suivre les courses en cours.</string>
+	<!-- Required by Apple (ITMS-90683) when location APIs / SDKs may request Always authorization. -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>SENGA utilise votre position en arrière-plan pour que les chauffeurs restent localisables pendant une course ou une livraison active.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>SENGA utilise votre position en arrière-plan pour que les chauffeurs restent localisables pendant une course ou une livraison active.</string>
 	<!-- Google Sign-In (iOS): add GIDClientID + URL scheme from GOOGLE_IOS_CLIENT_ID when shipping iOS. -->
 </dict>
 </plist>

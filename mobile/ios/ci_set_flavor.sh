@@ -22,7 +22,8 @@ fi
 ICON_SRC="$ROOT/Runner/Assets.xcassets/${ICON_SET}"
 ICON_DST="$ROOT/Runner/Assets.xcassets/AppIcon.appiconset"
 if [[ -d "$ICON_SRC" ]]; then
-  cp -f "$ICON_SRC"/*.png "$ICON_DST/"
+  # Only Icon-App-* (Contents.json); ignore any leftover flavor-prefixed PNGs.
+  cp -f "$ICON_SRC"/Icon-App-*.png "$ICON_DST/"
   echo "AppIcon ← ${ICON_SET}"
 else
   echo "WARNING: missing ${ICON_SRC} — AppIcon not updated" >&2

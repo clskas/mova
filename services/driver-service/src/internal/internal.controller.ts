@@ -56,6 +56,8 @@ class UpdateDriverStatusDto {
   @IsOptional()
   @IsIn(['BOTH', 'RIDES_ONLY', 'DELIVERIES_ONLY'])
   serviceMode?: 'BOTH' | 'RIDES_ONLY' | 'DELIVERIES_ONLY';
+  /** Ville d'opération SENGA (admin). */
+  @IsOptional() @IsString() operatingCity?: string;
   /** @deprecated Prefer serviceMode. */
   @IsOptional()
   @Transform(({ value }) => {

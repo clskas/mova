@@ -92,6 +92,12 @@ class DriverDeliveryModeDto {
   acceptsDeliveries?: boolean;
 }
 
+class DriverOperatingCityDto {
+  @ApiProperty({ example: 'Kinshasa', description: 'Ville SENGA (service area RDC)' })
+  @IsString()
+  operatingCity: string;
+}
+
 @ApiTags('admin')
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -260,6 +266,18 @@ export class AdminController {
       { serviceMode: dto.serviceMode, acceptsDeliveries: dto.acceptsDeliveries },
       resolveManagedCityScope(req.user),
     );
+  }
+
+  @Patch('drivers/:userId/operating-city')
+  @RequirePermissions(AdminPermission.DRIVERS_WRITE)
+  @ApiOperation({ summary: 'Modifier la ville d\'opération (SUPER_ADMIN / ADMIN)' })
+  driverOperatingCity(
+    @Request() req: { user: AdminJwtUser },
+    @Param('userId') userId: string,
+    @Body() dto: DriverOperatingCityDto,
+  ) {
+    this.assertOpsAdmin(req.user);
+    return this.adminService.setDriverOperatingCity(userId, dto.operatingCity, resolveManagedCityScope(req.user));
   }
 
   @Get('kyc/pending')

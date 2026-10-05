@@ -805,6 +805,14 @@ export class AdminService {
       body: JSON.stringify({ serviceMode }),
     });
   }
+
+  async setDriverOperatingCity(userId: string, operatingCity: string, managedCity?: string | null) {
+    await this.getDriver(userId, managedCity);
+    return this.proxy('driver', `/internal/drivers/${userId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ operatingCity }),
+    });
+  }
   pendingKyc(status?: string, managedCity?: string | null) {
     const params = new URLSearchParams();
     if (status) params.set('status', status);

@@ -2149,6 +2149,13 @@ export async function setDriverServiceMode(userId: string, serviceMode: DriverSe
   });
 }
 
+export async function setDriverOperatingCity(userId: string, operatingCity: string) {
+  return apiFetch<AdminDriverDetail>(`/api/admin/drivers/${userId}/operating-city`, {
+    method: "PATCH",
+    body: JSON.stringify({ operatingCity }),
+  });
+}
+
 /** @deprecated Prefer setDriverServiceMode */
 export async function setDriverAcceptsDeliveries(userId: string, acceptsDeliveries: boolean) {
   return setDriverServiceMode(userId, acceptsDeliveries ? "BOTH" : "RIDES_ONLY");

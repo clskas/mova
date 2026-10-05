@@ -7,12 +7,14 @@ import {
   apiFetch,
   fetchDriverDetail,
   fetchDrivers,
+  MOVA_CITIES,
   purgeDriverProfile,
   regenerateDriverActivationPin,
   reviewDriverKyc,
   reviewDriverDocumentsRenewal,
   reviewVehicleTypeApproval,
   runKycOcr,
+  setDriverOperatingCity,
   setDriverStatus,
   setDriverServiceMode,
   type AdminDriver,
@@ -33,6 +35,7 @@ import {
   Modal,
   PageHeader,
   SearchInput,
+  SelectInput,
   StatusBadge,
 } from "@/components/ui";
 
@@ -179,6 +182,7 @@ export default function ChauffeursPage() {
   const readOnly = !canWrite("chauffeurs");
   const canReviewKyc = canWrite("kyc");
   const canSetVehicleType = role === "SUPER_ADMIN" || role === "ADMIN";
+  const canEditOperatingCity = role === "SUPER_ADMIN" || role === "ADMIN";
   const [drivers, setDrivers] = useState<AdminDriver[]>([]);
   const [search, setSearch] = useState("");
   const [includeHidden, setIncludeHidden] = useState(false);
@@ -194,6 +198,7 @@ export default function ChauffeursPage() {
   const [smsNotice, setSmsNotice] = useState<string | null>(null);
   const [vehicleTypeRejectNotes, setVehicleTypeRejectNotes] = useState("");
   const [selectedVehicleType, setSelectedVehicleType] = useState("");
+  const [editOperatingCity, setEditOperatingCity] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -215,6 +220,7 @@ export default function ChauffeursPage() {
       setDetail(null);
       setActivationPin(null);
       setSmsNotice(null);
+      setEditOperatingCity("");
       return;
     }
     let cancelled = false;
@@ -223,6 +229,7 @@ export default function ChauffeursPage() {
       .then((d) => {
         if (!cancelled) {
           setDetail(d);
+          setEditOperatingCity(d.operatingCity?.trim() || "");
           const vehicle = activeDriverVehicle(d);
           setSelectedVehicleType(vehicle?.type ?? "");
           setVehicleTypeRejectNotes("");
@@ -252,11 +259,36 @@ export default function ChauffeursPage() {
         d.publicId?.toLowerCase().includes(q) ||
         d.kycStatus?.toLowerCase().includes(q) ||
         d.phone?.toLowerCase().includes(q) ||
+        d.operatingCity?.toLowerCase().includes(q) ||
         `${d.firstName ?? ""} ${d.lastName ?? ""}`.toLowerCase().includes(q) ||
         d.vehicles?.some((v) => v.plateNumber.toLowerCase().includes(q))
       );
     });
   }, [drivers, search, roleFilter]);
+
+  async function saveOperatingCity() {
+    if (!selectedId || !editOperatingCity.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await setDriverOperatingCity(selectedId, editOperatingCity.trim());
+      const refreshed =
+        updated && typeof updated === "object" && "operatingCity" in updated
+          ? (updated as AdminDriverDetail)
+          : await fetchDriverDetail(selectedId);
+      setDetail(refreshed);
+      setEditOperatingCity(refreshed.operatingCity?.trim() || editOperatingCity.trim());
+      setDrivers((prev) =>
+        prev.map((d) =>
+          d.userId === selectedId ? { ...d, operatingCity: refreshed.operatingCity ?? editOperatingCity.trim() } : d,
+        ),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de modifier la ville d'opération");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function setServiceMode(serviceMode: DriverServiceMode) {
     if (!selectedId) return;
@@ -500,6 +532,7 @@ export default function ChauffeursPage() {
                 <tr className="border-b text-left text-gray-500">
                   <th className="p-3">Identifiant</th>
                   <th className="p-3">Compte</th>
+                  <th className="p-3">Ville</th>
                   <th className="p-3">Étape</th>
                   <th className="p-3">Rôle</th>
                   <th className="p-3">Docs</th>
@@ -528,6 +561,7 @@ export default function ChauffeursPage() {
                         </>
                       )}
                     </td>
+                    <td className="p-3 text-xs">{d.operatingCity?.trim() || "—"}</td>
                     <td className="p-3 text-xs">{driverStageLabel(d)}</td>
                     <td className="p-3 text-xs">
                       <span
@@ -579,6 +613,10 @@ export default function ChauffeursPage() {
                     : `présent, rôle ${selected.userRole ?? detail.user?.role ?? "?"}`}
               </p>
               <p><span className="text-gray-500">KYC:</span> <StatusBadge status={selected.kycStatus} /></p>
+              <p>
+                <span className="text-gray-500">Ville d&apos;opération:</span>{" "}
+                {(detail?.operatingCity ?? selected.operatingCity)?.trim() || "—"}
+              </p>
               <p><span className="text-gray-500">Étape:</span> {driverStageLabel(selected)}</p>
               <p>
                 <span className="text-gray-500">Rôle service:</span>{" "}
@@ -1020,6 +1058,45 @@ export default function ChauffeursPage() {
                 <BtnDanger onClick={() => reviewKyc(false)} disabled={saving}>
                   Révoquer KYC
                 </BtnDanger>
+              </div>
+            )}
+            {canEditOperatingCity && (
+              <div className="space-y-2 pt-2 border-t">
+                <p className="text-xs text-gray-500">Ville d&apos;opération — SuperAdmin / Admin uniquement.</p>
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="min-w-[200px] flex-1">
+                    <SelectInput
+                      value={editOperatingCity}
+                      onChange={setEditOperatingCity}
+                      disabled={saving}
+                      options={[
+                        { value: "", label: "Choisir une ville…" },
+                        ...MOVA_CITIES.map((c) => ({ value: c, label: c })),
+                        ...((detail?.operatingCity || selected.operatingCity) &&
+                        !(MOVA_CITIES as readonly string[]).includes(
+                          (detail?.operatingCity ?? selected.operatingCity ?? "").trim(),
+                        )
+                          ? [
+                              {
+                                value: (detail?.operatingCity ?? selected.operatingCity ?? "").trim(),
+                                label: (detail?.operatingCity ?? selected.operatingCity ?? "").trim(),
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
+                  </div>
+                  <BtnSuccess
+                    onClick={saveOperatingCity}
+                    disabled={
+                      saving ||
+                      !editOperatingCity.trim() ||
+                      editOperatingCity.trim() === (detail?.operatingCity ?? selected.operatingCity ?? "").trim()
+                    }
+                  >
+                    Enregistrer la ville
+                  </BtnSuccess>
+                </div>
               </div>
             )}
             {!readOnly && (

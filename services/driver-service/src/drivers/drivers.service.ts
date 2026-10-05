@@ -1484,6 +1484,7 @@ export class DriversService {
         : null,
       licenseNumber: profile?.licenseNumber,
       idDocumentNumber: profile?.idDocumentNumber,
+      operatingCity: profile?.operatingCity ?? null,
       licenseExpiry: profile?.licenseExpiry,
       insuranceExpiry: profile?.insuranceExpiry,
       technicalInspectionExpiry: profile?.technicalInspectionExpiry,
@@ -1551,10 +1552,27 @@ export class DriversService {
       serviceMode?: 'BOTH' | 'RIDES_ONLY' | 'DELIVERIES_ONLY';
       acceptsDeliveries?: boolean;
       acceptsRides?: boolean;
+      operatingCity?: string;
     },
   ) {
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
     if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+
+    if (data.operatingCity !== undefined) {
+      const area = findServiceAreaByName(data.operatingCity);
+      if (!area) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'Choisissez une ville SENGA de la RDC.',
+        );
+      }
+      await this.prisma.driverProfile.update({
+        where: { userId },
+        data: { operatingCity: area.name },
+      });
+      return this.getDriverAdminDetail(userId);
+    }
 
     if (
       data.serviceMode !== undefined ||

@@ -243,38 +243,42 @@ def submit_version(token: str, app_id: str, version_id: str) -> None:
         )
         submission = created["data"]
     submission_id = submission["id"]
-    print(f"reviewSubmission id={submission_id} state={(submission.get('attributes') or {}).get('state')}")
+    sub_state = (submission.get("attributes") or {}).get("state")
+    print(f"reviewSubmission id={submission_id} state={sub_state}")
 
-    # Attach version if not already an item
-    items = api("GET", f"/v1/reviewSubmissions/{submission_id}/items", token)
-    already = False
-    for item in items.get("data") or []:
-        rel = ((item.get("relationships") or {}).get("appStoreVersion") or {}).get("data") or {}
-        if rel.get("id") == version_id:
-            already = True
-            break
-    if not already:
-        api(
-            "POST",
-            "/v1/reviewSubmissionItems",
-            token,
-            {
-                "data": {
-                    "type": "reviewSubmissionItems",
-                    "relationships": {
-                        "reviewSubmission": {
-                            "data": {"type": "reviewSubmissions", "id": submission_id}
+    # UNRESOLVED_ISSUES already contains the rejected version — do not add items.
+    if sub_state != "UNRESOLVED_ISSUES":
+        items = api("GET", f"/v1/reviewSubmissions/{submission_id}/items", token)
+        already = False
+        for item in items.get("data") or []:
+            rel = ((item.get("relationships") or {}).get("appStoreVersion") or {}).get("data") or {}
+            if rel.get("id") == version_id:
+                already = True
+                break
+        if not already:
+            api(
+                "POST",
+                "/v1/reviewSubmissionItems",
+                token,
+                {
+                    "data": {
+                        "type": "reviewSubmissionItems",
+                        "relationships": {
+                            "reviewSubmission": {
+                                "data": {"type": "reviewSubmissions", "id": submission_id}
+                            },
+                            "appStoreVersion": {
+                                "data": {"type": "appStoreVersions", "id": version_id}
+                            },
                         },
-                        "appStoreVersion": {
-                            "data": {"type": "appStoreVersions", "id": version_id}
-                        },
-                    },
-                }
-            },
-        )
-        print("attached appStoreVersion to reviewSubmission")
+                    }
+                },
+            )
+            print("attached appStoreVersion to reviewSubmission")
+        else:
+            print("appStoreVersion already on reviewSubmission")
     else:
-        print("appStoreVersion already on reviewSubmission")
+        print("UNRESOLVED_ISSUES — resubmitting existing items after demo notes update")
 
     api(
         "PATCH",

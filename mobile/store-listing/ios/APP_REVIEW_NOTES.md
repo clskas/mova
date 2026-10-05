@@ -92,7 +92,9 @@ python mobile/store-listing/ios/_gen_passenger_app_review_video.py
 
 ## ASC reply checklist
 
-1. App Store Connect → app → **App Review** / Resolution Center
-2. Paste **Notes** + set demo username/password
-3. Attach the matching MP4
-4. **Submit for Review** (or Reply to the rejection message)
+1. Demo username / password / notes are pushed via workflow `iOS App Review Resubmit` (API).
+2. App Store Connect → each app → **App Review** / Resolution Center
+3. Attach the matching MP4 (API cannot attach video):
+   - Driver → `senga-driver-app-review-walkthrough.mp4`
+   - Passenger → `senga-passenger-app-review-walkthrough.mp4`
+4. Confirm **Submit for Review** succeeded (workflow PATCH `reviewSubmissions.submitted=true`).

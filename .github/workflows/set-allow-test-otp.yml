@@ -1,0 +1,46 @@
+# One-shot: upsert ALLOW_TEST_OTP=true on mova-auth (App Review seed demos).
+name: Set ALLOW_TEST_OTP
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upsert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Upsert ALLOW_TEST_OTP on mova-auth + redeploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RENDER_API_KEY:-}" ]; then
+            echo "::error::RENDER_API_KEY missing"
+            exit 1
+          fi
+          AUTH_ID="srv-d8slrk8js32c73dac310"
+          code=$(curl -sS -o /tmp/render-env-out.json -w "%{http_code}" -X PUT \
+            "https://api.render.com/v1/services/${AUTH_ID}/env-vars/ALLOW_TEST_OTP" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json" \
+            -d '{"value":"true"}')
+          echo "PUT env HTTP ${code}"
+          cat /tmp/render-env-out.json || true
+          if [ "$code" != "200" ] && [ "$code" != "201" ]; then
+            echo "::error::Failed to set ALLOW_TEST_OTP"
+            exit 1
+          fi
+          deploy=$(curl -sS -o /tmp/render-deploy.json -w "%{http_code}" -X POST \
+            "https://api.render.com/v1/services/${AUTH_ID}/deploys" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache":"do_not_clear"}')
+          echo "Deploy HTTP ${deploy}"
+          cat /tmp/render-deploy.json || true
+          if [ "$deploy" != "200" ] && [ "$deploy" != "201" ]; then
+            echo "::error::Failed to trigger mova-auth deploy"
+            exit 1
+          fi
+          echo "ALLOW_TEST_OTP=true set; mova-auth redeploy started."

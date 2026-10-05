@@ -311,11 +311,11 @@ def process_app(token: str, key: str, do_submit: bool) -> None:
 
     if not do_submit:
         print("ASC_SUBMIT=false — skip submit")
-        return
+        return "notes_only"
 
     if state in ("WAITING_FOR_REVIEW", "IN_REVIEW"):
         print(f"already in review state={state} — skip submit")
-        return
+        return "already_in_review"
 
     if state not in (
         "PREPARE_FOR_SUBMISSION",
@@ -326,14 +326,23 @@ def process_app(token: str, key: str, do_submit: bool) -> None:
         "INVALID_BINARY",
     ):
         print(f"state={state} not submittable via API — update notes done; submit manually if needed")
-        return
+        return "notes_ok_submit_blocked"
 
     try:
         submit_version(token, app_id, version_id)
         print("SUBMITTED for review")
+        return "submitted"
     except RuntimeError as e:
         msg = str(e)
         print(f"SUBMIT FAILED: {msg[:1200]}")
+        # After Guideline rejection, ASC often requires a Resolution Center reply
+        # (message + optional video) before API submit is accepted.
+        if "not ready to be submitted" in msg or "UNRESOLVED_ISSUES" in msg or "ENTITY_STATE_INVALID" in msg:
+            print(
+                "NOTES_OK_SUBMIT_BLOCKED — open App Store Connect → App Review / "
+                "Resolution Center → reply with the walkthrough MP4 → Submit for Review."
+            )
+            return "notes_ok_submit_blocked"
         raise
 
 
@@ -342,12 +351,15 @@ def main() -> int:
     do_submit = os.environ.get("ASC_SUBMIT", "true").strip().lower() in ("1", "true", "yes")
     token = make_token()
     errors = []
+    results: list[str] = []
     for key in apps:
         if key not in APPS:
             errors.append(f"unknown app key: {key}")
             continue
         try:
-            process_app(token, key, do_submit)
+            outcome = process_app(token, key, do_submit)
+            if outcome:
+                results.append(f"{key}:{outcome}")
         except Exception as e:
             print(f"ERROR {key}: {e}", file=sys.stderr)
             errors.append(f"{key}: {e}")
@@ -357,6 +369,13 @@ def main() -> int:
             print(f" - {e}", file=sys.stderr)
         return 1
     print("\nOK — review notes updated" + (" and submit attempted" if do_submit else ""))
+    for r in results:
+        print(f"  {r}")
+    if any("notes_ok_submit_blocked" in r for r in results):
+        print(
+            "\nManual step required in ASC Resolution Center (attach MP4 from "
+            "mobile/store-listing/ios/*.mp4 then Submit)."
+        )
     return 0
 
 

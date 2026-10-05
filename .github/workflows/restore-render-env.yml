@@ -130,6 +130,7 @@ jobs:
             REDIS_URL "$REDIS_URL" \
             NODE_ENV "production" \
             APP_ENV "production" \
+            ALLOW_TEST_OTP "true" \
             SMS_PROVIDER "afrisoft" \
             AFRISOFT_SMS_HUB_URL "$AFRISOFT_SMS_HUB_URL" \
             AFRISOFT_HUB_APP_ID "$AFRISOFT_HUB_APP_ID" \

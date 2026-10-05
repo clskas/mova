@@ -90,11 +90,15 @@ python mobile/store-listing/ios/_gen_app_review_video.py
 python mobile/store-listing/ios/_gen_passenger_app_review_video.py
 ```
 
-## ASC reply checklist
+## ASC status (automated)
 
-1. Demo username / password / notes are pushed via workflow `iOS App Review Resubmit` (API).
-2. App Store Connect → each app → **App Review** / Resolution Center
-3. Attach the matching MP4 (API cannot attach video):
-   - Driver → `senga-driver-app-review-walkthrough.mp4`
-   - Passenger → `senga-passenger-app-review-walkthrough.mp4`
-4. Confirm **Submit for Review** succeeded (workflow PATCH `reviewSubmissions.submitted=true`).
+- Demo username / password / notes are **already on ASC** for both apps (version 1.0, state REJECTED → notes refreshed).
+- API resubmit returns *“Version is not ready”* until a **Resolution Center reply** is sent (Apple requirement after Guideline 2.1).
+
+## ASC reply checklist (manual — ~2 min)
+
+1. [App Store Connect](https://appstoreconnect.apple.com) → **Senga Driver** → **App Review** / Resolution Center  
+2. Reply with the English **Notes** block above  
+3. Attach `mobile/store-listing/ios/senga-driver-app-review-walkthrough.mp4`  
+4. **Submit for Review**  
+5. Repeat for **Senga** (passenger) with `+243900000010` + `senga-passenger-app-review-walkthrough.mp4`

@@ -1,4 +1,4 @@
-# SENGA Business — Portail partenaire
+# SENGA Partenaire — Portail partenaire
 
 Console web pour les **partenaires commerce** (restaurant, supermarché, pharmacie, boutique) : recevoir, confirmer et préparer les commandes passées via l'app SENGA.
 
@@ -25,7 +25,7 @@ Ouvrir http://localhost:3007
 
 1. Ouvrir http://localhost:3007 dans **Chrome** (Android) ou **Safari** (iOS)
 2. Menu navigateur → **Ajouter à l'écran d'accueil** / **Installer l'application**
-3. L'app s'ouvre en plein écran (`standalone`) avec icône SENGA Business
+3. L'app s'ouvre en plein écran (`standalone`) avec icône SENGA Partenaire
 
 Service worker : cache léger + fonctionnement basique hors ligne sur les pages visitées.
 
@@ -65,5 +65,5 @@ JWT requis, rôle `RESTAURANT`.
 ## Onboarding partenaire (admin SENGA)
 
 1. **Utilisateurs** → créer / modifier un compte avec rôle `RESTAURANT`
-2. **Restaurants** → créer le magasin avec le **type de commerce** (SENGA Business) → coller `ownerUserId`
+2. **Restaurants** → créer le magasin avec le **type de commerce** (SENGA Partenaire) → coller `ownerUserId`
 3. Remettre les identifiants OTP au partenaire

@@ -140,8 +140,8 @@ export const SEED_DEMO_PHONE_RE = /^\+2439000000\d{2}$/;
 export const OWNER_SUPER_ADMIN_PHONE = '+243971163574';
 
 /**
- * Seed / demo phones (local Docker, Playwright). Never treated as test OTP in production.
- * `TEST_OTP_PHONES` extras apply only outside production when `ALLOW_TEST_OTP=true`.
+ * Seed / demo phones (local Docker, Playwright, App Review when ALLOW_TEST_OTP=true).
+ * `TEST_OTP_PHONES` extras apply only outside production.
  */
 export const DEFAULT_TEST_OTP_PHONES: readonly string[] = [
   '+243900000001',
@@ -207,13 +207,18 @@ export function isSeedDemoPhone(phone: string): boolean {
   return SEED_DEMO_PHONE_RE.test(normalized) || DEFAULT_TEST_OTP_PHONE_SET.has(normalized);
 }
 
-/** Production / Render must never INSERT a +2439000000xx demo account (seed, OTP signup, or admin create). */
+/**
+ * Production / Render: block INSERT of +2439000000xx unless App Review demos are
+ * explicitly enabled (`ALLOW_TEST_OTP=true`) — OTP 123456 + upsert for store review.
+ */
 export function isDemoUserInsertForbidden(
   phone: string | null | undefined,
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   if (!phone) return false;
-  return isProductionOrRenderEnv(env) && isSeedDemoPhone(phone);
+  if (!isProductionOrRenderEnv(env) || !isSeedDemoPhone(phone)) return false;
+  if (envFlagTrue(env, 'ALLOW_TEST_OTP')) return false;
+  return true;
 }
 
 /**
@@ -257,14 +262,16 @@ export function getTestOtpPhones(): Set<string> {
 }
 
 /**
- * Fixed OTP 123456: local MOCK_OTP, or seed `+2439000000xx` / ALLOW_TEST_OTP extras
- * outside production. Production always uses the real SMS hub — never 123456.
- * Owner phone is never eligible.
+ * Fixed OTP 123456: local MOCK_OTP, seed phones, or ALLOW_TEST_OTP extras.
+ * Production: only seed `+2439000000xx` when `ALLOW_TEST_OTP=true` (App Review / Play demos).
+ * Owner phone is never eligible. Real +243 always use the SMS hub.
  */
 export function isTestOtpAllowedForPhone(phone: string): boolean {
   const normalized = normalizeTestOtpPhone(phone);
   if (normalized === OWNER_SUPER_ADMIN_PHONE) return false;
-  if (isProductionRuntime()) return false;
+  if (isProductionRuntime()) {
+    return isTestOtpModeEnabled() && isSeedDemoPhone(normalized);
+  }
   if (isMockOtpAllowed()) return true;
   if (isSeedDemoPhone(normalized)) return true;
   if (!isTestOtpModeEnabled()) return false;

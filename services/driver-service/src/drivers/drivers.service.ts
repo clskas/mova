@@ -1242,7 +1242,12 @@ export class DriversService {
     return { ...doc, ...notified };
   }
 
-  async setDriverKycStatus(userId: string, approved: boolean, notes?: string) {
+  async setDriverKycStatus(
+    userId: string,
+    approved: boolean,
+    notes?: string,
+    opts?: { autoActivate?: boolean },
+  ) {
     let reason: string | undefined;
     try {
       reason = normalizeKycRejectNotes(approved, notes);
@@ -1269,6 +1274,13 @@ export class DriversService {
       activationPin = issued.pin;
       loginPin = issued.loginPin;
       notified = issued;
+      // Seed / App Review: skip the post-KYC activation PIN gate so Online works immediately.
+      if (opts?.autoActivate === true && process.env.ALLOW_TEST_OTP === 'true') {
+        await this.prisma.driverProfile.update({
+          where: { userId },
+          data: { activationPinVerifiedAt: new Date() },
+        });
+      }
     } else {
       await this.prisma.driverProfile.upsert({
         where: { userId },

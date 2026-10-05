@@ -138,14 +138,15 @@ describe('prod-security', () => {
     const { assertProductionSecurity, isTestOtpAllowedForPhone, TEST_OTP_CODE } =
       await import('./prod-security');
     expect(() => assertProductionSecurity('auth-service')).not.toThrow();
-    expect(isTestOtpAllowedForPhone('+243900000010')).toBe(false);
-    expect(isTestOtpAllowedForPhone('+243900000040')).toBe(false);
-    expect(isTestOtpAllowedForPhone('+243900000050')).toBe(false);
+    // ALLOW_TEST_OTP=true → seed phones only (App Review); real MSISDNs never get 123456.
+    expect(isTestOtpAllowedForPhone('+243900000010')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243900000040')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243900000050')).toBe(true);
     expect(isTestOtpAllowedForPhone('+243812345678')).toBe(false);
     expect(TEST_OTP_CODE).toBe('123456');
   });
 
-  it('production never allows hardcoded 123456, even for seed demo phones', async () => {
+  it('production seed OTP 123456 only for +2439000000xx when ALLOW_TEST_OTP=true', async () => {
     process.env.NODE_ENV = 'production';
     process.env.ALLOW_TEST_OTP = 'true';
     process.env.MOCK_OTP = 'true';
@@ -165,12 +166,13 @@ describe('prod-security', () => {
     expect(userNeedsPinSetup('+243900000010', null)).toBe(true);
     expect(userNeedsPinSetup(null, 'hash')).toBe(false);
     expect(userNeedsPinSetup('+243812345678', 'hash')).toBe(false);
-    expect(isTestOtpAllowedForPhone('+243900000001')).toBe(false);
-    expect(isTestOtpAllowedForPhone('+243900000010')).toBe(false);
-    expect(isTestOtpAllowedForPhone('+243900000030')).toBe(false);
-    expect(isTestOtpAllowedForPhone('+243900000031')).toBe(false);
+    expect(isTestOtpAllowedForPhone('+243900000001')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243900000010')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243900000030')).toBe(true);
+    expect(isTestOtpAllowedForPhone('+243900000031')).toBe(true);
     expect(isTestOtpAllowedForPhone('+243812345678')).toBe(false);
-    expect(matchesSeedTestOtp('+243900000031', '123456')).toBe(false);
+    expect(isTestOtpAllowedForPhone('+243811111111')).toBe(false); // extras ignored in prod
+    expect(matchesSeedTestOtp('+243900000031', '123456')).toBe(true);
     expect(matchesSeedTestOtp('+243812345678', '123456')).toBe(false);
   });
 
@@ -320,7 +322,28 @@ describe('prod-security', () => {
     expect(resolveBootstrapSuperadminPhone({ BOOTSTRAP_SUPERADMIN_PHONE: '+243971163574' })).toBe('+243971163574');
     expect(isDemoUserInsertForbidden('+243900000010', { NODE_ENV: 'production' })).toBe(true);
     expect(isDemoUserInsertForbidden('+243900000010', { RENDER: 'true' })).toBe(true);
+    expect(
+      isDemoUserInsertForbidden('+243900000010', { NODE_ENV: 'production', ALLOW_TEST_OTP: 'true' }),
+    ).toBe(false);
     expect(isDemoUserInsertForbidden('+243812345678', { NODE_ENV: 'production' })).toBe(false);
     expect(isDemoUserInsertForbidden('+243900000010', { NODE_ENV: 'development' })).toBe(false);
+  });
+
+  it('production allows seed OTP 123456 only when ALLOW_TEST_OTP=true', async () => {
+    const { isTestOtpAllowedForPhone } = await import('./prod-security');
+    const prevNode = process.env.NODE_ENV;
+    const prevAllow = process.env.ALLOW_TEST_OTP;
+    try {
+      process.env.NODE_ENV = 'production';
+      process.env.ALLOW_TEST_OTP = 'false';
+      expect(isTestOtpAllowedForPhone('+243900000023')).toBe(false);
+      process.env.ALLOW_TEST_OTP = 'true';
+      expect(isTestOtpAllowedForPhone('+243900000023')).toBe(true);
+      expect(isTestOtpAllowedForPhone('+243829420988')).toBe(false);
+    } finally {
+      process.env.NODE_ENV = prevNode;
+      if (prevAllow === undefined) delete process.env.ALLOW_TEST_OTP;
+      else process.env.ALLOW_TEST_OTP = prevAllow;
+    }
   });
 });

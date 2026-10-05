@@ -56,9 +56,9 @@ services:
         fromService: { name: mova-gateway, type: web, envVarKey: JWT_SECRET }
       - key: MOCK_OTP
         value: "false"
-      # Production: real AfriSoft SMS hub only. Seed 123456 is local/E2E (Playwright), never prod DB.
+      # App Review / Play demos: OTP 123456 on seed +2439000000xx only. Real +243 use SMS hub.
       - key: ALLOW_TEST_OTP
-        value: "false"
+        value: "true"
       - key: NODE_ENV
         value: "production"
       - key: APP_ENV

@@ -32,6 +32,11 @@ class RatingDto { @IsNumber() ratingAvg: number; }
 class ReviewKycDto {
   @IsBoolean() approved: boolean;
   @IsOptional() @IsString() notes?: string;
+  /** App Review seed demos: mark activation PIN verified so Online works immediately. */
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === 1 || value === '1')
+  @IsBoolean()
+  autoActivate?: boolean;
   @Transform(({ value }) => {
     if (value == null || value === '') return undefined;
     try {
@@ -119,7 +124,9 @@ export class InternalController {
   @Post('kyc/:id/ocr') runKycOcr(@Param('id') id: string) { return this.drivers.runKycOcr(id); }
   @Patch('drivers/:userId/kyc')
   reviewDriverKyc(@Param('userId') userId: string, @Body() dto: ReviewKycDto) {
-    return this.drivers.setDriverKycStatus(userId, dto.approved, dto.notes);
+    return this.drivers.setDriverKycStatus(userId, dto.approved, dto.notes, {
+      autoActivate: dto.autoActivate === true,
+    });
   }
   @Patch('drivers/:userId/documents-renewal')
   reviewDocumentsRenewal(@Param('userId') userId: string, @Body() dto: ReviewKycDto) {

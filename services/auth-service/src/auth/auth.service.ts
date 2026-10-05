@@ -26,6 +26,7 @@ import {
   denyJwtJti,
   isMockOtpAllowed,
   isDemoUserInsertForbidden,
+  isSeedDemoPhone,
   isPlayPrelaunchAccount,
   isProductionRuntime,
   sanitizeAdminPermissions,
@@ -292,6 +293,27 @@ export class AuthService {
     return { success: true, message: 'Code PIN enregistré', pinConfigured: true };
   }
 
+  /** App Review seed drivers: KYC APPROVED + activation skipped when ALLOW_TEST_OTP=true. */
+  private async approveSeedDemoDriver(userId: string) {
+    const headers = { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY };
+    try {
+      const res = await fetch(serviceUrl('driver', `/internal/drivers/${userId}/kyc`), {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          approved: true,
+          autoActivate: true,
+          notes: 'App Review seed demo (ALLOW_TEST_OTP)',
+        }),
+      });
+      if (!res.ok) {
+        this.logger.warn(`Seed demo KYC approve HTTP ${res.status} for ${userId}`);
+      }
+    } catch (e) {
+      this.logger.warn(`Seed demo KYC approve failed for ${userId}: ${(e as Error).message}`);
+    }
+  }
+
   private async provisionUser(userId: string, role: UserRole) {
     const headers = { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY };
     try {
@@ -372,15 +394,20 @@ export class AuthService {
         );
       }
       if (requestedRole === UserRole.DRIVER) {
+        const seedDemo = isSeedDemoPhone(normalized) && process.env.ALLOW_TEST_OTP === 'true';
         user = await this.prisma.user.create({
           data: {
             phone: normalized,
             role: UserRole.DRIVER,
-            status: UserStatus.PENDING_KYC,
+            status: seedDemo ? UserStatus.ACTIVE : UserStatus.PENDING_KYC,
+            ...(seedDemo ? { firstName: 'Alain', lastName: 'Kabeya' } : {}),
           },
         });
         isNew = true;
         await this.provisionUser(user.id, user.role);
+        if (seedDemo) {
+          await this.approveSeedDemoDriver(user.id);
+        }
         try {
           const payload: UserCreatedPayload = { userId: user.id, phone: user.phone ?? undefined, role: user.role };
           await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);

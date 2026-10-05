@@ -117,49 +117,58 @@ def api(method: str, path: str, token: str, body: dict | None = None) -> dict:
 
 
 def find_app_id(token: str, bundle_id: str) -> str:
-    q = urllib.parse.urlencode({"filter[bundleId]": bundle_id, "limit": 1})
+    q = urllib.parse.urlencode({"filter[bundleId]": bundle_id, "limit": 5})
     data = api("GET", f"/v1/apps?{q}", token)
     rows = data.get("data") or []
-    if not rows:
-        raise RuntimeError(f"App not found for bundle {bundle_id}")
-    return rows[0]["id"]
+    for row in rows:
+        bid = (row.get("attributes") or {}).get("bundleId")
+        if bid == bundle_id:
+            return row["id"]
+    raise RuntimeError(f"App not found for bundle {bundle_id} (got {len(rows)} rows)")
 
 
 PREFERRED_STATES = (
-    "WAITING_FOR_REVIEW",
-    "PENDING_DEVELOPER_RELEASE",
-    "PENDING_APPLE_RELEASE",
-    "IN_REVIEW",
+    "READY_FOR_REVIEW",
+    "PREPARE_FOR_SUBMISSION",
     "REJECTED",
     "METADATA_REJECTED",
     "DEVELOPER_REJECTED",
-    "PREPARE_FOR_SUBMISSION",
-    "READY_FOR_REVIEW",
     "INVALID_BINARY",
+    "WAITING_FOR_REVIEW",
+    "IN_REVIEW",
+    "PENDING_DEVELOPER_RELEASE",
+    "PENDING_APPLE_RELEASE",
 )
 
 
+def _version_rank(version: dict) -> tuple:
+    attrs = version.get("attributes") or {}
+    ver = str(attrs.get("versionString") or "0")
+    parts: list[int] = []
+    for p in ver.split("."):
+        try:
+            parts.append(int(p))
+        except ValueError:
+            parts.append(0)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts)
+
+
 def find_version(token: str, app_id: str) -> dict:
-    # Prefer editable / reviewable versions
+    # Prefer editable / reviewable versions (no `sort` — ASC rejects it on this relationship).
     for state in PREFERRED_STATES:
-        q = urllib.parse.urlencode(
-            {
-                "filter[appStoreState]": state,
-                "limit": 5,
-                "sort": "-versionString",
-            }
-        )
+        q = urllib.parse.urlencode({"filter[appStoreState]": state, "limit": 10})
         data = api("GET", f"/v1/apps/{app_id}/appStoreVersions?{q}", token)
         rows = data.get("data") or []
         if rows:
-            return rows[0]
-    # Fallback: latest version of any state
-    q = urllib.parse.urlencode({"limit": 5, "sort": "-versionString"})
+            return max(rows, key=_version_rank)
+    q = urllib.parse.urlencode({"limit": 20})
     data = api("GET", f"/v1/apps/{app_id}/appStoreVersions?{q}", token)
     rows = data.get("data") or []
     if not rows:
         raise RuntimeError(f"No App Store versions for app {app_id}")
-    return rows[0]
+    return max(rows, key=_version_rank)
 
 
 def get_or_create_review_detail(token: str, version_id: str) -> str:

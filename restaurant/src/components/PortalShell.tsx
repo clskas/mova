@@ -107,7 +107,7 @@ export function PortalShell({
         <div className="px-3 sm:px-4 py-2.5 flex flex-col items-center gap-2">
           <div data-brand className="flex flex-col items-center gap-1">
             <p className="text-[10px] sm:text-xs text-[var(--brand)] font-semibold uppercase tracking-[0.14em]">
-              SENGA Business
+              SENGA Partenaire
             </p>
             <h1 className="font-semibold text-base sm:text-lg text-[#0f1222] truncate tracking-tight">
               {restaurantName ?? "Partenaire"}

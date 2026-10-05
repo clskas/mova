@@ -345,8 +345,8 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
       <PwaInstallBanner accentClass="bg-[#FF6B35]" />
       <div className="w-full max-w-md partner-card p-6 sm:p-8 space-y-5 ring-1 ring-orange-100/80">
         <div className="text-center">
-          <img src="/icon-192.png" alt="SENGA Business" width={56} height={56} className="mx-auto mb-2 rounded-2xl" />
-          <h1 className="text-2xl font-semibold text-[#1A1A2E]">SENGA Business</h1>
+          <img src="/icon-192.png" alt="SENGA Partenaire" width={56} height={56} className="mx-auto mb-2 rounded-2xl" />
+          <h1 className="text-2xl font-semibold text-[#1A1A2E]">SENGA Partenaire</h1>
           <p className="text-sm text-gray-600 mt-1">
             {setupToken || pinOnly
               ? PIN_SETUP_HINT_FR

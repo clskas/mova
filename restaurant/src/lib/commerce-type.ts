@@ -50,7 +50,7 @@ export type CommerceCopy = {
 };
 
 const LOGIN_WRONG_ROLE =
-  "Ce compte n'est pas un partenaire commerce. Utilisez le compte SENGA Business adapté à votre établissement.";
+  "Ce compte n'est pas un partenaire commerce. Utilisez le compte SENGA Partenaire adapté à votre établissement.";
 
 export function commerceCopy(type: CommerceType): CommerceCopy {
   const t = parseCommerceType(type);
@@ -204,7 +204,7 @@ export function commerceManuelChapters(type: CommerceType) {
       steps: [
         "Ouvrez https://sengapartner.afri-soft.com/login — Google, ou téléphone / e-mail. Ce n'est pas l'écran « Activer le compte ».",
         "Téléphone : un code SMS arrive, puis la fenêtre PIN de connexion (6 chiffres) : « Choisissez / confirmez votre PIN de connexion pour les prochaines fois ».",
-        "Google : après Google, un code arrive par e-mail (objet « Votre accès SENGA Business », sans le mot OTP). Saisissez-le, puis la même fenêtre PIN de connexion.",
+        "Google : après Google, un code arrive par e-mail (objet « Votre accès SENGA Partenaire », sans le mot OTP). Saisissez-le, puis la même fenêtre PIN de connexion.",
         "Après Déconnexion, le pavé Connexion s'affiche : « Entrez le PIN pour +243 ••• XXX », 6 points, clavier. Google ne reconnecte pas tout seul.",
         "Après validation SENGA, une fenêtre « Code PIN d'activation » bloque le tableau de bord. Saisissez le PIN reçu par e-mail / SMS pour commencer à travailler.",
         "Si le PIN n'arrive pas, l'équipe SENGA le renvoie depuis l'admin — vérifiez aussi le spam Gmail.",

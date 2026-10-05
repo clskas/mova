@@ -14,14 +14,14 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "SENGA Business",
+  title: "SENGA Partenaire",
   description: "Portail partenaire — restaurants, supermarchés, pharmacies et boutiques SENGA RDC",
-  applicationName: "SENGA Business",
+  applicationName: "SENGA Partenaire",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "SENGA Business",
+    title: "SENGA Partenaire",
   },
   formatDetection: { telephone: false },
   icons: {

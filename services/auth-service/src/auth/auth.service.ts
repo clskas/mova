@@ -1297,7 +1297,7 @@ export class AuthService {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        'Compte partenaire — utilisez le portail SENGA Business.',
+        'Compte partenaire — utilisez le portail SENGA Partenaire.',
       );
     }
     if (

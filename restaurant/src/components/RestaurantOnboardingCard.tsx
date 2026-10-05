@@ -97,7 +97,7 @@ export function RestaurantOnboardingCard({ onComplete }: RestaurantOnboardingCar
   return (
     <form onSubmit={submit} className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Bienvenue sur SENGA Business</h2>
+        <h2 className="text-xl font-bold text-gray-900">Bienvenue sur SENGA Partenaire</h2>
         <p className="mt-2 text-sm text-gray-500">
           Choisissez d’abord votre type de commerce — le portail s’adapte (menu, catalogue, stock,
           restrictions). Ensuite, complétez votre dossier KYC dans{" "}

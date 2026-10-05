@@ -212,18 +212,79 @@ def update_review_detail(token: str, detail_id: str, cfg: dict) -> None:
     )
 
 
-def submit_version(token: str, version_id: str) -> None:
-    # Create submission relationship
+def find_open_review_submission(token: str, app_id: str) -> dict | None:
+    q = urllib.parse.urlencode(
+        {
+            "filter[app]": app_id,
+            "filter[state]": "READY_FOR_REVIEW,UNRESOLVED_ISSUES",
+            "limit": 10,
+        }
+    )
+    data = api("GET", f"/v1/reviewSubmissions?{q}", token)
+    rows = data.get("data") or []
+    return rows[0] if rows else None
+
+
+def submit_version(token: str, app_id: str, version_id: str) -> None:
+    """Modern Review Submissions API (appStoreVersionSubmissions CREATE is deprecated)."""
+    submission = find_open_review_submission(token, app_id)
+    if not submission:
+        created = api(
+            "POST",
+            "/v1/reviewSubmissions",
+            token,
+            {
+                "data": {
+                    "type": "reviewSubmissions",
+                    "attributes": {"platform": "IOS"},
+                    "relationships": {"app": {"data": {"type": "apps", "id": app_id}}},
+                }
+            },
+        )
+        submission = created["data"]
+    submission_id = submission["id"]
+    print(f"reviewSubmission id={submission_id} state={(submission.get('attributes') or {}).get('state')}")
+
+    # Attach version if not already an item
+    items = api("GET", f"/v1/reviewSubmissions/{submission_id}/items", token)
+    already = False
+    for item in items.get("data") or []:
+        rel = ((item.get("relationships") or {}).get("appStoreVersion") or {}).get("data") or {}
+        if rel.get("id") == version_id:
+            already = True
+            break
+    if not already:
+        api(
+            "POST",
+            "/v1/reviewSubmissionItems",
+            token,
+            {
+                "data": {
+                    "type": "reviewSubmissionItems",
+                    "relationships": {
+                        "reviewSubmission": {
+                            "data": {"type": "reviewSubmissions", "id": submission_id}
+                        },
+                        "appStoreVersion": {
+                            "data": {"type": "appStoreVersions", "id": version_id}
+                        },
+                    },
+                }
+            },
+        )
+        print("attached appStoreVersion to reviewSubmission")
+    else:
+        print("appStoreVersion already on reviewSubmission")
+
     api(
-        "POST",
-        "/v1/appStoreVersionSubmissions",
+        "PATCH",
+        f"/v1/reviewSubmissions/{submission_id}",
         token,
         {
             "data": {
-                "type": "appStoreVersionSubmissions",
-                "relationships": {
-                    "appStoreVersion": {"data": {"type": "appStoreVersions", "id": version_id}}
-                },
+                "type": "reviewSubmissions",
+                "id": submission_id,
+                "attributes": {"submitted": True},
             }
         },
     )
@@ -264,12 +325,11 @@ def process_app(token: str, key: str, do_submit: bool) -> None:
         return
 
     try:
-        submit_version(token, version_id)
+        submit_version(token, app_id, version_id)
         print("SUBMITTED for review")
     except RuntimeError as e:
         msg = str(e)
-        # Some rejected apps need reviewSubmission Create API (newer) — report clearly
-        print(f"SUBMIT FAILED: {msg[:800]}")
+        print(f"SUBMIT FAILED: {msg[:1200]}")
         raise
 
 

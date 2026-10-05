@@ -1,0 +1,38 @@
+# Update ASC App Review demo credentials/notes and resubmit Senga + Senga Driver.
+name: iOS App Review Resubmit
+
+on:
+  workflow_dispatch:
+    inputs:
+      apps:
+        description: "passenger,driver or one of them"
+        required: true
+        default: "passenger,driver"
+      submit:
+        description: "Submit for review after updating notes"
+        type: boolean
+        required: true
+        default: true
+
+jobs:
+  update-and-submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install --quiet PyJWT cryptography
+
+      - name: Update ASC review notes (+ optional submit)
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          ASC_APPS: ${{ inputs.apps }}
+          ASC_SUBMIT: ${{ inputs.submit }}
+        run: python scripts/asc_update_review_and_submit.py

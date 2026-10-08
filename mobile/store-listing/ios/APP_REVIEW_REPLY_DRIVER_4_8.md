@@ -37,7 +37,8 @@ Notes:
 - Privacy: https://senga.afri-soft.com/privacy
 
 The demo driver is KYC-approved so Online works immediately.
-Please use the new build submitted with this reply.
+Please use the new build **1.0.18 (101)** submitted with this reply
+(Google Sign-In removed on iOS; demo PIN 123456 works on production).
 
 Thank you.
 ```

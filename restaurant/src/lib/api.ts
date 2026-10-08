@@ -93,6 +93,8 @@ export type RestaurantProfile = {
   prepTimeMin?: number;
   menuItems?: MenuItem[];
   courierMode?: "PLATFORM" | "OWN" | "HYBRID";
+  /** true si SuperAdmin a activé OWN ou HYBRID pour ce partenaire. */
+  allowInternalCouriers?: boolean;
   commerceType?: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE";
   kycStatus?: string;
   canOperate?: boolean;
@@ -165,6 +167,45 @@ export function mediaUrl(path?: string | null): string | null {
 
 export function fetchProfile() {
   return apiFetch<RestaurantProfile>("/api/restaurant/profile");
+}
+
+export type CourierMode = "PLATFORM" | "OWN" | "HYBRID";
+
+export type RestaurantFleetDriver = {
+  id: string;
+  driverUserId: string;
+  isActive: boolean;
+  phone?: string;
+  name?: string;
+};
+
+export function fetchRestaurantDrivers() {
+  return apiFetch<{
+    restaurantId: string;
+    courierMode: CourierMode;
+    allowInternalCouriers?: boolean;
+    drivers: RestaurantFleetDriver[];
+  }>("/api/restaurant/drivers");
+}
+
+export function addRestaurantDriver(data: { driverUserId?: string; phone?: string }) {
+  return apiFetch<RestaurantFleetDriver>("/api/restaurant/drivers", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function removeRestaurantDriver(driverUserId: string) {
+  return apiFetch<{ removed: boolean }>(`/api/restaurant/drivers/${driverUserId}/remove`, {
+    method: "POST",
+  });
+}
+
+export function assignOwnDriver(orderId: string, driverUserId: string) {
+  return apiFetch(`/api/restaurant/orders/${orderId}/assign-driver`, {
+    method: "POST",
+    body: JSON.stringify({ driverUserId }),
+  });
 }
 
 export function fetchMenu() {

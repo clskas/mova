@@ -560,7 +560,10 @@ export default function UtilisateursPage() {
                       />
                     </td>
                     <td className="p-3 text-gray-700">
-                      {u.homeCity?.trim() || u.managedCity?.trim() || "—"}
+                      {u.operatingCity?.trim() ||
+                        u.homeCity?.trim() ||
+                        u.managedCity?.trim() ||
+                        "—"}
                     </td>
                     <td className="p-3"><StatusBadge status={u.status ?? "ACTIVE"} /></td>
                     <td className="p-3">

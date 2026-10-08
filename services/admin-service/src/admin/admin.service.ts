@@ -288,22 +288,60 @@ export class AdminService {
     if (restaurantUsers.length > 0) {
       try {
         const restaurants = await this.fetchJson<
-          Array<{ ownerUserId?: string | null; commerceType?: string | null }>
+          Array<{
+            ownerUserId?: string | null;
+            commerceType?: string | null;
+            lat?: number | null;
+            lng?: number | null;
+            address?: string | null;
+          }>
         >('ride', '/internal/restaurants');
-        const byOwner = new Map<string, string>();
+        const byOwner = new Map<
+          string,
+          { commerceType: string; city?: string | null }
+        >();
         for (const r of restaurants ?? []) {
           if (r.ownerUserId && !byOwner.has(r.ownerUserId)) {
-            byOwner.set(r.ownerUserId, r.commerceType ?? 'RESTAURANT');
+            let city: string | null = null;
+            if (r.lat != null && r.lng != null && Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lng))) {
+              city = resolveCityFromCoords(Number(r.lat), Number(r.lng)) || null;
+            }
+            byOwner.set(r.ownerUserId, {
+              commerceType: r.commerceType ?? 'RESTAURANT',
+              city,
+            });
           }
         }
         for (const u of restaurantUsers) {
-          u.commerceType = byOwner.get(u.id) ?? 'RESTAURANT';
+          const meta = byOwner.get(u.id);
+          u.commerceType = meta?.commerceType ?? 'RESTAURANT';
+          if (meta?.city) u.homeCity = meta.city;
         }
       } catch {
         for (const u of restaurantUsers) {
           u.commerceType = u.commerceType ?? 'RESTAURANT';
         }
       }
+    }
+    const drivers = (result.data ?? []).filter((u) => u.role === 'DRIVER');
+    if (drivers.length > 0) {
+      await Promise.all(
+        drivers.map(async (u) => {
+          try {
+            const detail = await this.fetchJson<{ operatingCity?: string | null }>(
+              'driver',
+              `/internal/drivers/${u.id}/detail`,
+            );
+            const city = detail?.operatingCity?.trim();
+            if (city) {
+              (u as { operatingCity?: string | null }).operatingCity = city;
+              if (!u.homeCity) u.homeCity = city;
+            }
+          } catch {
+            /* profile missing */
+          }
+        }),
+      );
     }
     return result;
   }

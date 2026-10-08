@@ -3,9 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { ConnectionCard } from "@/components/ConnectionCard";
 import {
+  addRestaurantDriver,
   fetchProfile,
+  fetchRestaurantDrivers,
+  removeRestaurantDriver,
   updateMenuSettings,
   updateRestaurantLocation,
+  type CourierMode,
+  type RestaurantFleetDriver,
 } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import {
@@ -32,6 +37,11 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [canOperate, setCanOperate] = useState(true);
   const [docsReminder, setDocsReminder] = useState<string | null>(null);
+  const [courierMode, setCourierMode] = useState<CourierMode>("PLATFORM");
+  const [allowInternalCouriers, setAllowInternalCouriers] = useState(false);
+  const [drivers, setDrivers] = useState<RestaurantFleetDriver[]>([]);
+  const [driverPhone, setDriverPhone] = useState("");
+  const [fleetBusy, setFleetBusy] = useState(false);
   const copy = commerceCopy(commerceType);
 
   const load = useCallback(async () => {
@@ -52,6 +62,17 @@ export default function SettingsPage() {
           ? p.documentsReminder.message
           : null,
       );
+      const mode = (p.courierMode ?? "PLATFORM") as CourierMode;
+      setCourierMode(mode);
+      const allow = p.allowInternalCouriers === true || mode !== "PLATFORM";
+      setAllowInternalCouriers(allow);
+      if (allow) {
+        const fleet = await fetchRestaurantDrivers();
+        setDrivers(fleet.drivers ?? []);
+        setCourierMode((fleet.courierMode as CourierMode) ?? mode);
+      } else {
+        setDrivers([]);
+      }
     } catch (e) {
       setError(toUserErrorMessage(e, "Erreur"));
     } finally {
@@ -289,16 +310,102 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {!loading && (
+        {!loading && !allowInternalCouriers && (
           <div className="bg-white rounded-2xl border p-6 space-y-2">
             <h3 className="font-semibold text-sm text-gray-700">Livraison</h3>
             <p className="text-sm text-gray-600">
-              Les livraisons sont assurées uniquement par les livreurs SENGA. Vous ne gérez pas de flotte interne.
+              Les livraisons sont assurées par les livreurs SENGA. Vous ne gérez pas de flotte interne.
             </p>
             <p className="text-xs text-gray-400">
-              Le client paie d&apos;abord (portefeuille ou Mobile Money). Vous êtes payé quand la commande part.
-              Le livreur SENGA est payé après le code PIN du client.
+              Pour activer vos propres livreurs, le SuperAdmin SENGA doit autoriser cette option sur votre compte.
             </p>
+          </div>
+        )}
+
+        {!loading && allowInternalCouriers && (
+          <div className="bg-white rounded-2xl border p-6 space-y-4">
+            <h3 className="font-semibold text-sm text-gray-700">Livreurs internes</h3>
+            <p className="text-xs text-gray-500">
+              Mode activé par SENGA :{" "}
+              <strong>
+                {courierMode === "OWN"
+                  ? "vos livreurs uniquement"
+                  : courierMode === "HYBRID"
+                    ? "vos livreurs + SENGA"
+                    : "SENGA"}
+              </strong>
+              . Ajoutez des livreurs déjà inscrits dans l&apos;app SENGA (numéro +243…).
+              Sur une commande prête, vous pourrez choisir le livreur.
+            </p>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 rounded-xl border p-3 text-sm"
+                placeholder="Téléphone livreur SENGA (+243…)"
+                value={driverPhone}
+                onChange={(e) => setDriverPhone(e.target.value)}
+              />
+              <button
+                type="button"
+                disabled={fleetBusy || !driverPhone.trim()}
+                onClick={async () => {
+                  setFleetBusy(true);
+                  setError(null);
+                  try {
+                    await addRestaurantDriver({ phone: driverPhone.trim() });
+                    setDriverPhone("");
+                    const fleet = await fetchRestaurantDrivers();
+                    setDrivers(fleet.drivers ?? []);
+                  } catch (err) {
+                    setError(
+                      toUserErrorMessage(
+                        err,
+                        "Livreur introuvable. Il doit déjà avoir un compte livreur SENGA.",
+                      ),
+                    );
+                  } finally {
+                    setFleetBusy(false);
+                  }
+                }}
+                className="px-4 rounded-xl bg-orange-600 text-white text-sm disabled:opacity-60"
+              >
+                Ajouter
+              </button>
+            </div>
+            {drivers.length === 0 ? (
+              <p className="text-xs text-gray-400">Aucun livreur interne pour l&apos;instant.</p>
+            ) : (
+              <ul className="space-y-2">
+                {drivers.map((d) => (
+                  <li
+                    key={d.id}
+                    className="flex items-center justify-between text-sm border rounded-xl px-3 py-2"
+                  >
+                    <span>
+                      {d.phone || d.name || "Livreur"}
+                      {d.isActive ? "" : " (inactif)"}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={fleetBusy}
+                      onClick={async () => {
+                        setFleetBusy(true);
+                        try {
+                          await removeRestaurantDriver(d.driverUserId);
+                          setDrivers((prev) => prev.filter((x) => x.id !== d.id));
+                        } catch (err) {
+                          setError(toUserErrorMessage(err, "Retrait impossible."));
+                        } finally {
+                          setFleetBusy(false);
+                        }
+                      }}
+                      className="text-red-600 text-xs"
+                    >
+                      Retirer
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
     </div>

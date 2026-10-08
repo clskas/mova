@@ -99,6 +99,8 @@ export type AdminUser = {
   managedCity?: string | null;
   /** PASSENGER: last activity / home city (pickup). */
   homeCity?: string | null;
+  /** DRIVER: ville d'opération (driver-service). */
+  operatingCity?: string | null;
   /** When role=RESTAURANT: RESTAURANT | SUPERMARKET | PHARMACY | BOUTIQUE */
   commerceType?: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE" | string;
   /** Stored permission overrides (empty = role defaults). */
@@ -391,6 +393,8 @@ export type Restaurant = {
   prepTimeMin?: number;
   ownerUserId?: string | null;
   commerceType?: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE";
+  /** PLATFORM = livreurs SENGA ; OWN / HYBRID = flotte interne (activée par SuperAdmin). */
+  courierMode?: "PLATFORM" | "OWN" | "HYBRID";
   kycStatus?: string;
   kycNotes?: string | null;
 };

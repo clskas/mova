@@ -14,10 +14,12 @@ import {
   assertEscrowAllowsDispatch,
   assertPinMatches,
   cancelPhase,
+  driverEligibleForFoodOffer,
   isDeliveryPrepaidRequired,
   isFoodAcceptTimeoutDue,
   isFoodPaymentTimeoutDue,
   isPinTimeoutDue,
+  resolveCourierSource,
   settleGuaranteedCancel,
   shouldReturnToSender,
 } from './delivery-guarantee.util';
@@ -55,7 +57,7 @@ import {
   releaseEscrowPayout,
   settleEscrowPartial,
 } from '../common/escrow.util';
-import { notifyNearbyDrivers, DELIVERY_ALERT_VEHICLE_TYPES } from '../common/driver-job-alert.util';
+import { notifyNearbyDrivers, publishDriverJobAlert, DELIVERY_ALERT_VEHICLE_TYPES } from '../common/driver-job-alert.util';
 import { deliveryPinSms, sendPlatformSms } from '../common/sms-notify.util';
 import { RoutingService } from '../geo/routing.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
@@ -121,6 +123,21 @@ export class DeliveriesService {
       vehicleTypes: DELIVERY_ALERT_VEHICLE_TYPES,
       data: { deliveryType: delivery.type },
     };
+    if (delivery.type === DeliveryType.FOOD && delivery.restaurantId) {
+      const restaurant = await this.prisma.restaurant.findUnique({
+        where: { id: delivery.restaurantId },
+        select: { courierMode: true, drivers: { where: { isActive: true }, select: { driverUserId: true } } },
+      });
+      const fleetIds = restaurant?.drivers.map((d) => d.driverUserId) ?? [];
+      const mode = restaurant?.courierMode ?? 'PLATFORM';
+      if (mode === 'OWN' || mode === 'HYBRID') {
+        await publishDriverJobAlert(this.redis, {
+          ...payload,
+          driverUserIds: fleetIds,
+        }).catch(() => undefined);
+      }
+      if (mode === 'OWN') return;
+    }
     await notifyNearbyDrivers(this.redis, this.matching, payload).catch(() => undefined);
   }
 
@@ -1402,6 +1419,17 @@ export class DeliveriesService {
           return ageMs < 90_000;
         });
         if (rejected) return false;
+        if (d.type === DeliveryType.FOOD && d.restaurant) {
+          const fleet = (d.restaurant.drivers ?? []).some((x) => x.driverUserId === driverUserId);
+          if (
+            !driverEligibleForFoodOffer({
+              courierMode: d.restaurant.courierMode,
+              driverIsRestaurantFleet: fleet,
+            })
+          ) {
+            return false;
+          }
+        }
         return true;
       })
       .map((d) => {
@@ -1447,9 +1475,19 @@ export class DeliveriesService {
     return { offers };
   }
 
-  private async resolveAssignSource(_restaurantId: string | null, _driverUserId: string) {
-    // SENGA gère tous les livreurs — source toujours plateforme.
-    return 'PLATFORM' as const;
+  private async resolveAssignSource(restaurantId: string | null, driverUserId: string) {
+    if (!restaurantId) return 'PLATFORM' as const;
+    const restaurant = await this.prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { courierMode: true },
+    });
+    const fleet = await this.prisma.restaurantDriver.findUnique({
+      where: { restaurantId_driverUserId: { restaurantId, driverUserId } },
+    });
+    return resolveCourierSource({
+      restaurantCourierMode: restaurant?.courierMode,
+      driverIsRestaurantFleet: Boolean(fleet?.isActive),
+    });
   }
 
   async acceptDelivery(deliveryId: string, driverUserId: string) {
@@ -1479,6 +1517,22 @@ export class DeliveriesService {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Livraison déjà assignée.');
     }
     assertEscrowAllowsDispatch(delivery);
+    if (delivery.type === DeliveryType.FOOD && delivery.restaurantId) {
+      const restaurant = await this.prisma.restaurant.findUnique({
+        where: { id: delivery.restaurantId },
+        select: { courierMode: true },
+      });
+      const fleet = await this.prisma.restaurantDriver.findUnique({
+        where: { restaurantId_driverUserId: { restaurantId: delivery.restaurantId, driverUserId } },
+      });
+      if (restaurant?.courierMode === 'OWN' && !fleet?.isActive) {
+        throw new MovaHttpException(
+          MovaErrorCode.DELIVERY_INVALID_STATUS,
+          undefined,
+          'Ce restaurant utilise ses propres livreurs. Offre réservée à la flotte du restaurant.',
+        );
+      }
+    }
     const courierSource = await this.resolveAssignSource(delivery.restaurantId, driverUserId);
     const updated = await this.prisma.delivery.update({
       where: { id: deliveryId },
@@ -1834,6 +1888,17 @@ export class DeliveriesService {
           'commerceType invalide. Valeurs: RESTAURANT, SUPERMARKET, PHARMACY, BOUTIQUE.',
         );
       }
+    }
+    if ('courierMode' in payload) {
+      const mode = String(payload.courierMode ?? '').toUpperCase();
+      if (!['PLATFORM', 'OWN', 'HYBRID'].includes(mode)) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'courierMode invalide. Valeurs: PLATFORM, OWN, HYBRID.',
+        );
+      }
+      payload.courierMode = mode;
     }
     if (id) return this.prisma.restaurant.update({ where: { id }, data: payload as never });
     return this.prisma.restaurant.create({ data: payload as never });

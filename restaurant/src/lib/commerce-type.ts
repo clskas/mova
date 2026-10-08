@@ -170,8 +170,8 @@ export function commerceHelpChapters(type: CommerceType) {
     {
       title: "Livraison par SENGA",
       steps: [
-        "SENGA gère tous les livreurs : vous ne choisissez pas de flotte interne.",
-        "Quand la commande est prête, un livreur SENGA vient la chercher.",
+        "Par défaut, SENGA gère les livreurs (flotte partenaire uniquement si SuperAdmin l'active).",
+        "Quand la commande est prête, un livreur vient la chercher.",
         "Vous êtes payé à l'enlèvement ; le livreur est payé après le PIN client.",
       ],
     },
@@ -222,8 +222,8 @@ export function commerceManuelChapters(type: CommerceType) {
     {
       title: "Livraison par SENGA",
       steps: [
-        "SENGA gère tous les livreurs : vous ne choisissez pas de flotte interne.",
-        "Quand la commande est prête, un livreur SENGA vient la chercher.",
+        "Par défaut, SENGA gère les livreurs (flotte partenaire uniquement si SuperAdmin l'active).",
+        "Quand la commande est prête, un livreur vient la chercher.",
         "Vous êtes payé à l'enlèvement ; le livreur est payé après le PIN client.",
       ],
     },

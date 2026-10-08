@@ -60,9 +60,20 @@ function parseMenuItems(raw: unknown): MenuItem[] {
     .filter((item) => item.name.trim().length > 0);
 }
 
+const COURIER_MODE_OPTIONS = [
+  { value: "PLATFORM", label: "Livreurs SENGA uniquement" },
+  { value: "OWN", label: "Livreurs internes du partenaire uniquement" },
+  { value: "HYBRID", label: "Livreurs internes + SENGA (hybride)" },
+];
+
+function courierModeLabel(mode?: string | null) {
+  return COURIER_MODE_OPTIONS.find((o) => o.value === mode)?.label ?? "Livreurs SENGA";
+}
+
 export default function RestaurantsPage() {
-  const { canWrite } = useAdmin();
+  const { canWrite, role } = useAdmin();
   const readOnly = !canWrite("restaurants");
+  const canToggleFleet = role === "SUPER_ADMIN";
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,6 +176,9 @@ export default function RestaurantsPage() {
           isActive: editTarget.isActive !== false,
           ownerUserId: editTarget.ownerUserId || null,
           commerceType: editTarget.commerceType ?? "RESTAURANT",
+          ...(canToggleFleet
+            ? { courierMode: editTarget.courierMode ?? "PLATFORM" }
+            : {}),
         },
         editTarget.id,
       );
@@ -323,6 +337,7 @@ export default function RestaurantsPage() {
                 <th className="p-3">GPS</th>
                 <th className="p-3">Statut</th>
                 <th className="p-3">Compte partenaire</th>
+                <th className="p-3">Livreurs</th>
                 <th className="p-3">Note</th>
                 {!readOnly && <th className="p-3">Menu</th>}
                 {!readOnly && <th className="p-3"></th>}
@@ -354,6 +369,18 @@ export default function RestaurantsPage() {
                   </td>
                   <td className="p-3 text-gray-600 text-xs max-w-[180px] truncate" title={partnerLabel(r.ownerUserId)}>
                     {partnerLabel(r.ownerUserId)}
+                  </td>
+                  <td className="p-3 text-xs">
+                    <span
+                      className={`px-2 py-0.5 rounded-full ${
+                        (r.courierMode ?? "PLATFORM") === "PLATFORM"
+                          ? "bg-slate-100 text-slate-700"
+                          : "bg-violet-100 text-violet-800"
+                      }`}
+                      title={courierModeLabel(r.courierMode)}
+                    >
+                      {(r.courierMode ?? "PLATFORM") === "PLATFORM" ? "SENGA" : r.courierMode}
+                    </span>
                   </td>
                   <td className="p-3">{r.rating?.toFixed(1) ?? "—"}</td>
                   {!readOnly && (
@@ -439,6 +466,30 @@ export default function RestaurantsPage() {
                 <Link href="/utilisateurs" className="text-[#6C63FF] underline">Utilisateurs</Link>.
               </p>
             </div>
+            {canToggleFleet ? (
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 space-y-2">
+                <FieldLabel>Livreurs internes (SuperAdmin)</FieldLabel>
+                <SelectInput
+                  value={editTarget.courierMode ?? "PLATFORM"}
+                  onChange={(v) =>
+                    setEditTarget({
+                      ...editTarget,
+                      courierMode: v as "PLATFORM" | "OWN" | "HYBRID",
+                    })
+                  }
+                  options={COURIER_MODE_OPTIONS}
+                />
+                <p className="text-xs text-gray-500">
+                  Si activé (OWN ou HYBRID), le partenaire voit dans SENGA Partenaire la gestion de sa flotte
+                  et peut assigner un livreur à une commande. Sinon, uniquement les livreurs SENGA.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500">
+                Mode livreurs : <strong>{courierModeLabel(editTarget.courierMode)}</strong>{" "}
+                (modifiable uniquement par SuperAdmin).
+              </p>
+            )}
             <BtnPrimary onClick={handleUpdate} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</BtnPrimary>
           </div>
         )}

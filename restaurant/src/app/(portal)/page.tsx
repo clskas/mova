@@ -5,11 +5,14 @@ import { useSearchParams } from "next/navigation";
 import { useRestaurantLiveRegister } from "@/components/RestaurantLiveProvider";
 import { ChatPanel } from "@/components/ChatPanel";
 import {
+  assignOwnDriver,
   confirmOrder,
   fetchOrders,
+  fetchRestaurantDrivers,
   formatCdf,
   markOrderReady,
   rejectOrder,
+  type RestaurantFleetDriver,
   type RestaurantOrder,
 } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
@@ -95,6 +98,8 @@ export default function OrdersPage() {
   const [filterQ, setFilterQ] = useState("");
   const [filtersActive, setFiltersActive] = useState(false);
   const [paginationTotal, setPaginationTotal] = useState<number | null>(null);
+  const [fleetDrivers, setFleetDrivers] = useState<RestaurantFleetDriver[]>([]);
+  const [allowInternalCouriers, setAllowInternalCouriers] = useState(false);
   const seenPendingIds = useRef<Set<string> | null>(null);
 
   useEffect(() => {
@@ -142,20 +147,28 @@ export default function OrdersPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const o = await fetchOrders(
-        filtersActive
-          ? {
-              status: filterStatus || undefined,
-              from: filterFrom || undefined,
-              to: filterTo || undefined,
-              q: filterQ.trim() || undefined,
-              take: 50,
-            }
-          : undefined,
-      );
+      const [o, fleet] = await Promise.all([
+        fetchOrders(
+          filtersActive
+            ? {
+                status: filterStatus || undefined,
+                from: filterFrom || undefined,
+                to: filterTo || undefined,
+                q: filterQ.trim() || undefined,
+                take: 50,
+              }
+            : undefined,
+        ),
+        fetchRestaurantDrivers().catch(() => null),
+      ]);
       const list = o.orders ?? [];
       setOrders(list);
       setPaginationTotal(o.pagination?.total ?? null);
+      if (fleet) {
+        const allow = fleet.allowInternalCouriers === true || fleet.courierMode !== "PLATFORM";
+        setAllowInternalCouriers(allow);
+        setFleetDrivers(allow ? fleet.drivers ?? [] : []);
+      }
 
       if (!filtersActive) {
         const pendingIds = list.filter((x) => x.status === "PENDING").map((x) => x.id);
@@ -194,6 +207,19 @@ export default function OrdersPage() {
       await load();
     } catch (e) {
       setError(toUserErrorMessage(e, "Action impossible"));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function assignDriver(orderId: string, driverUserId: string) {
+    setBusyId(orderId);
+    setError(null);
+    try {
+      await assignOwnDriver(orderId, driverUserId);
+      await load();
+    } catch (e) {
+      setError(toUserErrorMessage(e, "Assignation livreur impossible"));
     } finally {
       setBusyId(null);
     }
@@ -289,6 +315,7 @@ export default function OrdersPage() {
                     key={o.id}
                     order={o}
                     busy={busyId === o.id}
+                    fleetDrivers={allowInternalCouriers ? fleetDrivers : []}
                     onConfirm={o.status === "PENDING" ? () => act(o.id, "confirm") : undefined}
                     onReject={
                       o.status === "PENDING" || (o.status === "RESTAURANT_CONFIRMED" && !orderCanPrepare(o))
@@ -298,6 +325,11 @@ export default function OrdersPage() {
                     onReady={
                       o.status === "RESTAURANT_CONFIRMED" && orderCanPrepare(o)
                         ? () => act(o.id, "ready")
+                        : undefined
+                    }
+                    onAssignDriver={
+                      allowInternalCouriers && !o.driverAssigned && o.status === "READY_FOR_PICKUP"
+                        ? (driverUserId) => assignDriver(o.id, driverUserId)
                         : undefined
                     }
                     onChatClient={() => openChat(o.id, "Client")}
@@ -322,6 +354,7 @@ export default function OrdersPage() {
                       key={o.id}
                       order={o}
                       busy={busyId === o.id}
+                      fleetDrivers={allowInternalCouriers ? fleetDrivers : []}
                       onConfirm={() => act(o.id, "confirm")}
                       onReject={() => act(o.id, "reject")}
                       onChatClient={() => openChat(o.id, "Client")}
@@ -343,6 +376,7 @@ export default function OrdersPage() {
                       key={o.id}
                       order={o}
                       busy={busyId === o.id}
+                      fleetDrivers={allowInternalCouriers ? fleetDrivers : []}
                       onReady={
                         o.status === "RESTAURANT_CONFIRMED" && orderCanPrepare(o)
                           ? () => act(o.id, "ready")
@@ -351,6 +385,11 @@ export default function OrdersPage() {
                       onReject={
                         o.status === "RESTAURANT_CONFIRMED" && !orderCanPrepare(o)
                           ? () => act(o.id, "reject")
+                          : undefined
+                      }
+                      onAssignDriver={
+                        allowInternalCouriers && !o.driverAssigned && o.status === "READY_FOR_PICKUP"
+                          ? (driverUserId) => assignDriver(o.id, driverUserId)
                           : undefined
                       }
                       onChatClient={() => openChat(o.id, "Client")}
@@ -369,17 +408,21 @@ export default function OrdersPage() {
 function OrderCard({
   order,
   busy,
+  fleetDrivers = [],
   onConfirm,
   onReject,
   onReady,
+  onAssignDriver,
   onChatClient,
   onChatDriver,
 }: {
   order: RestaurantOrder;
   busy: boolean;
+  fleetDrivers?: RestaurantFleetDriver[];
   onConfirm?: () => void;
   onReject?: () => void;
   onReady?: () => void;
+  onAssignDriver?: (driverUserId: string) => void;
   onChatClient?: () => void;
   onChatDriver?: () => void;
 }) {
@@ -486,6 +529,31 @@ function OrderCard({
           <span className="text-xs text-green-700 self-center">Livreur assigné</span>
         )}
       </div>
+      {onAssignDriver && fleetDrivers.length > 0 && (
+        <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50/40 p-3 space-y-2">
+          <p className="text-xs font-medium text-violet-900">Choisir un livreur interne</p>
+          <div className="flex flex-wrap gap-2">
+            {fleetDrivers
+              .filter((d) => d.isActive)
+              .map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onAssignDriver(d.driverUserId)}
+                  className="px-3 py-2 rounded-lg bg-violet-600 text-white text-xs font-medium disabled:opacity-60"
+                >
+                  {d.phone || d.name || "Livreur"}
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
+      {onAssignDriver && fleetDrivers.length === 0 && (
+        <p className="mt-3 text-xs text-amber-700">
+          Ajoutez des livreurs internes dans Paramètres pour les assigner ici.
+        </p>
+      )}
       {order.status === "PENDING" && (
         <p className="mt-3 text-xs text-amber-700">
           {orderIsCashCod(order)

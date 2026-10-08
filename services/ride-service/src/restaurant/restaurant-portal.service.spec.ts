@@ -134,24 +134,22 @@ describe('RestaurantPortalService', () => {
     expect(profile.courierMode).toBe('PLATFORM');
   });
 
-  it('refuse OWN/HYBRID et l’ajout de livreurs internes', async () => {
+  it('refuse au partenaire de s’auto-accorder OWN/HYBRID (SuperAdmin only)', async () => {
     await expect(service.updateCourierMode('owner-1', 'OWN')).rejects.toMatchObject({
-      code: MovaErrorCode.VALIDATION_ERROR,
+      code: MovaErrorCode.AUTH_FORBIDDEN,
     });
     await expect(service.updateCourierMode('owner-1', 'HYBRID')).rejects.toMatchObject({
-      code: MovaErrorCode.VALIDATION_ERROR,
+      code: MovaErrorCode.AUTH_FORBIDDEN,
     });
     await expect(service.addDriver('owner-1', { phone: '+243970000000' })).rejects.toMatchObject({
-      code: MovaErrorCode.VALIDATION_ERROR,
+      code: MovaErrorCode.AUTH_FORBIDDEN,
     });
     await expect(service.removeDriver('owner-1', 'drv-1')).rejects.toMatchObject({
-      code: MovaErrorCode.VALIDATION_ERROR,
-    });
-    await expect(service.assignOwnDriver('del-1', 'owner-1', 'drv-1')).rejects.toMatchObject({
-      code: MovaErrorCode.VALIDATION_ERROR,
+      code: MovaErrorCode.AUTH_FORBIDDEN,
     });
     const fleet = await service.listDrivers('owner-1');
     expect(fleet.courierMode).toBe('PLATFORM');
+    expect(fleet.allowInternalCouriers).toBe(false);
     expect(fleet.drivers).toEqual([]);
   });
 

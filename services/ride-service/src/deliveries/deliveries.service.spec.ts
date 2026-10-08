@@ -509,7 +509,7 @@ describe('DeliveriesService', () => {
     expect(prisma.delivery.update).not.toHaveBeenCalled();
   });
 
-  it('OWN historique : un livreur SENGA peut quand même prendre la commande (flotte partenaire désactivée)', async () => {
+  it('OWN : refuse un livreur hors flotte partenaire', async () => {
     prisma.delivery.findUnique.mockResolvedValue({
       id: 'd1',
       userId: 'u1',
@@ -527,10 +527,34 @@ describe('DeliveriesService', () => {
     });
     prisma.restaurant.findUnique.mockResolvedValue({ courierMode: 'OWN' });
     prisma.restaurantDriver.findUnique.mockResolvedValue(null);
+    await expect(service.acceptDelivery('d1', 'external-drv')).rejects.toMatchObject({
+      code: MovaErrorCode.DELIVERY_INVALID_STATUS,
+    });
+    expect(prisma.delivery.update).not.toHaveBeenCalled();
+  });
+
+  it('OWN : accepte un livreur de la flotte partenaire', async () => {
+    prisma.delivery.findUnique.mockResolvedValue({
+      id: 'd1',
+      userId: 'u1',
+      driverId: null,
+      type: 'FOOD',
+      status: 'READY_FOR_PICKUP',
+      restaurantId: 'r1',
+      guaranteed: true,
+      escrowReady: true,
+      escrowAmountCdf: 15000,
+      estimatedPriceCdf: 15000,
+      deliveryPin: '1234',
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+    });
+    prisma.restaurant.findUnique.mockResolvedValue({ courierMode: 'OWN' });
+    prisma.restaurantDriver.findUnique.mockResolvedValue({ isActive: true });
     prisma.delivery.update.mockResolvedValue({
       id: 'd1',
       userId: 'u1',
-      driverId: 'external-drv',
+      driverId: 'fleet-drv',
       type: 'FOOD',
       status: 'PICKED_UP',
       restaurantId: 'r1',
@@ -543,10 +567,10 @@ describe('DeliveriesService', () => {
       updatedAt: new Date(),
     });
     prisma.deliveryEvent.create.mockResolvedValue({});
-    await service.acceptDelivery('d1', 'external-drv');
+    await service.acceptDelivery('d1', 'fleet-drv');
     expect(prisma.delivery.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ courierSource: 'PLATFORM', driverId: 'external-drv' }),
+        data: expect.objectContaining({ courierSource: 'RESTAURANT', driverId: 'fleet-drv' }),
       }),
     );
   });

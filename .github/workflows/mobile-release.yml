@@ -146,12 +146,15 @@ jobs:
           # Floor must stay above the highest versionCode already accepted by Play
           # (102 used; bump when uploads fail with "already been used").
           FLOOR=120
-          PUBSPEC_CODE=$(grep -E '^version:' mobile/pubspec.yaml | head -1 | sed -E 's/.*\+([0-9]+).*/\1/')
+          PUBSPEC_LINE=$(grep -E '^version:' mobile/pubspec.yaml | head -1)
+          PUBSPEC_NAME=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+          PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
           CODE="${{ github.run_number }}"
           if [ "$CODE" -lt "$FLOOR" ]; then CODE="$FLOOR"; fi
           if [ -n "$PUBSPEC_CODE" ] && [ "$PUBSPEC_CODE" -gt "$CODE" ]; then CODE="$PUBSPEC_CODE"; fi
+          echo "name=${PUBSPEC_NAME}" >> "$GITHUB_OUTPUT"
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
-          echo "Play versionCode=$CODE (pubspec +${PUBSPEC_CODE:-?}; run_number=${{ github.run_number }}; floor=$FLOOR)"
+          echo "Play versionName=$PUBSPEC_NAME versionCode=$CODE (pubspec +${PUBSPEC_CODE:-?}; run_number=${{ github.run_number }}; floor=$FLOOR)"
 
       - name: Build passenger AAB
         working-directory: mobile
@@ -161,7 +164,7 @@ jobs:
           flutter build appbundle --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
-            --build-name=1.0.17 \
+            --build-name=${{ steps.playver.outputs.name }} \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
@@ -195,7 +198,7 @@ jobs:
           flutter build appbundle --release \
             --flavor driver \
             -t lib/main_driver.dart \
-            --build-name=1.0.17 \
+            --build-name=${{ steps.playver.outputs.name }} \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
@@ -221,7 +224,7 @@ jobs:
           flutter build apk --release \
             --flavor passenger \
             -t lib/main_passenger.dart \
-            --build-name=1.0.17 \
+            --build-name=${{ steps.playver.outputs.name }} \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
@@ -237,7 +240,7 @@ jobs:
           flutter build apk --release \
             --flavor driver \
             -t lib/main_driver.dart \
-            --build-name=1.0.17 \
+            --build-name=${{ steps.playver.outputs.name }} \
             --build-number=${{ steps.playver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
@@ -444,6 +447,15 @@ jobs:
           echo "Using API_URL=$API"
           echo "Using WS_URL=$WS"
 
+      - name: Resolve iOS marketing version
+        id: iosver
+        run: |
+          set -euo pipefail
+          PUBSPEC_LINE=$(grep -E '^version:' mobile/pubspec.yaml | head -1)
+          NAME=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "iOS CFBundleShortVersionString=$NAME (from pubspec)"
+
       - name: Check iOS credentials
         id: ios_creds
         env:
@@ -557,7 +569,7 @@ jobs:
           # No --verbose: huge showBuildSettings dumps hide real archive progress.
           flutter build ipa --release \
             -t ${{ matrix.entry }} \
-            --build-name=1.0.17 \
+            --build-name=${{ steps.iosver.outputs.name }} \
             --build-number=${{ github.run_number }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \

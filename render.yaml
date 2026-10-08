@@ -104,7 +104,8 @@ services:
     dockerfilePath: ./docker/ride.Dockerfile
     dockerContext: .
     # Start HTTP first so Render health checks pass while migrate retries against waking Postgres.
-    dockerCommand: sh -c "node dist/main.js & pid=$!; (MOVA_SKIP_BACKUP=1 /app/scripts/migrate-with-backup.sh || echo MIGRATE_WARN); wait $pid"
+    # Use dedicated script — do not inline $! / $pid in dockerCommand (Render/shell strip them → exit 127).
+    dockerCommand: bash /app/scripts/ride-entrypoint.sh
     plan: starter
     # Global prefix excludes health — live probe is /health/live (NOT /api/health/live which 404s).
     healthCheckPath: /health/live

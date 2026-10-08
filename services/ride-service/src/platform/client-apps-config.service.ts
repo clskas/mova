@@ -23,7 +23,7 @@ export class ClientAppsConfigService implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    await this.refresh().catch((err: unknown) => {
+    void this.refresh().catch((err: unknown) => {
       this.logger.warn(
         `Client apps config load skipped: ${err instanceof Error ? err.message : String(err)}`,
       );

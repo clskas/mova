@@ -39,7 +39,8 @@ export class PlatformConfigService implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    await this.refresh().catch((err: unknown) => {
+    // Non-blocking: do not delay HTTP bind for Render health checks.
+    void this.refresh().catch((err: unknown) => {
       this.logger.warn(`Platform config load skipped: ${err instanceof Error ? err.message : String(err)}`);
     });
   }

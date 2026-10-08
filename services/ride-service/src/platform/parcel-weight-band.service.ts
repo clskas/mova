@@ -23,7 +23,7 @@ export class ParcelWeightBandService implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    await this.ensureDefaults().catch((err: unknown) => {
+    void this.ensureDefaults().catch((err: unknown) => {
       this.logger.warn(`Parcel weight band seed skipped: ${err instanceof Error ? err.message : String(err)}`);
     });
   }

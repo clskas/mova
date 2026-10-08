@@ -30,7 +30,7 @@ export class LegalDocumentsService implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    await this.ensureDefaultPublished().catch((err: unknown) => {
+    void this.ensureDefaultPublished().catch((err: unknown) => {
       this.logger.warn(`CGU bootstrap skipped: ${err instanceof Error ? err.message : String(err)}`);
     });
   }

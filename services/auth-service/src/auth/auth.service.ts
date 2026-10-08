@@ -243,7 +243,11 @@ export class AuthService {
       );
     }
     this.assertRoleAccess(user, requestedRole);
-    if (!verifyLocalPin(pin, user.localPinHash)) {
+    // App Review (ASC): seed demos accept PIN 123456 when ALLOW_TEST_OTP=true,
+    // same standing code as SMS OTP — reviewers type password into the PIN pad.
+    const seedDemoPinOk =
+      Boolean(user.phone) && matchesSeedTestOtp(user.phone!, pin);
+    if (!seedDemoPinOk && !verifyLocalPin(pin, user.localPinHash)) {
       await this.registerPinFailure(found.lockKey);
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PIN, HttpStatus.UNAUTHORIZED);
     }

@@ -49,6 +49,13 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   String? _googleDestinationMasked;
   bool _pinSubmitLock = false;
 
+  /// Google Sign-In is hidden on iOS (Guideline 4.8 — needs Sign in with Apple).
+  bool get _showGoogleSignIn {
+    if (_step != PhoneLoginStep.phone && _step != PhoneLoginStep.forgot) return false;
+    if (kIsWeb) return true;
+    return defaultTargetPlatform != TargetPlatform.iOS;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -608,7 +615,8 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             child: Text(_step == PhoneLoginStep.googleOtp ? 'Retour' : 'Changer de numéro'),
           ),
         ],
-        if (_step == PhoneLoginStep.phone || _step == PhoneLoginStep.forgot) ...[
+        // Guideline 4.8: Google on iOS requires Sign in with Apple — hide until SIWA ships.
+        if (_showGoogleSignIn) ...[
           const SizedBox(height: 20),
           Row(
             children: [

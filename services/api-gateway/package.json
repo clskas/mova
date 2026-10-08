@@ -30,6 +30,7 @@
     "ioredis": "^5.11.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "proxy-addr": "^2.0.8",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1"
   },
@@ -60,7 +61,14 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": { "ignoreDeprecations": "5.0" } }]
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "ignoreDeprecations": "5.0"
+          }
+        }
+      ]
     },
     "testEnvironment": "node"
   }

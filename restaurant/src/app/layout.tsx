@@ -26,12 +26,12 @@ export const metadata: Metadata = {
   formatDetection: { telephone: false },
   icons: {
     icon: [
-      { url: "/favicon.ico?v=partner-v17", sizes: "any" },
-      { url: "/icon-192.png?v=partner-v17", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512.png?v=partner-v17", sizes: "512x512", type: "image/png" },
-      { url: "/icon.svg?v=partner-v17", type: "image/svg+xml" },
+      { url: "/favicon.ico?v=partner-v18", sizes: "any" },
+      { url: "/icon-192.png?v=partner-v18", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png?v=partner-v18", sizes: "512x512", type: "image/png" },
+      { url: "/icon.svg?v=partner-v18", type: "image/svg+xml" },
     ],
-    apple: [{ url: "/apple-touch-icon.png?v=partner-v17", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: "/apple-touch-icon.png?v=partner-v18", sizes: "180x180", type: "image/png" }],
   },
   other: {
     "mobile-web-app-capable": "yes",

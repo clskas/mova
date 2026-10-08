@@ -6,9 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class HealthController {
   constructor(private prisma: PrismaService) {}
 
-  /** Process liveness for Render — no DB (avoids false kills during Postgres wake). */
-  @Get('health/live')
-  live() {
+  private liveBody() {
     return {
       status: 'ok',
       service: 'ride-service',
@@ -17,6 +15,21 @@ export class HealthController {
       city: MARKET_RDC.coverageLabel,
       timestamp: new Date().toISOString(),
     };
+  }
+
+  /** Process liveness for Render — no DB (avoids false kills during Postgres wake). */
+  @Get('health/live')
+  live() {
+    return this.liveBody();
+  }
+
+  /**
+   * Legacy path some Render dashboards still probe (/api/health/live).
+   * Global prefix is excluded for health/*, so this is registered explicitly.
+   */
+  @Get('api/health/live')
+  liveApiPrefixed() {
+    return this.liveBody();
   }
 
   @Get('health')

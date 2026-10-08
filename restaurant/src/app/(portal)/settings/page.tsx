@@ -6,6 +6,7 @@ import {
   addRestaurantDriver,
   fetchProfile,
   fetchRestaurantDrivers,
+  isInternalFleetMode,
   removeRestaurantDriver,
   updateMenuSettings,
   updateRestaurantLocation,
@@ -64,12 +65,19 @@ export default function SettingsPage() {
       );
       const mode = (p.courierMode ?? "PLATFORM") as CourierMode;
       setCourierMode(mode);
-      const allow = p.allowInternalCouriers === true || mode !== "PLATFORM";
+      // PLATFORM (livreurs SENGA uniquement) → jamais afficher « Livreurs internes ».
+      const allow = isInternalFleetMode(mode, p.allowInternalCouriers);
       setAllowInternalCouriers(allow);
       if (allow) {
         const fleet = await fetchRestaurantDrivers();
-        setDrivers(fleet.drivers ?? []);
-        setCourierMode((fleet.courierMode as CourierMode) ?? mode);
+        const fleetMode = (fleet.courierMode as CourierMode) ?? mode;
+        setCourierMode(fleetMode);
+        if (!isInternalFleetMode(fleetMode, fleet.allowInternalCouriers)) {
+          setAllowInternalCouriers(false);
+          setDrivers([]);
+        } else {
+          setDrivers(fleet.drivers ?? []);
+        }
       } else {
         setDrivers([]);
       }

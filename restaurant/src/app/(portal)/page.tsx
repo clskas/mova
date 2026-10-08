@@ -10,6 +10,7 @@ import {
   fetchOrders,
   fetchRestaurantDrivers,
   formatCdf,
+  isInternalFleetMode,
   markOrderReady,
   rejectOrder,
   type RestaurantFleetDriver,
@@ -165,7 +166,7 @@ export default function OrdersPage() {
       setOrders(list);
       setPaginationTotal(o.pagination?.total ?? null);
       if (fleet) {
-        const allow = fleet.allowInternalCouriers === true || fleet.courierMode !== "PLATFORM";
+        const allow = isInternalFleetMode(fleet.courierMode, fleet.allowInternalCouriers);
         setAllowInternalCouriers(allow);
         setFleetDrivers(allow ? fleet.drivers ?? [] : []);
       }

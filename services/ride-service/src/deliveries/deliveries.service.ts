@@ -30,7 +30,7 @@ import {
   formatParcelDelivery,
   generateDeliveryPin,
 } from './parcel.util';
-import { assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverAcceptsDeliveries, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
+import { assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverAcceptsDeliveries, driverApprovedVehicleTypes, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 import { fetchDriverDebtStatus } from '../common/driver-debt.util';
 import { isCommerceType, stubRestaurantCreateData } from '../restaurant/restaurant-profile.util';
 import {
@@ -1398,16 +1398,18 @@ export class DeliveriesService {
 
     const radiusKm = this.platformConfig.get().matching.maxRadiusKm;
     const deliveryRule = await this.commission.get(CommissionServiceType.DELIVERY);
-    const driverTypes = (profile.vehicles ?? [])
-      .filter((v) => v.isActive !== false)
-      .map((v) => {
+    const driverTypes = driverApprovedVehicleTypes(profile)
+      .map((t) => {
         try {
-          return normalizeVehicleType(v.type) as VehicleTypeValue;
+          return normalizeVehicleType(t) as VehicleTypeValue;
         } catch {
           return null;
         }
       })
       .filter((t): t is VehicleTypeValue => t != null);
+    if (driverTypes.length === 0) {
+      return { offers: [] as Record<string, unknown>[] };
+    }
     const offers = deliveries
       .filter((d) => {
         const rejected = d.events.some((e) => {

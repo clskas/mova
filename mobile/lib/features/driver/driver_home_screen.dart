@@ -1194,6 +1194,20 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
 
   String? get _kycStatus => _profile?['kycStatus']?.toString();
 
+  String? get _vehicleTypeApprovalStatus {
+    final top = _profile?['vehicleTypeApprovalStatus']?.toString();
+    if (top != null && top.isNotEmpty) return top.toUpperCase();
+    final vehicles = _profile?['vehicles'];
+    if (vehicles is! List || vehicles.isEmpty) return null;
+    final maps = vehicles.whereType<Map>().map((v) => Map<String, dynamic>.from(v)).toList();
+    final active = maps.cast<Map<String, dynamic>>().firstWhere(
+          (v) => v['isActive'] == true,
+          orElse: () => maps.first,
+        );
+    final status = active['typeApprovalStatus']?.toString();
+    return status?.toUpperCase();
+  }
+
   _DriverServiceMode _serviceModeLabel() {
     final mode = _profile?['serviceMode']?.toString().toUpperCase();
     if (mode == 'RIDES_ONLY') return _DriverServiceMode.ridesOnly;
@@ -1541,6 +1555,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     if (value && _kycStatus != 'APPROVED') {
                       setState(() => _availabilityError =
                           'Documents KYC approuvés requis pour passer en ligne.');
+                      return;
+                    }
+                    final typeStatus = _vehicleTypeApprovalStatus;
+                    if (value && typeStatus != null && typeStatus != 'APPROVED') {
+                      setState(() => _availabilityError = typeStatus == 'REJECTED'
+                          ? 'Type d\'engin refusé — corrigez le type ou la photo dans Enregistrement.'
+                          : 'Type d\'engin en attente de validation SENGA — pas encore de courses.');
                       return;
                     }
                     if (value && !_documentsCanOperate) {

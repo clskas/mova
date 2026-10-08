@@ -62,6 +62,8 @@ describe('DriversService KYC dossier', () => {
     const result = await service.setDriverKycStatus('u1', true);
     expect(result.activationPin).toBeTruthy();
     expect(prisma.driverProfile.upsert).toHaveBeenCalled();
+    // Approuver le dossier ne doit PAS valider automatiquement le type d'engin.
+    expect(prisma.vehicle.updateMany).not.toHaveBeenCalled();
   });
 
   it('PENDING inclut les docs APPROVED des dossiers encore en attente (Approuver le dossier)', async () => {

@@ -1,11 +1,11 @@
 /* BUILD_ID: __MOVA_BUILD_ID__ */
-const CACHE = "mova-business-v16";
+const CACHE = "mova-business-v17";
 const SHELL = [
   "/manifest.webmanifest",
-  "/icon-192.png",
-  "/icon-512.png",
-  "/icon-512-maskable.png",
-  "/apple-touch-icon.png",
+  "/icon-192.png?v=partner-v17",
+  "/icon-512.png?v=partner-v17",
+  "/icon-512-maskable.png?v=partner-v17",
+  "/apple-touch-icon.png?v=partner-v17",
   "/alert-chime.wav",
 ];
 
@@ -72,8 +72,8 @@ self.addEventListener("push", (event) => {
       body: payload.body,
       tag: payload.tag,
       data: { url: payload.url },
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
+      icon: "/icon-192.png?v=partner-v17",
+      badge: "/icon-192.png?v=partner-v17",
     }),
   );
 });

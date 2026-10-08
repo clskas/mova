@@ -29,7 +29,8 @@ export type DriverProfileSnapshot = {
   currentLng?: number | null;
   operatingCity?: string | null;
   ratingAvg?: number;
-  vehicles?: { id: string; type: string; isActive?: boolean }[];
+  vehicles?: { id: string; type: string; isActive?: boolean; typeApprovalStatus?: string | null }[];
+  vehicleTypeApprovalStatus?: string | null;
 };
 
 /** Platform livreurs SENGA (default). Ride-only when admin sets acceptsDeliveries=false. */
@@ -76,13 +77,34 @@ export async function fetchDriverProfileSnapshot(userId: string): Promise<Driver
   }
 }
 
+/** Active vehicles whose type has been validated by SENGA admin. */
+export function driverApprovedVehicleTypes(
+  profile: DriverProfileSnapshot | null | undefined,
+): string[] {
+  const vehicles = profile?.vehicles ?? [];
+  return vehicles
+    .filter((v) => v.isActive !== false && String(v.typeApprovalStatus ?? '').toUpperCase() === 'APPROVED')
+    .map((v) => v.type)
+    .filter(Boolean);
+}
+
 export function driverCanReceiveJobs(profile: DriverProfileSnapshot | null | undefined): boolean {
   if (!profile || profile.kycStatus !== 'APPROVED') return false;
   const pinVerified =
     profile.activationPinVerified === true ||
     profile.activationPinVerifiedAt != null;
   if (!pinVerified) return false;
-  return profile.documentsStatus?.canOperate === true;
+  if (profile.documentsStatus?.canOperate !== true) return false;
+  // Belt-and-suspenders: never offer jobs while vehicle type is still pending/rejected.
+  const topStatus = String(profile.vehicleTypeApprovalStatus ?? '').toUpperCase();
+  if (topStatus === 'PENDING' || topStatus === 'REJECTED') return false;
+  const active = (profile.vehicles ?? []).filter((v) => v.isActive !== false);
+  if (active.length > 0) {
+    const hasApproved = active.some((v) => String(v.typeApprovalStatus ?? '').toUpperCase() === 'APPROVED');
+    const hasStatus = active.some((v) => v.typeApprovalStatus != null && String(v.typeApprovalStatus).length > 0);
+    if (hasStatus && !hasApproved) return false;
+  }
+  return true;
 }
 
 export async function assertDriverCanReceiveJobs(userId: string): Promise<DriverProfileSnapshot> {

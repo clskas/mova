@@ -272,6 +272,20 @@ export class DriversService {
         'Activez votre compte avec le code PIN reçu après validation SENGA.',
       );
     }
+    const activeVehicle = profile.vehicles?.find((v) => v.isActive !== false) ?? profile.vehicles?.[0];
+    if (
+      isAvailable &&
+      activeVehicle?.typeApprovalStatus &&
+      activeVehicle.typeApprovalStatus !== KycStatus.APPROVED
+    ) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        activeVehicle.typeApprovalStatus === KycStatus.REJECTED
+          ? "Type d'engin refusé par SENGA. Corrigez le type ou la photo dans Enregistrement."
+          : "Type d'engin en attente de validation SENGA — vous ne pouvez pas encore recevoir de courses.",
+      );
+    }
     const kyc = await this.getKycStatus(userId);
     const documentsStatus = this.documentsStatusFor(profile, kyc.checklist);
     if (isAvailable && !documentsStatus.canOperate) {
@@ -584,6 +598,13 @@ export class DriversService {
               : {}),
           },
         });
+        // Changing type/photo reopens admin review — take driver offline immediately.
+        if (typeOrPhotoChanged) {
+          await this.prisma.driverProfile.update({
+            where: { userId },
+            data: { isAvailable: false },
+          });
+        }
       }
     }
 
@@ -744,6 +765,7 @@ export class DriversService {
     const acceptsDeliveries = profile?.acceptsDeliveries !== false;
     const serviceMode =
       !acceptsRides ? 'DELIVERIES_ONLY' : !acceptsDeliveries ? 'RIDES_ONLY' : 'BOTH';
+    const activeVehicle = profile?.vehicles?.find((v) => v.isActive !== false) ?? profile?.vehicles?.[0];
     return {
       ...profile,
       acceptsRides,
@@ -758,6 +780,8 @@ export class DriversService {
       needsActivationPin: profile?.kycStatus === KycStatus.APPROVED && !pinVerified,
       documentsRenewalPending: profile?.documentsRenewalPending ?? false,
       documentsRenewalRequestedAt: profile?.documentsRenewalRequestedAt,
+      vehicleTypeApprovalStatus: activeVehicle?.typeApprovalStatus ?? null,
+      vehicleTypeApprovalPending: activeVehicle?.typeApprovalStatus === KycStatus.PENDING,
     };
   }
 
@@ -922,9 +946,8 @@ export class DriversService {
 
   private async applyKycApproval(userId: string) {
     const pin = await this.resolveOnePin(userId);
-    const now = new Date();
     const expiresAt = this.activationPinExpiry();
-    const defaultExpiry = new Date(now);
+    const defaultExpiry = new Date();
     defaultExpiry.setUTCFullYear(defaultExpiry.getUTCFullYear() + 2);
     const existing = await this.prisma.driverProfile.findUnique({ where: { userId } });
     await this.prisma.driverProfile.upsert({
@@ -956,9 +979,11 @@ export class DriversService {
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
     if (profile) {
       await this.ensureDefaultVehicle(profile.id);
-      await this.prisma.vehicle.updateMany({
-        where: { driverProfileId: profile.id, isActive: true, typeApprovalStatus: KycStatus.PENDING },
-        data: { typeApprovalStatus: KycStatus.APPROVED, typeApprovedAt: now, typeApprovalNotes: null },
+      // Do NOT auto-approve vehicle type here — admin must validate type separately
+      // ("Valider ce type d'engin"). Drivers stay offline until type is APPROVED.
+      await this.prisma.driverProfile.update({
+        where: { userId },
+        data: { isAvailable: false },
       });
     }
     const notified = await this.deliverActivationPin(userId, pin);
@@ -1612,11 +1637,20 @@ export class DriversService {
   }
 
   async setDriverActive(userId: string, active: boolean) {
-    const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
+    const profile = await this.prisma.driverProfile.findUnique({
+      where: { userId },
+      include: { vehicles: true },
+    });
     if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+    // "Activer" ne met PAS en ligne sans type d'engin validé + docs opérationnels.
+    let isAvailable = false;
+    if (active && profile.kycStatus === KycStatus.APPROVED) {
+      const documentsStatus = this.documentsStatusFor(profile);
+      isAvailable = documentsStatus.canOperate === true && !!profile.activationPinVerifiedAt;
+    }
     return this.prisma.driverProfile.update({
       where: { userId },
-      data: { isAvailable: active && profile.kycStatus === KycStatus.APPROVED },
+      data: { isAvailable },
     });
   }
 

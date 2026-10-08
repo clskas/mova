@@ -95,17 +95,6 @@ export type RestaurantProfile = {
   courierMode?: "PLATFORM" | "OWN" | "HYBRID";
   /** true si SuperAdmin a activé OWN ou HYBRID pour ce partenaire. */
   allowInternalCouriers?: boolean;
-
-/** Flotte interne visible seulement en OWN / HYBRID — jamais en PLATFORM (livreurs SENGA uniquement). */
-export function isInternalFleetMode(
-  mode?: string | null,
-  allowInternalCouriers?: boolean | null,
-): boolean {
-  const m = String(mode ?? "PLATFORM").toUpperCase();
-  if (m === "PLATFORM") return false;
-  if (m === "OWN" || m === "HYBRID") return true;
-  return allowInternalCouriers === true;
-}
   commerceType?: "RESTAURANT" | "SUPERMARKET" | "PHARMACY" | "BOUTIQUE";
   kycStatus?: string;
   canOperate?: boolean;
@@ -118,6 +107,17 @@ export function isInternalFleetMode(
   };
   needsProfileSetup?: boolean;
 };
+
+/** Flotte interne visible seulement en OWN / HYBRID — jamais en PLATFORM (livreurs SENGA uniquement). */
+export function isInternalFleetMode(
+  mode?: string | null,
+  allowInternalCouriers?: boolean | null,
+): boolean {
+  const m = String(mode ?? "PLATFORM").toUpperCase();
+  if (m === "PLATFORM") return false;
+  if (m === "OWN" || m === "HYBRID") return true;
+  return allowInternalCouriers === true;
+}
 
 export type RestaurantOrder = {
   id: string;

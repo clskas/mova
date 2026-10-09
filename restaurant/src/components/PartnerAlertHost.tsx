@@ -11,7 +11,9 @@ import {
 
 export function PartnerAlertHost() {
   const [ui, setUi] = useState<PartnerAlertUi>(() =>
-    typeof window === "undefined" ? { soundEnabled: false, toast: null } : getPartnerAlertUi(),
+    typeof window === "undefined"
+      ? { soundEnabled: false, soundMuted: false, soundStyle: "senga", toast: null }
+      : getPartnerAlertUi(),
   );
 
   useEffect(() => subscribePartnerAlertUi(setUi), []);

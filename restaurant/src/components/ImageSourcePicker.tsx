@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { ImageCropDialog, isCroppableImage } from "@/components/ImageCropDialog";
 
 type Props = {
   onSelect: (file: File) => void;
@@ -8,6 +9,8 @@ type Props = {
   label?: string;
   className?: string;
   accept?: string;
+  /** Désactiver le rognage (ex. PDF dossier). */
+  enableCrop?: boolean;
 };
 
 /** Visually hidden — `display:none` blocks programmatic .click() on some mobile browsers. */
@@ -16,9 +19,7 @@ const srOnlyFileInput =
 
 /**
  * Bouton de sélection d'image offrant un choix explicite : « Prendre une photo »
- * (appareil photo) ou « Galerie ». Deux <input> distincts
- * garantissent le bon comportement sur tous les navigateurs / PWA installées,
- * où un simple `capture` force la caméra sans laisser le choix de la galerie.
+ * (appareil photo) ou « Galerie », puis rognage optionnel.
  */
 export function ImageSourcePicker({
   onSelect,
@@ -26,8 +27,10 @@ export function ImageSourcePicker({
   label = "Ajouter une photo",
   className,
   accept = "image/*",
+  enableCrop = true,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
@@ -44,7 +47,6 @@ export function ImageSourcePicker({
   }, [open]);
 
   function pick(ref: RefObject<HTMLInputElement | null>) {
-    // Click while still in the user-gesture stack, then close the menu.
     const input = ref.current;
     if (!input) return;
     input.click();
@@ -54,7 +56,12 @@ export function ImageSourcePicker({
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (file) onSelect(file);
+    if (!file) return;
+    if (enableCrop && isCroppableImage(file)) {
+      setCropFile(file);
+      return;
+    }
+    onSelect(file);
   }
 
   return (
@@ -107,6 +114,16 @@ export function ImageSourcePicker({
         aria-hidden
         onChange={handleChange}
       />
+      {cropFile && (
+        <ImageCropDialog
+          file={cropFile}
+          onCancel={() => setCropFile(null)}
+          onConfirm={(cropped) => {
+            setCropFile(null);
+            onSelect(cropped);
+          }}
+        />
+      )}
     </div>
   );
 }

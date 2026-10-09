@@ -5,12 +5,12 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../core/config/market_config.dart';
 import '../../core/billing/driver_earnings_display.dart';
 import '../../core/geo/geo_utils.dart';
+import 'driver_alert_prefs.dart';
 
-/// Alertes chauffeur : vibration + **son SENGA dédié** (pas le son système partagé).
+/// Alertes chauffeur : vibration + **son SENGA dédié** (ou son système / mute).
 ///
-/// Android : `res/raw/senga_job.mp3` via canal `mova_driver_jobs_v2`
-/// (v2 force un nouveau canal — le son d’un canal Android est immuable après création).
-/// iOS : `senga_job.wav` dans le bundle Runner.
+/// Android : canaux distincts (le son d’un canal est immuable après création).
+/// iOS : `senga_job.wav` ou son par défaut / silencieux selon les prefs.
 class DriverJobAlertService {
   DriverJobAlertService._();
 
@@ -18,8 +18,9 @@ class DriverJobAlertService {
   static bool _initialized = false;
   static int _notificationId = 0;
 
-  /// Bump when changing channel sound/importance so existing installs pick it up.
-  static const _channelId = 'mova_driver_jobs_v2';
+  static const _channelSengaId = 'mova_driver_jobs_v2';
+  static const _channelSystemId = 'mova_driver_jobs_system_v1';
+  static const _channelSilentId = 'mova_driver_jobs_silent_v1';
   static const _channelName = 'Missions & courses SENGA';
   static const _androidSound = RawResourceAndroidNotificationSound('senga_job');
   static const _iosSound = 'senga_job.wav';
@@ -33,22 +34,49 @@ class DriverJobAlertService {
       settings: const InitializationSettings(android: androidInit, iOS: darwinInit),
     );
 
-    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin =
+        _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final vibration = Int64List.fromList([0, 450, 180, 450]);
     await androidPlugin?.createNotificationChannel(
       AndroidNotificationChannel(
-        _channelId,
+        _channelSengaId,
         _channelName,
-        description: 'Nouvelles courses, livraisons et missions assignées — son SENGA',
+        description: 'Nouvelles courses, livraisons et missions — son SENGA',
         importance: Importance.max,
         playSound: true,
         sound: _androidSound,
         enableVibration: true,
-        vibrationPattern: Int64List.fromList([0, 450, 180, 450]),
+        vibrationPattern: vibration,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+      ),
+    );
+    await androidPlugin?.createNotificationChannel(
+      AndroidNotificationChannel(
+        _channelSystemId,
+        '$_channelName (son téléphone)',
+        description: 'Missions avec le son de notification système',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        vibrationPattern: vibration,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+      ),
+    );
+    await androidPlugin?.createNotificationChannel(
+      AndroidNotificationChannel(
+        _channelSilentId,
+        '$_channelName (sans son)',
+        description: 'Missions en vibration seule (son coupé dans l’app)',
+        importance: Importance.max,
+        playSound: false,
+        enableVibration: true,
+        vibrationPattern: vibration,
         audioAttributesUsage: AudioAttributesUsage.alarm,
       ),
     );
 
     await androidPlugin?.requestNotificationsPermission();
+    await DriverAlertPrefs.ensureLoaded();
     _initialized = true;
   }
 
@@ -58,10 +86,18 @@ class DriverJobAlertService {
     String? payload,
   }) async {
     await init();
+    await DriverAlertPrefs.ensureLoaded();
+    final muted = DriverAlertPrefs.muted;
+    final style = DriverAlertPrefs.style;
+
     await HapticFeedback.heavyImpact();
     await Future<void>.delayed(const Duration(milliseconds: 100));
     await HapticFeedback.heavyImpact();
-    // Pas de SystemSound.alert (son partagé avec d’autres apps) — le canal joue senga_job.
+
+    final channelId = muted
+        ? _channelSilentId
+        : (style == DriverAlertSoundStyle.system ? _channelSystemId : _channelSengaId);
+    final playSound = !muted;
 
     final id = ++_notificationId;
     await _plugin.show(
@@ -70,25 +106,25 @@ class DriverJobAlertService {
       body: body,
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          _channelId,
+          channelId,
           _channelName,
-          channelDescription: 'Alertes chauffeur SENGA — son dédié',
+          channelDescription: 'Alertes chauffeur SENGA',
           importance: Importance.max,
           priority: Priority.max,
           category: AndroidNotificationCategory.call,
           fullScreenIntent: true,
-          playSound: true,
-          sound: _androidSound,
+          playSound: playSound,
+          sound: (!muted && style == DriverAlertSoundStyle.senga) ? _androidSound : null,
           enableVibration: true,
           vibrationPattern: Int64List.fromList([0, 450, 180, 450]),
           audioAttributesUsage: AudioAttributesUsage.alarm,
           ticker: title,
         ),
-        iOS: const DarwinNotificationDetails(
+        iOS: DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
-          presentSound: true,
-          sound: _iosSound,
+          presentSound: playSound,
+          sound: (!muted && style == DriverAlertSoundStyle.senga) ? _iosSound : null,
           interruptionLevel: InterruptionLevel.timeSensitive,
         ),
       ),
@@ -133,7 +169,8 @@ class DriverJobAlertService {
     final pickup = offer['pickupAddress']?.toString() ?? '';
     final driverNet = DriverEarningsDisplay.netFromMap(offer);
     final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
-    final tripKm = (offer['tripDistanceKm'] as num?)?.toDouble() ?? (offer['distanceKm'] as num?)?.toDouble();
+    final tripKm =
+        (offer['tripDistanceKm'] as num?)?.toDouble() ?? (offer['distanceKm'] as num?)?.toDouble();
     final parts = <String>[kind];
     if (pickup.isNotEmpty) parts.add(pickup);
     if (pickupKm != null) parts.add('à ${GeoUtils.formatDistanceKm(pickupKm)}');

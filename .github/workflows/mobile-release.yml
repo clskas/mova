@@ -144,8 +144,8 @@ jobs:
         run: |
           set -euo pipefail
           # Floor must stay above the highest versionCode already accepted by Play
-          # (121 used; bump when uploads fail with "already been used").
-          FLOOR=122
+          # (122 used; bump when uploads fail with "already been used").
+          FLOOR=123
           PUBSPEC_LINE=$(grep -E '^version:' mobile/pubspec.yaml | head -1)
           PUBSPEC_NAME=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')

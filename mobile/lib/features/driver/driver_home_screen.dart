@@ -32,13 +32,24 @@ import 'ride_offer_screen.dart';
 import 'delivery_offer_screen.dart';
 import 'driver_background_service.dart';
 import 'driver_job_alert_service.dart';
+import 'driver_notification_settings_screen.dart';
 import 'driver_moving_mission_screen.dart';
 import 'driver_push_service.dart';
 import 'driver_rental_mission_screen.dart';
 import 'driver_scheduled_mission_screen.dart';
 import '../delivery/delivery_payment_state.dart';
 
-enum _DriverMenuAction { earnings, history, carpool, dossier, profile, help, incident, logout }
+enum _DriverMenuAction {
+  earnings,
+  history,
+  carpool,
+  dossier,
+  notifications,
+  profile,
+  help,
+  incident,
+  logout,
+}
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
   const DriverHomeScreen({super.key});
@@ -1310,6 +1321,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   MaterialPageRoute(builder: (_) => const DriverOnboardingScreen(canSkipToHome: true)),
                 );
                 if (mounted) await _loadProfile(clearCache: true);
+              case _DriverMenuAction.notifications:
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DriverNotificationSettingsScreen()),
+                );
               case _DriverMenuAction.profile:
                 await Navigator.push(
                   context,
@@ -1377,6 +1393,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               child: ListTile(
                 leading: Icon(Icons.badge_outlined),
                 title: Text('Mon dossier'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            PopupMenuItem(
+              value: _DriverMenuAction.notifications,
+              child: ListTile(
+                leading: Icon(Icons.notifications_outlined),
+                title: Text('Notifications'),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),

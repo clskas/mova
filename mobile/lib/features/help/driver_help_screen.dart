@@ -10,6 +10,7 @@ import 'legal_screen.dart';
 import 'manual_screen.dart';
 import '../geo/suggest_place_screen.dart';
 import '../profile/profile_screen.dart';
+import '../driver/driver_notification_settings_screen.dart';
 
 /// Centre d'aide minimal pour l'application Chauffeur SENGA.
 class DriverHelpScreen extends ConsumerWidget {
@@ -52,6 +53,13 @@ class DriverHelpScreen extends ConsumerWidget {
             subtitle: const Text('Lier Google ou un numéro +243 — un seul compte chauffeur'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _open(context, const ProfileScreen(title: 'Compte et connexion')),
+          ),
+          ListTile(
+            leading: const Icon(Icons.notifications_outlined, color: MovaColors.orange),
+            title: const Text('Notifications', style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: const Text('Mute et choix du son des missions'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _open(context, const DriverNotificationSettingsScreen()),
           ),
           ListTile(
             leading: const Icon(Icons.place_outlined, color: MovaColors.green),

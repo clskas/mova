@@ -441,9 +441,9 @@ envVarGroups:
         value: "1.0.0"
       # Play production versionCode — keep in sync with pubspec +N after each AAB upload.
       - key: MOBILE_PASSENGER_VERSION_CODE
-        value: "122"
+        value: "123"
       - key: MOBILE_DRIVER_VERSION_CODE
-        value: "122"
+        value: "123"
       - key: MOBILE_MIN_VERSION_CODE
         value: "0"
       - key: PLAY_STORE_PASSENGER_URL

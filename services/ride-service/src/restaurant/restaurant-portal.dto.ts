@@ -112,6 +112,16 @@ export class RejectOrderDto {
   @ApiPropertyOptional() @IsOptional() @IsString() reason?: string;
 }
 
+export class MarkReadyDto {
+  @ApiPropertyOptional({
+    description:
+      'Si true (flotte interne OWN/HYBRID) : notifie tous les livreurs internes. Sinon, aucune alerte flotte — assignez un livreur manuellement.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  notifyAllDrivers?: boolean;
+}
+
 export class UpdateCourierModeDto {
   @ApiProperty({ enum: ['PLATFORM', 'OWN', 'HYBRID'] })
   @IsString()

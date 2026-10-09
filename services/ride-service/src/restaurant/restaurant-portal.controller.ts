@@ -10,6 +10,7 @@ import { SendRideChatDto } from '../chat/ride-chat.dto';
 import {
   AddRestaurantDriverDto,
   AssignOwnDriverDto,
+  MarkReadyDto,
   RejectOrderDto,
   UpdateCourierModeDto,
   UpdateRestaurantLocationDto,
@@ -167,8 +168,12 @@ export class RestaurantPortalController {
 
   @Post('orders/:id/ready')
   @ApiOperation({ summary: 'Marquer prête pour livreur' })
-  ready(@Request() req: { user: { id: string } }, @Param('id') id: string) {
-    return this.portal.markReady(id, req.user.id);
+  ready(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() dto: MarkReadyDto,
+  ) {
+    return this.portal.markReady(id, req.user.id, { notifyAllDrivers: dto?.notifyAllDrivers });
   }
 
   @Post('orders/:id/reject')

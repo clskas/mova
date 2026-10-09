@@ -333,7 +333,11 @@ export class RestaurantPortalService {
     return this.transition(delivery.id, DeliveryStatus.RESTAURANT_CONFIRMED, ownerUserId, 'RESTAURANT_CONFIRMED');
   }
 
-  async markReady(deliveryId: string, ownerUserId: string) {
+  async markReady(
+    deliveryId: string,
+    ownerUserId: string,
+    opts?: { notifyAllDrivers?: boolean },
+  ) {
     const { delivery, restaurant } = await this.assertOrderAccess(deliveryId, ownerUserId);
     this.assertRestaurantKycApproved(restaurant);
     if (delivery.status !== DeliveryStatus.RESTAURANT_CONFIRMED) {
@@ -346,7 +350,18 @@ export class RestaurantPortalService {
         'Attendez le paiement du client avant de préparer et marquer la commande prête.',
       );
     }
-    return this.transition(delivery.id, DeliveryStatus.READY_FOR_PICKUP, ownerUserId, 'READY_FOR_PICKUP');
+    const mode = (restaurant.courierMode ?? 'PLATFORM').toUpperCase();
+    const hasInternalFleet = mode === 'OWN' || mode === 'HYBRID';
+    // Flotte interne : défaut = pas d'alerte à toute la flotte (assignation manuelle du livreur).
+    // Case cochée notifyAllDrivers → alerte tous les livreurs internes.
+    const notifyAllDrivers = hasInternalFleet ? opts?.notifyAllDrivers === true : undefined;
+    return this.transition(
+      delivery.id,
+      DeliveryStatus.READY_FOR_PICKUP,
+      ownerUserId,
+      'READY_FOR_PICKUP',
+      { notifyAllDrivers },
+    );
   }
 
   async rejectOrder(deliveryId: string, ownerUserId: string, reason?: string) {
@@ -643,18 +658,34 @@ export class RestaurantPortalService {
     };
   }
 
-  private async transition(deliveryId: string, status: DeliveryStatus, ownerUserId: string, event: string) {
+  private async transition(
+    deliveryId: string,
+    status: DeliveryStatus,
+    ownerUserId: string,
+    event: string,
+    opts?: { notifyAllDrivers?: boolean },
+  ) {
     const updated = await this.prisma.delivery.update({
       where: { id: deliveryId },
       data: { status },
       include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
     });
     await this.prisma.deliveryEvent.create({
-      data: { deliveryId, event, metadata: { updatedBy: ownerUserId } as Prisma.InputJsonValue },
+      data: {
+        deliveryId,
+        event,
+        metadata: {
+          updatedBy: ownerUserId,
+          ...(opts?.notifyAllDrivers != null ? { notifyAllDrivers: opts.notifyAllDrivers } : {}),
+        } as Prisma.InputJsonValue,
+      },
     });
     await this.publishStatus(updated, status);
-    if (status === DeliveryStatus.READY_FOR_PICKUP && !updated.driverId && updated.escrowReady) {
-      await this.deliveries.dispatchDeliveryOffer(updated.id);
+    const canDispatch = !updated.guaranteed || updated.escrowReady;
+    if (status === DeliveryStatus.READY_FOR_PICKUP && !updated.driverId && canDispatch) {
+      await this.deliveries.dispatchDeliveryOffer(updated.id, {
+        notifyAllDrivers: opts?.notifyAllDrivers,
+      });
     }
     return { order: this.formatOrder(updated), delivery: formatParcelDelivery(updated) };
   }

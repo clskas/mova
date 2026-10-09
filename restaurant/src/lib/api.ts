@@ -352,8 +352,11 @@ export function confirmOrder(id: string) {
   return apiFetch(`/api/restaurant/orders/${id}/confirm`, { method: "POST" });
 }
 
-export function markOrderReady(id: string) {
-  return apiFetch(`/api/restaurant/orders/${id}/ready`, { method: "POST" });
+export function markOrderReady(id: string, opts?: { notifyAllDrivers?: boolean }) {
+  return apiFetch(`/api/restaurant/orders/${id}/ready`, {
+    method: "POST",
+    body: JSON.stringify({ notifyAllDrivers: opts?.notifyAllDrivers === true }),
+  });
 }
 
 export function rejectOrder(id: string, reason?: string) {

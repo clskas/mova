@@ -198,12 +198,16 @@ export default function OrdersPage() {
 
   useRestaurantLiveRegister(load);
 
-  async function act(id: string, action: "confirm" | "ready" | "reject") {
+  async function act(
+    id: string,
+    action: "confirm" | "ready" | "reject",
+    opts?: { notifyAllDrivers?: boolean },
+  ) {
     setBusyId(id);
     setError(null);
     try {
       if (action === "confirm") await confirmOrder(id);
-      else if (action === "ready") await markOrderReady(id);
+      else if (action === "ready") await markOrderReady(id, { notifyAllDrivers: opts?.notifyAllDrivers });
       else await rejectOrder(id, "Indisponible");
       await load();
     } catch (e) {
@@ -323,9 +327,10 @@ export default function OrdersPage() {
                         ? () => act(o.id, "reject")
                         : undefined
                     }
+                    showNotifyAllDrivers={allowInternalCouriers}
                     onReady={
                       o.status === "RESTAURANT_CONFIRMED" && orderCanPrepare(o)
-                        ? () => act(o.id, "ready")
+                        ? (opts) => act(o.id, "ready", opts)
                         : undefined
                     }
                     onAssignDriver={
@@ -378,9 +383,10 @@ export default function OrdersPage() {
                       order={o}
                       busy={busyId === o.id}
                       fleetDrivers={allowInternalCouriers ? fleetDrivers : []}
+                      showNotifyAllDrivers={allowInternalCouriers}
                       onReady={
                         o.status === "RESTAURANT_CONFIRMED" && orderCanPrepare(o)
-                          ? () => act(o.id, "ready")
+                          ? (opts) => act(o.id, "ready", opts)
                           : undefined
                       }
                       onReject={
@@ -410,6 +416,7 @@ function OrderCard({
   order,
   busy,
   fleetDrivers = [],
+  showNotifyAllDrivers = false,
   onConfirm,
   onReject,
   onReady,
@@ -420,13 +427,16 @@ function OrderCard({
   order: RestaurantOrder;
   busy: boolean;
   fleetDrivers?: RestaurantFleetDriver[];
+  showNotifyAllDrivers?: boolean;
   onConfirm?: () => void;
   onReject?: () => void;
-  onReady?: () => void;
+  onReady?: (opts?: { notifyAllDrivers?: boolean }) => void;
   onAssignDriver?: (driverUserId: string) => void;
   onChatClient?: () => void;
   onChatDriver?: () => void;
 }) {
+  const [notifyAllDrivers, setNotifyAllDrivers] = useState(false);
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 md:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
@@ -490,7 +500,7 @@ function OrderCard({
           <button
             type="button"
             disabled={busy}
-            onClick={onReady}
+            onClick={() => onReady({ notifyAllDrivers: showNotifyAllDrivers && notifyAllDrivers })}
             className="px-4 py-2.5 min-h-11 rounded-xl bg-[#6C63FF] text-white text-sm font-medium disabled:opacity-60"
           >
             Prête pour livreur
@@ -530,9 +540,29 @@ function OrderCard({
           <span className="text-xs text-green-700 self-center">Livreur assigné</span>
         )}
       </div>
+      {onReady && showNotifyAllDrivers && (
+        <label className="mt-3 flex items-start gap-2 text-xs text-gray-700 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="mt-0.5 rounded border-gray-300"
+            checked={notifyAllDrivers}
+            disabled={busy}
+            onChange={(e) => setNotifyAllDrivers(e.target.checked)}
+          />
+          <span>
+            Notifier <strong>tous</strong> les livreurs internes.
+            <span className="block text-gray-500 font-normal">
+              Décoché : aucun push à la flotte — seul le livreur que vous assignerez ensuite sera notifié.
+            </span>
+          </span>
+        </label>
+      )}
       {onAssignDriver && fleetDrivers.length > 0 && (
         <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50/40 p-3 space-y-2">
           <p className="text-xs font-medium text-violet-900">Choisir un livreur interne</p>
+          <p className="text-[11px] text-violet-800/80">
+            Seul le livreur choisi reçoit l&apos;assignation (notification dédiée).
+          </p>
           <div className="flex flex-wrap gap-2">
             {fleetDrivers
               .filter((d) => d.isActive)

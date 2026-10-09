@@ -97,15 +97,18 @@ export class DeliveriesService {
     return this.platformConfig.get().trip.averageSpeedKmh.delivery;
   }
 
-  private async alertDeliveryOffer(delivery: {
-    id: string;
-    type: DeliveryType;
-    restaurantId?: string | null;
-    pickupLat?: number | null;
-    pickupLng?: number | null;
-    pickupAddress?: string | null;
-    restaurant?: { name?: string | null; lat?: number | null; lng?: number | null; address?: string | null } | null;
-  }) {
+  private async alertDeliveryOffer(
+    delivery: {
+      id: string;
+      type: DeliveryType;
+      restaurantId?: string | null;
+      pickupLat?: number | null;
+      pickupLng?: number | null;
+      pickupAddress?: string | null;
+      restaurant?: { name?: string | null; lat?: number | null; lng?: number | null; address?: string | null } | null;
+    },
+    opts?: { notifyAllDrivers?: boolean },
+  ) {
     const pickupLat = delivery.pickupLat ?? delivery.restaurant?.lat;
     const pickupLng = delivery.pickupLng ?? delivery.restaurant?.lng;
     if (pickupLat == null || pickupLng == null) return;
@@ -130,7 +133,9 @@ export class DeliveriesService {
       });
       const fleetIds = restaurant?.drivers.map((d) => d.driverUserId) ?? [];
       const mode = restaurant?.courierMode ?? 'PLATFORM';
-      if (mode === 'OWN' || mode === 'HYBRID') {
+      // notifyAllDrivers === false : flotte interne non alertée (partenaire assignera un livreur).
+      // undefined / true : comportement historique (alerte toute la flotte OWN/HYBRID).
+      if ((mode === 'OWN' || mode === 'HYBRID') && opts?.notifyAllDrivers !== false && fleetIds.length > 0) {
         await publishDriverJobAlert(this.redis, {
           ...payload,
           driverUserIds: fleetIds,
@@ -2044,14 +2049,14 @@ export class DeliveriesService {
     };
   }
 
-  async dispatchDeliveryOffer(deliveryId: string) {
+  async dispatchDeliveryOffer(deliveryId: string, opts?: { notifyAllDrivers?: boolean }) {
     const delivery = await this.prisma.delivery.findUnique({
       where: { id: deliveryId },
       include: { restaurant: true },
     });
     if (!delivery || delivery.driverId) return;
     if (delivery.guaranteed && !delivery.escrowReady) return;
-    await this.alertDeliveryOffer(delivery);
+    await this.alertDeliveryOffer(delivery, opts);
   }
 
   async onEscrowCollected(deliveryId: string) {

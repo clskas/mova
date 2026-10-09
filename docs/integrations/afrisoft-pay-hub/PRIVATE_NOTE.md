@@ -19,14 +19,16 @@ Sur `/opt/afrisoft-pay/.env` → `AFRISOFT_HUB_APPS` :
 | `afrisoft-partenaire` | Autre partenaire AfriSoft |
 | `wekka` / `safealert` | Apps sœurs |
 | `reserva` | RESERVA (SMS + pay, oct. 2026) |
+| `congowash` | CongoWash / lavage-saas (SMS + pay, oct. 2026) |
 
-Les clés `educongo` / `afrisoft-partenaire` / `reserva` sont **alignées** sur le hub SMS (`/opt/afrisoft-sms/.env`) pour le même `app_id`.
+Les clés `educongo` / `afrisoft-partenaire` / `reserva` / `congowash` sont **alignées** sur le hub SMS (`/opt/afrisoft-sms/.env`) pour le même `app_id`.
 
 Fichiers privés générés localement (hors git) :
 
 - `%USERPROFILE%\Downloads\educongo.env`
 - `%USERPROFILE%\Downloads\afrisoft-partenaire.env`
 - `%USERPROFILE%\Downloads\reserva.env`
+- `%USERPROFILE%\Downloads\congowash.env`
 
 ## 3. Ce que l’autre app reçoit
 

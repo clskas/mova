@@ -16,15 +16,15 @@ export default function manifest(): MetadataRoute.Manifest {
     dir: "ltr",
     categories: ["business", "travel"],
     shortcuts: [
-      { name: "Réservations", short_name: "Reservation", url: "/reservations", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
-      { name: "Revenus", short_name: "Revenus", url: "/revenus", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
-      { name: "Véhicules", short_name: "Flotte", url: "/vehicules", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+      { name: "Réservations", short_name: "Reservation", url: "/reservations", icons: [{ src: "/icon-192.png?v=location-v1", sizes: "192x192" }] },
+      { name: "Revenus", short_name: "Revenus", url: "/revenus", icons: [{ src: "/icon-192.png?v=location-v1", sizes: "192x192" }] },
+      { name: "Véhicules", short_name: "Flotte", url: "/vehicules", icons: [{ src: "/icon-192.png?v=location-v1", sizes: "192x192" }] },
     ],
     icons: [
-      { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icon-512-maskable.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
-      { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+      { src: "/icon-192.png?v=location-v1", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icon-512.png?v=location-v1", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icon-512-maskable.png?v=location-v1", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icon.svg?v=location-v1", sizes: "any", type: "image/svg+xml", purpose: "any" },
     ],
   };
 }

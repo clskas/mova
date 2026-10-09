@@ -21,13 +21,13 @@ const DEFAULT_DRIVER_STORE =
  * Marketing name floor must match latest Play marketing version (`1.0.18`).
  * Phones still on older binaries see behindName and get the in-app banner
  * until they install the matching Play build.
- * versionCode floor tracks Play production (currently 121).
- * Raise the code floor when a newer AAB is uploaded — otherwise older phones
+ * versionCode floor tracks Play / App Store production (currently 122).
+ * Raise the code floor when a newer AAB/IPA is uploaded — otherwise older phones
  * never see the banner when names already match (banner also fires when
  * store code > APP_BUILD). Stale Render env below this floor hid banners.
  */
 const CURRENT_VERSION_FLOOR = '1.0.18';
-const CURRENT_VERSION_CODE_FLOOR = 121;
+const CURRENT_VERSION_CODE_FLOOR = 122;
 
 function parseVersionCode(raw: string | undefined, fallback: number): number {
   const n = Number.parseInt(raw?.trim() || '', 10);

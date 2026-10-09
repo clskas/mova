@@ -308,9 +308,14 @@ export function TextInput({
       className={`w-full rounded-xl border border-gray-200 p-3 text-sm disabled:bg-gray-50 disabled:text-gray-500 ${className}`}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onFocus={(e) => {
+        if (type === "number") {
+          requestAnimationFrame(() => e.currentTarget.select());
+        }
+      }}
       placeholder={placeholder}
       disabled={disabled}
-      inputMode={inputMode}
+      inputMode={inputMode ?? (type === "number" ? "decimal" : undefined)}
       maxLength={maxLength}
       autoComplete={autoComplete}
       step={step}

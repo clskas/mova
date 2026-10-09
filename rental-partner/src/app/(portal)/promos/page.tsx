@@ -10,6 +10,7 @@ import {
   type PartnerPromo,
 } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
+import { NumberField } from "@/components/NumberField";
 
 const emptyForm = () => ({
   code: "",
@@ -102,22 +103,22 @@ export default function PromosPage() {
             </label>
             <label className="block text-sm">
               Réduction (%)
-              <input
-                type="number"
+              <NumberField
                 min={1}
                 max={100}
+                emptyAsNull={false}
                 value={form.discountPercent}
-                onChange={(e) => setForm((f) => ({ ...f, discountPercent: Number(e.target.value) }))}
+                onChange={(n) => setForm((f) => ({ ...f, discountPercent: n == null ? 0 : Math.round(n) }))}
                 className="mt-1 w-full border rounded-lg px-3 py-2"
               />
             </label>
             <label className="block text-sm">
               Quota
-              <input
-                type="number"
+              <NumberField
                 min={1}
+                emptyAsNull={false}
                 value={form.maxUses}
-                onChange={(e) => setForm((f) => ({ ...f, maxUses: Number(e.target.value) }))}
+                onChange={(n) => setForm((f) => ({ ...f, maxUses: n == null ? 0 : Math.round(n) }))}
                 className="mt-1 w-full border rounded-lg px-3 py-2"
               />
             </label>

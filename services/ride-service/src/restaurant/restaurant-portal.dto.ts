@@ -131,6 +131,10 @@ export class UpdateCourierModeDto {
 export class AddRestaurantDriverDto {
   @ApiPropertyOptional() @IsOptional() @IsString() driverUserId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
+  @ApiPropertyOptional({ description: 'E-mail du compte livreur SENGA' })
+  @IsOptional()
+  @IsString()
+  email?: string;
 }
 
 export class AssignOwnDriverDto {

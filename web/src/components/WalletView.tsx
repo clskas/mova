@@ -326,6 +326,7 @@ export function WalletView({ onBack, mock }: Props) {
           className="w-full rounded-xl border-0 bg-gray-50 p-3"
           type="number"
           value={amount}
+          onFocus={(e) => requestAnimationFrame(() => e.currentTarget.select())}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="Montant FC (min. 2 300)"
         />
@@ -362,6 +363,7 @@ export function WalletView({ onBack, mock }: Props) {
           className="w-full rounded-xl border-0 bg-gray-50 p-3"
           type="number"
           value={withdrawAmount}
+          onFocus={(e) => requestAnimationFrame(() => e.currentTarget.select())}
           onChange={(e) => setWithdrawAmount(e.target.value)}
           placeholder="Montant FC"
         />

@@ -28,6 +28,7 @@ import {
   unlockPartnerAlerts,
   type PartnerSoundStyle,
 } from "@/lib/partner-alerts";
+import { NumberField } from "@/components/NumberField";
 
 export default function SettingsPage() {
   const [accepting, setAccepting] = useState(true);
@@ -49,7 +50,7 @@ export default function SettingsPage() {
   const [courierMode, setCourierMode] = useState<CourierMode>("PLATFORM");
   const [allowInternalCouriers, setAllowInternalCouriers] = useState(false);
   const [drivers, setDrivers] = useState<RestaurantFleetDriver[]>([]);
-  const [driverPhone, setDriverPhone] = useState("");
+  const [driverLookup, setDriverLookup] = useState("");
   const [fleetBusy, setFleetBusy] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [soundMuted, setSoundMuted] = useState(false);
@@ -300,13 +301,13 @@ export default function SettingsPage() {
             </label>
             <label className="block text-sm">
               <span className="text-gray-600">Temps de préparation (minutes)</span>
-              <input
-                type="number"
+              <NumberField
                 min={5}
                 max={120}
+                emptyAsNull={false}
                 className="mt-1 w-full rounded-xl border p-3"
                 value={prepTime}
-                onChange={(e) => setPrepTime(Number(e.target.value))}
+                onChange={(n) => setPrepTime(n == null || n <= 0 ? 0 : Math.round(n))}
               />
             </label>
             <label className="block text-sm">
@@ -441,32 +442,37 @@ export default function SettingsPage() {
                     ? "vos livreurs + SENGA"
                     : "SENGA"}
               </strong>
-              . Ajoutez des livreurs déjà inscrits dans l&apos;app SENGA (numéro +243…).
+              . Ajoutez des livreurs déjà inscrits dans l&apos;app SENGA (téléphone +243… ou e-mail).
               Sur une commande prête, vous pourrez choisir le livreur.
             </p>
             <div className="flex gap-2">
               <input
                 className="flex-1 rounded-xl border p-3 text-sm"
-                placeholder="Téléphone livreur SENGA (+243…)"
-                value={driverPhone}
-                onChange={(e) => setDriverPhone(e.target.value)}
+                placeholder="Téléphone (+243…) ou e-mail du livreur"
+                value={driverLookup}
+                onChange={(e) => setDriverLookup(e.target.value)}
+                autoComplete="off"
               />
               <button
                 type="button"
-                disabled={fleetBusy || !driverPhone.trim()}
+                disabled={fleetBusy || !driverLookup.trim()}
                 onClick={async () => {
                   setFleetBusy(true);
                   setError(null);
                   try {
-                    await addRestaurantDriver({ phone: driverPhone.trim() });
-                    setDriverPhone("");
+                    const q = driverLookup.trim();
+                    const payload = q.includes("@")
+                      ? { email: q.toLowerCase() }
+                      : { phone: q };
+                    await addRestaurantDriver(payload);
+                    setDriverLookup("");
                     const fleet = await fetchRestaurantDrivers();
                     setDrivers(fleet.drivers ?? []);
                   } catch (err) {
                     setError(
                       toUserErrorMessage(
                         err,
-                        "Livreur introuvable. Il doit déjà avoir un compte livreur SENGA.",
+                        "Livreur introuvable. Il doit déjà avoir un compte livreur SENGA (téléphone ou e-mail).",
                       ),
                     );
                   } finally {
@@ -488,7 +494,7 @@ export default function SettingsPage() {
                     className="flex items-center justify-between text-sm border rounded-xl px-3 py-2"
                   >
                     <span>
-                      {d.phone || d.name || "Livreur"}
+                      {d.phone || d.email || d.name || "Livreur"}
                       {d.isActive ? "" : " (inactif)"}
                     </span>
                     <button

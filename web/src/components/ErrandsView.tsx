@@ -109,7 +109,14 @@ export function ErrandsView({ onBack, mock }: Props) {
           ))}
         </ul>
       )}
-      <input className="w-full rounded-xl border-0 bg-white p-3 shadow-sm" placeholder="Budget articles (FC, optionnel)" value={budget} onChange={(e) => setBudget(e.target.value)} type="number" />
+      <input
+        className="w-full rounded-xl border-0 bg-white p-3 shadow-sm"
+        placeholder="Budget articles (FC, optionnel)"
+        value={budget}
+        onFocus={(e) => requestAnimationFrame(() => e.currentTarget.select())}
+        onChange={(e) => setBudget(e.target.value)}
+        type="number"
+      />
       <PromoCodeInput value={promoCode} onChange={(v) => { setPromoCode(v); setEstimate(null); }} />
       {estimate != null && (
         <div className="bg-white rounded-xl p-4 shadow-sm">

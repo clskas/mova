@@ -187,6 +187,7 @@ export type RestaurantFleetDriver = {
   driverUserId: string;
   isActive: boolean;
   phone?: string;
+  email?: string;
   name?: string;
 };
 
@@ -199,7 +200,11 @@ export function fetchRestaurantDrivers() {
   }>("/api/restaurant/drivers");
 }
 
-export function addRestaurantDriver(data: { driverUserId?: string; phone?: string }) {
+export function addRestaurantDriver(data: {
+  driverUserId?: string;
+  phone?: string;
+  email?: string;
+}) {
   return apiFetch<RestaurantFleetDriver>("/api/restaurant/drivers", {
     method: "POST",
     body: JSON.stringify(data),

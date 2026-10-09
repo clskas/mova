@@ -140,6 +140,7 @@ export function VehicleForm({ form, onChange, onSubmit, saving, error, submitLab
             min={1}
             className={inputClass}
             value={form.dailyRateCdf}
+            onFocus={(e) => requestAnimationFrame(() => e.currentTarget.select())}
             onChange={(e) => onChange({ ...form, dailyRateCdf: e.target.value })}
           />
         </label>
@@ -151,6 +152,7 @@ export function VehicleForm({ form, onChange, onSubmit, saving, error, submitLab
           min={1}
           className={inputClass}
           value={form.hourlyRateCdf}
+          onFocus={(e) => requestAnimationFrame(() => e.currentTarget.select())}
           onChange={(e) => onChange({ ...form, hourlyRateCdf: e.target.value })}
           placeholder="Optionnel — calculé depuis le tarif jour si vide"
         />

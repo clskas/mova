@@ -272,6 +272,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
             placeholder="2300"
             value={topUpAmount}
+            onFocus={(e) => requestAnimationFrame(() => e.currentTarget.select())}
             onChange={(e) => setTopUpAmount(e.target.value)}
           />
           <button
@@ -291,6 +292,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
             placeholder="5000"
             value={amount}
+            onFocus={(e) => requestAnimationFrame(() => e.currentTarget.select())}
             onChange={(e) => setAmount(e.target.value)}
           />
           <label className="block text-xs text-gray-500">

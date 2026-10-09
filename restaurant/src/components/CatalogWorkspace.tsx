@@ -13,6 +13,7 @@ import {
 } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { ImageSourcePicker } from "@/components/ImageSourcePicker";
+import { NumberField } from "@/components/NumberField";
 import { COMMERCE_TYPE_LABELS_FR, parseCommerceType, type CommerceType } from "@/lib/commerce-type";
 
 export type CatalogMode = "catalogue" | "stock" | "restrictions";
@@ -330,12 +331,12 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
             </label>
             <label className="block text-sm">
               <span className="text-gray-600">Prix (FC)</span>
-              <input
-                type="number"
+              <NumberField
                 min={100}
+                emptyAsNull={false}
                 className="mt-1 w-full rounded-xl border p-3"
                 value={draft.unitPriceCdf}
-                onChange={(e) => setDraft({ ...draft, unitPriceCdf: Number(e.target.value) })}
+                onChange={(n) => setDraft({ ...draft, unitPriceCdf: n == null ? 0 : Math.round(n) })}
               />
             </label>
             <label className="block text-sm">
@@ -355,15 +356,15 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
             </label>
             <label className="block text-sm">
               <span className="text-gray-600">Stock (vide = illimité)</span>
-              <input
-                type="number"
+              <NumberField
                 min={0}
+                emptyAsNull
                 className="mt-1 w-full rounded-xl border p-3"
-                value={draft.stockQty ?? ""}
-                onChange={(e) =>
+                value={draft.stockQty}
+                onChange={(n) =>
                   setDraft({
                     ...draft,
-                    stockQty: e.target.value === "" ? null : Number(e.target.value),
+                    stockQty: n == null ? null : Math.round(n),
                   })
                 }
                 placeholder="Illimité"
@@ -459,16 +460,16 @@ export function CatalogWorkspace({ mode }: { mode: CatalogMode }) {
                   </td>
                   <td className="p-3 text-gray-600">{categoryName(item.categoryId) ?? "—"}</td>
                   <td className="p-3">
-                    <input
-                      type="number"
+                    <NumberField
                       min={0}
+                      emptyAsNull
                       disabled={!canOperate}
                       className="w-full rounded-lg border p-2"
-                      value={item.stockQty ?? ""}
+                      value={item.stockQty}
                       placeholder="∞"
-                      onChange={(e) =>
+                      onChange={(n) =>
                         patchItem(index, {
-                          stockQty: e.target.value === "" ? null : Number(e.target.value),
+                          stockQty: n == null ? null : Math.round(n),
                         })
                       }
                     />

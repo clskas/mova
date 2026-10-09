@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { ImageSourcePicker } from "@/components/ImageSourcePicker";
+import { NumberField } from "@/components/NumberField";
 
 const emptyDraft = (): MenuItem => ({
   name: "",
@@ -244,12 +245,12 @@ export default function MenuPage() {
           </label>
           <label className="block text-sm">
             <span className="text-gray-600">Prix de base (FC)</span>
-            <input
-              type="number"
+            <NumberField
               min={100}
+              emptyAsNull={false}
               className="mt-1 w-full rounded-xl border p-3"
               value={draft.unitPriceCdf}
-              onChange={(e) => setDraft({ ...draft, unitPriceCdf: Number(e.target.value) })}
+              onChange={(n) => setDraft({ ...draft, unitPriceCdf: n == null ? 0 : Math.round(n) })}
             />
           </label>
         </div>
@@ -290,15 +291,15 @@ export default function MenuPage() {
                     setDraft({ ...draft, sizes: next });
                   }}
                 />
-                <input
-                  type="number"
+                <NumberField
                   min={0}
+                  emptyAsNull={false}
                   className="rounded-xl border p-2 text-sm"
                   placeholder="Prix FC"
-                  value={size.priceCdf ?? ""}
-                  onChange={(e) => {
+                  value={size.priceCdf ?? 0}
+                  onChange={(n) => {
                     const next = [...sizes];
-                    next[si] = { ...next[si], priceCdf: Number(e.target.value) };
+                    next[si] = { ...next[si], priceCdf: n == null ? 0 : Math.round(n) };
                     setDraft({ ...draft, sizes: next });
                   }}
                 />
@@ -361,16 +362,16 @@ export default function MenuPage() {
                       setDraft({ ...draft, optionGroups: next });
                     }}
                   />
-                  <input
-                    type="number"
+                  <NumberField
                     min={0}
+                    emptyAsNull={false}
                     className="rounded-xl border p-2 text-sm"
                     placeholder="+ FC"
-                    value={opt.priceCdf ?? ""}
-                    onChange={(e) => {
+                    value={opt.priceCdf ?? 0}
+                    onChange={(n) => {
                       const next = [...groups];
                       const opts = [...(next[gi].options ?? [])];
-                      opts[oi] = { ...opts[oi], priceCdf: Number(e.target.value) };
+                      opts[oi] = { ...opts[oi], priceCdf: n == null ? 0 : Math.round(n) };
                       next[gi] = { ...next[gi], options: opts };
                       setDraft({ ...draft, optionGroups: next });
                     }}

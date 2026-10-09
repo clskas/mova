@@ -723,6 +723,7 @@ export class RestaurantPortalService {
           driverUserId: string;
           isActive: boolean;
           phone?: string;
+          email?: string;
           name?: string;
         }[],
       };
@@ -739,6 +740,7 @@ export class RestaurantPortalService {
           driverUserId: r.driverUserId,
           isActive: r.isActive,
           phone: brief?.phone,
+          email: brief?.email,
           name: brief?.name,
         };
       }),
@@ -751,7 +753,7 @@ export class RestaurantPortalService {
     };
   }
 
-  async addDriver(ownerUserId: string, dto: { driverUserId?: string; phone?: string }) {
+  async addDriver(ownerUserId: string, dto: { driverUserId?: string; phone?: string; email?: string }) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
     this.assertInternalFleetAllowed(restaurant);
     this.assertRestaurantKycApproved(restaurant);
@@ -760,7 +762,7 @@ export class RestaurantPortalService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         undefined,
-        'Aucun livreur SENGA pour ce numéro. La personne doit déjà avoir un compte livreur dans l\'application SENGA.',
+        'Aucun livreur SENGA pour ce téléphone ou e-mail. La personne doit déjà avoir un compte livreur dans l\'application SENGA.',
       );
     }
     const row = await this.prisma.restaurantDriver.upsert({
@@ -773,31 +775,52 @@ export class RestaurantPortalService {
       driverUserId: row.driverUserId,
       isActive: row.isActive,
       phone: driver.phone,
+      email: driver.email,
       name: driver.name,
     };
   }
 
-  private async resolveSengaDriverAccount(dto: { driverUserId?: string; phone?: string }) {
+  private async resolveSengaDriverAccount(dto: {
+    driverUserId?: string;
+    phone?: string;
+    email?: string;
+  }) {
     const directId = dto.driverUserId?.trim();
     if (directId) {
       return this.loadSengaDriverAccount(directId);
     }
+    const rawEmail = dto.email?.trim().toLowerCase();
     const rawPhone = dto.phone?.trim();
-    if (!rawPhone) return null;
-    const normalized = normalizePhoneRdc(rawPhone);
+    const query = rawEmail || rawPhone;
+    if (!query) return null;
+    const normalizedPhone = rawPhone ? normalizePhoneRdc(rawPhone) : '';
     try {
       const res = await fetch(
-        serviceUrl('auth', `/internal/users?search=${encodeURIComponent(normalized || rawPhone)}&take=5`),
+        serviceUrl(
+          'auth',
+          `/internal/users?search=${encodeURIComponent(rawEmail || normalizedPhone || rawPhone || '')}&take=8`,
+        ),
         { headers: { 'x-internal-api-key': INTERNAL_API_KEY } },
       );
       const body = (await res.json()) as {
-        data?: { id: string; role?: string; phone?: string; firstName?: string; lastName?: string }[];
+        data?: {
+          id: string;
+          role?: string;
+          phone?: string;
+          email?: string;
+          firstName?: string;
+          lastName?: string;
+        }[];
       };
       const rows = body.data ?? [];
-      const match =
-        rows.find((u) => normalizePhoneRdc(u.phone ?? '') === normalized) ??
-        rows.find((u) => u.role === UserRole.DRIVER) ??
-        rows[0];
+      const match = rawEmail
+        ? rows.find((u) => (u.email ?? '').trim().toLowerCase() === rawEmail) ??
+          rows.find((u) => u.role === UserRole.DRIVER && (u.email ?? '').toLowerCase().includes(rawEmail)) ??
+          rows.find((u) => u.role === UserRole.DRIVER) ??
+          rows[0]
+        : rows.find((u) => normalizePhoneRdc(u.phone ?? '') === normalizedPhone) ??
+          rows.find((u) => u.role === UserRole.DRIVER) ??
+          rows[0];
       if (!match?.id) return null;
       return this.loadSengaDriverAccount(match.id, match);
     } catch {
@@ -807,13 +830,14 @@ export class RestaurantPortalService {
 
   private async loadSengaDriverAccount(
     userId: string,
-    hint?: { role?: string; phone?: string; firstName?: string; lastName?: string },
+    hint?: { role?: string; phone?: string; email?: string; firstName?: string; lastName?: string },
   ) {
     let role = hint?.role;
     let phone = hint?.phone;
+    let email = hint?.email;
     let firstName = hint?.firstName;
     let lastName = hint?.lastName;
-    if (!role || !phone) {
+    if (!role || (!phone && !email)) {
       try {
         const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
           headers: { 'x-internal-api-key': INTERNAL_API_KEY },
@@ -822,11 +846,13 @@ export class RestaurantPortalService {
         const user = (await res.json()) as {
           role?: string;
           phone?: string;
+          email?: string;
           firstName?: string;
           lastName?: string;
         };
         role = user.role ?? role;
         phone = user.phone ?? phone;
+        email = user.email ?? email;
         firstName = user.firstName ?? firstName;
         lastName = user.lastName ?? lastName;
       } catch {
@@ -835,7 +861,7 @@ export class RestaurantPortalService {
     }
     if (role !== UserRole.DRIVER) return null;
     const name = [firstName, lastName].filter(Boolean).join(' ').trim();
-    return { id: userId, phone, name: name || undefined };
+    return { id: userId, phone, email, name: name || undefined };
   }
 
   async removeDriver(ownerUserId: string, driverUserId: string) {

@@ -85,7 +85,8 @@ function getAudioContext(): AudioContext | null {
 function getHtmlAudio(): HTMLAudioElement | null {
   if (typeof window === "undefined") return null;
   if (!htmlAudio) {
-    htmlAudio = new Audio("/alert-chime.wav");
+    // Son SENGA Partenaire (distinct du chauffeur et des sons système)
+    htmlAudio = new Audio("/senga-partner-alert.wav");
     htmlAudio.preload = "auto";
     htmlAudio.setAttribute("playsinline", "true");
     (htmlAudio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
@@ -94,20 +95,21 @@ function getHtmlAudio(): HTMLAudioElement | null {
 }
 
 function scheduleOscillatorChime(ctx: AudioContext) {
-  const notes = [880, 1175];
+  // Motif descendant puis remontée — distinct des bips génériques / WhatsApp
+  const notes = [1568, 1175, 784, 988];
   notes.forEach((freq, i) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = "sine";
+    osc.type = "triangle";
     osc.frequency.value = freq;
-    const start = ctx.currentTime + i * 0.18;
+    const start = ctx.currentTime + i * 0.15;
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.28, start + 0.03);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.32);
+    gain.gain.exponentialRampToValueAtTime(0.32, start + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28);
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start(start);
-    osc.stop(start + 0.34);
+    osc.stop(start + 0.3);
   });
 }
 

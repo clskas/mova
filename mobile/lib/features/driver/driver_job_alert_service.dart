@@ -6,7 +6,11 @@ import '../../core/config/market_config.dart';
 import '../../core/billing/driver_earnings_display.dart';
 import '../../core/geo/geo_utils.dart';
 
-/// Alertes chauffeur : vibration, son système et notification tray (y compris arrière-plan).
+/// Alertes chauffeur : vibration + **son SENGA dédié** (pas le son système partagé).
+///
+/// Android : `res/raw/senga_job.mp3` via canal `mova_driver_jobs_v2`
+/// (v2 force un nouveau canal — le son d’un canal Android est immuable après création).
+/// iOS : `senga_job.wav` dans le bundle Runner.
 class DriverJobAlertService {
   DriverJobAlertService._();
 
@@ -14,8 +18,11 @@ class DriverJobAlertService {
   static bool _initialized = false;
   static int _notificationId = 0;
 
-  static const _channelId = 'mova_driver_jobs';
+  /// Bump when changing channel sound/importance so existing installs pick it up.
+  static const _channelId = 'mova_driver_jobs_v2';
   static const _channelName = 'Missions & courses SENGA';
+  static const _androidSound = RawResourceAndroidNotificationSound('senga_job');
+  static const _iosSound = 'senga_job.wav';
 
   static Future<void> init() async {
     if (_initialized) return;
@@ -31,9 +38,10 @@ class DriverJobAlertService {
       AndroidNotificationChannel(
         _channelId,
         _channelName,
-        description: 'Nouvelles courses, livraisons et missions assignées',
+        description: 'Nouvelles courses, livraisons et missions assignées — son SENGA',
         importance: Importance.max,
         playSound: true,
+        sound: _androidSound,
         enableVibration: true,
         vibrationPattern: Int64List.fromList([0, 450, 180, 450]),
         audioAttributesUsage: AudioAttributesUsage.alarm,
@@ -53,7 +61,7 @@ class DriverJobAlertService {
     await HapticFeedback.heavyImpact();
     await Future<void>.delayed(const Duration(milliseconds: 100));
     await HapticFeedback.heavyImpact();
-    await SystemSound.play(SystemSoundType.alert);
+    // Pas de SystemSound.alert (son partagé avec d’autres apps) — le canal joue senga_job.
 
     final id = ++_notificationId;
     await _plugin.show(
@@ -64,12 +72,13 @@ class DriverJobAlertService {
         android: AndroidNotificationDetails(
           _channelId,
           _channelName,
-          channelDescription: 'Alertes chauffeur SENGA',
+          channelDescription: 'Alertes chauffeur SENGA — son dédié',
           importance: Importance.max,
           priority: Priority.max,
           category: AndroidNotificationCategory.call,
           fullScreenIntent: true,
           playSound: true,
+          sound: _androidSound,
           enableVibration: true,
           vibrationPattern: Int64List.fromList([0, 450, 180, 450]),
           audioAttributesUsage: AudioAttributesUsage.alarm,
@@ -79,6 +88,7 @@ class DriverJobAlertService {
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
+          sound: _iosSound,
           interruptionLevel: InterruptionLevel.timeSensitive,
         ),
       ),

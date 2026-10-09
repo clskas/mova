@@ -220,6 +220,8 @@ class AppUpdateService extends Notifier<AppUpdateState> {
       // After install: hide banner completely (no leftover flexible "Redémarrer").
       if (!next.updateAvailable) {
         next = next.copyWith(
+          updateAvailable: false,
+          forceUpdate: false,
           flexibleDownloaded: false,
           dismissedUntil: null,
         );

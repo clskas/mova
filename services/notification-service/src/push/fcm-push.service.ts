@@ -7,6 +7,10 @@ export interface FcmPushMessage {
   data?: Record<string, string>;
 }
 
+/** Canal + son SENGA (doit matcher DriverJobAlertService côté app). */
+export const SENGA_DRIVER_JOB_CHANNEL = 'mova_driver_jobs_v2';
+export const SENGA_DRIVER_JOB_SOUND = 'senga_job';
+
 @Injectable()
 export class FcmPushService {
   private readonly logger = new Logger(FcmPushService.name);
@@ -29,6 +33,7 @@ export class FcmPushService {
     await Promise.all(
       unique.map(async (token) => {
         try {
+          // Legacy FCM HTTP API — android_channel_id + sound (raw resource / iOS bundle)
           const res = await fetch('https://fcm.googleapis.com/fcm/send', {
             method: 'POST',
             headers: {
@@ -42,14 +47,15 @@ export class FcmPushService {
               notification: {
                 title: message.title,
                 body: message.body,
-                sound: 'default',
-                android_channel_id: 'mova_driver_jobs',
+                sound: SENGA_DRIVER_JOB_SOUND,
+                android_channel_id: SENGA_DRIVER_JOB_CHANNEL,
               },
               data: {
                 ...data,
                 title: message.title,
                 body: message.body,
                 click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                android_channel_id: SENGA_DRIVER_JOB_CHANNEL,
               },
             }),
           });

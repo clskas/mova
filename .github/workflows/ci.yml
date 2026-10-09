@@ -292,7 +292,8 @@ jobs:
 
           gateway_log="$(mktemp)"
           cd ../../services/api-gateway
-          npm install 2>&1 | tee "$gateway_log"
+          # Same isolation as packages/shared — avoid monorepo root hoist skewing audit.
+          npm ci --no-workspaces 2>&1 | tee "$gateway_log"
           fail_if_install_has_critical "$gateway_log" api-gateway
           npm_audit_retry critical api-gateway
           npm_audit_retry high api-gateway 1

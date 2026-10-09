@@ -17,13 +17,16 @@ Sur `/opt/afrisoft-pay/.env` → `AFRISOFT_HUB_APPS` :
 | `senga` | SENGA uniquement — **ne pas** donner aux autres apps |
 | `educongo` | App sœur Educongo |
 | `afrisoft-partenaire` | Autre partenaire AfriSoft |
+| `wekka` / `safealert` | Apps sœurs |
+| `reserva` | RESERVA (SMS + pay, oct. 2026) |
 
-Les clés `educongo` / `afrisoft-partenaire` sont **alignées** sur le hub SMS (`/opt/afrisoft-sms/.env`) pour le même `app_id`.
+Les clés `educongo` / `afrisoft-partenaire` / `reserva` sont **alignées** sur le hub SMS (`/opt/afrisoft-sms/.env`) pour le même `app_id`.
 
 Fichiers privés générés localement (hors git) :
 
 - `%USERPROFILE%\Downloads\educongo.env`
 - `%USERPROFILE%\Downloads\afrisoft-partenaire.env`
+- `%USERPROFILE%\Downloads\reserva.env`
 
 ## 3. Ce que l’autre app reçoit
 

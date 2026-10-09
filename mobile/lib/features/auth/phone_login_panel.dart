@@ -90,6 +90,14 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       'role': widget.appRole,
     });
     if (!mounted) return;
+    // Ne pas écraser un flux PIN oublié / OTP déjà en cours (course async).
+    if (_forgotPinRecovery ||
+        _step == PhoneLoginStep.forgot ||
+        _step == PhoneLoginStep.otp ||
+        _step == PhoneLoginStep.googleOtp) {
+      setState(() => _loading = false);
+      return;
+    }
     switch (result) {
       case Success(:final data):
         if (data['pinEnabled'] == true) {
@@ -247,7 +255,13 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       _error = null;
     });
     final phone = _normalizedPhone;
-    if (phone == null) return;
+    if (phone == null) {
+      setState(() {
+        _loading = false;
+        _error = 'Numéro manquant. Recommencez.';
+      });
+      return;
+    }
     final api = ref.read(apiClientProvider);
     final result = await api.post('/auth/otp/verify', {
       'phone': phone,
@@ -258,10 +272,12 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _loginWithGoogle() async {
+    // Conserver le mode « PIN oublié » si on part de cet écran (nouveau PIN après Google).
+    final keepForgot = _forgotPinRecovery || _step == PhoneLoginStep.forgot;
     setState(() {
       _loading = true;
       _error = null;
-      _forgotPinRecovery = false;
+      _forgotPinRecovery = keepForgot;
     });
     try {
       final idToken = await signInWithGoogleIdToken();
@@ -387,22 +403,11 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         }
         await api.saveToken(token);
         await api.markSessionUnlocked();
-        final mustSetupPin = !seedDemo && (_forgotPinRecovery || !pinConfigured);
+        // Capturer avant les awaits UI — évite de perdre le mode reset.
+        final resetPin = _forgotPinRecovery;
+        final mustSetupPin = !seedDemo && (resetPin || !pinConfigured);
         if (mustSetupPin && mounted) {
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => LocalPinSetupScreen(
-                title: _forgotPinRecovery
-                    ? pinResetHeadingFr
-                    : connectionPinHeadingFr,
-                reset: _forgotPinRecovery,
-                onCompleted: () async {
-                  Navigator.of(context).pop();
-                  await widget.onAuthenticated(data);
-                },
-              ),
-            ),
-          );
+          await _presentPinSetupScreen(data: data, reset: resetPin);
           return;
         }
         await widget.onAuthenticated(data);
@@ -411,12 +416,42 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     }
   }
 
+  /// Plein écran via root navigator — fiable même si le panel est dans un scroll/Center.
+  Future<void> _presentPinSetupScreen({
+    required Map<String, dynamic> data,
+    required bool reset,
+  }) async {
+    if (!mounted) return;
+    // Laisser le unfocus/clavier se terminer avant d'empiler la route.
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
+    await Navigator.of(context, rootNavigator: true).push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (routeContext) => LocalPinSetupScreen(
+          title: reset ? pinResetHeadingFr : connectionPinHeadingFr,
+          reset: reset,
+          onCompleted: () async {
+            if (Navigator.of(routeContext).canPop()) {
+              Navigator.of(routeContext).pop();
+            }
+            if (!mounted) return;
+            _forgotPinRecovery = false;
+            await widget.onAuthenticated(data);
+          },
+        ),
+      ),
+    );
+  }
+
   void _openForgotOptions() {
     setState(() {
       _forgotPinRecovery = true;
       _step = PhoneLoginStep.forgot;
       _error = null;
       _pinController.clear();
+      _codeController.clear();
+      _loading = false;
     });
   }
 
@@ -440,7 +475,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       return;
     }
     _normalizedPhone = phone;
-    _forgotPinRecovery = true;
+    setState(() => _forgotPinRecovery = true);
     await _requestOtp();
   }
 

@@ -252,7 +252,8 @@ jobs:
             local per_try=90
             while [ "$attempt" -le "$max_attempts" ]; do
               set +e
-              out="$(timeout "${per_try}s" npm audit --audit-level="$level" 2>&1)"
+              # Match install: audit this package tree only (not the monorepo root).
+              out="$(timeout "${per_try}s" npm audit --audit-level="$level" --no-workspaces 2>&1)"
               rc=$?
               set -e
               printf '%s\n' "$out"

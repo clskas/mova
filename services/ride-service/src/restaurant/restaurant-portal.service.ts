@@ -212,10 +212,27 @@ export class RestaurantPortalService {
         }
       }),
     );
+    const owner = await fetchAuthUserBrief(ownerUserId);
+    const partnerIdentity = {
+      partnerName: restaurant.name,
+      partnerPhone: owner?.phone ?? null,
+      partnerEmail: owner?.email ?? null,
+    };
     return {
-      restaurant: { id: restaurant.id, name: restaurant.name },
+      restaurant: {
+        id: restaurant.id,
+        name: restaurant.name,
+        phone: partnerIdentity.partnerPhone,
+        email: partnerIdentity.partnerEmail,
+      },
       orders: page.map((d) =>
-        this.formatOrder(d, restaurant.id, paymentStatuses[d.id], d.driverId ? driverBriefs.get(d.driverId) : undefined),
+        this.formatOrder(
+          d,
+          restaurant.id,
+          paymentStatuses[d.id],
+          d.driverId ? driverBriefs.get(d.driverId) : undefined,
+          partnerIdentity,
+        ),
       ),
       pagination: { skip, take, total },
     };
@@ -271,6 +288,7 @@ export class RestaurantPortalService {
     restaurantId?: string,
     payment?: { isPaid?: boolean; paymentStatus?: string | null; paymentMethod?: string | null },
     driver?: { name?: string; phone?: string; email?: string } | null,
+    partner?: { partnerName?: string; partnerPhone?: string | null; partnerEmail?: string | null } | null,
   ) {
     const items = restaurantId ? this.orderItemsForRestaurant(d.items, restaurantId) : d.items;
     const amounts = computeRestaurantPartnerDisplay({
@@ -299,6 +317,9 @@ export class RestaurantPortalService {
       partnerDiscountCdf: amounts.partnerDiscountCdf,
       promoCode: amounts.promoCode,
       createdAt: d.createdAt.toISOString(),
+      partnerName: partner?.partnerName ?? null,
+      partnerPhone: partner?.partnerPhone ?? null,
+      partnerEmail: partner?.partnerEmail ?? null,
       driverAssigned: Boolean(d.driverId),
       driverId: d.driverId,
       driverName: driver?.name ?? null,

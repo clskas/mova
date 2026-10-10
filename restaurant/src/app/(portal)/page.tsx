@@ -450,7 +450,12 @@ function OrderCard({
     order.driverPhone ||
     order.driverEmail ||
     (order.driverId ? `#${order.driverId.slice(0, 8)}` : null);
+  const driverContact = [order.driverPhone, order.driverEmail].filter(Boolean).join(" · ");
   const showAssignPanel = Boolean(onAssignDriver) && (!reassignMode || showReassignPicker);
+  const partnerName = order.partnerName?.trim();
+  const partnerPhone = order.partnerPhone?.trim();
+  const partnerEmail = order.partnerEmail?.trim();
+  const hasPartnerIdentity = Boolean(partnerName || partnerPhone || partnerEmail);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 md:p-5">
@@ -474,6 +479,30 @@ function OrderCard({
           </span>
         )}
       </div>
+      {hasPartnerIdentity && (
+        <div className="mb-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 space-y-0.5">
+          <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Partenaire</p>
+          {partnerName && (
+            <p className="text-sm font-semibold text-[#1A1A2E]">{partnerName}</p>
+          )}
+          {partnerPhone && (
+            <p className="text-sm text-slate-600">
+              Tél.{" "}
+              <a href={`tel:${partnerPhone}`} className="text-[#6C63FF] underline-offset-2 hover:underline">
+                {partnerPhone}
+              </a>
+            </p>
+          )}
+          {partnerEmail && (
+            <p className="text-sm text-slate-600">
+              E-mail{" "}
+              <a href={`mailto:${partnerEmail}`} className="text-[#6C63FF] underline-offset-2 hover:underline">
+                {partnerEmail}
+              </a>
+            </p>
+          )}
+        </div>
+      )}
       <div className="mb-1">
         {(() => {
           const lines = formatOrderItemLines(order.items);
@@ -554,6 +583,7 @@ function OrderCard({
         {order.driverAssigned && driverLabel && (
           <span className="text-xs text-green-700 self-center">
             Livreur : {driverLabel}
+            {driverContact ? ` · ${driverContact}` : ""}
           </span>
         )}
         {reassignMode && onAssignDriver && (

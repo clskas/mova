@@ -134,6 +134,10 @@ export type RestaurantOrder = {
   partnerDiscountCdf?: number;
   promoCode?: string | null;
   createdAt?: string;
+  /** Identifiants établissement partenaire (carte commande). */
+  partnerName?: string | null;
+  partnerPhone?: string | null;
+  partnerEmail?: string | null;
   driverAssigned?: boolean;
   driverId?: string | null;
   driverName?: string | null;

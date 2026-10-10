@@ -106,6 +106,9 @@ export type RestaurantProfile = {
     hoursRemaining?: number | null;
   };
   needsProfileSetup?: boolean;
+  /** Téléphone / e-mail du compte partenaire (identifiants affichés). */
+  ownerPhone?: string | null;
+  ownerEmail?: string | null;
 };
 
 /** Flotte interne visible seulement en OWN / HYBRID — jamais en PLATFORM (livreurs SENGA uniquement). */
@@ -132,6 +135,12 @@ export type RestaurantOrder = {
   promoCode?: string | null;
   createdAt?: string;
   driverAssigned?: boolean;
+  driverId?: string | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
+  driverEmail?: string | null;
+  /** true tant que la livraison n'est pas en transit — permet de changer de livreur */
+  canReassignDriver?: boolean;
   isPaid?: boolean;
   paymentStatus?: string | null;
   paymentMethod?: string | null;

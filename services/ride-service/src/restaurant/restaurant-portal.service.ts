@@ -97,6 +97,7 @@ export class RestaurantPortalService {
   async getProfile(ownerUserId: string) {
     const restaurant = await this.getRestaurantForOwner(ownerUserId);
     const dossier = await this.partnerKyc.getRestaurantDossier(ownerUserId);
+    const owner = await fetchAuthUserBrief(ownerUserId);
     return {
       id: restaurant.id,
       name: restaurant.name,
@@ -118,6 +119,9 @@ export class RestaurantPortalService {
       documentsJobsGateOk: dossier.documentsJobsGateOk,
       documentsReminder: dossier.documentsReminder,
       needsProfileSetup: restaurantNeedsProfileSetup(restaurant),
+      /** Identifiants compte partenaire (affichage portail / livreurs). */
+      ownerPhone: owner?.phone ?? null,
+      ownerEmail: owner?.email ?? null,
     };
   }
 
@@ -194,9 +198,25 @@ export class RestaurantPortalService {
       'DELIVERY',
       page.map((d) => d.id),
     );
+    const driverIds = [...new Set(page.map((d) => d.driverId).filter(Boolean))] as string[];
+    const driverBriefs = new Map<string, { name?: string; phone?: string; email?: string }>();
+    await Promise.all(
+      driverIds.map(async (id) => {
+        const brief = await fetchAuthUserBrief(id);
+        if (brief) {
+          driverBriefs.set(id, {
+            name: brief.name,
+            phone: brief.phone,
+            email: brief.email,
+          });
+        }
+      }),
+    );
     return {
       restaurant: { id: restaurant.id, name: restaurant.name },
-      orders: page.map((d) => this.formatOrder(d, restaurant.id, paymentStatuses[d.id])),
+      orders: page.map((d) =>
+        this.formatOrder(d, restaurant.id, paymentStatuses[d.id], d.driverId ? driverBriefs.get(d.driverId) : undefined),
+      ),
       pagination: { skip, take, total },
     };
   }
@@ -250,6 +270,7 @@ export class RestaurantPortalService {
   },
     restaurantId?: string,
     payment?: { isPaid?: boolean; paymentStatus?: string | null; paymentMethod?: string | null },
+    driver?: { name?: string; phone?: string; email?: string } | null,
   ) {
     const items = restaurantId ? this.orderItemsForRestaurant(d.items, restaurantId) : d.items;
     const amounts = computeRestaurantPartnerDisplay({
@@ -263,6 +284,9 @@ export class RestaurantPortalService {
     const escrowReady = Boolean(d.escrowReady);
     const isPaid = payment?.isPaid ?? escrowReady;
     const canPrepare = !guaranteed || isPaid || escrowReady;
+    const canReassignDriver =
+      Boolean(d.driverId) &&
+      (d.status === DeliveryStatus.READY_FOR_PICKUP || d.status === DeliveryStatus.PICKED_UP);
     return {
       id: d.id,
       status: d.status,
@@ -276,6 +300,11 @@ export class RestaurantPortalService {
       promoCode: amounts.promoCode,
       createdAt: d.createdAt.toISOString(),
       driverAssigned: Boolean(d.driverId),
+      driverId: d.driverId,
+      driverName: driver?.name ?? null,
+      driverPhone: driver?.phone ?? null,
+      driverEmail: driver?.email ?? null,
+      canReassignDriver,
       multiRestaurant: Boolean(restaurantId && !d.restaurantId && this.deliveryIncludesRestaurant(d.items, restaurantId)),
       isPaid,
       paymentStatus: payment?.paymentStatus ?? null,
@@ -890,7 +919,97 @@ export class RestaurantPortalService {
         'Ce livreur n\'est pas dans votre flotte. Ajoutez-le dans Paramètres.',
       );
     }
-    return this.deliveries.acceptDelivery(deliveryId, driverUserId);
+    if (!delivery.driverId) {
+      return this.deliveries.acceptDelivery(deliveryId, driverUserId);
+    }
+    return this.reassignOwnDriver(delivery, ownerUserId, driverUserId);
+  }
+
+  /**
+   * Remplace le livreur interne tant que la course n'est pas en transit
+   * (cas typique : le livreur désigné tarde à prendre en charge).
+   */
+  private async reassignOwnDriver(
+    delivery: {
+      id: string;
+      userId: string;
+      type: DeliveryType;
+      status: DeliveryStatus;
+      driverId: string | null;
+      pickupAddress?: string | null;
+      dropoffAddress?: string | null;
+      deliveryAddress?: string | null;
+      pickedUpAt?: Date | null;
+    },
+    ownerUserId: string,
+    driverUserId: string,
+  ) {
+    if (
+      delivery.status !== DeliveryStatus.READY_FOR_PICKUP &&
+      delivery.status !== DeliveryStatus.PICKED_UP
+    ) {
+      throw new MovaHttpException(
+        MovaErrorCode.DELIVERY_INVALID_STATUS,
+        undefined,
+        'Réassignation impossible : la livraison est déjà en cours ou terminée.',
+      );
+    }
+    if (delivery.driverId === driverUserId) {
+      const current = await this.prisma.delivery.findUnique({
+        where: { id: delivery.id },
+        include: { events: { orderBy: { createdAt: 'asc' } } },
+      });
+      if (!current) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
+      return {
+        order: this.formatOrder(current),
+        delivery: formatParcelDelivery(current),
+        success: true,
+        reassigned: false,
+      };
+    }
+    const previousDriverId = delivery.driverId;
+    const updated = await this.prisma.delivery.update({
+      where: { id: delivery.id },
+      data: {
+        driverId: driverUserId,
+        status: DeliveryStatus.PICKED_UP,
+        pickedUpAt: delivery.pickedUpAt ?? new Date(),
+        courierSource: 'RESTAURANT',
+      },
+      include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
+    });
+    await this.prisma.deliveryEvent.create({
+      data: {
+        deliveryId: delivery.id,
+        event: 'REASSIGNED',
+        metadata: {
+          previousDriverId,
+          driverUserId,
+          by: ownerUserId,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
+      serviceType: 'DELIVERY',
+      referenceId: delivery.id,
+      driverId: driverUserId,
+      passengerId: delivery.userId,
+      summary: `Livraison ${delivery.type} réassignée`,
+      pickupAddress: delivery.pickupAddress ?? undefined,
+      dropoffAddress: delivery.dropoffAddress ?? delivery.deliveryAddress ?? undefined,
+    });
+    await this.publishStatus(updated, updated.status);
+    const driver = await fetchAuthUserBrief(driverUserId);
+    return {
+      order: this.formatOrder(updated, undefined, undefined, {
+        name: driver?.name,
+        phone: driver?.phone,
+        email: driver?.email,
+      }),
+      delivery: formatParcelDelivery(updated),
+      success: true,
+      reassigned: true,
+    };
   }
 
   private async publishStatus(

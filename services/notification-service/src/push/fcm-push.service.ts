@@ -9,7 +9,9 @@ export interface FcmPushMessage {
 
 /** Canal + son SENGA (doit matcher DriverJobAlertService côté app). */
 export const SENGA_DRIVER_JOB_CHANNEL = 'mova_driver_jobs_v2';
-export const SENGA_DRIVER_JOB_SOUND = 'senga_job';
+/** Android raw `senga_job` ; iOS bundle `senga_job.wav` (extension requise pour APNs). */
+export const SENGA_DRIVER_JOB_SOUND_ANDROID = 'senga_job';
+export const SENGA_DRIVER_JOB_SOUND_IOS = 'senga_job.wav';
 
 @Injectable()
 export class FcmPushService {
@@ -47,8 +49,24 @@ export class FcmPushService {
               notification: {
                 title: message.title,
                 body: message.body,
-                sound: SENGA_DRIVER_JOB_SOUND,
+                // Legacy FCM: Android utilise souvent le canal ; iOS lit `sound` (avec .wav).
+                sound: SENGA_DRIVER_JOB_SOUND_IOS,
                 android_channel_id: SENGA_DRIVER_JOB_CHANNEL,
+              },
+              android: {
+                priority: 'high',
+                notification: {
+                  channel_id: SENGA_DRIVER_JOB_CHANNEL,
+                  sound: SENGA_DRIVER_JOB_SOUND_ANDROID,
+                },
+              },
+              apns: {
+                payload: {
+                  aps: {
+                    sound: SENGA_DRIVER_JOB_SOUND_IOS,
+                    'content-available': 1,
+                  },
+                },
               },
               data: {
                 ...data,

@@ -80,6 +80,16 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     return _delivery['restaurantName']?.toString() ?? 'Restaurant';
   }
 
+  String? get _restaurantContact {
+    final phone = _delivery['restaurantPhone']?.toString().trim();
+    final email = _delivery['restaurantEmail']?.toString().trim();
+    final parts = <String>[
+      if (phone != null && phone.isNotEmpty) phone,
+      if (email != null && email.isNotEmpty) email,
+    ];
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -558,6 +568,22 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (_isFood) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _restaurantName,
+                    style: const TextStyle(color: MovaColors.textSecondary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (_restaurantContact != null)
+                    Text(
+                      _restaurantContact!,
+                      style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
                 const SizedBox(height: 8),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -183,7 +183,10 @@ export class RestaurantPortalController {
   }
 
   @Post('orders/:id/assign-driver')
-  @ApiOperation({ summary: 'Assigner un livreur interne (si SuperAdmin a activé la flotte)' })
+  @ApiOperation({
+    summary:
+      'Assigner ou réassigner un livreur interne (réassignation tant que pas en transit)',
+  })
   assignDriver(
     @Request() req: { user: { id: string } },
     @Param('id') id: string,

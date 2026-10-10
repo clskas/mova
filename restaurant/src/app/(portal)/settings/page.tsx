@@ -37,6 +37,8 @@ export default function SettingsPage() {
   const [name, setName] = useState("");
   const [cuisine, setCuisine] = useState("");
   const [commerceType, setCommerceType] = useState<CommerceType>("RESTAURANT");
+  const [ownerPhone, setOwnerPhone] = useState<string | null>(null);
+  const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
   const [address, setAddress] = useState("");
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
@@ -53,6 +55,7 @@ export default function SettingsPage() {
   const [driverLookup, setDriverLookup] = useState("");
   const [fleetBusy, setFleetBusy] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [needsUnlock, setNeedsUnlock] = useState(true);
   const [soundMuted, setSoundMuted] = useState(false);
   const [soundStyle, setSoundStyle] = useState<PartnerSoundStyle>("senga");
   const [soundTesting, setSoundTesting] = useState(false);
@@ -61,6 +64,7 @@ export default function SettingsPage() {
   useEffect(() => {
     return subscribePartnerAlertUi((ui) => {
       setSoundEnabled(ui.soundEnabled);
+      setNeedsUnlock(ui.needsUnlock);
       setSoundMuted(ui.soundMuted);
       setSoundStyle(ui.soundStyle);
     });
@@ -75,6 +79,8 @@ export default function SettingsPage() {
       setName(p.name ?? "");
       setCuisine(p.cuisine ?? "");
       setCommerceType(parseCommerceType(p.commerceType));
+      setOwnerPhone(p.ownerPhone ?? null);
+      setOwnerEmail(p.ownerEmail ?? null);
       setAddress(p.address ?? "");
       setLat(p.lat != null ? String(p.lat) : "");
       setLng(p.lng != null ? String(p.lng) : "");
@@ -238,6 +244,12 @@ export default function SettingsPage() {
                 </select>
                 <span className="mt-1 block text-xs text-gray-400">{copy.portalNavHint}</span>
               </label>
+              {(ownerPhone || ownerEmail) && (
+                <p className="text-sm text-gray-600 rounded-xl bg-gray-50 border px-3 py-2">
+                  <span className="block text-xs text-gray-400 mb-0.5">Identifiants partenaire</span>
+                  {[ownerPhone, ownerEmail].filter(Boolean).join(" · ")}
+                </p>
+              )}
               <label className="block text-sm">
                 <span className="text-gray-600">{copy.nameLabel}</span>
                 <input
@@ -346,7 +358,7 @@ export default function SettingsPage() {
               Alertes pour les nouvelles commandes et paiements. Le navigateur peut exiger un clic
               pour autoriser le son.
             </p>
-            {!soundEnabled && (
+            {needsUnlock && (
               <button
                 type="button"
                 onClick={() => void unlockPartnerAlerts({ fromBanner: true })}
@@ -359,7 +371,11 @@ export default function SettingsPage() {
               <span className="text-sm">
                 Son des alertes
                 <span className="block text-xs text-gray-400">
-                  {soundMuted ? "Coupé (toasts sans bip)" : "Activé"}
+                  {soundMuted
+                    ? "Coupé (toasts sans bip)"
+                    : needsUnlock
+                      ? "Autorisation navigateur requise"
+                      : "Activé"}
                 </span>
               </span>
               <input
@@ -369,7 +385,7 @@ export default function SettingsPage() {
                 onChange={(e) => {
                   const on = e.target.checked;
                   setPartnerSoundMuted(!on);
-                  if (on && !soundEnabled) {
+                  if (on) {
                     void unlockPartnerAlerts({ fromBanner: true });
                   }
                 }}
@@ -402,7 +418,7 @@ export default function SettingsPage() {
               onClick={async () => {
                 setSoundTesting(true);
                 try {
-                  if (!soundEnabled) {
+                  if (needsUnlock || !soundEnabled) {
                     await unlockPartnerAlerts({ fromBanner: true });
                   } else {
                     await playPartnerAlertChime();

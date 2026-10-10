@@ -1,6 +1,9 @@
 let sharedCtx: AudioContext | null = null;
 let htmlAudio: HTMLAudioElement | null = null;
-let audioUnlocked = false;
+/** Préférence sticky : l’utilisateur a déjà cliqué « Activer le son » une fois. */
+let prefWantsSound = false;
+/** Cette session peut réellement jouer de l’audio (geste + contexte OK). */
+let sessionReady = false;
 let soundMuted = false;
 let soundStyle: PartnerSoundStyle = "senga";
 let pendingChime = false;
@@ -15,7 +18,10 @@ const SOUND_STYLE_KEY = "mova_restaurant_sound_style_v1";
 export type PartnerSoundStyle = "senga" | "chime";
 
 export type PartnerAlertUi = {
+  /** true si le navigateur peut jouer le son cette session */
   soundEnabled: boolean;
+  /** true si une activation (clic) est encore nécessaire */
+  needsUnlock: boolean;
   soundMuted: boolean;
   soundStyle: PartnerSoundStyle;
   toast: { title: string; body: string } | null;
@@ -84,9 +90,7 @@ function writeStylePref(style: PartnerSoundStyle) {
 }
 
 function restoreSoundPref() {
-  if (!audioUnlocked && readSoundPref()) {
-    audioUnlocked = true;
-  }
+  prefWantsSound = readSoundPref();
   soundMuted = readMutedPref();
   soundStyle = readStylePref();
 }
@@ -94,7 +98,8 @@ function restoreSoundPref() {
 export function getPartnerAlertUi(): PartnerAlertUi {
   if (typeof window !== "undefined") restoreSoundPref();
   return {
-    soundEnabled: audioUnlocked,
+    soundEnabled: sessionReady && !soundMuted,
+    needsUnlock: !soundMuted && !sessionReady,
     soundMuted,
     soundStyle,
     toast,
@@ -124,9 +129,7 @@ export function onPartnerAlertsUnlocked(fn: () => void) {
 export function setPartnerSoundMuted(muted: boolean) {
   soundMuted = muted;
   writeMutedPref(muted);
-  if (!muted && !audioUnlocked) {
-    // L’utilisateur réactive le son depuis Paramètres : besoin d’un geste pour unlock.
-  }
+  if (muted) stopRepeat();
   emitUi();
 }
 
@@ -175,7 +178,6 @@ function scheduleOscillatorChime(ctx: AudioContext) {
   });
 }
 
-/** Start HTML play in the same turn as the user gesture (before other awaits). */
 function beginHtmlChime(): Promise<boolean> {
   const audio = getHtmlAudio();
   if (!audio) return Promise.resolve(false);
@@ -191,7 +193,7 @@ function beginHtmlChime(): Promise<boolean> {
     try {
       audio.currentTime = 0;
     } catch {
-      /* ignore seek errors before metadata */
+      /* ignore */
     }
     audio.muted = false;
     audio.volume = 1;
@@ -215,22 +217,30 @@ async function playWebAudioChime(): Promise<boolean> {
   return true;
 }
 
-/** Bip sonore selon le style choisi ; respect du mute. */
+/** Bip sonore selon le style ; respect du mute. false = échec autoplay → bannière. */
 export async function playPartnerAlertChime(): Promise<boolean> {
   if (typeof window !== "undefined") restoreSoundPref();
-  if (soundMuted) return true;
+  if (soundMuted) return false;
   try {
+    let ok = false;
     if (soundStyle === "chime") {
-      if (await playWebAudioChime()) return true;
-      if (await beginHtmlChime()) return true;
+      ok = (await playWebAudioChime()) || (await beginHtmlChime());
     } else {
-      if (await beginHtmlChime()) return true;
-      if (await playWebAudioChime()) return true;
+      ok = (await beginHtmlChime()) || (await playWebAudioChime());
     }
+    if (ok) {
+      sessionReady = true;
+      emitUi();
+      return true;
+    }
+    sessionReady = false;
     pendingChime = true;
+    emitUi();
     return false;
   } catch {
+    sessionReady = false;
     pendingChime = true;
+    emitUi();
     return false;
   }
 }
@@ -260,19 +270,17 @@ export function dismissPartnerToast() {
   emitUi();
 }
 
-/**
- * À appeler depuis un clic (bouton « Activer le son » ou Paramètres).
- */
 export async function unlockPartnerAlerts(opts?: { fromBanner?: boolean }) {
   if (typeof window === "undefined") return;
   if (unlockInFlight) {
     await unlockInFlight;
-    if (audioUnlocked || opts?.fromBanner !== true) return;
+    if (sessionReady || opts?.fromBanner !== true) return;
   }
 
   const fromBanner = opts?.fromBanner === true;
 
   unlockInFlight = (async () => {
+    restoreSoundPref();
     const preferChime = soundStyle === "chime";
     const htmlPlay = preferChime ? Promise.resolve(false) : beginHtmlChime();
     const ctx = getAudioContext();
@@ -288,13 +296,14 @@ export async function unlockPartnerAlerts(opts?: { fromBanner?: boolean }) {
     }
     const ctxReady = ctx?.state === "running";
     if (!played && !ctxReady && !fromBanner) {
+      sessionReady = false;
       emitUi();
       return;
     }
 
-    audioUnlocked = true;
+    sessionReady = true;
+    prefWantsSound = true;
     writeSoundPref();
-    // Activer le son depuis la bannière / Paramètres enlève aussi le mute.
     if (fromBanner || soundMuted) {
       soundMuted = false;
       writeMutedPref(false);
@@ -322,18 +331,20 @@ export async function unlockPartnerAlerts(opts?: { fromBanner?: boolean }) {
   }
 }
 
-/** Précharge le WAV. Retourne un cleanup pour le listener de geste. */
 export function initPartnerAudioUnlock(): () => void {
   if (typeof window === "undefined") return () => undefined;
   restoreSoundPref();
   getHtmlAudio();
+  // Ne pas marquer sessionReady depuis le sticky pref seul — un geste est requis.
   emitUi();
 
   let armed = true;
-  let needsResume = true;
   const resumeOnGesture = () => {
-    if (!armed || !audioUnlocked || !needsResume) return;
-    needsResume = false;
+    if (!armed || soundMuted) return;
+    if (prefWantsSound && !sessionReady) {
+      void unlockPartnerAlerts({ fromBanner: true });
+      return;
+    }
     const ctx = getAudioContext();
     if (ctx?.state === "suspended") {
       void ctx.resume().catch(() => undefined);
@@ -350,7 +361,6 @@ export function initPartnerAudioUnlock(): () => void {
   };
 }
 
-/** Conservé pour compat : la permission n'est demandée que dans unlockPartnerAlerts. */
 export function requestPartnerNotificationPermission() {
   /* permission demandée après clic — voir unlockPartnerAlerts */
 }
@@ -372,11 +382,7 @@ export function notifyPartnerAlert(options: {
   emitUi();
 
   if (options.playSound !== false && !soundMuted) {
-    void playPartnerAlertChime().then((ok) => {
-      if (!ok && !audioUnlocked) {
-        emitUi();
-      }
-    });
+    void playPartnerAlertChime();
     startRepeat();
   }
 
@@ -387,7 +393,7 @@ export function notifyPartnerAlert(options: {
         tag: options.tag ?? options.key,
       });
     } catch {
-      /* Safari hors PWA : Notification peut exister mais échouer */
+      /* Safari hors PWA */
     }
   }
 }

@@ -9,9 +9,11 @@ import 'driver_job_alert_service.dart';
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
+  // Si FCM a déjà affiché une notification système (son inclus), éviter le double bip.
+  if (message.notification != null) return;
   await DriverJobAlertService.init();
-  final title = message.notification?.title ?? message.data['title']?.toString() ?? 'SENGA Driver';
-  final body = message.notification?.body ?? message.data['body']?.toString() ?? 'Nouvelle alerte';
+  final title = message.data['title']?.toString() ?? 'SENGA Driver';
+  final body = message.data['body']?.toString() ?? 'Nouvelle alerte';
   await DriverJobAlertService.notify(title: title, body: body, payload: message.data['type']?.toString());
 }
 

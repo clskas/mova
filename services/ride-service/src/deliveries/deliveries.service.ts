@@ -1082,8 +1082,13 @@ export class DeliveriesService {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
     const courier = delivery.driverId ? await this.fetchCourierProfile(delivery.driverId) : null;
+    const partnerContact = await this.restaurantPartnerContact(delivery.restaurant);
     const formatted = await this.enrichDeliveryPayment(
-      await this.enrichDeliveryForViewer(delivery, formatParcelDelivery(delivery, courier), userId),
+      await this.enrichDeliveryForViewer(
+        delivery,
+        { ...formatParcelDelivery(delivery, courier), ...partnerContact },
+        userId,
+      ),
       id,
     );
     const gpsTrace = await this.trackingService.getTrace(TrackingReferenceType.DELIVERY, id);
@@ -1146,18 +1151,41 @@ export class DeliveriesService {
     return rating;
   }
 
-  private async fetchUserBrief(userId: string): Promise<{ name?: string; phone?: string } | null> {
+  private async fetchUserBrief(
+    userId: string,
+  ): Promise<{ name?: string; phone?: string; email?: string } | null> {
     try {
       const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
         headers: { 'x-internal-api-key': INTERNAL_API_KEY },
       });
       if (!res.ok) return null;
-      const user = (await res.json()) as { firstName?: string; lastName?: string; phone?: string };
+      const user = (await res.json()) as {
+        firstName?: string;
+        lastName?: string;
+        phone?: string;
+        email?: string | null;
+      };
       const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
-      return { name: name || undefined, phone: user.phone };
+      return {
+        name: name || undefined,
+        phone: user.phone,
+        email: user.email?.trim() || undefined,
+      };
     } catch {
       return null;
     }
+  }
+
+  private async restaurantPartnerContact(
+    restaurant?: { name?: string | null; ownerUserId?: string | null } | null,
+  ) {
+    if (!restaurant?.name && !restaurant?.ownerUserId) return {};
+    const owner = restaurant.ownerUserId ? await this.fetchUserBrief(restaurant.ownerUserId) : null;
+    return {
+      restaurantName: restaurant.name ?? undefined,
+      restaurantPhone: owner?.phone ?? undefined,
+      restaurantEmail: owner?.email ?? undefined,
+    };
   }
 
   private async touchPassengerHomeCity(userId: string, city?: string | null) {
@@ -1394,6 +1422,7 @@ export class DeliveriesService {
             lng: true,
             address: true,
             courierMode: true,
+            ownerUserId: true,
             drivers: { where: { isActive: true }, select: { driverUserId: true } },
           },
         },
@@ -1415,30 +1444,40 @@ export class DeliveriesService {
     if (driverTypes.length === 0) {
       return { offers: [] as Record<string, unknown>[] };
     }
-    const offers = deliveries
-      .filter((d) => {
-        const rejected = d.events.some((e) => {
-          if (e.event !== 'DRIVER_REJECTED') return false;
-          const meta = e.metadata as { driverUserId?: string; reason?: string };
-          if (meta?.driverUserId !== driverUserId) return false;
-          if (meta.reason === 'explicit') return true;
-          const ageMs = Date.now() - e.createdAt.getTime();
-          return ageMs < 90_000;
-        });
-        if (rejected) return false;
-        if (d.type === DeliveryType.FOOD && d.restaurant) {
-          const fleet = (d.restaurant.drivers ?? []).some((x) => x.driverUserId === driverUserId);
-          if (
-            !driverEligibleForFoodOffer({
-              courierMode: d.restaurant.courierMode,
-              driverIsRestaurantFleet: fleet,
-            })
-          ) {
-            return false;
-          }
+    const eligible = deliveries.filter((d) => {
+      const rejected = d.events.some((e) => {
+        if (e.event !== 'DRIVER_REJECTED') return false;
+        const meta = e.metadata as { driverUserId?: string; reason?: string };
+        if (meta?.driverUserId !== driverUserId) return false;
+        if (meta.reason === 'explicit') return true;
+        const ageMs = Date.now() - e.createdAt.getTime();
+        return ageMs < 90_000;
+      });
+      if (rejected) return false;
+      if (d.type === DeliveryType.FOOD && d.restaurant) {
+        const fleet = (d.restaurant.drivers ?? []).some((x) => x.driverUserId === driverUserId);
+        if (
+          !driverEligibleForFoodOffer({
+            courierMode: d.restaurant.courierMode,
+            driverIsRestaurantFleet: fleet,
+          })
+        ) {
+          return false;
         }
-        return true;
-      })
+      }
+      return true;
+    });
+    const ownerIds = [
+      ...new Set(eligible.map((d) => d.restaurant?.ownerUserId).filter(Boolean)),
+    ] as string[];
+    const ownerContacts = new Map<string, { phone?: string; email?: string }>();
+    await Promise.all(
+      ownerIds.map(async (id) => {
+        const brief = await this.fetchUserBrief(id);
+        if (brief) ownerContacts.set(id, { phone: brief.phone, email: brief.email });
+      }),
+    );
+    const offers = eligible
       .map((d) => {
         const pickupLat = d.pickupLat ?? d.restaurant?.lat ?? 0;
         const pickupLng = d.pickupLng ?? d.restaurant?.lng ?? 0;
@@ -1454,6 +1493,8 @@ export class DeliveriesService {
         const driverNetCdf = Math.round(
           this.commission.splitGross(driverGross, deliveryRule.platformPercent).driverNetCdf,
         );
+        const ownerId = d.restaurant?.ownerUserId;
+        const contact = ownerId ? ownerContacts.get(ownerId) : undefined;
         return {
           ...formatted,
           distanceKm: tripKm,
@@ -1464,6 +1505,8 @@ export class DeliveriesService {
           offerType: 'DELIVERY',
           type: d.type,
           restaurantName: d.restaurant?.name,
+          restaurantPhone: contact?.phone,
+          restaurantEmail: contact?.email,
           pickupAddress: formatted.pickupAddress ?? d.restaurant?.address ?? undefined,
         };
       })

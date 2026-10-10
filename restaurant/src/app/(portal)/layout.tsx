@@ -13,6 +13,8 @@ import { parseCommerceType, type CommerceType } from "@/lib/commerce-type";
 
 function RestaurantPortalFrame({ children }: { children: React.ReactNode }) {
   const [restaurantName, setRestaurantName] = useState<string>();
+  const [ownerPhone, setOwnerPhone] = useState<string | null>(null);
+  const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
   const [commerceType, setCommerceType] = useState<CommerceType>("RESTAURANT");
   const [docsReminder, setDocsReminder] = useState<{ message: string; blocked?: boolean } | null>(
     null,
@@ -24,6 +26,8 @@ function RestaurantPortalFrame({ children }: { children: React.ReactNode }) {
       .then((p) => {
         if (cancelled) return;
         setRestaurantName(p.name);
+        setOwnerPhone(p.ownerPhone ?? null);
+        setOwnerEmail(p.ownerEmail ?? null);
         setCommerceType(parseCommerceType(p.commerceType));
         const rem = p.documentsReminder;
         if (rem?.active && rem.message) {
@@ -40,7 +44,12 @@ function RestaurantPortalFrame({ children }: { children: React.ReactNode }) {
 
   return (
     <CommerceTypeProvider commerceType={commerceType}>
-      <PortalShell restaurantName={restaurantName} commerceType={commerceType}>
+      <PortalShell
+        restaurantName={restaurantName}
+        ownerPhone={ownerPhone}
+        ownerEmail={ownerEmail}
+        commerceType={commerceType}
+      >
         {docsReminder ? (
           <DocumentsReminderBanner message={docsReminder.message} blocked={docsReminder.blocked} />
         ) : null}

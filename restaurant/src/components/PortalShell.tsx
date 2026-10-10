@@ -43,10 +43,14 @@ const PRIMARY_ORDER = ["/dashboard", "/", "/menu", "/catalogue", "/earnings"];
 export function PortalShell({
   children,
   restaurantName,
+  ownerPhone,
+  ownerEmail,
   commerceType = "RESTAURANT",
 }: {
   children: React.ReactNode;
   restaurantName?: string;
+  ownerPhone?: string | null;
+  ownerEmail?: string | null;
   commerceType?: CommerceType;
 }) {
   const pathname = usePathname();
@@ -112,6 +116,11 @@ export function PortalShell({
             <h1 className="font-semibold text-base sm:text-lg text-[#0f1222] truncate tracking-tight">
               {restaurantName ?? "Partenaire"}
             </h1>
+            {(ownerPhone || ownerEmail) && (
+              <p className="text-xs text-slate-500 text-center max-w-full truncate px-2">
+                {[ownerPhone, ownerEmail].filter(Boolean).join(" · ")}
+              </p>
+            )}
             <div className="flex flex-wrap items-center justify-center gap-1.5 mt-0.5">
               <span className="text-[10px] uppercase tracking-wide px-2.5 py-0.5 rounded-full bg-[var(--brand-soft)] text-[var(--brand)] font-semibold ring-1 ring-[var(--brand-ring)]/40">
                 {typeLabel}

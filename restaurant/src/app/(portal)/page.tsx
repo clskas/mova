@@ -334,10 +334,13 @@ export default function OrdersPage() {
                         : undefined
                     }
                     onAssignDriver={
-                      allowInternalCouriers && !o.driverAssigned && o.status === "READY_FOR_PICKUP"
+                      allowInternalCouriers &&
+                      ((!o.driverAssigned && o.status === "READY_FOR_PICKUP") ||
+                        o.canReassignDriver === true)
                         ? (driverUserId) => assignDriver(o.id, driverUserId)
                         : undefined
                     }
+                    reassignMode={o.canReassignDriver === true}
                     onChatClient={() => openChat(o.id, "Client")}
                     onChatDriver={o.driverAssigned ? () => openChat(o.id, "Livreur") : undefined}
                   />
@@ -395,10 +398,13 @@ export default function OrdersPage() {
                           : undefined
                       }
                       onAssignDriver={
-                        allowInternalCouriers && !o.driverAssigned && o.status === "READY_FOR_PICKUP"
+                        allowInternalCouriers &&
+                        ((!o.driverAssigned && o.status === "READY_FOR_PICKUP") ||
+                          o.canReassignDriver === true)
                           ? (driverUserId) => assignDriver(o.id, driverUserId)
                           : undefined
                       }
+                      reassignMode={o.canReassignDriver === true}
                       onChatClient={() => openChat(o.id, "Client")}
                       onChatDriver={o.driverAssigned ? () => openChat(o.id, "Livreur") : undefined}
                     />
@@ -417,6 +423,7 @@ function OrderCard({
   busy,
   fleetDrivers = [],
   showNotifyAllDrivers = false,
+  reassignMode = false,
   onConfirm,
   onReject,
   onReady,
@@ -428,6 +435,7 @@ function OrderCard({
   busy: boolean;
   fleetDrivers?: RestaurantFleetDriver[];
   showNotifyAllDrivers?: boolean;
+  reassignMode?: boolean;
   onConfirm?: () => void;
   onReject?: () => void;
   onReady?: (opts?: { notifyAllDrivers?: boolean }) => void;
@@ -436,6 +444,13 @@ function OrderCard({
   onChatDriver?: () => void;
 }) {
   const [notifyAllDrivers, setNotifyAllDrivers] = useState(false);
+  const [showReassignPicker, setShowReassignPicker] = useState(false);
+  const driverLabel =
+    order.driverName ||
+    order.driverPhone ||
+    order.driverEmail ||
+    (order.driverId ? `#${order.driverId.slice(0, 8)}` : null);
+  const showAssignPanel = Boolean(onAssignDriver) && (!reassignMode || showReassignPicker);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 md:p-5">
@@ -536,8 +551,20 @@ function OrderCard({
             Chat livreur
           </button>
         )}
-        {order.driverAssigned && (
-          <span className="text-xs text-green-700 self-center">Livreur assigné</span>
+        {order.driverAssigned && driverLabel && (
+          <span className="text-xs text-green-700 self-center">
+            Livreur : {driverLabel}
+          </span>
+        )}
+        {reassignMode && onAssignDriver && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setShowReassignPicker((v) => !v)}
+            className="px-4 py-2 rounded-xl border border-amber-300 text-amber-800 text-sm disabled:opacity-60"
+          >
+            {showReassignPicker ? "Annuler" : "Changer de livreur"}
+          </button>
         )}
       </div>
       {onReady && showNotifyAllDrivers && (
@@ -557,30 +584,37 @@ function OrderCard({
           </span>
         </label>
       )}
-      {onAssignDriver && fleetDrivers.length > 0 && (
+      {showAssignPanel && fleetDrivers.length > 0 && (
         <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50/40 p-3 space-y-2">
-          <p className="text-xs font-medium text-violet-900">Choisir un livreur interne</p>
+          <p className="text-xs font-medium text-violet-900">
+            {reassignMode ? "Assigner un autre livreur" : "Choisir un livreur interne"}
+          </p>
           <p className="text-[11px] text-violet-800/80">
-            Seul le livreur choisi reçoit l&apos;assignation (notification dédiée).
+            {reassignMode
+              ? "Si le livreur actuel tarde, choisissez-en un autre — il reçoit la notification d'assignation."
+              : "Seul le livreur choisi reçoit l'assignation (notification dédiée)."}
           </p>
           <div className="flex flex-wrap gap-2">
             {fleetDrivers
-              .filter((d) => d.isActive)
+              .filter((d) => d.isActive && (!reassignMode || d.driverUserId !== order.driverId))
               .map((d) => (
                 <button
                   key={d.id}
                   type="button"
                   disabled={busy}
-                  onClick={() => onAssignDriver(d.driverUserId)}
+                  onClick={() => {
+                    onAssignDriver?.(d.driverUserId);
+                    setShowReassignPicker(false);
+                  }}
                   className="px-3 py-2 rounded-lg bg-violet-600 text-white text-xs font-medium disabled:opacity-60"
                 >
-                  {d.phone || d.name || "Livreur"}
+                  {d.phone || d.email || d.name || "Livreur"}
                 </button>
               ))}
           </div>
         </div>
       )}
-      {onAssignDriver && fleetDrivers.length === 0 && (
+      {showAssignPanel && fleetDrivers.length === 0 && (
         <p className="mt-3 text-xs text-amber-700">
           Ajoutez des livreurs internes dans Paramètres pour les assigner ici.
         </p>

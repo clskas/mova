@@ -51,7 +51,8 @@ android {
     // --dart-define=GOOGLE_SERVER_CLIENT_ID (this app). Do not commit secrets.
     defaultConfig {
         applicationId = "cd.mova.mova"
-        minSdk = maxOf(23, flutter.minSdkVersion)
+        // Play automatic protection requires minSdk ≥ 24.
+        minSdk = maxOf(24, flutter.minSdkVersion)
         targetSdk = maxOf(36, flutter.targetSdkVersion)
         versionCode = flutter.versionCode
         versionName = flutter.versionName

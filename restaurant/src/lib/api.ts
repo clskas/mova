@@ -579,6 +579,26 @@ export function sendDeliveryChat(deliveryId: string, text: string) {
   });
 }
 
+export type LiveKitTokenResponse = {
+  url: string;
+  token: string;
+  roomName: string;
+  identity: string;
+  role: string;
+  expiresAt: string;
+};
+
+export function fetchLiveKitStatus() {
+  return apiFetch<{ enabled: boolean }>("/api/restaurant/livekit/status");
+}
+
+export function createDeliveryLiveKitToken(deliveryId: string, opts?: { announce?: boolean }) {
+  return apiFetch<LiveKitTokenResponse>(`/api/restaurant/orders/${deliveryId}/livekit-token`, {
+    method: "POST",
+    body: JSON.stringify({ announce: opts?.announce === true }),
+  });
+}
+
 export function fetchRentalChat(inquiryId: string) {
   return apiFetch<{ inquiryId?: string; messages: ChatMessagePayload[] }>(`/api/rental/inquiries/${inquiryId}/chat`);
 }

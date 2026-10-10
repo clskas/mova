@@ -6,6 +6,7 @@ import { DeliveriesController } from './deliveries.controller';
 import { DeliveriesService } from './deliveries.service';
 import { RidesModule } from '../rides/rides.module';
 import { DeliveryChatService } from '../chat/delivery-chat.service';
+import { DeliveryLiveKitService } from '../chat/delivery-livekit.service';
 import { WebsocketModule } from '../websocket/websocket.module';
 import { EscrowDispatchService } from './escrow-dispatch.service';
 import { DeliveryGuaranteeScheduler } from './delivery-guarantee.scheduler';
@@ -13,7 +14,13 @@ import { DeliveryGuaranteeScheduler } from './delivery-guarantee.scheduler';
 @Module({
   imports: [RidesModule, ErrandsModule, TrackingModule, MatchingModule, WebsocketModule],
   controllers: [DeliveriesController],
-  providers: [DeliveriesService, DeliveryChatService, EscrowDispatchService, DeliveryGuaranteeScheduler],
-  exports: [DeliveriesService, DeliveryChatService],
+  providers: [
+    DeliveriesService,
+    DeliveryChatService,
+    DeliveryLiveKitService,
+    EscrowDispatchService,
+    DeliveryGuaranteeScheduler,
+  ],
+  exports: [DeliveriesService, DeliveryChatService, DeliveryLiveKitService],
 })
 export class DeliveriesModule {}

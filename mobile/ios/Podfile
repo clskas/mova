@@ -44,6 +44,11 @@ post_install do |installer|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       # Faster / less hang-prone CI archives on GitHub Actions.
       config.build_settings['COMPILER_INDEX_STORE_ENABLE'] = 'NO'
+      # permission_handler — micro pour appels LiveKit
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
+        '$(inherited)',
+        'PERMISSION_MICROPHONE=1',
+      ]
     end
   end
 end

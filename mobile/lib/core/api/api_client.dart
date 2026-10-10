@@ -1550,6 +1550,25 @@ class ApiClient {
     };
   }
 
+  Future<Result<bool>> getDeliveryLiveKitEnabled() async {
+    final result = await get('/deliveries/livekit/status');
+    return switch (result) {
+      Success(:final data) => Success(data['enabled'] == true),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  Future<Result<Map<String, dynamic>>> createDeliveryLiveKitToken(
+    String deliveryId, {
+    bool announce = false,
+  }) async {
+    final result = await post('/deliveries/$deliveryId/livekit-token', {'announce': announce});
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
   Future<Result<List<Map<String, dynamic>>>> getRentalChatMessages(String inquiryId) async {
     final result = await get('/rental/inquiries/$inquiryId/chat');
     return switch (result) {

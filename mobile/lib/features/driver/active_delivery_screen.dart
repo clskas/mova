@@ -15,6 +15,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../chat/chat_alert_service.dart';
 import '../chat/delivery_chat_screen.dart';
+import '../chat/delivery_voice_call_screen.dart';
 import '../chat/errand_chat_screen.dart';
 import '../../core/billing/service_price_display.dart';
 import '../../core/safety/sos_helper.dart';
@@ -451,6 +452,19 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     );
   }
 
+  Future<void> _openVoiceCall() {
+    return Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DeliveryVoiceCallScreen(
+          deliveryId: _deliveryId,
+          peerLabel: _isFood ? _restaurantName : 'Client',
+          announce: true,
+        ),
+      ),
+    );
+  }
+
   bool get _navigateToPickup {
     if (_isErrand) return _status == 'ASSIGNED';
     return _status == 'READY_FOR_PICKUP' || _status == 'PENDING';
@@ -679,6 +693,15 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
               isSecondary: true,
               icon: Icons.storefront_outlined,
               onPressed: _deliveryId.isEmpty ? null : () => _openChat(peerLabel: _restaurantName),
+            ),
+          ],
+          if (!_isErrand) ...[
+            const SizedBox(height: 8),
+            MovaButton(
+              label: 'Appel vocal',
+              isSecondary: true,
+              icon: Icons.call_outlined,
+              onPressed: _deliveryId.isEmpty ? null : _openVoiceCall,
             ),
           ],
           const SizedBox(height: 8),

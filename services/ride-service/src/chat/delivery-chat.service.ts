@@ -60,6 +60,11 @@ export class DeliveryChatService {
     return null;
   }
 
+  /** Public ACL check for LiveKit and other delivery-scoped features. */
+  async requireParticipant(deliveryId: string, userId: string): Promise<DeliveryParticipants> {
+    return this.assertParticipant(deliveryId, userId);
+  }
+
   private async assertParticipant(deliveryId: string, userId: string): Promise<DeliveryParticipants> {
     const delivery = await this.prisma.delivery.findUnique({
       where: { id: deliveryId },

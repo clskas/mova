@@ -48,6 +48,8 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SENGA utilise le micro pour les appels vocaux entre client, livreur et partenaire.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>SENGA utilise la caméra pour photographier vos colis lors de l'envoi.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

@@ -4,9 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRestaurantLiveRegister } from "@/components/RestaurantLiveProvider";
 import { ChatPanel } from "@/components/ChatPanel";
+import { VoiceCallPanel } from "@/components/VoiceCallPanel";
 import {
   assignOwnDriver,
   confirmOrder,
+  fetchLiveKitStatus,
   fetchOrders,
   fetchRestaurantDrivers,
   formatCdf,
@@ -93,6 +95,9 @@ export default function OrdersPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [chatOrderId, setChatOrderId] = useState<string | null>(null);
   const [chatPeerLabel, setChatPeerLabel] = useState("Client");
+  const [callOrderId, setCallOrderId] = useState<string | null>(null);
+  const [callPeerLabel, setCallPeerLabel] = useState("Appel");
+  const [voiceCallsEnabled, setVoiceCallsEnabled] = useState(false);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
@@ -102,6 +107,12 @@ export default function OrdersPage() {
   const [fleetDrivers, setFleetDrivers] = useState<RestaurantFleetDriver[]>([]);
   const [allowInternalCouriers, setAllowInternalCouriers] = useState(false);
   const seenPendingIds = useRef<Set<string> | null>(null);
+
+  useEffect(() => {
+    fetchLiveKitStatus()
+      .then((s) => setVoiceCallsEnabled(s.enabled === true))
+      .catch(() => setVoiceCallsEnabled(false));
+  }, []);
 
   useEffect(() => {
     const status = searchParams.get("status") ?? "";
@@ -124,6 +135,16 @@ export default function OrdersPage() {
   function closeChat() {
     setChatOrderId(null);
     setChatPeerLabel("Client");
+  }
+
+  function openCall(orderId: string, peerLabel: string) {
+    setCallOrderId(orderId);
+    setCallPeerLabel(peerLabel);
+  }
+
+  function closeCall() {
+    setCallOrderId(null);
+    setCallPeerLabel("Appel");
   }
 
   const notifyNewOrders = useCallback((newOrders: RestaurantOrder[]) => {
@@ -305,6 +326,13 @@ export default function OrdersPage() {
             onClose={closeChat}
           />
         )}
+        {callOrderId && (
+          <VoiceCallPanel
+            deliveryId={callOrderId}
+            peerLabel={callPeerLabel}
+            onClose={closeCall}
+          />
+        )}
 
         {loading ? (
           <p className="text-gray-400 py-12 text-center">Chargement…</p>
@@ -343,6 +371,11 @@ export default function OrdersPage() {
                     reassignMode={o.canReassignDriver === true}
                     onChatClient={() => openChat(o.id, "Client")}
                     onChatDriver={o.driverAssigned ? () => openChat(o.id, "Livreur") : undefined}
+                    onCallVoice={
+                      voiceCallsEnabled && !["DELIVERED", "CANCELLED"].includes(o.status)
+                        ? () => openCall(o.id, o.driverAssigned ? "Client / Livreur" : "Client")
+                        : undefined
+                    }
                   />
                 ))}
               </div>
@@ -368,6 +401,9 @@ export default function OrdersPage() {
                       onReject={() => act(o.id, "reject")}
                       onChatClient={() => openChat(o.id, "Client")}
                       onChatDriver={o.driverAssigned ? () => openChat(o.id, "Livreur") : undefined}
+                      onCallVoice={
+                        voiceCallsEnabled ? () => openCall(o.id, "Client") : undefined
+                      }
                     />
                   ))}
                 </div>
@@ -407,6 +443,11 @@ export default function OrdersPage() {
                       reassignMode={o.canReassignDriver === true}
                       onChatClient={() => openChat(o.id, "Client")}
                       onChatDriver={o.driverAssigned ? () => openChat(o.id, "Livreur") : undefined}
+                      onCallVoice={
+                        voiceCallsEnabled
+                          ? () => openCall(o.id, o.driverAssigned ? "Client / Livreur" : "Client")
+                          : undefined
+                      }
                     />
                   ))}
                 </div>
@@ -430,6 +471,7 @@ function OrderCard({
   onAssignDriver,
   onChatClient,
   onChatDriver,
+  onCallVoice,
 }: {
   order: RestaurantOrder;
   busy: boolean;
@@ -442,6 +484,7 @@ function OrderCard({
   onAssignDriver?: (driverUserId: string) => void;
   onChatClient?: () => void;
   onChatDriver?: () => void;
+  onCallVoice?: () => void;
 }) {
   const [notifyAllDrivers, setNotifyAllDrivers] = useState(false);
   const [showReassignPicker, setShowReassignPicker] = useState(false);
@@ -578,6 +621,16 @@ function OrderCard({
             className="px-4 py-2 rounded-xl border border-emerald-300 text-emerald-700 text-sm disabled:opacity-60"
           >
             Chat livreur
+          </button>
+        )}
+        {onCallVoice && !["DELIVERED", "CANCELLED"].includes(order.status) && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onCallVoice}
+            className="px-4 py-2 rounded-xl border border-sky-300 text-sky-800 text-sm disabled:opacity-60"
+          >
+            Appeler
           </button>
         )}
         {order.driverAssigned && driverLabel && (

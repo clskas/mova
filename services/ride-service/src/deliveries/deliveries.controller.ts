@@ -7,6 +7,7 @@ import { CreateFoodDeliveryDto, CreateFoodMultiDeliveryDto, CreateParcelDelivery
 import { MobileErrandCreateDto, MobileErrandEstimateDto } from './deliveries-mobile.dto';
 import { DeliveriesService } from './deliveries.service';
 import { DeliveryChatService } from '../chat/delivery-chat.service';
+import { DeliveryLiveKitService } from '../chat/delivery-livekit.service';
 import { SendRideChatDto } from '../chat/ride-chat.dto';
 
 @ApiTags('deliveries')
@@ -18,6 +19,7 @@ export class DeliveriesController {
     private deliveriesService: DeliveriesService,
     private errandsService: ErrandsService,
     private deliveryChatService: DeliveryChatService,
+    private deliveryLiveKit: DeliveryLiveKitService,
   ) {}
 
   @Post('upload-photo')
@@ -184,6 +186,12 @@ export class DeliveriesController {
     }
   }
 
+  @Get('livekit/status')
+  @ApiOperation({ summary: 'Appels vocaux LiveKit disponibles ?' })
+  liveKitStatus() {
+    return this.deliveryLiveKit.status();
+  }
+
   @Get('active')
   @ApiOperation({ summary: 'Livraison ou course active du passager (reprise après fermeture app)' })
   async active(@Request() req: { user: { id: string } }) {
@@ -278,5 +286,15 @@ export class DeliveriesController {
   @ApiOperation({ summary: 'Envoyer un message chat livraison' })
   sendChat(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: SendRideChatDto) {
     return this.deliveryChatService.sendMessage(id, req.user.id, dto.text);
+  }
+
+  @Post(':id/livekit-token')
+  @ApiOperation({ summary: 'Jeton LiveKit pour appel vocal sur une livraison' })
+  liveKitToken(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() body?: { announce?: boolean },
+  ) {
+    return this.deliveryLiveKit.createToken(id, req.user.id, { announce: body?.announce === true });
   }
 }

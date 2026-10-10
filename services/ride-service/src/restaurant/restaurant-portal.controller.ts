@@ -6,6 +6,7 @@ import { PartnerPromoDto } from '../promo/partner-promo.dto';
 import { PartnerPromoService } from '../promo/partner-promo.service';
 import { PartnerBillingService } from '../billing/partner-billing.service';
 import { DeliveryChatService } from '../chat/delivery-chat.service';
+import { DeliveryLiveKitService } from '../chat/delivery-livekit.service';
 import { SendRideChatDto } from '../chat/ride-chat.dto';
 import {
   AddRestaurantDriverDto,
@@ -31,6 +32,7 @@ export class RestaurantPortalController {
     private partnerPromo: PartnerPromoService,
     private partnerBilling: PartnerBillingService,
     private deliveryChat: DeliveryChatService,
+    private deliveryLiveKit: DeliveryLiveKitService,
     private partnerKyc: PartnerKycService,
   ) {}
 
@@ -229,6 +231,22 @@ export class RestaurantPortalController {
   @ApiOperation({ summary: 'Envoyer un message chat commande' })
   orderChatSend(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body() dto: SendRideChatDto) {
     return this.deliveryChat.sendMessage(id, req.user.id, dto.text);
+  }
+
+  @Get('livekit/status')
+  @ApiOperation({ summary: 'Appels vocaux LiveKit disponibles ?' })
+  liveKitStatus() {
+    return this.deliveryLiveKit.status();
+  }
+
+  @Post('orders/:id/livekit-token')
+  @ApiOperation({ summary: 'Jeton LiveKit pour appel vocal (partenaire)' })
+  orderLiveKitToken(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() body?: { announce?: boolean },
+  ) {
+    return this.deliveryLiveKit.createToken(id, req.user.id, { announce: body?.announce === true });
   }
 
   @Patch('menu')

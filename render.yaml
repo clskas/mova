@@ -357,6 +357,15 @@ envVarGroups:
         value: "true"
       - key: MAPBOX_STYLE_URL
         value: mapbox://styles/mova/midnight-violet
+      # LiveKit Cloud (appels vocaux in-app). Sans ces clés : boutons Appeler masqués.
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: LIVEKIT_ENABLED
+        value: "true"
       # OTP SMS switch : africastalking | serdipay (docs/SMS_OTP_PROVIDERS.md). Sticky — no silent fallback.
       - key: SMS_PROVIDER
         value: africastalking

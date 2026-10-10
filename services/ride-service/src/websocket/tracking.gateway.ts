@@ -375,6 +375,16 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(`delivery:${payload.deliveryId}`).emit('delivery:chat', payload);
   }
 
+  broadcastDeliveryCall(payload: {
+    deliveryId: string;
+    starterId: string;
+    starterRole: string;
+    action: 'start' | 'end';
+    ts: number;
+  }) {
+    this.server.to(`delivery:${payload.deliveryId}`).emit('delivery:call', payload);
+  }
+
   @SubscribeMessage('rental:chat')
   async handleRentalChat(@ConnectedSocket() client: Socket, @MessageBody() data: { inquiryId: string; senderId?: string; senderRole?: string; text: string; ts?: number }) {
     const user = this.socketUser(client);

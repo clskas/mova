@@ -9,6 +9,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import 'chat_alert_service.dart';
 import 'chat_receipt.dart';
+import 'delivery_voice_call_screen.dart';
 import 'ride_chat_screen.dart';
 
 class DeliveryChatScreen extends ConsumerStatefulWidget {
@@ -36,6 +37,7 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
   Timer? _pollTimer;
   bool _loading = true;
   bool _sending = false;
+  bool _voiceEnabled = false;
   String? _error;
 
   @override
@@ -43,7 +45,29 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
     super.initState();
     ChatAlertService.activeThreadKey = ChatAlertService.threadKey('delivery', widget.deliveryId);
     _load();
+    _checkVoice();
     _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _load());
+  }
+
+  Future<void> _checkVoice() async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.getDeliveryLiveKitEnabled();
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      setState(() => _voiceEnabled = data);
+    }
+  }
+
+  void _openVoiceCall() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DeliveryVoiceCallScreen(
+          deliveryId: widget.deliveryId,
+          peerLabel: widget.peerLabel,
+          announce: true,
+        ),
+      ),
+    );
   }
 
   @override
@@ -136,6 +160,14 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
     return MovaScreen(
       title: 'Chat · ${widget.peerLabel}',
       scrollable: false,
+      actions: [
+        if (_voiceEnabled)
+          IconButton(
+            tooltip: 'Appel vocal',
+            icon: const Icon(Icons.call_outlined),
+            onPressed: _openVoiceCall,
+          ),
+      ],
       child: Column(
         children: [
           if (_error != null)

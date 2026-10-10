@@ -82,8 +82,8 @@ export function VoiceCallPanel({ deliveryId, peerLabel = "Appel", onClose }: Voi
         if (cancelled) return;
         setStatus("connected");
         refreshRemotes();
-        for (const p of room.remoteParticipants.values()) {
-          for (const pub of p.audioTrackPublications.values()) {
+        for (const p of Array.from(room.remoteParticipants.values())) {
+          for (const pub of Array.from(p.audioTrackPublications.values())) {
             if (pub.track) attachTrack(pub.track);
           }
         }

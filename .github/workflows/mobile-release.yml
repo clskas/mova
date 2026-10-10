@@ -45,7 +45,8 @@ permissions:
   contents: read
 
 env:
-  FLUTTER_VERSION: stable
+  # Keep in sync with CI mobile job — must compile livekit_client 2.4.9.
+  FLUTTER_VERSION: '3.32.6'
   # Défauts production (domaine custom). Les secrets peuvent surcharger, mais le job
   # "Resolve production API URLs" rejette les IP LAN / localhost.
   DEFAULT_PROD_API_URL: https://api.afri-soft.com/api
@@ -97,6 +98,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
@@ -473,6 +475,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         if: steps.ios_creds.outputs.available == 'true'
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 

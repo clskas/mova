@@ -45,7 +45,7 @@ permissions:
   contents: read
 
 env:
-  # Keep in sync with CI mobile job — must compile livekit_client 2.4.9.
+  # Keep in sync with CI mobile job — livekit_client 2.5.4 (16 KB noise) on Flutter 3.32.6.
   FLUTTER_VERSION: '3.32.6'
   # Défauts production (domaine custom). Les secrets peuvent surcharger, mais le job
   # "Resolve production API URLs" rejette les IP LAN / localhost.
@@ -147,7 +147,7 @@ jobs:
           set -euo pipefail
           # Floor must stay above the highest versionCode already accepted by Play
           # (123 used; bump when uploads fail with "already been used").
-          FLOOR=124
+          FLOOR=128
           PUBSPEC_LINE=$(grep -E '^version:' mobile/pubspec.yaml | head -1)
           PUBSPEC_NAME=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')

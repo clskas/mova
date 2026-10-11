@@ -39,7 +39,7 @@ void main() {
     );
     expect(
       sanitizeUserMessage(r'otp must match /^\d{6}$/ regular expression'),
-      'Code OTP requis (6 chiffres envoyé au numéro Mobile Money).',
+      'Code SMS requis (6 chiffres envoyé au numéro Mobile Money).',
     );
     expect(
       sanitizeUserMessage('amountCdf must be an integer number'),

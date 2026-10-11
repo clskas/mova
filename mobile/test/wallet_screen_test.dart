@@ -111,7 +111,7 @@ void main() {
 
     expect(
       find.text(
-        'Minimum SerdiPay : 2 300 FC. Vous pouvez retirer une partie du solde si ce montant reste ≥ 2 300 FC.',
+        'Montant minimum : 2 300 FC. Vous pouvez retirer une partie du solde si ce montant reste ≥ 2 300 FC.',
       ),
       findsOneWidget,
     );

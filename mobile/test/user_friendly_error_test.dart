@@ -78,9 +78,10 @@ void main() {
   test('maps Laravel Unauthenticated to merchant French, not SENGA login', () {
     expect(
       sanitizeUserMessage('Unauthenticated.'),
-      'Authentification marchand SerdiPay expirée. Réessayez la recharge — ce n’est pas votre session SENGA.',
+      merchantUnauthenticatedFr,
     );
     expect(sanitizeUserMessage('Unauthenticated.'), isNot(contains('Veuillez vous connecter')));
+    expect(sanitizeUserMessage('Unauthenticated.'), isNot(contains('SerdiPay')));
   });
 
   test('maps SerdiPay merchant-float English to French (not the user SENGA wallet)', () {

@@ -171,6 +171,98 @@ def find_version(token: str, app_id: str) -> dict:
     return max(rows, key=_version_rank)
 
 
+EDITABLE_STATES = (
+    "PREPARE_FOR_SUBMISSION",
+    "READY_FOR_REVIEW",
+    "REJECTED",
+    "METADATA_REJECTED",
+    "DEVELOPER_REJECTED",
+    "INVALID_BINARY",
+)
+
+
+def get_or_create_editable_version(token: str, app_id: str, version_string: str) -> dict:
+    """Return an editable App Store version, creating `version_string` if needed."""
+    for state in EDITABLE_STATES:
+        q = urllib.parse.urlencode({"filter[appStoreState]": state, "limit": 20})
+        data = api("GET", f"/v1/apps/{app_id}/appStoreVersions?{q}", token)
+        for row in data.get("data") or []:
+            ver = (row.get("attributes") or {}).get("versionString")
+            if ver == version_string:
+                return row
+        rows = data.get("data") or []
+        if rows:
+            # Prefer any editable version (even if marketing string differs).
+            return max(rows, key=_version_rank)
+
+    # Create a new IOS version for submission.
+    created = api(
+        "POST",
+        "/v1/appStoreVersions",
+        token,
+        {
+            "data": {
+                "type": "appStoreVersions",
+                "attributes": {
+                    "platform": "IOS",
+                    "versionString": version_string,
+                },
+                "relationships": {
+                    "app": {"data": {"type": "apps", "id": app_id}},
+                },
+            }
+        },
+    )
+    print(f"created appStoreVersion {version_string}")
+    return created["data"]
+
+
+def find_latest_processed_build(token: str, app_id: str, prefer_number: str | None = None) -> dict:
+    q = urllib.parse.urlencode(
+        {
+            "filter[app]": app_id,
+            "filter[processingState]": "VALID",
+            "limit": 50,
+        }
+    )
+    data = api("GET", f"/v1/builds?{q}", token)
+    rows = data.get("data") or []
+    if not rows:
+        # Fallback without processingState filter.
+        q2 = urllib.parse.urlencode({"filter[app]": app_id, "limit": 50})
+        data = api("GET", f"/v1/builds?{q2}", token)
+        rows = [
+            r
+            for r in (data.get("data") or [])
+            if (r.get("attributes") or {}).get("processingState") in (None, "VALID", "VALIDATING")
+        ]
+    if not rows:
+        raise RuntimeError(f"No processed builds for app {app_id}")
+
+    def build_key(b: dict) -> tuple:
+        attrs = b.get("attributes") or {}
+        num = str(attrs.get("version") or "0")
+        try:
+            n = int(num)
+        except ValueError:
+            n = 0
+        uploaded = str(attrs.get("uploadedDate") or "")
+        prefer = 1 if prefer_number and num == prefer_number else 0
+        return (prefer, n, uploaded)
+
+    return max(rows, key=build_key)
+
+
+def attach_build_to_version(token: str, version_id: str, build_id: str) -> None:
+    api(
+        "PATCH",
+        f"/v1/appStoreVersions/{version_id}/relationships/build",
+        token,
+        {"data": {"type": "builds", "id": build_id}},
+    )
+    print(f"attached build {build_id} → version {version_id}")
+
+
 def get_or_create_review_detail(token: str, version_id: str) -> str:
     data = api("GET", f"/v1/appStoreVersions/{version_id}/appStoreReviewDetail", token)
     detail = data.get("data")
@@ -298,12 +390,28 @@ def process_app(token: str, key: str, do_submit: bool) -> None:
     cfg = APPS[key]
     print(f"\n=== {key} ({cfg['bundle_id']}) ===")
     app_id = find_app_id(token, cfg["bundle_id"])
-    version = find_version(token, app_id)
+    version_string = os.environ.get("ASC_VERSION", "1.0.18").strip() or "1.0.18"
+    prefer_build = os.environ.get("ASC_BUILD_NUMBER", "").strip() or None
+
+    version = get_or_create_editable_version(token, app_id, version_string)
     attrs = version.get("attributes") or {}
     version_id = version["id"]
     state = attrs.get("appStoreState")
     ver = attrs.get("versionString")
     print(f"version={ver} state={state} id={version_id}")
+
+    # Attach newest processed TestFlight build (prefer CI build number when set).
+    try:
+        build = find_latest_processed_build(token, app_id, prefer_build)
+        battrs = build.get("attributes") or {}
+        print(
+            f"build version={battrs.get('version')} "
+            f"processing={battrs.get('processingState')} id={build['id']}"
+        )
+        if state in EDITABLE_STATES:
+            attach_build_to_version(token, version_id, build["id"])
+    except Exception as e:
+        print(f"build attach skipped/failed: {e}")
 
     detail_id = get_or_create_review_detail(token, version_id)
     update_review_detail(token, detail_id, cfg)
@@ -317,14 +425,7 @@ def process_app(token: str, key: str, do_submit: bool) -> None:
         print(f"already in review state={state} — skip submit")
         return "already_in_review"
 
-    if state not in (
-        "PREPARE_FOR_SUBMISSION",
-        "READY_FOR_REVIEW",
-        "REJECTED",
-        "METADATA_REJECTED",
-        "DEVELOPER_REJECTED",
-        "INVALID_BINARY",
-    ):
+    if state not in EDITABLE_STATES:
         print(f"state={state} not submittable via API — update notes done; submit manually if needed")
         return "notes_ok_submit_blocked"
 
@@ -349,6 +450,9 @@ def process_app(token: str, key: str, do_submit: bool) -> None:
 def main() -> int:
     apps = [a.strip() for a in os.environ.get("ASC_APPS", "passenger,driver").split(",") if a.strip()]
     do_submit = os.environ.get("ASC_SUBMIT", "true").strip().lower() in ("1", "true", "yes")
+    # Retry briefly — CI often submits before Apple finishes processing the IPA.
+    attempts = int(os.environ.get("ASC_SUBMIT_ATTEMPTS", "6") or "6")
+    delay_s = int(os.environ.get("ASC_SUBMIT_RETRY_SECONDS", "45") or "45")
     token = make_token()
     errors = []
     results: list[str] = []
@@ -356,13 +460,24 @@ def main() -> int:
         if key not in APPS:
             errors.append(f"unknown app key: {key}")
             continue
-        try:
-            outcome = process_app(token, key, do_submit)
-            if outcome:
-                results.append(f"{key}:{outcome}")
-        except Exception as e:
-            print(f"ERROR {key}: {e}", file=sys.stderr)
-            errors.append(f"{key}: {e}")
+        last_err: Exception | None = None
+        outcome = None
+        for attempt in range(1, attempts + 1):
+            try:
+                outcome = process_app(token, key, do_submit)
+                last_err = None
+                break
+            except Exception as e:
+                last_err = e
+                print(f"attempt {attempt}/{attempts} {key}: {e}", file=sys.stderr)
+                if attempt < attempts:
+                    time.sleep(delay_s)
+                    token = make_token()
+        if last_err is not None:
+            print(f"ERROR {key}: {last_err}", file=sys.stderr)
+            errors.append(f"{key}: {last_err}")
+        elif outcome:
+            results.append(f"{key}:{outcome}")
     if errors:
         print("\nCompleted with errors:", file=sys.stderr)
         for e in errors:

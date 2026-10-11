@@ -40,6 +40,16 @@ on:
         required: false
         type: boolean
         default: false
+      asc_submit_only:
+        description: "iOS — soumettre pour review App Store sans rebuild (IPA déjà sur TestFlight). Utilise scripts/asc_update_review_and_submit.py."
+        required: false
+        type: boolean
+        default: false
+      asc_build_number:
+        description: "iOS — CFBundleVersion / build number à préférer (ex. 119). Vide = dernier build VALID."
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -63,6 +73,7 @@ jobs:
         github.event.workflow_run.conclusion == 'success') ||
        (github.event_name == 'workflow_dispatch' &&
         inputs.promote_only != true &&
+        inputs.asc_submit_only != true &&
         (inputs.promote_to_production == true ||
          (inputs.build_ios != true && inputs.upload_ios_testflight != true && inputs.submit_ios_app_store != true))))
     runs-on: ubuntu-latest
@@ -402,6 +413,7 @@ jobs:
       github.repository != 'afri-soft-com/mova' &&
       (startsWith(github.ref, 'refs/tags/v') ||
        (github.event_name == 'workflow_dispatch' &&
+        inputs.asc_submit_only != true &&
         (inputs.build_ios == true || inputs.upload_ios_testflight == true || inputs.submit_ios_app_store == true)))
     # App Store Connect requires iOS 26 SDK (Xcode 26+) as of Apple's 2026 cutoff.
     runs-on: macos-26
@@ -614,6 +626,7 @@ jobs:
       needs.build-ios.result != 'cancelled' &&
       (startsWith(github.ref, 'refs/tags/v') ||
        (github.event_name == 'workflow_dispatch' &&
+        inputs.asc_submit_only != true &&
         (inputs.upload_ios_testflight == true || inputs.submit_ios_app_store == true)))
     runs-on: macos-26
     environment: production-mobile
@@ -668,3 +681,48 @@ jobs:
           # Prefer env vars over CLI options so spaces in filenames are safe.
           export PASSENGER_IPA DRIVER_IPA
           bundle exec fastlane release_both
+          if [ "${SUBMIT_APP_STORE}" = "true" ]; then
+            python3 -m pip install --quiet PyJWT cryptography
+            export ASC_VERSION="${{ steps.iosver.outputs.name || '1.0.18' }}"
+            export ASC_BUILD_NUMBER="${{ github.run_number }}"
+            export ASC_SUBMIT=true
+            export ASC_SUBMIT_ATTEMPTS=8
+            export ASC_SUBMIT_RETRY_SECONDS=60
+            python3 ../../scripts/asc_update_review_and_submit.py
+          fi
+
+  asc-submit-only:
+    name: App Store Connect submit (no rebuild)
+    if: >
+      github.repository != 'afri-soft-com/mova' &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.asc_submit_only == true
+    runs-on: ubuntu-latest
+    environment: production-mobile
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Submit Senga + Senga Driver for App Store review
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          ASC_VERSION: '1.0.18'
+          ASC_BUILD_NUMBER: ${{ inputs.asc_build_number }}
+          ASC_SUBMIT: 'true'
+          ASC_SUBMIT_ATTEMPTS: '8'
+          ASC_SUBMIT_RETRY_SECONDS: '60'
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_STORE_CONNECT_API_KEY:-}" ]; then
+            echo "::error::APP_STORE_CONNECT_API_KEY manquant"
+            exit 1
+          fi
+          python3 -m pip install --quiet PyJWT cryptography
+          echo "ASC_VERSION=$ASC_VERSION ASC_BUILD_NUMBER=${ASC_BUILD_NUMBER:-<latest VALID>}"
+          python3 scripts/asc_update_review_and_submit.py

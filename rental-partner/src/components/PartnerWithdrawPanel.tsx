@@ -179,7 +179,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
     if (inFlight.current) return;
     const amountCdf = Number(topUpAmount);
     if (!Number.isFinite(amountCdf) || amountCdf < 2300) {
-      setError("Minimum SerdiPay : 2 300 FC.");
+      setError("Montant minimum : 2 300 FC.");
       return;
     }
     if (!phone.trim()) {
@@ -229,7 +229,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
       <div>
         <h3 className="font-medium text-[#1A1A2E]">Portefeuille Mobile Money</h3>
         <p className="text-xs text-gray-500 mt-1">
-          Orange Money, M-Pesa ou Airtel Money (selon disponibilité). Minimum SerdiPay 2 300 FC. Solde :{" "}
+          Orange Money, M-Pesa ou Airtel Money (selon disponibilité). Minimum 2 300 FC. Solde :{" "}
           <strong>{formatCdf(balanceCdf)}</strong>
         </p>
       </div>

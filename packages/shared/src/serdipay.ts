@@ -188,7 +188,7 @@ export function serdiPaySanitizeSmsText(text: string): string {
 
 /** User-facing copy when SerdiPay SMS API returns the generic 400 processing error. */
 export const SERDIPAY_SMS_REJECTED_FR =
-  "SerdiPay a refusé l'envoi SMS. Vérifiez le sender ID approuvé, le crédit SMS et l'identifiant API SMS dans le tableau de bord SerdiPay.";
+  "Impossible d'envoyer le code SMS. Réessayez dans quelques minutes.";
 
 export function isSerdiPaySmsProcessingError(status: number, raw?: string): boolean {
   const lower = (raw ?? '').toLowerCase();
@@ -239,12 +239,12 @@ export function mapSerdiPayTokenFailure(status: number, raw?: string): string {
     status === 403
   ) {
     return (
-      'Authentification marchand SerdiPay refusée. ' +
-      'Recharge / paiement Mobile Money temporairement indisponible — contactez le support SENGA.'
+      'Paiement Mobile Money temporairement indisponible. ' +
+      'Réessayez dans un instant ou contactez le support SENGA.'
     );
   }
   if (msg && msg.length <= 160 && !/^https?:\/\//i.test(msg)) return msg;
-  return `Échec auth SerdiPay (${status || 'réseau'}). Réessayez plus tard.`;
+  return 'Paiement Mobile Money indisponible. Réessayez plus tard.';
 }
 
 /** AfriMomo/SerdiPay concatenates channel id (`channel0`) — B2C product not enabled. */
@@ -253,7 +253,7 @@ export const SERDIPAY_B2C_CHANNEL_DISABLED_FR =
 
 /** C2B collect: Orange/M-Pesa/Airtel channel not enabled — no USSD is sent. */
 export const SERDIPAY_C2B_CHANNEL_DISABLED_FR =
-  'Ce canal Mobile Money n’est pas activé pour le marchand SerdiPay. Aucun push USSD n’a été envoyé. Contactez le support SENGA.';
+  'Le paiement Mobile Money n’est pas disponible pour le moment. Réessayez plus tard ou contactez le support SENGA.';
 
 export const SERDIPAY_CHANNEL_DISABLED_FR = SERDIPAY_C2B_CHANNEL_DISABLED_FR;
 
@@ -262,7 +262,7 @@ export const SERDIPAY_CHANNEL_DISABLED_FR = SERDIPAY_C2B_CHANNEL_DISABLED_FR;
  * Not Nest JWT (`Unauthorized`), not hub HMAC (`Invalid HMAC signature`).
  */
 export const SERDIPAY_MERCHANT_UNAUTHENTICATED_FR =
-  'Authentification marchand SerdiPay expirée. Réessayez la recharge — ce n’est pas votre session SENGA.';
+  'Le paiement Mobile Money a rencontré un problème temporaire. Réessayez dans un instant.';
 export const SERDIPAY_UNAUTHENTICATED_FR = SERDIPAY_MERCHANT_UNAUTHENTICATED_FR;
 
 export function isSerdiPayUnauthenticatedError(raw?: string): boolean {
@@ -277,20 +277,20 @@ export function isAfriSoftHubHmacError(raw?: string): boolean {
 }
 
 export const AFRISOFT_HUB_HMAC_FR =
-  'Le hub paiements AfriSoft a refusé l’authentification. Réessayez dans un instant.';
+  'Paiement temporairement indisponible. Réessayez dans un instant.';
 
 /** SerdiPay payment-client (B2C) checks merchant float, not the user SENGA wallet. */
 export const SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR =
-  'Le compte de versement n’a pas assez de fonds. Votre solde SENGA n’a pas été débité.';
+  'Le versement Mobile Money est temporairement indisponible. Votre solde SENGA n’a pas été débité.';
 
 /** C2B collect does not debit the user SENGA wallet. */
 export const SERDIPAY_C2B_MERCHANT_FLOAT_LOW_FR =
-  'Le compte d’encaissement SerdiPay n’a pas assez de fonds (float). Aucun push USSD n’a été envoyé. Votre portefeuille SENGA n’a pas été crédité.';
+  'Le paiement Mobile Money est temporairement indisponible. Votre portefeuille SENGA n’a pas été crédité.';
 
 export const SERDIPAY_CHANNEL_DISABLED_GENERIC_FR =
-  'Ce canal Mobile Money n’est pas activé pour le marchand SerdiPay. Aucun push USSD n’a été envoyé. Contactez le support SENGA.';
+  'Le paiement Mobile Money n’est pas disponible pour le moment. Contactez le support SENGA.';
 export const SERDIPAY_MERCHANT_FLOAT_LOW_GENERIC_FR =
-  'Le compte marchand SerdiPay n’a pas assez de fonds. L’opération Mobile Money n’a pas abouti.';
+  'Paiement Mobile Money indisponible pour le moment. Réessayez plus tard ou contactez le support SENGA.';
 
 export function isSerdiPayChannelDisabledError(raw?: string): boolean {
   const lower = (raw ?? '').toLowerCase();
@@ -375,7 +375,7 @@ export function mapSerdiPayPaymentFailure(
     }
     return detail;
   }
-  return `Échec paiement SerdiPay (${status || 'réseau'}). Réessayez plus tard.`;
+  return 'Le paiement Mobile Money a échoué. Réessayez plus tard.';
 }
 
 /** Merchant get-token → Bearer access_token. */

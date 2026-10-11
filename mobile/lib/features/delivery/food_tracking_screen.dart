@@ -479,7 +479,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                             !deliveryIsPaid(_delivery)) ...[
                           const MovaCard(
                             child: Text(
-                              'Commande non garantie (espèces). Paiement à la livraison — SENGA ne séquestre pas les fonds.',
+                              'Commande non garantie (espèces). Paiement à la livraison — SENGA ne bloque pas les fonds.',
                               style: TextStyle(fontSize: 13),
                             ),
                           ),
@@ -516,7 +516,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                                         ? 'Commande payée (espèces confirmées)'
                                         : (_delivery?['guaranteed'] == true &&
                                                 _delivery?['status']?.toString() != 'DELIVERED')
-                                            ? 'Montant séquestré. Donnez le PIN uniquement à la réception.'
+                                            ? 'Montant sécurisé. Donnez le PIN uniquement à la réception.'
                                             : 'Commande payée',
                                     style: const TextStyle(fontWeight: FontWeight.w600),
                                   ),

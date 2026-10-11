@@ -574,9 +574,9 @@ export class PaymentsService {
 
   private escrowCollectSuccessMessage(type: string): string {
     if (type === 'RENTAL') {
-      return 'Montant séquestré. La remise du véhicule est débloquée — le loueur est payé après le retour.';
+      return 'Montant sécurisé. La remise du véhicule est débloquée — le loueur est payé après le retour.';
     }
-    return 'Montant séquestré. Le livreur part dès confirmation du séquestre — il n\'est payé qu\'après votre code PIN.';
+    return 'Montant sécurisé. Le livreur part dès confirmation du paiement — il n\'est payé qu\'après votre confirmation.';
   }
 
   private servicePaymentNotReadyMessage(type: string, status?: string): string {

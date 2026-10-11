@@ -584,7 +584,7 @@ export class WalletService {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         undefined,
-        `Minimum SerdiPay : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString('fr-FR')} FC.`,
+        `Montant minimum : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString('fr-FR')} FC.`,
       );
     }
     const providerKey = (provider ?? '').trim().toUpperCase();
@@ -597,6 +597,27 @@ export class WalletService {
     }
     await this.assertMmOperatorAllowed(userId, providerKey, 'topup');
     await this.acquireTopUpLock(userId, amountCdf, providerKey);
+
+    // Reuse an in-flight top-up so Cancel on STK + retry does not fire a 2nd C2B push.
+    const existingPending = await this.findReusableTopUpPending(userId, amountCdf, providerKey);
+    if (existingPending) {
+      const wallet = await this.createWallet(userId);
+      return {
+        success: true,
+        simulated: false,
+        pendingMobileMoney: true,
+        reusedPending: true,
+        message:
+          `Une confirmation Mobile Money est déjà en cours pour ${formatCdf(amountCdf)}. ` +
+          `Validez ou annulez le PIN sur votre téléphone — ne relancez pas tout de suite.`,
+        amountCdf,
+        provider: providerKey,
+        balanceCdf: wallet.balanceCdf,
+        formattedBalance: formatCdf(wallet.balanceCdf),
+        providerRef: existingPending.reference,
+      };
+    }
+
     const ref = afrisoftHubReference('senga', 'topup', randomUUID());
 
     if (providerKey === 'MOCK') {
@@ -681,7 +702,7 @@ export class WalletService {
         formattedBalance: formatCdf(wallet.balanceCdf),
         providerRef,
         ...(paymentUrl ? { paymentUrl } : {}),
-        ...(mm.ussdCode ? { ussdCode: mm.ussdCode } : {}),
+        // Do not return ussdCode — clients must not tel:-dial; AfriMomo STK already pushed.
       };
     }
 
@@ -1526,6 +1547,31 @@ export class WalletService {
 
   private topUpLockKey(userId: string, amountCdf: number, providerKey: string) {
     return `${TOPUP_LOCK_PREFIX}${userId}:${providerKey}:${amountCdf}`;
+  }
+
+  /** Recent pending C2B for same user/amount/operator — avoid a second STK push. */
+  private async findReusableTopUpPending(
+    userId: string,
+    amountCdf: number,
+    providerKey: string,
+  ): Promise<{ reference: string } | null> {
+    const since = new Date(Date.now() - 10 * 60 * 1000);
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+    if (!wallet) return null;
+    const rows = await this.prisma.walletTransaction.findMany({
+      where: {
+        walletId: wallet.id,
+        type: 'TOPUP_PENDING',
+        amountCdf,
+        createdAt: { gte: since },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 8,
+    });
+    const needle = providerKey.toUpperCase();
+    const match = rows.find((r) => (r.description ?? '').toUpperCase().includes(needle));
+    if (!match?.reference) return null;
+    return { reference: match.reference };
   }
 
   /** Enforce SUPER_ADMIN MM visibility (topup vs withdraw) from ride-service client-apps config. */

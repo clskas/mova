@@ -179,7 +179,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
     if (inFlight.current) return;
     const amountCdf = Number(topUpAmount);
     if (!Number.isFinite(amountCdf) || amountCdf < 2300) {
-      setError("Minimum SerdiPay : 2 300 FC.");
+      setError("Montant minimum : 2 300 FC.");
       return;
     }
     if (!phone.trim()) {

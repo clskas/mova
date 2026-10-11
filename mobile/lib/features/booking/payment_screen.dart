@@ -8,6 +8,7 @@ import '../../core/api/api_client.dart';
 import '../../core/config/client_apps_config.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
+import '../../core/error/user_friendly_error.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
@@ -208,7 +209,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     if (_escrowCollect) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Montant séquestré. Le livreur peut partir — il sera payé après votre code PIN.'),
+          content: Text('Montant sécurisé. Le livreur peut partir — il sera payé après votre confirmation.'),
         ),
       );
       Navigator.pop(context, true);
@@ -284,12 +285,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           _stopMmPoll();
           setState(() {
             _awaitingMobileMoney = false;
-            _error = data['failureReason']?.toString() ??
-                'Paiement Mobile Money refusé ou annulé. Réessayez.';
+            _error = sanitizeUserMessage(
+              data['failureReason']?.toString(),
+              fallback: 'Paiement Mobile Money refusé ou annulé. Réessayez.',
+            );
           });
         }
       case Failure():
-        // Keep waiting — transient network errors during USSD.
+        // Keep waiting — transient network errors while confirming Mobile Money.
         break;
     }
   }
@@ -354,13 +357,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         if (data['pendingMobileMoney'] == true) {
           await openMobileMoneyPrompt(
             paymentUrl: data['paymentUrl']?.toString(),
-            ussdCode: data['ussdCode']?.toString(),
+            providerRef: data['providerRef']?.toString() ?? data['paymentId']?.toString(),
           );
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                data['message']?.toString() ??
-                    'Confirmez le paiement sur votre téléphone Mobile Money.',
+                sanitizeUserMessage(
+                  data['message']?.toString(),
+                  fallback:
+                      'Confirmez le paiement sur votre téléphone avec votre PIN Mobile Money.',
+                ),
               ),
             ),
           );
@@ -538,7 +545,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'Une demande Mobile Money a été envoyée. Validez le paiement (USSD / PIN), '
+                    'Une demande Mobile Money a été envoyée. Validez avec votre PIN sur le téléphone ; '
                     'nous confirmerons automatiquement.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),

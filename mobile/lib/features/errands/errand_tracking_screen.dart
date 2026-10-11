@@ -542,7 +542,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                             if (_escrowPaymentDue && !deliveryIsPaid(_order)) ...[
                               const MovaCard(
                                 child: Text(
-                                  'Payez maintenant pour séquestrer le budget et les frais. Aucun livreur n\'est contacté avant paiement.',
+                                  'Payez maintenant pour sécuriser le budget et les frais. Aucun livreur n\'est contacté avant paiement.',
                                   style: TextStyle(fontWeight: FontWeight.w600),
                                 ),
                               ),
@@ -562,7 +562,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                 !deliveryIsPaid(_order)) ...[
                               const MovaCard(
                                 child: Text(
-                                  'Course non garantie (espèces). Paiement à la remise — SENGA ne séquestre pas les fonds.',
+                                  'Course non garantie (espèces). Paiement à la remise — SENGA ne bloque pas les fonds.',
                                   style: TextStyle(fontSize: 13),
                                 ),
                               ),
@@ -580,7 +580,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                             ? 'Course payée (espèces confirmées)'
                                             : (_order?['guaranteed'] == true &&
                                                     _order?['status']?.toString() != 'COMPLETED')
-                                                ? 'Budget + frais séquestrés. PIN à la réception uniquement.'
+                                                ? 'Budget + frais sécurisés. PIN à la réception uniquement.'
                                                 : 'Course payée',
                                         style: const TextStyle(fontWeight: FontWeight.w600),
                                       ),

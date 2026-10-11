@@ -66,11 +66,11 @@ export const PIN_SIX_DIGITS_FR = "Le code PIN doit contenir 6 chiffres.";
 export const PAYMENT_FAILED_FR =
   "Le paiement Mobile Money a échoué. Réessayez ou contactez le support SENGA.";
 export const CHANNEL_DISABLED_FR =
-  "Ce canal Mobile Money n’est pas activé pour le marchand SerdiPay. Aucun push USSD n’a été envoyé. Contactez le support SENGA.";
+  "Le paiement Mobile Money n’est pas disponible pour le moment. Contactez le support SENGA.";
 export const MERCHANT_FLOAT_LOW_FR =
-  "Le compte marchand SerdiPay n’a pas assez de fonds. L’opération Mobile Money n’a pas abouti.";
+  "Paiement Mobile Money indisponible pour le moment. Réessayez plus tard.";
 export const MERCHANT_UNAUTHENTICATED_FR =
-  "Authentification marchand SerdiPay expirée. Réessayez la recharge — ce n’est pas votre session SENGA.";
+  "Le paiement Mobile Money a rencontré un problème temporaire. Réessayez dans un instant.";
 export const VALIDATION_FAILED_FR = "Données invalides. Vérifiez les champs.";
 
 function isClassValidatorPinMessage(msg: string): boolean {
@@ -92,7 +92,7 @@ export const SMS_RATE_LIMIT_FR = "Trop de codes envoyés vers ce numéro. Réess
 export const SMS_CREDIT_FR = "Envoi SMS temporairement indisponible. Contactez le support SENGA.";
 export const SMS_UNAVAILABLE_FR = "Impossible d'envoyer le code par SMS. Réessayez dans quelques minutes.";
 export const SMS_SERDIPAY_REJECTED_FR =
-  "SerdiPay a refusé l'envoi SMS. Vérifiez le sender ID approuvé, le crédit SMS et l'identifiant API SMS dans le tableau de bord SerdiPay.";
+  "Impossible d'envoyer le code SMS. Réessayez dans quelques minutes.";
 export const SMS_INVALID_PHONE_FR = "Numéro de téléphone invalide. Format : +243XXXXXXXXX";
 
 /** Hub / SerdiPay leftovers → French the founder can act on (not « Une erreur est survenue »). */

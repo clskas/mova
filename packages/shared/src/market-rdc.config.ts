@@ -257,16 +257,16 @@ export function rdcC2bPendingUserMessageFr(params: {
   }
   if (op === 'ORANGE_MONEY') {
     return (
-      `SerdiPay a enregistré Orange Money de ${params.amountLabel} vers ${params.phone} (en attente). ` +
-      `Aucun code USSD ni lien n’a été renvoyé — si rien n’apparaît, le canal Orange n’a pas poussé. Réessayez M-Pesa ou Airtel Money.`
+      `Demande Orange Money de ${params.amountLabel} envoyée vers ${params.phone}. ` +
+      `Si aucune confirmation n’apparaît sur le téléphone, réessayez avec M-Pesa ou Airtel Money.`
     );
   }
   if (op === 'AIRTEL_MONEY') {
-    return `Confirmez le push Airtel Money de ${params.amountLabel} sur ${params.phone}.`;
+    return `Confirmez le paiement Airtel Money de ${params.amountLabel} sur ${params.phone} (PIN sur le téléphone).`;
   }
   return (
     params.gatewayMessage?.trim() ||
-    `Confirmez la recharge de ${params.amountLabel} sur votre téléphone (${params.phone}).`
+    `Confirmez la recharge de ${params.amountLabel} sur votre téléphone (${params.phone}) avec votre PIN Mobile Money.`
   );
 }
 

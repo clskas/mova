@@ -65,11 +65,12 @@ describe('Market RDC Config', () => {
       amountLabel: '2 700 FC',
       phone: '+243893515173',
     });
-    expect(msg).toMatch(/SerdiPay/);
     expect(msg).toMatch(/Orange Money/);
     expect(msg).toMatch(/M-Pesa|Airtel/);
+    expect(msg).not.toMatch(/SerdiPay/);
     expect(msg).not.toMatch(/\*144#/);
     expect(msg).not.toMatch(/composeur/);
+    expect(msg).not.toMatch(/USSD/);
   });
 
   it('keeps the gateway message when SerdiPay returns a USSD or URL', () => {

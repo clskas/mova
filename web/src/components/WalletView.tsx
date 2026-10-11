@@ -99,7 +99,7 @@ export function WalletView({ onBack, mock }: Props) {
     if (topUpInFlight.current) return;
     const value = parseInt(amount, 10);
     if (value < 2300) {
-      setError("Montant minimum SerdiPay : 2 300 FC");
+      setError("Montant minimum : 2 300 FC");
       return;
     }
     if (!mock && !topUpPhone.trim()) {
@@ -148,9 +148,8 @@ export function WalletView({ onBack, mock }: Props) {
       }, { useMock: mock });
       if (res.paymentUrl) {
         window.open(res.paymentUrl, "_blank", "noopener,noreferrer");
-      } else if (res.ussdCode && (res.ussdCode.includes("*") || res.ussdCode.includes("#"))) {
-        window.location.href = `tel:${res.ussdCode}`;
       }
+      // Never auto-dial USSD: AfriMomo STK already pushes a PIN dialog; tel: causes Cancel loops.
       if (res.balanceCdf != null) {
         setWallet((w) => ({ ...w, balanceCdf: res.balanceCdf }));
       }
@@ -161,7 +160,7 @@ export function WalletView({ onBack, mock }: Props) {
           res.message ??
             (topUpProvider === "ORANGE_MONEY"
               ? "Demande Orange Money envoyée. Si rien n’apparaît, rechargez avec M-Pesa ou Airtel Money."
-              : "Confirmez le push USSD / PIN sur le numéro saisi."),
+              : "Confirmez le paiement sur votre téléphone avec votre PIN Mobile Money."),
         );
       }
     } catch (e) {

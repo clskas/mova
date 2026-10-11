@@ -353,7 +353,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                             if (_escrowPaymentDue && !deliveryIsPaid(_delivery)) ...[
                               const MovaCard(
                                 child: Text(
-                                  'Payez maintenant pour séquestrer le montant. Aucun livreur n\'est contacté avant paiement.',
+                                  'Payez maintenant pour sécuriser le montant. Aucun livreur n\'est contacté avant paiement.',
                                   style: TextStyle(fontWeight: FontWeight.w600),
                                 ),
                               ),
@@ -380,7 +380,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                                             ? 'Livraison payée (espèces confirmées)'
                                             : (_delivery?['guaranteed'] == true &&
                                                     _delivery?['status']?.toString() != 'DELIVERED')
-                                                ? 'Montant séquestré. Donnez le PIN uniquement au livreur à la réception.'
+                                                ? 'Montant sécurisé. Donnez le PIN uniquement au livreur à la réception.'
                                                 : 'Livraison payée',
                                         style: const TextStyle(fontWeight: FontWeight.w600),
                                       ),
@@ -393,7 +393,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                             if (deliveryIsCod(_delivery) && !_cashSettlementDue && !deliveryIsPaid(_delivery)) ...[
                               const MovaCard(
                                 child: Text(
-                                  'Livraison non garantie (espèces). SENGA ne séquestre pas les fonds — paiement à la remise.',
+                                  'Livraison non garantie (espèces). SENGA ne bloque pas les fonds — paiement à la remise.',
                                   style: TextStyle(fontSize: 13),
                                 ),
                               ),

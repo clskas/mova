@@ -371,7 +371,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Prépayé — montant séquestré jusqu\'au retour du véhicule.',
+                      'Prépayé — montant sécurisé jusqu\'au retour du véhicule.',
                       style: theme.textTheme.bodySmall,
                     ),
                   ),

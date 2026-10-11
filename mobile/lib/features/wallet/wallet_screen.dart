@@ -239,7 +239,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   Future<void> _showWithdrawSheet({bool resumeOtp = false}) async {
     if (_balance < 2300) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Solde insuffisant — minimum SerdiPay : 2 300 FC')),
+        const SnackBar(content: Text('Solde insuffisant — montant minimum : 2 300 FC')),
       );
       return;
     }
@@ -352,14 +352,17 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           }
           await openMobileMoneyPrompt(
             paymentUrl: data['paymentUrl']?.toString(),
-            ussdCode: data['ussdCode']?.toString(),
+            providerRef: providerRef,
           );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  data['message']?.toString() ??
-                      'Confirmez la recharge sur votre téléphone Mobile Money.',
+                  sanitizeUserMessage(
+                    data['message']?.toString(),
+                    fallback:
+                        'Confirmez la recharge sur votre téléphone avec votre PIN Mobile Money.',
+                  ),
                 ),
               ),
             );
@@ -518,6 +521,34 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               onRetry: isWithdrawOtpChallengeMessage(_error)
                   ? () => _showWithdrawSheet(resumeOtp: true)
                   : _loadWallet,
+            ),
+          ],
+          if (_topUpLoading) ...[
+            const SizedBox(height: 16),
+            MovaCard(
+              child: Column(
+                children: [
+                  const Text(
+                    'Confirmez sur votre téléphone',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Validez ou annulez le PIN Mobile Money sur le téléphone. '
+                    'Ne relancez pas tout de suite si vous avez appuyé sur Annuler.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      _topUpPollTimer?.cancel();
+                      setState(() => _topUpLoading = false);
+                    },
+                    child: const Text('Annuler l\'attente'),
+                  ),
+                ],
+              ),
             ),
           ],
           const SizedBox(height: 24),
@@ -814,7 +845,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
     }
     if (amount < 2300) {
       setState(() => _formError =
-          'Minimum SerdiPay : 2 300 FC. Vous pouvez retirer une partie du solde si ce montant reste ≥ 2 300 FC.');
+          'Montant minimum : 2 300 FC. Vous pouvez retirer une partie du solde si ce montant reste ≥ 2 300 FC.');
       return null;
     }
     if (amount > widget.maxAmount) {
@@ -914,7 +945,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Vous pouvez retirer une partie du solde (minimum SerdiPay : 2 300 FC). Le reste reste sur le portefeuille.',
+              'Vous pouvez retirer une partie du solde (minimum : 2 300 FC). Le reste reste sur le portefeuille.',
               style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 8),
@@ -947,7 +978,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
                 labelText: 'Montant (FC)',
-                helperText: 'Minimum SerdiPay : 2 300 FC — pas besoin de vider tout le solde',
+                helperText: 'Minimum : 2 300 FC — pas besoin de vider tout le solde',
                 prefixIcon: const Icon(Icons.payments_outlined),
                 suffixIcon: !_otpSent && widget.maxAmount >= 2300
                     ? TextButton(
@@ -1068,7 +1099,7 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
     final amount = int.tryParse(_amountController.text.trim()) ?? 0;
     if (amount < 2300) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Minimum SerdiPay : 2 300 FC')),
+        const SnackBar(content: Text('Montant minimum : 2 300 FC')),
       );
       return;
     }
@@ -1106,7 +1137,7 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
             Text(
               widget.provider.id == 'ORANGE_MONEY'
                   ? 'Numéro Orange (80 / 84 / 85 / 89), minimum 2 300 FC. Si aucune confirmation n’apparaît, utilisez M-Pesa ou Airtel Money.'
-                  : 'Confirmez le push USSD / PIN sur le numéro Mobile Money ci-dessous. Minimum 2 300 FC.',
+                  : 'Confirmez le paiement sur votre téléphone (PIN Mobile Money). Minimum 2 300 FC.',
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 16),

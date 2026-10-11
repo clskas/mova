@@ -453,6 +453,12 @@ def process_app(token: str, key: str, do_submit: bool) -> None:
     except Exception as e:
         print(f"build attach skipped/failed: {e}")
 
+    if state in EDITABLE_STATES:
+        try:
+            ensure_whats_new(token, version_id)
+        except Exception as e:
+            print(f"whatsNew update skipped/failed: {e}")
+
     detail_id = get_or_create_review_detail(token, version_id)
     update_review_detail(token, detail_id, cfg)
     print(f"review detail updated (demo={cfg['demo_user']})")
@@ -478,10 +484,17 @@ def process_app(token: str, key: str, do_submit: bool) -> None:
         print(f"SUBMIT FAILED: {msg[:1200]}")
         # After Guideline rejection, ASC often requires a Resolution Center reply
         # (message + optional video) before API submit is accepted.
-        if "not ready to be submitted" in msg or "UNRESOLVED_ISSUES" in msg or "ENTITY_STATE_INVALID" in msg:
+        if (
+            "not ready to be submitted" in msg
+            or "UNRESOLVED_ISSUES" in msg
+            or "ENTITY_STATE_INVALID" in msg
+            or "whatsNew" in msg
+            or "cannot be reviewed" in msg
+        ):
             print(
-                "NOTES_OK_SUBMIT_BLOCKED — open App Store Connect → App Review / "
-                "Resolution Center → reply with the walkthrough MP4 → Submit for Review."
+                "NOTES_OK_SUBMIT_BLOCKED — open App Store Connect → complete "
+                "missing metadata (Nouveautés / whatsNew, screenshots) or "
+                "Resolution Center, then Submit for Review."
             )
             return "notes_ok_submit_blocked"
         raise

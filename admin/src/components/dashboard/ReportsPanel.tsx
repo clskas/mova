@@ -22,9 +22,9 @@ export function ReportsPanel({ reports, onExport }: ReportsPanelProps) {
     { label: "Taux d'annulation", value: pct(kpis.cancelRate), desc: "Courses annulées / demandées" },
     { label: "Panier moyen course", value: formatCdf(kpis.avgTicketCdf), desc: "Revenu moyen par course complétée" },
     { label: "Revenus courses (période)", value: formatCdf(kpis.totalRevenueCdf), desc: `${periodDays} derniers jours` },
-    { label: "Revenus livraisons (période)", value: formatCdf(kpis.deliveryRevenueCdf), desc: "Colis, repas, express, courses" },
+    { label: "Revenus livraisons (période)", value: formatCdf(kpis.deliveryRevenueCdf), desc: "Uniquement livraisons / courses terminées" },
     { label: "Commissions SENGA (période)", value: formatCdf(kpis.totalPlatformCommissionCdf ?? 0), desc: "Parts plateforme estimées" },
-    { label: "Volume livraisons", value: String(kpis.totalDeliveries), desc: "Livraisons + commissions sur période" },
+    { label: "Volume livraisons", value: String(kpis.totalDeliveries), desc: "Demandes créées (y compris annulées)" },
   ];
 
   const services = [

@@ -2216,11 +2216,16 @@ export class RidesService {
       if (dailyMap.has(key)) dailyMap.get(key)!.deliveries += 1;
     }
 
-    const deliveryRevenue = filteredDeliveries.reduce(
-      (sum, d) => sum + (d.finalPriceCdf ?? d.estimatedPriceCdf ?? 0),
-      0,
-    );
-    const errandRevenue = filteredErrands.reduce((sum, e) => sum + (e.finalPriceCdf ?? 0), 0);
+    // Revenue = completed only. Cancelled food/parcel still carry estimatedPriceCdf —
+    // summing those inflated "Revenus livraisons" (e.g. 25 400 + 26 982 annulées).
+    const deliveryRevenue = filteredDeliveries.reduce((sum, d) => {
+      if (d.status !== DeliveryStatus.DELIVERED) return sum;
+      return sum + (d.finalPriceCdf ?? d.estimatedPriceCdf ?? 0);
+    }, 0);
+    const errandRevenue = filteredErrands.reduce((sum, e) => {
+      if (e.status !== ErrandOrderStatus.COMPLETED) return sum;
+      return sum + (e.finalPriceCdf ?? 0);
+    }, 0);
 
     const commissionsByCity = Array.from(commissionByCity.values()).sort((a, b) => b.totalCdf - a.totalCdf);
     const totalPlatformCommissionCdf = commissionsByCity.reduce((s, c) => s + c.totalCdf, 0);

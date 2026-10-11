@@ -425,7 +425,7 @@ export class PaymentsService {
         providerRef: result.providerRef,
         message: result.message ?? 'Confirmez le paiement sur votre téléphone Mobile Money.',
         ...(result.paymentUrl ? { paymentUrl: result.paymentUrl } : {}),
-        ...(result.ussdCode ? { ussdCode: result.ussdCode } : {}),
+        // Never return ussdCode — clients must not tel:-dial (Cancel loop on all MM ops).
       };
     }
 
@@ -893,7 +893,7 @@ export class PaymentsService {
         amountCdf,
         currency: 'CDF',
         ...(result.paymentUrl ? { paymentUrl: result.paymentUrl } : {}),
-        ...(result.ussdCode ? { ussdCode: result.ussdCode } : {}),
+        // Never return ussdCode — clients must not tel:-dial (Cancel loop on all MM ops).
       };
     }
 

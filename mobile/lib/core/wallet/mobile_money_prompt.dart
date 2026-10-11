@@ -6,8 +6,9 @@ DateTime? _lastMmPromptAt;
 /// Opens a hosted checkout URL when the aggregator returns one.
 ///
 /// Do **not** auto-dial USSD (`tel:*…#`). SerdiPay / AfriMomo already send a
-/// network STK push (PIN dialog « AFRIMOMORDC »). Dialing USSD on top of that
-/// makes Android re-open the PIN sheet in a loop when the user taps Cancel.
+/// network STK/USSD push for **M-Pesa, Airtel Money et Orange Money**
+/// (PIN dialog type « AFRIMOMORDC »). Dialing USSD on top of that makes Android
+/// re-open the PIN sheet in a loop when the user taps Cancel — all operators.
 Future<void> openMobileMoneyPrompt({
   String? paymentUrl,
   String? ussdCode,

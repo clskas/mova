@@ -1,4 +1,4 @@
-import { RideStatus, RoundTripLeg, VehicleType } from '@prisma/client';
+import { DeliveryStatus, DeliveryType, ErrandOrderStatus, RideStatus, RoundTripLeg, VehicleType } from '@prisma/client';
 import { MOVA_EVENTS } from '@mova/shared';
 import { RidesService } from './rides.service';
 import { mockPlatformConfig } from '../platform/platform-config.mock';
@@ -24,6 +24,11 @@ describe('RidesService', () => {
     },
     rideEvent: { create: jest.fn(), count: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     cancellationPolicy: { findUnique: jest.fn() },
+    delivery: { findMany: jest.fn().mockResolvedValue([]) },
+    errandOrder: { findMany: jest.fn().mockResolvedValue([]) },
+    movingRequest: { count: jest.fn().mockResolvedValue(0) },
+    scheduledRide: { count: jest.fn().mockResolvedValue(0) },
+    carpoolTrip: { count: jest.fn().mockResolvedValue(0) },
   };
   const pricing = {
     haversineKm: jest.fn().mockReturnValue(4.5),
@@ -677,5 +682,51 @@ describe('RidesService', () => {
     expect(result.ride).not.toBeNull();
     expect(result.ride?.isPaid).toBe(false);
     expect(result.ride?.type).toBe('RIDE_SHARE');
+  });
+
+  it('excludes cancelled deliveries from report delivery revenue', async () => {
+    prisma.ride.findMany.mockResolvedValue([]);
+    prisma.delivery.findMany.mockResolvedValue([
+      {
+        createdAt: new Date(),
+        status: DeliveryStatus.CANCELLED,
+        type: DeliveryType.FOOD,
+        finalPriceCdf: null,
+        estimatedPriceCdf: 25400,
+        pickupLat: 0.5,
+        pickupLng: 29.47,
+      },
+      {
+        createdAt: new Date(),
+        status: DeliveryStatus.CANCELLED,
+        type: DeliveryType.FOOD,
+        finalPriceCdf: null,
+        estimatedPriceCdf: 26982,
+        pickupLat: 0.5,
+        pickupLng: 29.47,
+      },
+      {
+        createdAt: new Date(),
+        status: DeliveryStatus.DELIVERED,
+        type: DeliveryType.PARCEL,
+        finalPriceCdf: 5000,
+        estimatedPriceCdf: 5000,
+        pickupLat: 0.5,
+        pickupLng: 29.47,
+      },
+    ]);
+    prisma.errandOrder.findMany.mockResolvedValue([
+      {
+        createdAt: new Date(),
+        status: ErrandOrderStatus.CANCELLED,
+        finalPriceCdf: 9000,
+        pickupLat: 0.5,
+        pickupLng: 29.47,
+      },
+    ]);
+
+    const report = await service.getReportAnalytics(30);
+    expect(report.kpis.deliveryRevenueCdf).toBe(5000);
+    expect(report.kpis.totalDeliveries).toBe(4);
   });
 });

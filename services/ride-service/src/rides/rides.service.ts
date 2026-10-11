@@ -48,6 +48,7 @@ import {
   type RidePaymentStatus,
 } from '../common/payment-status.util';
 import { applyPromoCode } from '../common/promo-apply.util';
+import { cancelPendingCashRide } from '../common/escrow.util';
 import { rideDriverGrossCdf, rideShareBookingDriverGrossCdf } from '../common/ride-driver-gross.util';
 import { PromoService } from './surcharge.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
@@ -756,6 +757,10 @@ export class RidesService {
       },
     });
     this.emitStatusChange(rideId, RideStatus.CANCELLED);
+    await cancelPendingCashRide(
+      rideId,
+      'Course annulée — encaissement espèces annulé.',
+    ).catch(() => undefined);
     if (notifiedDriverIds.length > 0) {
       this.trackingGateway.broadcastDriverJob(notifiedDriverIds, 'ride:cancelled', { rideId });
     }
@@ -2309,7 +2314,7 @@ export class RidesService {
     if (ride.status === RideStatus.COMPLETED || ride.status === RideStatus.CANCELLED) {
       throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
     }
-    return this.prisma.ride.update({
+    const updated = await this.prisma.ride.update({
       where: { id: rideId },
       data: {
         status: RideStatus.CANCELLED,
@@ -2318,6 +2323,11 @@ export class RidesService {
         cancelReason: reason ?? 'Annulé par administrateur',
       },
     });
+    await cancelPendingCashRide(
+      rideId,
+      reason ?? 'Course annulée par admin — encaissement espèces annulé.',
+    ).catch(() => undefined);
+    return updated;
   }
 
   async adminUpdateStatus(rideId: string, status: RideStatus, reason?: string) {

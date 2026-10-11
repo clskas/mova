@@ -1412,6 +1412,23 @@ export class PaymentsService {
     return { success: true, cancelled: true, payment };
   }
 
+  /** Void leftover ride Payment CASH PENDING after cancel (hygiene / race). */
+  async cancelPendingCashRide(rideId: string, reason?: string) {
+    const existing = await this.prisma.payment.findUnique({ where: { rideId } });
+    if (!existing) return { success: true, cancelled: false };
+    if (existing.method !== PaymentMethod.CASH || existing.status !== PaymentStatus.PENDING) {
+      return { success: true, cancelled: false, status: existing.status };
+    }
+    const payment = await this.prisma.payment.update({
+      where: { rideId },
+      data: {
+        status: PaymentStatus.FAILED,
+        failureReason: reason?.slice(0, 240) || 'Course annulée — encaissement espèces annulé.',
+      },
+    });
+    return { success: true, cancelled: true, payment };
+  }
+
   getDriverCashDebtSummary(driverUserId: string) {
     return this.debtLedger.getSummary(driverUserId);
   }

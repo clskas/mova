@@ -113,16 +113,18 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         messageId: payload['id']?.toString(),
       );
     };
-    // Le passager a réglé en espèces → ouvrir automatiquement la saisie du PIN.
-    socket.onCashPending = (payload) {
+    // Le passager a réglé en espèces → ouvrir automatiquement la confirmation.
+    socket.onCashPending = (payload) async {
       final rideId = payload['rideId']?.toString();
       if (rideId != null && rideId != _rideId) return;
+      await _refreshRide();
+      if (!mounted || !_cashPending) return;
       _autoOpenCashConfirm();
     };
   }
 
   void _autoOpenCashConfirm() {
-    if (!mounted || _cashDialogOpen || _isPaid) return;
+    if (!mounted || _cashDialogOpen || _isPaid || !_cashPending) return;
     _confirmCash(auto: true);
   }
 
@@ -134,7 +136,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       setState(() => _ride = data);
       _syncPaymentPolling();
       // Fallback fiable si l'événement socket a été manqué : dès que le
-      // paiement espèces passe en attente, ouvrir la confirmation du PIN.
+      // paiement espèces passe en attente, ouvrir la confirmation — jamais
+      // sur une course CANCELLED.
       if (_cashPending) _autoOpenCashConfirm();
     }
   }
@@ -804,6 +807,18 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
 
   Future<void> _confirmCash({bool auto = false}) async {
     if (_cashDialogOpen) return;
+    if (_status != 'COMPLETED' || _isPaid) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Cette course n’attend plus d’encaissement espèces (annulée ou déjà réglée).',
+            ),
+          ),
+        );
+      }
+      return;
+    }
     _cashDialogOpen = true;
     final api = ref.read(apiClientProvider);
     final ok = await DriverCashReceivedDialog.show(

@@ -365,6 +365,11 @@ export class InternalController {
     return this.payments.cancelPendingCashService(referenceType, referenceId, body?.reason);
   }
 
+  @Post('rides/:rideId/cash/cancel-pending')
+  cancelPendingCashRide(@Param('rideId') rideId: string, @Body() body: { reason?: string }) {
+    return this.payments.cancelPendingCashRide(rideId, body?.reason);
+  }
+
   @Post('services/:referenceType/:referenceId/escrow')
   settleEscrow(
     @Param('referenceType') referenceType: string,

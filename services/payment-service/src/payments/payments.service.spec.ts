@@ -649,6 +649,26 @@ describe('PaymentsService', () => {
     );
   });
 
+  it('cancelPendingCashRide marks leftover ride CASH PENDING as FAILED', async () => {
+    prisma.payment.findUnique.mockResolvedValueOnce({
+      id: 'pay-cash',
+      method: PaymentMethod.CASH,
+      status: 'PENDING',
+      rideId: 'ride-cancel',
+    });
+    prisma.payment.update.mockResolvedValueOnce({
+      id: 'pay-cash',
+      status: 'FAILED',
+    });
+    const result = await service.cancelPendingCashRide('ride-cancel', 'Course annulée');
+    expect(result).toMatchObject({ success: true, cancelled: true });
+    expect(prisma.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'FAILED' }),
+      }),
+    );
+  });
+
   it('findDriverPendingCashRide skips CANCELLED deliveries with leftover CASH PENDING', async () => {
     prisma.payment.findMany.mockResolvedValueOnce([]);
     prisma.servicePayment.findMany.mockResolvedValueOnce([

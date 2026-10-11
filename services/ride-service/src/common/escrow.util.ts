@@ -79,6 +79,11 @@ export async function cancelPendingCashService(
   );
 }
 
+/** Annule un Payment CASH PENDING de course. */
+export async function cancelPendingCashRide(rideId: string, reason?: string) {
+  return escrowRequest(`/internal/rides/${rideId}/cash/cancel-pending`, 'POST', { reason });
+}
+
 /** Crédite uniquement les restaurants (pickup repas) — le livreur reste en séquestre jusqu'au PIN. */
 export async function creditRestaurantEscrow(referenceType: string, referenceId: string) {
   return escrowRequest(`/internal/services/${referenceType}/${referenceId}/escrow`, 'POST', {

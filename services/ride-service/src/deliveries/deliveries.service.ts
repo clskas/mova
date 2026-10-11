@@ -52,6 +52,7 @@ import {
 import { applyPromoCode, formatPromoValidation } from '../common/promo-apply.util';
 import {
   creditRestaurantEscrow,
+  cancelPendingCashService,
   freezeEscrow,
   refundEscrow,
   releaseEscrowPayout,
@@ -2183,6 +2184,11 @@ export class DeliveriesService {
       })
     ) {
       await this.settleGuaranteedDelivery({ ...delivery, ...updated, events: delivery.events }, 'RETURN_TO_SENDER');
+      await cancelPendingCashService(
+        'DELIVERY',
+        id,
+        'Destinataire injoignable — retour expéditeur. Encaissement espèces annulé.',
+      ).catch(() => undefined);
       await this.prisma.delivery.update({
         where: { id },
         data: { status: DeliveryStatus.CANCELLED, cancelledAt: new Date(), payoutReleasedAt: new Date() },

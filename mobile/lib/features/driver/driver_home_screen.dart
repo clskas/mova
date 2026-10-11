@@ -509,12 +509,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     if (!mounted) return;
     if (detail case Success(:final data)) {
       final merged = mergeDeliveryApiPayload(Map<String, dynamic>.from(data));
+      final cashPending = _deliveryCashPending(merged);
       setState(() {
-        _pendingCashDelivery = merged;
-        if (_activeDelivery == null || _activeDelivery!['id']?.toString() == id) {
+        _pendingCashDelivery = cashPending ? merged : null;
+        if (cashPending &&
+            (_activeDelivery == null || _activeDelivery!['id']?.toString() == id)) {
           _activeDelivery = merged;
         }
       });
+      if (!cashPending) return;
       await _connectDeliveryCashSocket(merged);
       _maybeAutoOpenDeliveryCash(merged);
     }
@@ -723,9 +726,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
 
   void _maybeAutoOpenDeliveryCash(Map<String, dynamic> delivery) {
     if (!mounted || _cashDeliveryPromptOpen || _showingOffer) return;
-    if (!_deliveryCashPending(delivery) && !(_deliveryAwaitingPayment(delivery) && !_deliveryInProgress(delivery))) {
-      return;
-    }
+    if (!_deliveryCashPending(delivery)) return;
     _cashDeliveryPromptOpen = true;
     Navigator.push(
       context,

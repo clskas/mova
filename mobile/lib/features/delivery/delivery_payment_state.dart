@@ -31,10 +31,14 @@ bool deliveryIsPaid(Map<String, dynamic>? delivery) {
 bool deliveryIsCod(Map<String, dynamic>? delivery) =>
     delivery?['guaranteed'] == false;
 
-bool deliveryCashPaymentPending(Map<String, dynamic>? delivery) =>
-    !deliveryIsPaid(delivery) &&
-    delivery?['paymentStatus']?.toString().toUpperCase() == 'PENDING' &&
-    delivery?['paymentMethod']?.toString().toUpperCase() == 'CASH';
+bool deliveryCashPaymentPending(Map<String, dynamic>? delivery) {
+  if (deliveryIsPaid(delivery)) return false;
+  final status = delivery?['status']?.toString().toUpperCase() ?? '';
+  // Never prompt cash on cancelled / return-to-sender / in-progress.
+  if (status != 'DELIVERED' && status != 'COMPLETED') return false;
+  return delivery?['paymentStatus']?.toString().toUpperCase() == 'PENDING' &&
+      delivery?['paymentMethod']?.toString().toUpperCase() == 'CASH';
+}
 
 bool _terminalDelivered(Map<String, dynamic>? delivery) {
   final status = delivery?['status']?.toString();

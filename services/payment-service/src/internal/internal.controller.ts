@@ -356,6 +356,15 @@ export class InternalController {
     return this.debtLedger.getDebtStatus(userId);
   }
 
+  @Post('services/:referenceType/:referenceId/cash/cancel-pending')
+  cancelPendingCash(
+    @Param('referenceType') referenceType: string,
+    @Param('referenceId') referenceId: string,
+    @Body() body: { reason?: string },
+  ) {
+    return this.payments.cancelPendingCashService(referenceType, referenceId, body?.reason);
+  }
+
   @Post('services/:referenceType/:referenceId/escrow')
   settleEscrow(
     @Param('referenceType') referenceType: string,

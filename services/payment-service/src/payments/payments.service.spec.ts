@@ -623,4 +623,57 @@ describe('PaymentsService', () => {
     expect(foodPayouts.creditFoodDeliverySettlement).not.toHaveBeenCalled();
     expect(driverPayouts.creditRidePayoutFromPayment).not.toHaveBeenCalled();
   });
+
+  it('cancelPendingCashService marks leftover CASH PENDING as FAILED', async () => {
+    prisma.servicePayment.findUnique.mockResolvedValueOnce({
+      id: 'sp-cash',
+      method: PaymentMethod.CASH,
+      status: 'PENDING',
+      referenceType: 'DELIVERY',
+      referenceId: 'del-cancel',
+    });
+    prisma.servicePayment.update.mockResolvedValueOnce({
+      id: 'sp-cash',
+      status: 'FAILED',
+    });
+    const result = await service.cancelPendingCashService(
+      'DELIVERY',
+      'del-cancel',
+      'Retour expéditeur',
+    );
+    expect(result).toMatchObject({ success: true, cancelled: true });
+    expect(prisma.servicePayment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'FAILED' }),
+      }),
+    );
+  });
+
+  it('findDriverPendingCashRide skips CANCELLED deliveries with leftover CASH PENDING', async () => {
+    prisma.payment.findMany.mockResolvedValueOnce([]);
+    prisma.servicePayment.findMany.mockResolvedValueOnce([
+      {
+        method: PaymentMethod.CASH,
+        status: 'PENDING',
+        referenceType: 'DELIVERY',
+        referenceId: 'del-cancelled',
+        amountCdf: 25400,
+      },
+    ]);
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        driverId: 'driver-1',
+        status: 'CANCELLED',
+        paymentReady: false,
+        title: 'Livraison annulée',
+        referenceType: 'DELIVERY',
+        referenceId: 'del-cancelled',
+        amountCdf: 25400,
+      }),
+    });
+    const result = await service.findDriverPendingCashRide('driver-1');
+    expect(result).toMatchObject({ pendingCash: false });
+  });
 });

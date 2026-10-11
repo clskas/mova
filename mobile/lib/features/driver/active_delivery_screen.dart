@@ -116,7 +116,8 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     await _connectTrackingSocket();
     _startLocationUpdates();
     _syncPaymentPolling();
-    if (widget.autoOpenCashPin || _cashPending) {
+    // Only open after refresh — ignore stale autoOpenCashPin on CANCELLED.
+    if (_cashPending) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _autoOpenCashConfirm());
     }
   }
@@ -136,7 +137,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
         final deliveryId = payload['deliveryId']?.toString();
         if (deliveryId != null && deliveryId != _deliveryId) return;
         await _refresh();
-        if (!mounted) return;
+        if (!mounted || !_cashPending) return;
         WidgetsBinding.instance.addPostFrameCallback((_) => _autoOpenCashConfirm());
       },
       onChat: (payload) {
@@ -159,8 +160,10 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
 
   void _autoOpenCashConfirm() {
     if (!mounted || _cashDialogOpen || _isPaid || _skipNextCashAutoOpen) return;
+    // Re-check after refresh: CANCELLED / return-to-sender must never open cash.
+    if (!_cashPending) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _cashDialogOpen || _isPaid) return;
+      if (!mounted || _cashDialogOpen || _isPaid || !_cashPending) return;
       _confirmCash(auto: true);
     });
   }
@@ -397,6 +400,18 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
 
   Future<void> _confirmCash({bool auto = false}) async {
     if (_cashDialogOpen) return;
+    if (!_awaitingCashConfirm) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Cette livraison n’attend plus d’encaissement espèces (annulée ou déjà réglée).',
+            ),
+          ),
+        );
+      }
+      return;
+    }
     _cashDialogOpen = true;
     final api = ref.read(apiClientProvider);
     final refType = _isErrand ? 'ERRAND' : 'DELIVERY';

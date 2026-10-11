@@ -1360,6 +1360,12 @@ export class PaymentsService {
       try {
         const info = await this.fetchServicePaymentInfo(payment.referenceType, payment.referenceId);
         if (info.driverId !== driverUserId) continue;
+        // Cancelled / return-to-sender / non-delivered must not prompt « Cash reçu ».
+        const status = String(info.status ?? '').toUpperCase();
+        if (status === 'CANCELLED' || !info.paymentReady) continue;
+        const type = String(payment.referenceType ?? '').toUpperCase();
+        if (type === 'DELIVERY' && status !== 'DELIVERED') continue;
+        if (type === 'ERRAND' && status !== 'COMPLETED') continue;
         return {
           referenceType: payment.referenceType,
           referenceId: payment.referenceId,
@@ -1381,6 +1387,29 @@ export class PaymentsService {
     }
 
     return { ride: null, pendingCash: false };
+  }
+
+  /**
+   * Void leftover CASH PENDING after cancel / return-to-sender so the driver
+   * is not prompted to collect the full order amount.
+   */
+  async cancelPendingCashService(referenceType: string, referenceId: string, reason?: string) {
+    const type = referenceType.toUpperCase();
+    const existing = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (!existing) return { success: true, cancelled: false };
+    if (existing.method !== PaymentMethod.CASH || existing.status !== PaymentStatus.PENDING) {
+      return { success: true, cancelled: false, status: existing.status };
+    }
+    const payment = await this.prisma.servicePayment.update({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+      data: {
+        status: PaymentStatus.FAILED,
+        failureReason: reason?.slice(0, 240) || 'Livraison annulée — encaissement espèces annulé.',
+      },
+    });
+    return { success: true, cancelled: true, payment };
   }
 
   getDriverCashDebtSummary(driverUserId: string) {

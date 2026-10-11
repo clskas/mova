@@ -66,6 +66,19 @@ export async function freezeEscrow(referenceType: string, referenceId: string, r
   });
 }
 
+/** Annule un ServicePayment CASH PENDING (retour expéditeur / annulation). */
+export async function cancelPendingCashService(
+  referenceType: string,
+  referenceId: string,
+  reason?: string,
+) {
+  return escrowRequest(
+    `/internal/services/${referenceType}/${referenceId}/cash/cancel-pending`,
+    'POST',
+    { reason },
+  );
+}
+
 /** Crédite uniquement les restaurants (pickup repas) — le livreur reste en séquestre jusqu'au PIN. */
 export async function creditRestaurantEscrow(referenceType: string, referenceId: string) {
   return escrowRequest(`/internal/services/${referenceType}/${referenceId}/escrow`, 'POST', {

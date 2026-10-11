@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../core/config/market_config.dart';
@@ -11,19 +13,25 @@ import 'driver_alert_prefs.dart';
 ///
 /// Android : canaux distincts (le son d’un canal est immuable après création).
 /// iOS : `senga_job.wav` ou son par défaut / silencieux selon les prefs.
+///
+/// En premier plan, beaucoup d’Android restent muets sur les notifs locales :
+/// on joue donc aussi le WAV via [AudioPlayer] (comme le portail partenaire).
 class DriverJobAlertService {
   DriverJobAlertService._();
 
   static final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+  static final AudioPlayer _player = AudioPlayer();
   static bool _initialized = false;
   static int _notificationId = 0;
 
-  static const _channelSengaId = 'mova_driver_jobs_v2';
+  /// v3 : canal neuf après passage raw mp3 → wav + lecture in-app.
+  static const _channelSengaId = 'mova_driver_jobs_v3';
   static const _channelSystemId = 'mova_driver_jobs_system_v1';
   static const _channelSilentId = 'mova_driver_jobs_silent_v1';
   static const _channelName = 'Missions & courses SENGA';
   static const _androidSound = RawResourceAndroidNotificationSound('senga_job');
   static const _iosSound = 'senga_job.wav';
+  static const _assetSound = 'sounds/senga_job.wav';
 
   static Future<void> init() async {
     if (_initialized) return;
@@ -77,7 +85,23 @@ class DriverJobAlertService {
 
     await androidPlugin?.requestNotificationsPermission();
     await DriverAlertPrefs.ensureLoaded();
+    try {
+      await _player.setReleaseMode(ReleaseMode.stop);
+      await _player.setPlayerMode(PlayerMode.lowLatency);
+    } catch (_) {
+      /* ignore */
+    }
     _initialized = true;
+  }
+
+  /// Joue le WAV SENGA dans l’app (volume média) — fiable au premier plan.
+  static Future<void> playSengaSound() async {
+    try {
+      await _player.stop();
+      await _player.play(AssetSource(_assetSound), volume: 1.0);
+    } catch (_) {
+      /* asset / audio session — la notif canal reste le filet de secours */
+    }
   }
 
   static Future<void> notify({
@@ -93,6 +117,12 @@ class DriverJobAlertService {
     await HapticFeedback.heavyImpact();
     await Future<void>.delayed(const Duration(milliseconds: 100));
     await HapticFeedback.heavyImpact();
+
+    final useSenga = !muted && style == DriverAlertSoundStyle.senga;
+    if (useSenga) {
+      // Ne pas await la fin du clip — la notif doit partir tout de suite.
+      unawaited(playSengaSound());
+    }
 
     final channelId = muted
         ? _channelSilentId
@@ -114,7 +144,7 @@ class DriverJobAlertService {
           category: AndroidNotificationCategory.call,
           fullScreenIntent: true,
           playSound: playSound,
-          sound: (!muted && style == DriverAlertSoundStyle.senga) ? _androidSound : null,
+          sound: useSenga ? _androidSound : null,
           enableVibration: true,
           vibrationPattern: Int64List.fromList([0, 450, 180, 450]),
           audioAttributesUsage: AudioAttributesUsage.alarm,
@@ -124,7 +154,7 @@ class DriverJobAlertService {
           presentAlert: true,
           presentBadge: true,
           presentSound: playSound,
-          sound: (!muted && style == DriverAlertSoundStyle.senga) ? _iosSound : null,
+          sound: useSenga ? _iosSound : null,
           interruptionLevel: InterruptionLevel.timeSensitive,
         ),
       ),

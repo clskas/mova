@@ -143,8 +143,8 @@ class _DriverNotificationSettingsScreenState
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Sur Android, le volume dépend aussi des réglages du téléphone '
-                  '(canal « Missions & courses SENGA »).',
+                  'Le test joue le son SENGA dans l’app (volume média). '
+                  'En arrière-plan, Android utilise aussi le canal « Missions & courses SENGA ».',
                   style: TextStyle(fontSize: 12, color: MovaColors.textMuted, height: 1.35),
                 ),
               ],

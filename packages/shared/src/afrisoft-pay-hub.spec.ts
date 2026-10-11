@@ -146,7 +146,7 @@ describe('afrisoft-pay-hub', () => {
         error: {
           code: 'MOVA_INT_001',
           message:
-            'Authentification marchand SerdiPay refusée. Recharge / paiement Mobile Money temporairement indisponible — contactez le support SENGA.',
+            'Paiement Mobile Money temporairement indisponible. Réessayez dans un instant ou contactez le support SENGA.',
         },
       }),
     }) as unknown as typeof fetch;
@@ -158,7 +158,7 @@ describe('afrisoft-pay-hub', () => {
       purpose: 'topup',
     });
     expect(result.success).toBe(false);
-    expect(result.message).toMatch(/Authentification marchand SerdiPay/i);
+    expect(result.message).toMatch(/Paiement Mobile Money temporairement indisponible/i);
   });
 
   it('POSTs /v1/payouts for B2C with telecom MP and no channel field', async () => {

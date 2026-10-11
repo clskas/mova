@@ -311,13 +311,13 @@ describe('serdipay Public API', () => {
     expect(mapSerdiPayPaymentFailure(400, 'Failed to process the payment', 'Your Balance is low', undefined, 'b2c')).toBe(
       SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR,
     );
-    expect(SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR).toMatch(/compte de versement/i);
+    expect(SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR).toMatch(/versement Mobile Money/i);
     expect(SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR).toMatch(/n’a pas été débité|n'a pas été débité/);
     expect(mapSerdiPayPaymentFailure(400, 'Your Balance is low', 'Your Balance is low', undefined, 'c2b')).toBe(
       SERDIPAY_C2B_MERCHANT_FLOAT_LOW_FR,
     );
-    expect(SERDIPAY_C2B_MERCHANT_FLOAT_LOW_FR).toMatch(/encaissement/i);
-    expect(SERDIPAY_C2B_MERCHANT_FLOAT_LOW_FR).toMatch(/Aucun push USSD/i);
+    expect(SERDIPAY_C2B_MERCHANT_FLOAT_LOW_FR).toMatch(/temporairement indisponible/i);
+    expect(SERDIPAY_C2B_MERCHANT_FLOAT_LOW_FR).toMatch(/n’a pas été crédité|n'a pas été crédité/);
     expect(SERDIPAY_B2C_MERCHANT_FLOAT_LOW_FR).not.toMatch(/Your Balance is low/i);
   });
 
@@ -380,7 +380,10 @@ describe('serdipay Public API', () => {
   });
 
   it('maps get-token failures away from debit-style solde copy', () => {
-    expect(mapSerdiPayTokenFailure(400, 'Failed to get the token')).toMatch(/Authentification marchand/);
+    expect(mapSerdiPayTokenFailure(400, 'Failed to get the token')).toMatch(
+      /Paiement Mobile Money temporairement indisponible/i,
+    );
+    expect(mapSerdiPayTokenFailure(400, 'Failed to get the token')).not.toMatch(/Failed to get the token/i);
   });
 
   it('maps Laravel Unauthenticated to French merchant-auth (not SENGA session)', () => {
@@ -453,7 +456,9 @@ describe('serdipay Public API', () => {
     expect(mapSerdiPayPaymentFailure(400, raw, raw, undefined, 'c2b')).toBe(
       SERDIPAY_C2B_CHANNEL_DISABLED_FR,
     );
-    expect(mapSerdiPayPaymentFailure(400, raw, raw, undefined, 'c2b')).toMatch(/Aucun push USSD/);
+    expect(mapSerdiPayPaymentFailure(400, raw, raw, undefined, 'c2b')).toMatch(
+      /n’est pas disponible|n'est pas disponible/i,
+    );
     expect(mapSerdiPayPaymentFailure(400, raw)).toBe(SERDIPAY_CHANNEL_DISABLED_GENERIC_FR);
     expect(mapSerdiPayPaymentFailure(400, raw)).not.toMatch(/channel0/i);
     expect(mapSerdiPayPaymentFailure(400, raw)).not.toMatch(/Payment Failed/i);
@@ -597,7 +602,7 @@ describe('serdipay Public API', () => {
     const auth = await serdiPayGetAccessToken(get);
     expect(auth.ok).toBe(false);
     if (auth.ok === false) {
-      expect(auth.message).toMatch(/Authentification marchand SerdiPay/i);
+      expect(auth.message).toMatch(/Paiement Mobile Money temporairement indisponible/i);
       expect(auth.message).not.toMatch(/Failed to get the token/i);
     }
 
@@ -608,7 +613,7 @@ describe('serdipay Public API', () => {
       reference: 'senga_topup_test',
     });
     expect(mm.success).toBe(false);
-    expect(mm.message).toMatch(/Authentification marchand SerdiPay/i);
+    expect(mm.message).toMatch(/Paiement Mobile Money temporairement indisponible/i);
     // Only get-token, never payment-merchant
     expect(fetchMock).toHaveBeenCalledTimes(2); // token attempted twice (no cache on failure)
     expect(String(fetchMock.mock.calls[0][0])).toMatch(/get-token/);

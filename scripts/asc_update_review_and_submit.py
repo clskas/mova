@@ -196,25 +196,65 @@ def get_or_create_editable_version(token: str, app_id: str, version_string: str)
             return max(rows, key=_version_rank)
 
     # Create a new IOS version for submission.
-    created = api(
-        "POST",
-        "/v1/appStoreVersions",
-        token,
-        {
-            "data": {
-                "type": "appStoreVersions",
-                "attributes": {
-                    "platform": "IOS",
-                    "versionString": version_string,
-                },
-                "relationships": {
-                    "app": {"data": {"type": "apps", "id": app_id}},
-                },
-            }
-        },
-    )
-    print(f"created appStoreVersion {version_string}")
-    return created["data"]
+    try:
+        created = api(
+            "POST",
+            "/v1/appStoreVersions",
+            token,
+            {
+                "data": {
+                    "type": "appStoreVersions",
+                    "attributes": {
+                        "platform": "IOS",
+                        "versionString": version_string,
+                    },
+                    "relationships": {
+                        "app": {"data": {"type": "apps", "id": app_id}},
+                    },
+                }
+            },
+        )
+        print(f"created appStoreVersion {version_string}")
+        return created["data"]
+    except RuntimeError as e:
+        # Often: another version is already Waiting for Review / Pending Release.
+        print(f"create version failed ({e}); falling back to existing version")
+        return find_version(token, app_id)
+
+
+DEFAULT_WHATS_NEW = (
+    "Corrections de stabilité, messages d’erreur plus clairs en cas de "
+    "connexion faible, et améliorations du suivi des courses et livraisons."
+)
+
+
+def ensure_whats_new(token: str, version_id: str, text: str | None = None) -> None:
+    """App Store requires localization.whatsNew before review submit."""
+    body_text = (text or os.environ.get("ASC_WHATS_NEW") or DEFAULT_WHATS_NEW).strip()
+    if not body_text:
+        return
+    data = api("GET", f"/v1/appStoreVersions/{version_id}/appStoreVersionLocalizations", token)
+    for loc in data.get("data") or []:
+        loc_id = loc["id"]
+        attrs = loc.get("attributes") or {}
+        locale = attrs.get("locale")
+        current = (attrs.get("whatsNew") or "").strip()
+        if current:
+            print(f"whatsNew already set for {locale}")
+            continue
+        api(
+            "PATCH",
+            f"/v1/appStoreVersionLocalizations/{loc_id}",
+            token,
+            {
+                "data": {
+                    "type": "appStoreVersionLocalizations",
+                    "id": loc_id,
+                    "attributes": {"whatsNew": body_text[:4000]},
+                }
+            },
+        )
+        print(f"whatsNew set for {locale}")
 
 
 def find_latest_processed_build(token: str, app_id: str, prefer_number: str | None = None) -> dict:

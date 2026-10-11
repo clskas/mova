@@ -425,7 +425,7 @@ void main() {
       expect(state.showBanner, isTrue);
     });
 
-    test('Play reporting installed code does not clear an API ahead banner', () {
+    test('Play reporting installed code clears a soft API-ahead banner', () {
       final fromApi = AppUpdateService.parseRemote(
         {
           'passenger': {
@@ -441,12 +441,36 @@ void main() {
       )!;
       expect(fromApi.updateAvailable, isTrue);
       expect(fromApi.remoteVersion, '1.0.5+65');
-      // Play often echoes the installed versionCode when no update is probed —
-      // that must not wipe the API "store is ahead" decision.
+      // After install (or when Play has nothing newer), echoing the installed
+      // code must hide the soft banner — otherwise it sticks forever.
       final afterPlay = AppUpdateService.reconcileWithPlay(
         fromApi,
         playCode: 50,
         localBuild: 50,
+        advertisedCode: 65,
+      );
+      expect(afterPlay.updateAvailable, isFalse);
+      expect(afterPlay.showBanner, isFalse);
+    });
+
+    test('Play probe failure keeps API soft banner', () {
+      final fromApi = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 65,
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.5',
+        localBuild: 50,
+      )!;
+      final afterPlay = AppUpdateService.reconcileWithPlay(
+        fromApi,
+        playCode: 0,
+        localBuild: 50,
+        advertisedCode: 65,
       );
       expect(afterPlay.updateAvailable, isTrue);
       expect(afterPlay.showBanner, isTrue);

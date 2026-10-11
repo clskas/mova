@@ -147,8 +147,37 @@ class SyncQueue {
     }
   }
 
-  /// Chemins éligibles à la mise en file (créations / recharges / profil / chauffeur).
+  /// GPS / tracking : inutiles hors ligne (positions périmées) et engorgent la file.
+  static bool isEphemeralPath(String path) {
+    return path == '/drivers/location' ||
+        RegExp(r'^/tracking/[^/]+/[^/]+/points$').hasMatch(path);
+  }
+
+  /// Supprime les positions GPS déjà empilées (anciennes builds).
+  Future<int> pruneEphemeral() async {
+    var removed = 0;
+    for (final key in _box.keys.toList()) {
+      try {
+        final raw = _box.get(key);
+        if (raw == null) continue;
+        final action =
+            PendingAction.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        if (isEphemeralPath(action.path)) {
+          await _box.delete(key);
+          removed++;
+        }
+      } catch (_) {
+        await _box.delete(key);
+        removed++;
+      }
+    }
+    if (removed > 0) _emitCount();
+    return removed;
+  }
+
+  /// Chemins éligibles à la mise en file (créations / profil / statut course).
   static bool shouldQueue(String method, String path) {
+    if (isEphemeralPath(path)) return false;
     if (method == 'PATCH' && path == '/users/me') return true;
     if (method == 'PATCH') {
       if (RegExp(r'^/rides/[^/]+/status$').hasMatch(path)) return true;
@@ -160,8 +189,6 @@ class SyncQueue {
       if (RegExp(r'^/rides/[^/]+/reject$').hasMatch(path)) return true;
       if (RegExp(r'^/deliveries/[^/]+/accept$').hasMatch(path)) return true;
       if (RegExp(r'^/deliveries/[^/]+/reject$').hasMatch(path)) return true;
-      if (path == '/drivers/location') return true;
-      if (RegExp(r'^/tracking/[^/]+/[^/]+/points$').hasMatch(path)) return true;
     }
     if (method != 'POST') return false;
     if (path.contains('/auth/')) return false;

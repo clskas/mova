@@ -137,5 +137,6 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.PROMO_INVALID]: 'Code promo invalide ou expiré.',
   [MovaErrorCode.SUBSCRIPTION_NOT_FOUND]: 'Abonnement introuvable.',
   [MovaErrorCode.CITY_INACTIVE]: 'SENGA n\'est pas disponible dans cette ville pour le moment.',
-  [MovaErrorCode.INTERNAL_ERROR]: 'Une erreur interne est survenue.',
+  [MovaErrorCode.INTERNAL_ERROR]:
+    'Un problème temporaire est survenu. Vérifiez votre connexion et réessayez.',
 };

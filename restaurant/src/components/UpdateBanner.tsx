@@ -30,7 +30,14 @@ async function reloadWithServiceWorker() {
   }
   try {
     const reg = await navigator.serviceWorker?.getRegistration();
-    reg?.waiting?.postMessage({ type: "SKIP_WAITING" });
+    if (reg?.waiting) {
+      await new Promise<void>((resolve) => {
+        const done = () => resolve();
+        navigator.serviceWorker.addEventListener("controllerchange", done, { once: true });
+        reg.waiting?.postMessage({ type: "SKIP_WAITING" });
+        window.setTimeout(done, 1200);
+      });
+    }
   } catch {
     /* ignore */
   }
@@ -46,6 +53,11 @@ export function UpdateBanner({ accentClass = "bg-orange-600" }: { accentClass?: 
 
     function show(remote: string) {
       if (cancelled) return;
+      if (!remote || remote === LOCAL_BUILD) {
+        setAvailable(false);
+        setRemoteId(null);
+        return;
+      }
       setRemoteId(remote);
       setAvailable(true);
     }
@@ -69,13 +81,19 @@ export function UpdateBanner({ accentClass = "bg-orange-600" }: { accentClass?: 
 
     const onSw = () => {
       void readRemoteBuildId().then((remote) => {
-        const id = remote || `sw-${LOCAL_BUILD}`;
+        if (!remote || remote === LOCAL_BUILD) {
+          if (!cancelled) {
+            setAvailable(false);
+            setRemoteId(null);
+          }
+          return;
+        }
         try {
-          if (sessionStorage.getItem(DISMISS_KEY) === id) return;
+          if (sessionStorage.getItem(DISMISS_KEY) === remote) return;
         } catch {
           /* still show */
         }
-        show(id);
+        show(remote);
       });
     };
 

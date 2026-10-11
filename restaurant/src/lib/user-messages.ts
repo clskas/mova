@@ -125,8 +125,12 @@ export function httpStatusUserMessage(status: number): string {
   if (status === 403) return "Accès refusé.";
   if (status === 404) return "Ressource introuvable.";
   if (status === 429) return "Trop de tentatives. Réessayez dans un instant.";
-  if (status === 502 || status === 503) return "Service temporairement indisponible. Réessayez dans quelques minutes.";
-  if (status >= 500) return "Une erreur interne est survenue.";
+  if (status === 502 || status === 503 || status === 504) {
+    return "Connexion difficile. Vérifiez votre réseau et réessayez.";
+  }
+  if (status >= 500) {
+    return "Un problème temporaire est survenu. Vérifiez votre connexion et réessayez.";
+  }
   return "Une erreur est survenue. Veuillez réessayer.";
 }
 

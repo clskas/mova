@@ -287,12 +287,12 @@ class AppUpdateService extends Notifier<AppUpdateState> {
 
   /// Merge Play Core's available versionCode with the API decision.
   ///
-  /// Only *adds* a soft update when Play offers a newer package than the
-  /// installed build. Never clears an API-driven banner when Play reports no
-  /// update while `/public/app-version` still says the store is ahead.
+  /// Soft banners only stay when Play actually offers a newer package, or when
+  /// the Play probe failed (`playCode == 0`) and the API still says ahead.
+  /// After a Play install, Play often echoes the installed code — that must
+  /// clear a soft API-ahead banner so it does not stick forever.
   ///
-  /// When [advertisedCode] is known and `localBuild >= advertisedCode`, force
-  /// hide — versionCode wins over a lagging AppVersion.name after install.
+  /// Forced min-version banners are never cleared by Play.
   static AppUpdateState reconcileWithPlay(
     AppUpdateState next, {
     required int playCode,
@@ -301,8 +301,6 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     int advertisedCode = 0,
   }) {
     // Installed build already at/above store advertisement → hide.
-    // Do not use playCode==localBuild alone: Play often echoes the installed
-    // code when no update is probed, which must not wipe an API "ahead" banner.
     if (advertisedCode > 0 && localBuild > 0 && localBuild >= advertisedCode) {
       return next.copyWith(updateAvailable: false, flexibleDownloaded: false);
     }
@@ -314,6 +312,11 @@ class AppUpdateService extends Notifier<AppUpdateState> {
             ? fallbackStoreUrl
             : next.storeUrl,
       );
+    }
+    // Play has nothing newer than the installed build → hide soft banner
+    // (API may already advertise the next CI build not yet on Play).
+    if (!next.forceUpdate) {
+      return next.copyWith(updateAvailable: false, flexibleDownloaded: false);
     }
     return next;
   }

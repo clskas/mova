@@ -54,6 +54,14 @@ void main() {
       'Une erreur est survenue. Veuillez réessayer.',
     );
     expect(
+      sanitizeUserMessage('Une erreur interne est survenue.'),
+      'Un problème temporaire est survenu. Vérifiez votre connexion et réessayez.',
+    );
+    expect(
+      sanitizeUserMessage('SocketException: Failed host lookup'),
+      'Connexion difficile. Vérifiez votre réseau et réessayez.',
+    );
+    expect(
       sanitizeUserMessage('MOVA_DEL_004'),
       'Une erreur est survenue. Veuillez réessayer.',
     );

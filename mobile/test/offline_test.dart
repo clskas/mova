@@ -34,6 +34,10 @@ void main() {
       expect(SyncQueue.shouldQueue('POST', '/rides/estimate'), isFalse);
       expect(SyncQueue.shouldQueue('POST', '/auth/otp/request'), isFalse);
       expect(SyncQueue.shouldQueue('GET', '/rides'), isFalse);
+      // GPS / tracking must not flood the offline queue.
+      expect(SyncQueue.shouldQueue('POST', '/drivers/location'), isFalse);
+      expect(SyncQueue.shouldQueue('POST', '/tracking/ride/abc/points'), isFalse);
+      expect(SyncQueue.isEphemeralPath('/drivers/location'), isTrue);
     });
 
     test('optimisticResponse includes offline metadata', () {

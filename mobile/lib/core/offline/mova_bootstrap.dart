@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
@@ -15,23 +17,29 @@ Future<void> bootstrapMovaApp(WidgetRef ref) async {
   await connectivity.init();
   await api.loadToken();
 
+  // Anciennes builds empilaient le GPS hors ligne → bannière « N actions ».
+  await queue.pruneEphemeral();
+
+  Future<void> flushPending() async {
+    if (!api.canSync || queue.pendingCount == 0) {
+      connectivity.setPendingSyncCount(queue.pendingCount);
+      return;
+    }
+    await queue.flush((method, path, body) async {
+      return switch (method) {
+        'POST' => api.post(path, body, skipOffline: true),
+        'PATCH' => api.patch(path, body, skipOffline: true),
+        _ => const Failure(NetworkFailure('Méthode non prise en charge.')),
+      };
+    });
+    connectivity.setPendingSyncCount(queue.pendingCount);
+  }
+
   connectivity.onBackOnline = () async {
     await api.checkHealth();
     // Passenger cold-start often misses the first app-version probe while offline.
     ref.read(appUpdateServiceProvider.notifier).onAppResumed();
-    if (api.canSync) {
-      final flushResult = await queue.flush((method, path, body) async {
-        return switch (method) {
-          'POST' => api.post(path, body, skipOffline: true),
-          'PATCH' => api.patch(path, body, skipOffline: true),
-          _ => const Failure(NetworkFailure('Méthode non prise en charge.')),
-        };
-      });
-      if (flushResult.synced > 0) {
-        connectivity.setPendingSyncCount(queue.pendingCount);
-      }
-    }
-    connectivity.setPendingSyncCount(queue.pendingCount);
+    await flushPending();
   };
 
   queue.pendingCountStream.listen((count) {
@@ -39,6 +47,12 @@ Future<void> bootstrapMovaApp(WidgetRef ref) async {
   });
 
   connectivity.setPendingSyncCount(queue.pendingCount);
+  // File déjà non vide au démarrage (réseau revenu pendant que l'app était fermée).
+  unawaited(flushPending());
+  // Relance périodique si des actions restent après des échecs transitoires.
+  Timer.periodic(const Duration(seconds: 45), (_) {
+    unawaited(flushPending());
+  });
 
   connectivity.onNetworkRestored = () async {
     connectivity.prepareReconnect();

@@ -113,10 +113,25 @@ String sanitizeUserMessage(
   if (RegExp(r'localhost:\d+').hasMatch(msg)) return fallback;
   if (RegExp(r'^Erreur \d{3}$').hasMatch(msg)) return fallback;
   if (RegExp(r'^PDF \d+$', caseSensitive: false).hasMatch(msg)) return fallback;
-  if (msg.contains('Exception:') ||
-      msg.contains('SocketException') ||
-      msg.contains('FormatException') ||
+  if (msg.toLowerCase().contains('erreur interne')) {
+    return 'Un problème temporaire est survenu. Vérifiez votre connexion et réessayez.';
+  }
+  if (msg.contains('SocketException') ||
       msg.contains('TimeoutException') ||
+      msg.contains('ClientException') ||
+      msg.contains('HandshakeException') ||
+      msg.contains('ECONNREFUSED') ||
+      msg.contains('ECONNRESET') ||
+      msg.contains('ETIMEDOUT') ||
+      msg.contains('ENOTFOUND') ||
+      msg.contains('fetch failed') ||
+      msg.contains('Failed to fetch') ||
+      msg.contains('NetworkError') ||
+      msg.contains('Network request failed')) {
+    return 'Connexion difficile. Vérifiez votre réseau et réessayez.';
+  }
+  if (msg.contains('Exception:') ||
+      msg.contains('FormatException') ||
       msg.contains('TypeError:') ||
       msg.contains('SyntaxError:') ||
       msg.contains('AggregateError')) {
@@ -124,18 +139,6 @@ String sanitizeUserMessage(
   }
   if (RegExp(r'MOVA_[A-Z]+_\d+').hasMatch(msg)) return fallback;
   if (RegExp(r'SENGA_[A-Z]+_\d+').hasMatch(msg)) return fallback;
-  if (msg.contains('ECONNREFUSED') ||
-      msg.contains('ECONNRESET') ||
-      msg.contains('ETIMEDOUT') ||
-      msg.contains('ENOTFOUND') ||
-      msg.contains('fetch failed') ||
-      msg.contains('Failed to fetch') ||
-      msg.contains('NetworkError') ||
-      msg.contains('Network request failed') ||
-      msg.contains('ClientException') ||
-      msg.contains('HandshakeException')) {
-    return fallback;
-  }
   if (msg.contains('PrismaClient') ||
       msg.contains('Prisma') ||
       RegExp(r'\bP20\d{2}\b').hasMatch(msg) ||

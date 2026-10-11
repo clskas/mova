@@ -61,7 +61,8 @@ const movaErrorMessages = <String, String>{
   'MOVA_VAL_005': 'Code promo invalide ou expiré.',
   'MOVA_VAL_006': 'Abonnement introuvable.',
   'MOVA_VAL_007': 'SENGA n\'est pas disponible dans cette ville pour le moment.',
-  'MOVA_INT_001': 'Une erreur interne est survenue.',
+  'MOVA_INT_001':
+      'Un problème temporaire est survenu. Vérifiez votre connexion et réessayez.',
 };
 
 MovaFailure failureFromApiResponse(int statusCode, Map<String, dynamic> body) {

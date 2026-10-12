@@ -13,6 +13,7 @@ import '../../core/media/image_pick_util.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../chat/call_ring_service.dart';
 import '../chat/chat_alert_service.dart';
 import '../chat/delivery_chat_screen.dart';
 import '../chat/delivery_voice_call_screen.dart';
@@ -154,6 +155,21 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           peerLabel: 'Client',
           messageId: payload['id']?.toString(),
         );
+      },
+      onDeliveryCall: (payload) {
+        final id = payload['deliveryId']?.toString();
+        if (id != null && id != _deliveryId) return;
+        final action = payload['action']?.toString() ?? 'start';
+        if (action != 'start') {
+          unawaited(CallRingService.stop(deliveryId: _deliveryId));
+          return;
+        }
+        unawaited(CallRingService.startIncoming(
+          deliveryId: _deliveryId,
+          starterId: payload['starterId']?.toString() ?? '',
+          myUserId: _userId,
+          peerLabel: 'Client',
+        ));
       },
     );
   }

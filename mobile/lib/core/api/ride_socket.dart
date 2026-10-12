@@ -25,6 +25,7 @@ class RideSocket {
   void Function(Map<String, dynamic> payload)? _onChat;
   void Function(Map<String, dynamic> payload)? _onCashPending;
   void Function(Map<String, dynamic> payload)? _onPaymentCompleted;
+  void Function(Map<String, dynamic> payload)? _onDeliveryCall;
   void Function(Map<String, dynamic> payload)? _onRideNew;
   void Function(Map<String, dynamic> payload)? _onRideCancelled;
   void Function(Map<String, dynamic> payload)? _onOfferTaken;
@@ -35,6 +36,7 @@ class RideSocket {
   set onChat(void Function(Map<String, dynamic> payload)? handler) => _onChat = handler;
   set onCashPending(void Function(Map<String, dynamic> payload)? handler) => _onCashPending = handler;
   set onPaymentCompleted(void Function(Map<String, dynamic> payload)? handler) => _onPaymentCompleted = handler;
+  set onDeliveryCall(void Function(Map<String, dynamic> payload)? handler) => _onDeliveryCall = handler;
 
   /// Retire les callbacks sans couper la connexion (écran fermé).
   void clearHandlers({bool chatOnly = false}) {
@@ -47,6 +49,7 @@ class RideSocket {
     _onChat = null;
     _onCashPending = null;
     _onPaymentCompleted = null;
+    _onDeliveryCall = null;
     _onRideNew = null;
     _onRideCancelled = null;
     _onOfferTaken = null;
@@ -187,6 +190,11 @@ class RideSocket {
         ..on('errand:chat', (data) {
           if (data is Map) {
             _onChat?.call(Map<String, dynamic>.from(data));
+          }
+        })
+        ..on('delivery:call', (data) {
+          if (data is Map) {
+            _onDeliveryCall?.call(Map<String, dynamic>.from(data));
           }
         })
         ..on('ride:cash-pending', (data) {
@@ -342,6 +350,7 @@ class RideSocket {
     void Function(Map<String, dynamic> payload)? onPaymentCompleted,
     void Function(Map<String, dynamic> payload)? onCashPending,
     void Function(Map<String, dynamic> payload)? onChat,
+    void Function(Map<String, dynamic> payload)? onDeliveryCall,
     void Function()? onConnected,
     void Function()? onDisconnected,
   }) {
@@ -353,6 +362,7 @@ class RideSocket {
     if (onPaymentCompleted != null) _onPaymentCompleted = onPaymentCompleted;
     if (onCashPending != null) _onCashPending = onCashPending;
     if (onChat != null) _onChat = onChat;
+    if (onDeliveryCall != null) _onDeliveryCall = onDeliveryCall;
     if (onConnected != null) _onConnected = onConnected;
     if (onDisconnected != null) _onDisconnected = onDisconnected;
 

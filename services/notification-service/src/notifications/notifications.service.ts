@@ -87,20 +87,21 @@ export class NotificationsService implements OnModuleInit {
     await this.fcm.sendToTokens(tokens, { title, body, data });
   }
 
-  /** Push FCM tous flavors (passenger + driver) — ops / audiences SOS. */
+  /** Push FCM tous flavors (passenger + driver) — chat / SOS / audiences. */
   private async pushToUsersAnyFlavor(
     userIds: string[],
     title: string,
     body: string,
     data?: Record<string, string>,
+    opts?: { profile?: 'job' | 'chat' },
   ) {
     if (!this.fcm.isConfigured() || userIds.length === 0) return 0;
     const tokens = await this.pushTokens.tokensForUsersAnyFlavor(userIds);
     if (tokens.length === 0) {
-      this.logger.warn(`FCM SOS: 0 token pour ${userIds.length} destinataire(s)`);
+      this.logger.warn(`FCM: 0 token pour ${userIds.length} destinataire(s)`);
       return 0;
     }
-    await this.fcm.sendToTokens(tokens, { title, body, data });
+    await this.fcm.sendToTokens(tokens, { title, body, data }, { profile: opts?.profile ?? 'job' });
     return tokens.length;
   }
 
@@ -203,13 +204,16 @@ export class NotificationsService implements OnModuleInit {
     for (const recipientId of recipients) {
       await this.create(recipientId, title, preview, 'CHAT_MESSAGE', data);
     }
-    // Push FCM best-effort (chauffeurs enregistrés) ; sans effet si FCM non configuré.
-    await this.pushToDrivers(recipients, title, preview, {
+    // Push FCM tous flavors (passager + chauffeur) — pushToDrivers ne cible que
+    // appFlavor=driver, donc le destinataire passager ne recevait jamais le push.
+    const pushed = await this.pushToUsersAnyFlavor(recipients, title, preview, {
       type: 'CHAT_MESSAGE',
       kind: payload.kind,
       threadId: payload.threadId,
-    });
-    this.logger.log(`chat.message notification → ${recipients.length} destinataire(s) (${payload.kind}:${payload.threadId})`);
+    }, { profile: 'chat' });
+    this.logger.log(
+      `chat.message notification → ${recipients.length} destinataire(s), FCM tokens=${pushed} (${payload.kind}:${payload.threadId})`,
+    );
   }
 
   async onIncidentCreated(payload: IncidentCreatedPayload) {

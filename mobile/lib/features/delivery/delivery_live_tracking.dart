@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -5,6 +7,8 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/ride_socket.dart';
 import '../booking/widgets/mova_ride_map.dart';
+import '../chat/call_ring_service.dart';
+import '../chat/chat_alert_service.dart';
 import 'delivery_payment_state.dart';
 import 'widgets/delivery_tracking_map.dart';
 
@@ -95,6 +99,34 @@ class DeliveryLiveTracking {
       },
       onPaymentCompleted: (payload) {
         onPaymentCompleted?.call(payload);
+      },
+      onChat: (payload) {
+        final id = payload['deliveryId']?.toString() ?? payload['rideId']?.toString();
+        if (id != null && id != deliveryId) return;
+        final role = payload['senderRole']?.toString() ?? '';
+        if (role == 'passenger') return;
+        unawaited(ChatAlertService.notifyIncoming(
+          kind: referenceType == 'ERRAND' ? 'errand' : 'delivery',
+          threadId: deliveryId,
+          senderRole: role,
+          text: payload['text']?.toString() ?? '',
+          peerLabel: 'Livreur',
+          messageId: payload['id']?.toString(),
+        ));
+      },
+      onDeliveryCall: (payload) {
+        final id = payload['deliveryId']?.toString();
+        if (id != null && id != deliveryId) return;
+        final action = payload['action']?.toString() ?? 'start';
+        if (action != 'start') {
+          unawaited(CallRingService.stop(deliveryId: deliveryId));
+          return;
+        }
+        unawaited(CallRingService.startIncoming(
+          deliveryId: deliveryId,
+          starterId: payload['starterId']?.toString() ?? '',
+          peerLabel: 'Livreur',
+        ));
       },
       onDisconnected: () {
         if (!mounted()) return;

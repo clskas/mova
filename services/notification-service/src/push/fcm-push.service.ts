@@ -7,11 +7,16 @@ export interface FcmPushMessage {
   data?: Record<string, string>;
 }
 
+export type FcmPushProfile = 'job' | 'chat';
+
 /** Canal + son SENGA (doit matcher DriverJobAlertService côté app — v5). */
 export const SENGA_DRIVER_JOB_CHANNEL = 'mova_driver_jobs_v5';
 /** Android raw `senga_job` ; iOS bundle `senga_job.wav` (extension requise pour APNs). */
 export const SENGA_DRIVER_JOB_SOUND_ANDROID = 'senga_job';
 export const SENGA_DRIVER_JOB_SOUND_IOS = 'senga_job.wav';
+
+/** Canal chat (ChatAlertService sur passager + chauffeur). Son système. */
+export const SENGA_CHAT_CHANNEL = 'mova_chat';
 
 @Injectable()
 export class FcmPushService {
@@ -23,7 +28,11 @@ export class FcmPushService {
     return Boolean(this.config.get<string>('FCM_SERVER_KEY')?.trim());
   }
 
-  async sendToTokens(tokens: string[], message: FcmPushMessage): Promise<void> {
+  async sendToTokens(
+    tokens: string[],
+    message: FcmPushMessage,
+    opts?: { profile?: FcmPushProfile },
+  ): Promise<void> {
     const serverKey = this.config.get<string>('FCM_SERVER_KEY')?.trim();
     if (!serverKey || tokens.length === 0) return;
 
@@ -31,6 +40,11 @@ export class FcmPushService {
     const data = Object.fromEntries(
       Object.entries(message.data ?? {}).map(([k, v]) => [k, String(v)]),
     );
+    const profile = opts?.profile ?? 'job';
+    const isChat = profile === 'chat';
+    const channelId = isChat ? SENGA_CHAT_CHANNEL : SENGA_DRIVER_JOB_CHANNEL;
+    const soundAndroid = isChat ? 'default' : SENGA_DRIVER_JOB_SOUND_ANDROID;
+    const soundIos = isChat ? 'default' : SENGA_DRIVER_JOB_SOUND_IOS;
 
     await Promise.all(
       unique.map(async (token) => {
@@ -49,21 +63,20 @@ export class FcmPushService {
               notification: {
                 title: message.title,
                 body: message.body,
-                // Legacy FCM: Android utilise souvent le canal ; iOS lit `sound` (avec .wav).
-                sound: SENGA_DRIVER_JOB_SOUND_IOS,
-                android_channel_id: SENGA_DRIVER_JOB_CHANNEL,
+                sound: soundIos,
+                android_channel_id: channelId,
               },
               android: {
                 priority: 'high',
                 notification: {
-                  channel_id: SENGA_DRIVER_JOB_CHANNEL,
-                  sound: SENGA_DRIVER_JOB_SOUND_ANDROID,
+                  channel_id: channelId,
+                  sound: soundAndroid,
                 },
               },
               apns: {
                 payload: {
                   aps: {
-                    sound: SENGA_DRIVER_JOB_SOUND_IOS,
+                    sound: soundIos,
                     'content-available': 1,
                   },
                 },
@@ -73,7 +86,7 @@ export class FcmPushService {
                 title: message.title,
                 body: message.body,
                 click_action: 'FLUTTER_NOTIFICATION_CLICK',
-                android_channel_id: SENGA_DRIVER_JOB_CHANNEL,
+                android_channel_id: channelId,
               },
             }),
           });

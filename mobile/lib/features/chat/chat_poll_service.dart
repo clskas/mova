@@ -7,6 +7,7 @@ import '../../core/config/app_version.dart';
 import '../../core/error/result.dart';
 import '../driver/driver_job_alert_service.dart';
 import '../passenger/passenger_alert_service.dart';
+import 'call_ring_service.dart';
 import 'chat_alert_service.dart';
 
 /// Poll léger des notifications serveur pour afficher une bannière chat / SOS
@@ -85,12 +86,21 @@ class ChatPollService {
         final threadId = data['threadId']?.toString() ?? '';
         final messageId = data['messageId']?.toString();
 
+        final body = n['body']?.toString() ?? '';
+        if (body.contains('Appel vocal SENGA') && threadId.isNotEmpty) {
+          await CallRingService.startIncoming(
+            deliveryId: threadId,
+            starterId: '',
+            peerLabel: 'Contact',
+          );
+        }
+
         await ChatAlertService.notifyFromServer(
           kind: kind,
           threadId: threadId,
           messageId: messageId,
           title: n['title']?.toString() ?? 'Message SENGA',
-          body: n['body']?.toString() ?? '',
+          body: body,
         );
       }
       _primed = true;

@@ -7,6 +7,7 @@ import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
+import 'call_ring_service.dart';
 import 'chat_alert_service.dart';
 import 'chat_receipt.dart';
 import 'delivery_voice_call_screen.dart';
@@ -59,6 +60,7 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
   }
 
   void _openVoiceCall() {
+    unawaited(CallRingService.stop(deliveryId: widget.deliveryId));
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => DeliveryVoiceCallScreen(
@@ -107,6 +109,13 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
         if (_knownIds.contains(m.id)) continue;
         _knownIds.add(m.id);
         if (_chatHistoryLoaded && !m.isMine) {
+          if (m.text.contains('Appel vocal SENGA')) {
+            unawaited(CallRingService.startIncoming(
+              deliveryId: widget.deliveryId,
+              starterId: '',
+              peerLabel: widget.peerLabel,
+            ));
+          }
           ChatAlertService.notifyIncoming(
             kind: 'delivery',
             threadId: widget.deliveryId,

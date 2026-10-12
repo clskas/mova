@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -7,6 +9,7 @@ import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
+import 'call_ring_service.dart';
 
 /// Appel vocal LiveKit sur une livraison (partenaire / livreur / client).
 class DeliveryVoiceCallScreen extends ConsumerStatefulWidget {
@@ -35,11 +38,13 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
   @override
   void initState() {
     super.initState();
+    unawaited(CallRingService.stop(deliveryId: widget.deliveryId));
     _connect();
   }
 
   @override
   void dispose() {
+    unawaited(CallRingService.stop(deliveryId: widget.deliveryId));
     _room?.dispose();
     super.dispose();
   }

@@ -143,8 +143,9 @@ class _DriverNotificationSettingsScreenState
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Le test joue le son SENGA dans l’app (volume média). '
-                  'En arrière-plan, Android utilise aussi le canal « Missions & courses SENGA ».',
+                  'Pour une nouvelle course ou livraison, le son SENGA sonne en boucle '
+                  '(comme un appel) jusqu’à acceptation, refus ou annulation par le passager. '
+                  'Le test ci-dessus joue un bip unique.',
                   style: TextStyle(fontSize: 12, color: MovaColors.textMuted, height: 1.35),
                 ),
               ],

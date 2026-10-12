@@ -117,6 +117,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     _locationTimer?.cancel();
     _profilePollTimer?.cancel();
     _assignmentsPollTimer?.cancel();
+    unawaited(DriverJobAlertService.stopRinging());
     super.dispose();
   }
 
@@ -868,9 +869,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   Future<void> _openDeliveryOfferPopup(Map<String, dynamic> offer) async {
     final id = offer['id']?.toString() ?? '';
     if (id.isEmpty) return;
+    final offerKey = DriverJobAlertService.offerKey('delivery', id);
     _showingOffer = true;
     _openOfferKind = 'delivery';
     _openOfferId = id;
+    // Continuer / relancer la sonnerie pendant l’écran d’offre.
+    unawaited(DriverJobAlertService.startRinging(offerKey: offerKey));
     final result = await Navigator.push<dynamic>(
       context,
       MaterialPageRoute(builder: (_) => DeliveryOfferScreen(offer: offer)),
@@ -878,6 +882,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     _showingOffer = false;
     _openOfferKind = null;
     _openOfferId = null;
+    await DriverJobAlertService.stopRinging(offerKey: offerKey);
     if (!mounted) return;
     if (result == 'taken') {
       _dismissedOffers.add('delivery:$id');
@@ -903,8 +908,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   Future<void> _rejectDeliveryOffer(Map<String, dynamic> offer) async {
     final id = offer['id']?.toString() ?? '';
     if (id.isEmpty) return;
+    final offerKey = DriverJobAlertService.offerKey('delivery', id);
     final api = ref.read(apiClientProvider);
     final result = await api.rejectDelivery(id);
+    await DriverJobAlertService.stopRinging(offerKey: offerKey);
     if (!mounted) return;
     if (result case Success()) {
       _dismissedOffers.add('delivery:$id');
@@ -924,8 +931,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   Future<void> _rejectRideOffer(Map<String, dynamic> offer) async {
     final id = offer['id']?.toString() ?? '';
     if (id.isEmpty) return;
+    final offerKey = DriverJobAlertService.offerKey('ride', id);
     final api = ref.read(apiClientProvider);
     final result = await api.rejectRide(id);
+    await DriverJobAlertService.stopRinging(offerKey: offerKey);
     if (!mounted) return;
     if (result case Success()) {
       _dismissedOffers.add('ride:$id');
@@ -945,9 +954,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   Future<void> _openRideOffer(Map<String, dynamic> offer) async {
     final id = offer['id']?.toString() ?? '';
     if (id.isEmpty) return;
+    final offerKey = DriverJobAlertService.offerKey('ride', id);
     _showingOffer = true;
     _openOfferKind = 'ride';
     _openOfferId = id;
+    unawaited(DriverJobAlertService.startRinging(offerKey: offerKey));
     final result = await Navigator.push<String?>(
       context,
       MaterialPageRoute(
@@ -960,6 +971,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     _showingOffer = false;
     _openOfferKind = null;
     _openOfferId = null;
+    await DriverJobAlertService.stopRinging(offerKey: offerKey);
     if (result == 'taken') {
       _dismissedOffers.add('ride:$id');
     } else if (result == 'cancelled') {
@@ -994,19 +1006,29 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   }
 
   Future<void> _syncKnownOfferKeys(Iterable<String> keys, {required List<Map<String, dynamic>> newOffers}) async {
+    final keySet = keys.toSet();
     if (_offerAlertsSeeded && newOffers.isNotEmpty && mounted) {
       for (final offer in newOffers) {
         final isRide = offer.containsKey('vehicleType') && !offer.containsKey('deliveryType');
+        final id = offer['id']?.toString() ?? '';
+        final offerKey = DriverJobAlertService.offerKey(isRide ? 'ride' : 'delivery', id);
         final title = isRide ? 'Nouvelle course' : 'Nouvelle livraison';
         final body = isRide
             ? DriverJobAlertService.rideOfferMessage(offer)
             : DriverJobAlertService.deliveryOfferMessage(offer);
-        await DriverJobAlertService.notify(title: title, body: body);
+        await DriverJobAlertService.notify(
+          title: title,
+          body: body,
+          ringUntilStopped: true,
+          offerKey: offerKey,
+        );
       }
     }
+    // Coupe la sonnerie si plus aucune offre ouverte (acceptée ailleurs / annulée).
+    await DriverJobAlertService.syncActiveOffers(keySet);
     _knownOfferKeys
       ..clear()
-      ..addAll(keys);
+      ..addAll(keySet);
     _offerAlertsSeeded = true;
   }
 
@@ -1180,6 +1202,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           _startPolling();
           await DriverBackgroundService.start();
         } else {
+          await DriverJobAlertService.stopRinging();
           _stopPolling();
           await DriverBackgroundService.stop();
         }

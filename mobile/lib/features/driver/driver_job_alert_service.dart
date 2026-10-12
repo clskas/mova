@@ -11,14 +11,11 @@ import 'driver_alert_prefs.dart';
 
 /// Alertes chauffeur : vibration + **son SENGA dédié** (ou son système / mute).
 ///
+/// Pour courses/livraisons : sonnerie en boucle (comme un appel) jusqu’à
+/// [stopRinging] — acceptation, refus, annulation passager, ou offre disparue.
+///
 /// Android : canaux distincts (le son d’un canal est immuable après création).
 /// iOS : `senga_job.wav` ou son par défaut / silencieux selon les prefs.
-///
-/// En premier plan, beaucoup d’Android restent muets sur les notifs locales :
-/// on joue donc aussi le WAV via [AudioPlayer] (comme le portail partenaire).
-///
-/// Important : si le canal / son SENGA échoue (OEM, raw manquant, etc.), on
-/// retombe sur le canal système pour que la course/livraison reste visible.
 class DriverJobAlertService {
   DriverJobAlertService._();
 
@@ -26,6 +23,11 @@ class DriverJobAlertService {
   static final AudioPlayer _player = AudioPlayer();
   static bool _initialized = false;
   static int _notificationId = 0;
+
+  static bool _ringing = false;
+  static final Set<String> _activeOfferKeys = {};
+  static Timer? _ringSafetyTimer;
+  static const _maxRingDuration = Duration(minutes: 3);
 
   /// v4 : fallback robuste si le canal SENGA casse la publication de la notif.
   static const _channelSengaId = 'mova_driver_jobs_v4';
@@ -35,6 +37,8 @@ class DriverJobAlertService {
   static const _androidSound = RawResourceAndroidNotificationSound('senga_job');
   static const _iosSound = 'senga_job.wav';
   static const _assetSound = 'sounds/senga_job.wav';
+
+  static bool get isRinging => _ringing;
 
   static Future<void> init() async {
     if (_initialized) return;
@@ -49,8 +53,6 @@ class DriverJobAlertService {
         _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     final vibration = Int64List.fromList([0, 450, 180, 450]);
 
-    // Créer d’abord les canaux « sûrs », puis SENGA — un échec SENGA ne doit
-    // pas empêcher les alertes avec son téléphone.
     await androidPlugin?.createNotificationChannel(
       AndroidNotificationChannel(
         _channelSystemId,
@@ -60,7 +62,7 @@ class DriverJobAlertService {
         playSound: true,
         enableVibration: true,
         vibrationPattern: vibration,
-        audioAttributesUsage: AudioAttributesUsage.notification,
+        audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
       ),
     );
     await androidPlugin?.createNotificationChannel(
@@ -72,7 +74,7 @@ class DriverJobAlertService {
         playSound: false,
         enableVibration: true,
         vibrationPattern: vibration,
-        audioAttributesUsage: AudioAttributesUsage.notification,
+        audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
       ),
     );
     try {
@@ -86,7 +88,7 @@ class DriverJobAlertService {
           sound: _androidSound,
           enableVibration: true,
           vibrationPattern: vibration,
-          audioAttributesUsage: AudioAttributesUsage.notification,
+          audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
         ),
       );
     } catch (e) {
@@ -97,27 +99,129 @@ class DriverJobAlertService {
     await DriverAlertPrefs.ensureLoaded();
     try {
       await _player.setReleaseMode(ReleaseMode.stop);
-      await _player.setPlayerMode(PlayerMode.lowLatency);
+      await _player.setPlayerMode(PlayerMode.mediaPlayer);
+      await _player.setAudioContext(
+        AudioContext(
+          android: const AudioContextAndroid(
+            isSpeakerphoneOn: true,
+            stayAwake: true,
+            contentType: AndroidContentType.sonification,
+            usageType: AndroidUsageType.notificationRingtone,
+            audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+          ),
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+            options: const {
+              AVAudioSessionOptions.duckOthers,
+              AVAudioSessionOptions.mixWithOthers,
+            },
+          ),
+        ),
+      );
     } catch (_) {
       /* ignore */
     }
     _initialized = true;
   }
 
-  /// Joue le WAV SENGA dans l’app (volume média) — fiable au premier plan.
+  /// Joue le WAV SENGA une fois (test / mission ponctuelle).
   static Future<void> playSengaSound() async {
     try {
       await _player.stop();
+      await _player.setReleaseMode(ReleaseMode.stop);
       await _player.play(AssetSource(_assetSound), volume: 1.0);
     } catch (e) {
       if (kDebugMode) debugPrint('Lecture son SENGA (in-app) échouée : $e');
     }
   }
 
+  /// Sonnerie en boucle jusqu’à [stopRinging] (acceptation / annulation / refus).
+  static Future<void> startRinging({String? offerKey}) async {
+    await init();
+    await DriverAlertPrefs.ensureLoaded();
+    if (DriverAlertPrefs.muted) return;
+
+    if (offerKey != null && offerKey.isNotEmpty) {
+      _activeOfferKeys.add(offerKey);
+      _ringingOfferKey = offerKey;
+    }
+
+    if (_ringing) {
+      _armRingSafety();
+      return;
+    }
+
+    _ringing = true;
+    _armRingSafety();
+    try {
+      await _player.stop();
+      await _player.setReleaseMode(ReleaseMode.loop);
+      await _player.setVolume(1.0);
+      await _player.play(AssetSource(_assetSound), volume: 1.0);
+    } catch (e) {
+      _ringing = false;
+      if (kDebugMode) debugPrint('Sonnerie SENGA (boucle) échouée : $e');
+    }
+  }
+
+  /// Arrête la sonnerie. Si [offerKey] est fourni, n’arrête que si plus aucune
+  /// offre active (ou si c’est la dernière clé suivie).
+  static Future<void> stopRinging({String? offerKey}) async {
+    if (offerKey != null && offerKey.isNotEmpty) {
+      _activeOfferKeys.remove(offerKey);
+      if (_activeOfferKeys.isNotEmpty) {
+        _ringingOfferKey = _activeOfferKeys.last;
+        return;
+      }
+    } else {
+      _activeOfferKeys.clear();
+    }
+    await _haltRingPlayer();
+  }
+
+  /// Synchronise les offres encore ouvertes : coupe le son si plus aucune offre.
+  static Future<void> syncActiveOffers(Set<String> openOfferKeys) async {
+    _activeOfferKeys.removeWhere((k) => !openOfferKeys.contains(k));
+    if (_activeOfferKeys.isEmpty) {
+      await _haltRingPlayer();
+    }
+  }
+
+  static Future<void> _haltRingPlayer() async {
+    _ringSafetyTimer?.cancel();
+    _ringSafetyTimer = null;
+    _ringing = false;
+    _ringingOfferKey = null;
+    try {
+      await _player.stop();
+      await _player.setReleaseMode(ReleaseMode.stop);
+    } catch (_) {
+      /* ignore */
+    }
+    // Retirer la notif « ongoing » type appel si elle était affichée.
+    try {
+      if (_notificationId > 0) {
+        await _plugin.cancel(id: _notificationId);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  static void _armRingSafety() {
+    _ringSafetyTimer?.cancel();
+    _ringSafetyTimer = Timer(_maxRingDuration, () {
+      unawaited(_haltRingPlayer());
+    });
+  }
+
   static Future<void> notify({
     required String title,
     required String body,
     String? payload,
+    /// Sonnerie continue (courses / livraisons) jusqu’à [stopRinging].
+    bool ringUntilStopped = false,
+    String? offerKey,
   }) async {
     await init();
     await DriverAlertPrefs.ensureLoaded();
@@ -147,9 +251,9 @@ class DriverJobAlertService {
       channelId: channelId,
       playSound: playSound,
       useSengaSound: preferSenga,
+      asCall: ringUntilStopped,
     );
 
-    // Si le canal SENGA empêche l’affichage, republier sans son custom.
     if (!shown && preferSenga) {
       await _showSafe(
         id: id,
@@ -159,11 +263,16 @@ class DriverJobAlertService {
         channelId: _channelSystemId,
         playSound: true,
         useSengaSound: false,
+        asCall: ringUntilStopped,
       );
     }
 
-    // Son in-app après la notif (ne doit jamais bloquer / remplacer le push).
-    if (preferSenga) {
+    if (muted) return;
+
+    if (ringUntilStopped) {
+      // Boucle in-app (volume sonnerie) — fiable au premier plan et avec l’écran offres.
+      unawaited(startRinging(offerKey: offerKey));
+    } else if (preferSenga) {
       unawaited(playSengaSound());
     }
   }
@@ -176,6 +285,7 @@ class DriverJobAlertService {
     required String channelId,
     required bool playSound,
     required bool useSengaSound,
+    bool asCall = false,
   }) async {
     try {
       await _plugin.show(
@@ -189,20 +299,24 @@ class DriverJobAlertService {
             channelDescription: 'Alertes chauffeur SENGA',
             importance: Importance.max,
             priority: Priority.max,
-            category: AndroidNotificationCategory.message,
+            category: asCall
+                ? AndroidNotificationCategory.call
+                : AndroidNotificationCategory.message,
             playSound: playSound,
-            // Le son est déjà sur le canal ; le repasser ici casse certains OEM.
             sound: null,
             enableVibration: true,
             vibrationPattern: Int64List.fromList([0, 450, 180, 450]),
-            audioAttributesUsage: AudioAttributesUsage.notification,
+            audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
             ticker: title,
+            ongoing: asCall,
+            autoCancel: !asCall,
           ),
           iOS: DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: true,
-            presentSound: playSound,
-            sound: useSengaSound ? _iosSound : null,
+            presentSound: playSound && !asCall,
+            // La boucle in-app gère le son « appel » ; évite un bip unique court.
+            sound: (!asCall && useSengaSound) ? _iosSound : null,
             interruptionLevel: InterruptionLevel.timeSensitive,
           ),
         ),

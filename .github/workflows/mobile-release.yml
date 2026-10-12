@@ -158,7 +158,7 @@ jobs:
           set -euo pipefail
           # Floor must stay above the highest versionCode already accepted by Play
           # (123 used; bump when uploads fail with "already been used").
-          FLOOR=130
+          FLOOR=131
           PUBSPEC_LINE=$(grep -E '^version:' mobile/pubspec.yaml | head -1)
           PUBSPEC_NAME=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
@@ -682,13 +682,17 @@ jobs:
           export PASSENGER_IPA DRIVER_IPA
           bundle exec fastlane release_both
           if [ "${SUBMIT_APP_STORE}" = "true" ]; then
-            python3 -m pip install --quiet PyJWT cryptography
+            # macOS runners use PEP 668 — install deps in a venv, not system pip.
+            python3 -m venv /tmp/asc-venv
+            # shellcheck disable=SC1091
+            source /tmp/asc-venv/bin/activate
+            pip install --quiet PyJWT cryptography
             export ASC_VERSION=1.0.19
             export ASC_BUILD_NUMBER="${{ github.run_number }}"
             export ASC_SUBMIT=true
             export ASC_SUBMIT_ATTEMPTS=8
             export ASC_SUBMIT_RETRY_SECONDS=60
-            python3 "$(git rev-parse --show-toplevel)/scripts/asc_update_review_and_submit.py"
+            python "$(git rev-parse --show-toplevel)/scripts/asc_update_review_and_submit.py"
           fi
 
   asc-submit-only:
@@ -726,3 +730,4 @@ jobs:
           python3 -m pip install --quiet PyJWT cryptography
           echo "ASC_VERSION=$ASC_VERSION ASC_BUILD_NUMBER=${ASC_BUILD_NUMBER:-<latest VALID>}"
           python3 scripts/asc_update_review_and_submit.py
+          # (ubuntu + setup-python: system pip is fine)

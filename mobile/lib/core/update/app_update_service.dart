@@ -287,12 +287,15 @@ class AppUpdateService extends Notifier<AppUpdateState> {
 
   /// Merge Play Core's available versionCode with the API decision.
   ///
-  /// Soft banners only stay when Play actually offers a newer package, or when
-  /// the Play probe failed (`playCode == 0`) and the API still says ahead.
-  /// After a Play install, Play often echoes the installed code — that must
-  /// clear a soft API-ahead banner so it does not stick forever.
+  /// Soft banners show when:
+  /// - Play offers a newer package, or
+  /// - the public API advertises a store code above the installed build
+  ///   (covers staged Play rollouts where In-App Update still reports the
+  ///   installed code), or
+  /// - the Play probe failed (`playCode == 0`) and the API still says ahead.
   ///
-  /// Forced min-version banners are never cleared by Play.
+  /// After install, when [localBuild] ≥ advertised store code, soft banners
+  /// clear. Forced min-version banners are never cleared by Play.
   static AppUpdateState reconcileWithPlay(
     AppUpdateState next, {
     required int playCode,
@@ -304,8 +307,7 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     if (advertisedCode > 0 && localBuild > 0 && localBuild >= advertisedCode) {
       return next.copyWith(updateAvailable: false, flexibleDownloaded: false);
     }
-    if (playCode <= 0 || localBuild <= 0) return next;
-    if (playCode > localBuild) {
+    if (playCode > 0 && localBuild > 0 && playCode > localBuild) {
       return next.copyWith(
         updateAvailable: true,
         storeUrl: (next.storeUrl == null || next.storeUrl!.isEmpty)
@@ -313,8 +315,21 @@ class AppUpdateService extends Notifier<AppUpdateState> {
             : next.storeUrl,
       );
     }
-    // Play has nothing newer than the installed build → hide soft banner
-    // (API may already advertise the next CI build not yet on Play).
+    // API ahead of installed (floor / env) — keep soft banner even if Play
+    // Core has not yet offered the package on this device.
+    if (advertisedCode > 0 && localBuild > 0 && advertisedCode > localBuild) {
+      if (!next.updateAvailable && !next.forceUpdate) {
+        return next.copyWith(
+          updateAvailable: true,
+          storeUrl: (next.storeUrl == null || next.storeUrl!.isEmpty)
+              ? fallbackStoreUrl
+              : next.storeUrl,
+        );
+      }
+      return next;
+    }
+    if (playCode <= 0 || localBuild <= 0) return next;
+    // Play has nothing newer and API is not ahead → hide soft banner.
     if (!next.forceUpdate) {
       return next.copyWith(updateAvailable: false, flexibleDownloaded: false);
     }

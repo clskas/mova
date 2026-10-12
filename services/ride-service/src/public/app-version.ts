@@ -18,16 +18,16 @@ const DEFAULT_DRIVER_STORE =
   'https://play.google.com/store/apps/details?id=cd.mova.mova.driver';
 
 /**
- * Marketing name floor must match latest Play marketing version (`1.0.18`).
+ * Marketing name floor must match latest Play / App Store marketing version.
  * Phones still on older binaries see behindName and get the in-app banner
- * until they install the matching Play build.
- * versionCode floor tracks Play / App Store production (currently 130).
- * Raise the code floor when a newer AAB/IPA is uploaded — otherwise older phones
- * never see the banner when names already match (banner also fires when
- * store code > APP_BUILD). Stale Render env below this floor hid banners.
+ * until they install the matching store build.
+ * versionCode floor tracks production (currently 131 = 1.0.19).
+ * Raise both floors when a newer AAB/IPA is uploaded — otherwise older phones
+ * never see the banner when names already match. Stale Render env below this
+ * floor hid banners.
  */
-const CURRENT_VERSION_FLOOR = '1.0.18';
-const CURRENT_VERSION_CODE_FLOOR = 130;
+const CURRENT_VERSION_FLOOR = '1.0.19';
+const CURRENT_VERSION_CODE_FLOOR = 131;
 
 function parseVersionCode(raw: string | undefined, fallback: number): number {
   const n = Number.parseInt(raw?.trim() || '', 10);

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { dismissUpdateBanner, requireReachable } from "./helpers";
+import { dismissPwaInstallBanner, dismissUpdateBanner, requireReachable } from "./helpers";
 
 const LIVE = {
   web: process.env.WEB_BASE_URL ?? "https://senga.afri-soft.com",
@@ -21,6 +21,25 @@ async function interceptPinEnabled(page: Page) {
   });
 }
 
+/** Seed remembered identity + dismiss PWA banner before reload so PIN overlay is free. */
+async function seedRememberedPhone(
+  page: Page,
+  opts: { tokenKey: string; phoneKey: string; unlockKey: string; phone: string },
+): Promise<void> {
+  await dismissPwaInstallBanner(page);
+  await page.evaluate((o) => {
+    try {
+      sessionStorage.setItem("mova-pwa-install-dismissed", "1");
+    } catch {
+      /* ignore */
+    }
+    localStorage.removeItem(o.tokenKey);
+    localStorage.setItem(o.phoneKey, o.phone);
+    localStorage.removeItem(o.unlockKey);
+    sessionStorage.removeItem(o.unlockKey);
+  }, opts);
+}
+
 async function assertPinOnly(page: Page) {
   await dismissUpdateBanner(page);
   await expect(page.getByTestId("pin-pad")).toBeVisible({ timeout: 20_000 });
@@ -34,10 +53,11 @@ test.describe("PIN-only after remembered phone + PIN", () => {
     await requireReachable(request, LIVE.web, `Web indisponible: ${LIVE.web}`);
     await interceptPinEnabled(page);
     await page.goto(LIVE.web);
-    await page.evaluate(() => {
-      localStorage.removeItem("mova_web_token");
-      localStorage.setItem("mova_web_phone", "+243812345678");
-      sessionStorage.removeItem("mova_web_pin_unlocked");
+    await seedRememberedPhone(page, {
+      tokenKey: "mova_web_token",
+      phoneKey: "mova_web_phone",
+      unlockKey: "mova_web_pin_unlocked",
+      phone: "+243812345678",
     });
     await page.reload();
     await assertPinOnly(page);
@@ -47,10 +67,11 @@ test.describe("PIN-only after remembered phone + PIN", () => {
     await requireReachable(request, LIVE.web, `Web indisponible: ${LIVE.web}`);
     await interceptPinEnabled(page);
     await page.goto(LIVE.web);
-    await page.evaluate(() => {
-      localStorage.removeItem("mova_web_token");
-      localStorage.setItem("mova_web_phone", "+243812345678");
-      sessionStorage.removeItem("mova_web_pin_unlocked");
+    await seedRememberedPhone(page, {
+      tokenKey: "mova_web_token",
+      phoneKey: "mova_web_phone",
+      unlockKey: "mova_web_pin_unlocked",
+      phone: "+243812345678",
     });
     await page.reload();
     await assertPinOnly(page);
@@ -67,10 +88,11 @@ test.describe("PIN-only after remembered phone + PIN", () => {
     await requireReachable(request, `${LIVE.restaurant}/login`, `Restaurant indisponible: ${LIVE.restaurant}`);
     await interceptPinEnabled(page);
     await page.goto(`${LIVE.restaurant}/login`);
-    await page.evaluate(() => {
-      localStorage.removeItem("mova_restaurant_token");
-      localStorage.setItem("mova_restaurant_last_phone", "+243812345678");
-      sessionStorage.removeItem("mova_restaurant_pin_unlocked");
+    await seedRememberedPhone(page, {
+      tokenKey: "mova_restaurant_token",
+      phoneKey: "mova_restaurant_last_phone",
+      unlockKey: "mova_restaurant_pin_login_unlocked",
+      phone: "+243812345678",
     });
     await page.reload();
     await assertPinOnly(page);
@@ -80,10 +102,11 @@ test.describe("PIN-only after remembered phone + PIN", () => {
     await requireReachable(request, `${LIVE.rental}/login`, `Location indisponible: ${LIVE.rental}`);
     await interceptPinEnabled(page);
     await page.goto(`${LIVE.rental}/login`);
-    await page.evaluate(() => {
-      localStorage.removeItem("mova_rental_partner_token");
-      localStorage.setItem("mova_rental_partner_last_phone", "+243812345678");
-      sessionStorage.removeItem("mova_rental_partner_pin_unlocked");
+    await seedRememberedPhone(page, {
+      tokenKey: "mova_rental_partner_token",
+      phoneKey: "mova_rental_partner_last_phone",
+      unlockKey: "mova_rental_partner_pin_login_unlocked",
+      phone: "+243812345678",
     });
     await page.reload();
     await assertPinOnly(page);
@@ -93,10 +116,11 @@ test.describe("PIN-only after remembered phone + PIN", () => {
     await requireReachable(request, LIVE.web, `Web indisponible: ${LIVE.web}`);
     await interceptPinEnabled(page);
     await page.goto(LIVE.web);
-    await page.evaluate(() => {
-      localStorage.removeItem("mova_web_token");
-      localStorage.setItem("mova_web_phone", "marie@gmail.com");
-      sessionStorage.removeItem("mova_web_pin_unlocked");
+    await seedRememberedPhone(page, {
+      tokenKey: "mova_web_token",
+      phoneKey: "mova_web_phone",
+      unlockKey: "mova_web_pin_unlocked",
+      phone: "marie@gmail.com",
     });
     await page.reload();
     await assertPinOnly(page);

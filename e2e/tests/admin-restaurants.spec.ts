@@ -18,8 +18,8 @@ test.describe("Admin — restaurants CRUD", () => {
     await loginAsStaff(page, ADMIN_PHONE);
     await expect(page.getByRole("heading", { name: "Tableau de bord" })).toBeVisible({ timeout: 15_000 });
 
-    await page.getByRole("link", { name: "Restaurants", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Restaurants" })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("link", { name: "Partenaires", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Partenaires" })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("Ajouter un restaurant")).toBeVisible();
     await expect(page.getByText("Type de commerce (SENGA Business)")).toBeVisible();
     await expect(page.getByRole("button", { name: "Créer" })).toBeVisible();

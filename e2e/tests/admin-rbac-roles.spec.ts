@@ -17,20 +17,20 @@ const STAFF_ACCOUNTS: { phone: string; role: StaffRole; label: string }[] = [
 const MENU_BY_ROLE: Record<StaffRole, string[]> = {
   SUPER_ADMIN: [
     "Tableau de bord", "Utilisateurs", "Chauffeurs", "KYC", "Courses", "Livraisons",
-    "Restaurants", "Tarifs", "Abonnements", "Portefeuille", "Litiges", "Planifiées", "Zones géographiques", "Locations", "Contacts", "CGU",
+    "Partenaires", "Tarifs", "Abonnements", "Portefeuille", "Litiges", "Planifiées", "Zones géographiques", "Locations", "Contacts", "CGU",
   ],
   ADMIN: [
     "Tableau de bord", "Utilisateurs", "Chauffeurs", "KYC", "Courses", "Livraisons",
-    "Restaurants", "Tarifs", "Abonnements", "Portefeuille", "Litiges", "Planifiées", "Zones géographiques", "Locations", "Contacts", "CGU",
+    "Partenaires", "Tarifs", "Abonnements", "Portefeuille", "Litiges", "Planifiées", "Zones géographiques", "Locations", "Contacts", "CGU",
   ],
   SUPPORT: [
     "Utilisateurs", "Chauffeurs", "KYC", "Litiges", "Courses", "Livraisons", "Planifiées", "Locations",
   ],
   FINANCE: ["Tableau de bord", "Portefeuille", "Tarifs", "Abonnements"],
-  CONTENT: ["Restaurants", "Tarifs", "Zones géographiques", "Locations"],
+  CONTENT: ["Partenaires", "Tarifs", "Zones géographiques", "Locations"],
 };
 
-const HIDDEN_FOR_SUPPORT = ["Restaurants", "Abonnements", "Portefeuille", "Tableau de bord"];
+const HIDDEN_FOR_SUPPORT = ["Partenaires", "Abonnements", "Portefeuille", "Tableau de bord"];
 
 test.describe("Admin — RBAC par rôle staff", () => {
   test.beforeEach(async ({ request, baseURL }) => {

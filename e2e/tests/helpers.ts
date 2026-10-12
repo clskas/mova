@@ -69,14 +69,39 @@ export async function requireGateway(
 
 const DEV_OTP = process.env.E2E_OTP ?? "123456";
 
-/** Ferme la bannière de mise à jour si elle recouvre le formulaire. */
+const PWA_DISMISS_KEY = "mova-pwa-install-dismissed";
+
+/** Prefers sessionStorage so PwaInstallBanner never mounts after reload. */
+export async function dismissPwaInstallBanner(page: Page): Promise<void> {
+  try {
+    await page.evaluate((key) => {
+      try {
+        sessionStorage.setItem(key, "1");
+      } catch {
+        /* Safari private mode */
+      }
+      document.querySelectorAll('[role="dialog"][aria-label^="Installer"]').forEach((el) => {
+        (el as HTMLElement).style.display = "none";
+      });
+    }, PWA_DISMISS_KEY);
+  } catch {
+    /* page closed / not ready */
+  }
+}
+
+/**
+ * Ferme bannières « Plus tard » (PWA install / update) sans bloquer le test.
+ * Important: le PIN fullscreen (z-[10050]) peut couvrir le bouton — ne pas
+ * attendre un click actionable (timeout 30s) ; forcer ou abandonner vite.
+ */
 export async function dismissUpdateBanner(page: Page): Promise<void> {
+  await dismissPwaInstallBanner(page);
   const later = page.getByRole("button", { name: "Plus tard" });
   try {
-    await later.waitFor({ state: "visible", timeout: 1_500 });
-    await later.click();
+    await later.waitFor({ state: "visible", timeout: 800 });
+    await later.click({ timeout: 1_000, force: true });
   } catch {
-    /* banner absent */
+    /* banner absent or already covered/dismissed */
   }
 }
 

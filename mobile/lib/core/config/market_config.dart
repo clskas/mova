@@ -58,6 +58,8 @@ class MarketConfig {
   /// `--dart-define=GOOGLE_IOS_CLIENT_ID=….apps.googleusercontent.com`
   /// Also set `GIDClientID` + reversed URL scheme in `ios/Runner/Info.plist`
   /// (patched per flavor by `ios/ci_set_flavor.sh`).
+  /// Empty default: `google_sign_in.dart` falls back per `AppFlavor`.
+  /// CI always passes `--dart-define=GOOGLE_IOS_CLIENT_ID=…` (never empty).
   static const googleIosClientId = String.fromEnvironment(
     'GOOGLE_IOS_CLIENT_ID',
     defaultValue: '',

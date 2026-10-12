@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../config/app_version.dart';
 import '../config/market_config.dart';
 
 /// Google Sign-In → ID token for `POST /auth/google`.
@@ -26,14 +27,29 @@ import '../config/market_config.dart';
 ///
 /// Missing Play App Signing SHA-1 → error 10 on Play-installed builds.
 GoogleSignIn? _googleSignInInstance;
+
+/// Public iOS OAuth clients (same defaults as `ios/ci_set_flavor.sh`).
+const _kIosClientPassenger =
+    '58917716638-9qupcijrhjr7dvd5v1efmi9elitmndnd.apps.googleusercontent.com';
+const _kIosClientDriver =
+    '58917716638-q5i6cr1hv085ri1k7tpot6sggvcv9qih.apps.googleusercontent.com';
+
+String _resolvedIosClientId() {
+  final fromEnv = MarketConfig.googleIosClientId.trim();
+  if (fromEnv.isNotEmpty) return fromEnv;
+  return AppFlavor.isDriver ? _kIosClientDriver : _kIosClientPassenger;
+}
+
 GoogleSignIn get _googleSignIn {
   if (_googleSignInInstance != null) return _googleSignInInstance!;
   final serverId = MarketConfig.googleServerClientId.trim();
-  final iosId = MarketConfig.googleIosClientId.trim();
-  final useIosClient =
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS && iosId.isNotEmpty;
+  final useIos = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+  final iosId = useIos ? _resolvedIosClientId() : '';
   _googleSignInInstance = GoogleSignIn(
-    clientId: useIosClient ? iosId : null,
+    // Always pass the iOS client on iPhone so GIDConfiguration is set before
+    // signIn (avoids native "No active configuration" / missing URL scheme
+    // exceptions that the plugin re-raises and that kill the app).
+    clientId: iosId.isNotEmpty ? iosId : null,
     serverClientId: serverId.isEmpty ? null : serverId,
   );
   return _googleSignInInstance!;
@@ -55,8 +71,10 @@ String googleSignInErrorMessage(Object error) {
     }
     if (error.code == 'google_sign_in' ||
         blob.contains('no active configuration') ||
-        blob.contains('gidclientid')) {
-      return 'Google Sign-In iOS non configuré (client OAuth iOS manquant). Utilisez le SMS.';
+        blob.contains('gidclientid') ||
+        blob.contains('url schemes') ||
+        blob.contains('presentingviewcontroller')) {
+      return 'Google Sign-In iOS indisponible sur cet appareil. Utilisez le SMS.';
     }
     if (error.code == '12500' || blob.contains('12500')) {
       return 'Connexion Google indisponible sur cet appareil. Utilisez le SMS.';
@@ -73,27 +91,43 @@ String googleSignInErrorMessage(Object error) {
 }
 
 Future<String?> signInWithGoogleIdToken() async {
+  // Avoid signOut-before-signIn on iOS: a cold GIDSignIn session + signOut has
+  // been observed to throw native exceptions that terminate the app (plugin
+  // re-raises NSException after reporting FlutterError).
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {
+      /* ignore — force a fresh account picker when safe */
+    }
+  }
+
   try {
-    await _googleSignIn.signOut();
-  } catch (_) {
-    /* ignore — force a fresh account picker so a stale session cannot yield a null idToken */
-  }
-  final account = await _googleSignIn.signIn();
-  if (account == null) return null;
-  var auth = await account.authentication;
-  var idToken = auth.idToken;
-  if (idToken == null || idToken.isEmpty) {
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    auth = await account.authentication;
-    idToken = auth.idToken;
-  }
-  if (idToken == null || idToken.isEmpty) {
+    final account = await _googleSignIn.signIn();
+    if (account == null) return null;
+    var auth = await account.authentication;
+    var idToken = auth.idToken;
+    if (idToken == null || idToken.isEmpty) {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      auth = await account.authentication;
+      idToken = auth.idToken;
+    }
+    if (idToken == null || idToken.isEmpty) {
+      throw PlatformException(
+        code: 'id_token_missing',
+        message: 'Google Sign-In returned an account without an ID token',
+      );
+    }
+    return idToken;
+  } on PlatformException {
+    rethrow;
+  } catch (e, st) {
+    debugPrint('Google Sign-In unexpected: $e\n$st');
     throw PlatformException(
-      code: 'id_token_missing',
-      message: 'Google Sign-In returned an account without an ID token',
+      code: 'google_sign_in',
+      message: e.toString(),
     );
   }
-  return idToken;
 }
 
 Future<void> signOutGoogle() async {

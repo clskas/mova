@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { PwaRegister } from "@/components/PwaRegister";
+import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { UpdateBanner } from "@/components/UpdateBanner";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <PwaRegister />
         <UpdateBanner />
         {children}
+        <PwaInstallBanner />
       </body>
     </html>
   );

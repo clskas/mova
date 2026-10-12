@@ -6,11 +6,11 @@ describe('buildMobileAppVersionResponse', () => {
   it('uses defaults when env is empty', () => {
     const payload = buildMobileAppVersionResponse({}, now);
     expect(payload.generatedAt).toBe('2026-08-15T10:00:00.000Z');
-    expect(payload.passenger.currentVersion).toBe('1.0.19');
-    expect(payload.driver.currentVersion).toBe('1.0.19');
+    expect(payload.passenger.currentVersion).toBe('1.0.20');
+    expect(payload.driver.currentVersion).toBe('1.0.20');
     expect(payload.passenger.minVersion).toBe('1.0.0');
-    expect(payload.passenger.currentVersionCode).toBe(131);
-    expect(payload.driver.currentVersionCode).toBe(131);
+    expect(payload.passenger.currentVersionCode).toBe(132);
+    expect(payload.driver.currentVersionCode).toBe(132);
     expect(payload.passenger.minVersionCode).toBe(0);
     expect(payload.passenger.storeUrl).toContain('cd.mova.mova.passenger');
     expect(payload.driver.storeUrl).toContain('cd.mova.mova.driver');

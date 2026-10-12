@@ -830,13 +830,18 @@ export class RidesService {
       ride.sharePassengers.some(
         (p) => p.userId === participantUserId && p.status !== 'CANCELLED',
       );
+    // Chauffeur notifié (offre) mais pas encore assigné : doit pouvoir lire le statut
+    // pour couper la sonnerie / fermer l'écran si le passager annule.
     if (
       participantUserId &&
       ride.passengerId !== participantUserId &&
       ride.driverId !== participantUserId &&
       !isSharePassenger
     ) {
-      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+      const notified = await this.driverIdsNotifiedForRide(rideId);
+      if (!notified.includes(participantUserId)) {
+        throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+      }
     }
     if (ride.isShared) {
       const shared = this.ridePool.formatSharedRide(ride);

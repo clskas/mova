@@ -282,10 +282,58 @@ describe('RidesService', () => {
       updatedAt: new Date(),
       events: [],
       ratings: [],
+      sharePassengers: [],
     });
+    prisma.rideEvent.findMany.mockResolvedValue([]);
     await expect(service.getRide('ride-1', 'stranger')).rejects.toMatchObject({
       response: { code: 'MOVA_AUTH_003' },
     });
+  });
+
+  it('allows a notified (unassigned) driver to read ride status for cancel detection', async () => {
+    prisma.ride.findUnique.mockResolvedValue({
+      id: 'ride-1',
+      passengerId: 'p1',
+      driverId: null,
+      vehicleId: null,
+      status: RideStatus.CANCELLED,
+      vehicleType: VehicleType.MOTO_TAXI,
+      isShared: false,
+      sharePassengers: [],
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      pickupAddress: 'Gombe',
+      dropoffAddress: 'Limete',
+      estimatedFareCdf: 6200,
+      finalFareCdf: null,
+      distanceKm: 4.5,
+      durationMin: 11,
+      acceptedAt: null,
+      startedAt: null,
+      completedAt: null,
+      cancelledAt: new Date(),
+      cancelReason: 'passenger_cancel',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      events: [],
+      ratings: [],
+    });
+    prisma.rideEvent.findMany.mockResolvedValue([
+      { metadata: { driverUserIds: ['driver-notified'] } },
+    ]);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    }) as never;
+
+    const result = (await service.getRide('ride-1', 'driver-notified')) as {
+      status?: string;
+      id?: string;
+    };
+    expect(result.id).toBe('ride-1');
+    expect(String(result.status).toUpperCase()).toMatch(/CANCEL/);
   });
 
   it('cancels ride for passenger with reason', async () => {

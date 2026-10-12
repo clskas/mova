@@ -541,11 +541,24 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       onRideCancelled: (payload) {
         final id = payload['rideId']?.toString();
         if (id == null || id.isEmpty || !mounted) return;
+        final offerKey = DriverJobAlertService.offerKey('ride', id);
+        // Stop immédiat — ne pas attendre le pop de l'écran d'offre.
+        unawaited(DriverJobAlertService.stopRinging(offerKey: offerKey));
+        _dismissedOffers.add('ride:$id');
         setState(() {
           _rideOffers = _rideOffers.where((o) => o['id']?.toString() != id).toList();
         });
-        if (_showingOffer && _openOfferId == id && _openOfferKind == 'ride') {
+        final onThisOffer =
+            _showingOffer && _openOfferId == id && _openOfferKind == 'ride';
+        if (onThisOffer) {
           Navigator.of(context).pop('cancelled');
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Course annulée par le passager'),
+              duration: Duration(seconds: 3),
+            ),
+          );
         }
       },
       onOfferTaken: (payload) {
@@ -555,6 +568,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         final deliveryId = payload['deliveryId']?.toString();
         final id = kind == 'ride' ? rideId : deliveryId;
         if (id == null || id.isEmpty) return;
+        final offerKey = DriverJobAlertService.offerKey(
+          kind == 'delivery' ? 'delivery' : 'ride',
+          id,
+        );
+        unawaited(DriverJobAlertService.stopRinging(offerKey: offerKey));
         setState(() {
           if (kind == 'ride') {
             _rideOffers = _rideOffers.where((o) => o['id']?.toString() != id).toList();

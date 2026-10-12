@@ -12,6 +12,7 @@ import '../../core/billing/driver_earnings_display.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'active_ride_screen.dart';
+import 'driver_job_alert_service.dart';
 
 class RideOfferScreen extends ConsumerStatefulWidget {
   const RideOfferScreen({
@@ -83,6 +84,12 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
     _closingForCancel = true;
     _timer?.cancel();
     _statusPollTimer?.cancel();
+    // Couper la sonnerie immédiatement (ne pas attendre le pop du parent).
+    unawaited(
+      DriverJobAlertService.stopRinging(
+        offerKey: DriverJobAlertService.offerKey('ride', _rideId),
+      ),
+    );
     Navigator.pop(context, 'cancelled');
   }
 
@@ -155,6 +162,10 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
       case Success(:final data):
         _timer?.cancel();
         _statusPollTimer?.cancel();
+        await DriverJobAlertService.stopRinging(
+          offerKey: DriverJobAlertService.offerKey('ride', _rideId),
+        );
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => ActiveRideScreen(ride: data)),

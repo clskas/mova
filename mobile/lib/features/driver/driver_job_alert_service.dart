@@ -29,10 +29,10 @@ class DriverJobAlertService {
   static Timer? _ringSafetyTimer;
   static const _maxRingDuration = Duration(minutes: 3);
 
-  /// v4 : fallback robuste si le canal SENGA casse la publication de la notif.
-  static const _channelSengaId = 'mova_driver_jobs_v4';
-  static const _channelSystemId = 'mova_driver_jobs_system_v2';
-  static const _channelSilentId = 'mova_driver_jobs_silent_v2';
+  /// v5 : aligné FCM (`mova_driver_jobs_v5`) — les canaux Android sont immuables.
+  static const _channelSengaId = 'mova_driver_jobs_v5';
+  static const _channelSystemId = 'mova_driver_jobs_system_v3';
+  static const _channelSilentId = 'mova_driver_jobs_silent_v3';
   static const _channelName = 'Missions & courses SENGA';
   static const _androidSound = RawResourceAndroidNotificationSound('senga_job');
   static const _iosSound = 'senga_job.wav';

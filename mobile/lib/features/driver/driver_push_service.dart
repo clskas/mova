@@ -39,7 +39,28 @@ class DriverPushService {
       FirebaseMessaging.onMessage.listen((message) async {
         final title = message.notification?.title ?? message.data['title']?.toString() ?? 'SENGA Driver';
         final body = message.notification?.body ?? message.data['body']?.toString() ?? 'Nouvelle alerte';
-        await DriverJobAlertService.notify(title: title, body: body, payload: message.data['type']?.toString());
+        final jobKind = message.data['jobKind']?.toString() ?? message.data['type']?.toString() ?? '';
+        final refId = message.data['referenceId']?.toString() ??
+            message.data['rideId']?.toString() ??
+            message.data['deliveryId']?.toString();
+        final isOffer = jobKind.contains('RIDE') ||
+            jobKind.contains('DELIVERY') ||
+            jobKind.contains('OFFER') ||
+            jobKind.contains('JOB');
+        // Évite un 2ᵉ bip « système » pendant que la sonnerie SENGA tourne déjà via le poll.
+        if (isOffer && DriverJobAlertService.isRinging) return;
+        String? offerKey;
+        if (isOffer && refId != null && refId.isNotEmpty) {
+          final kind = jobKind.contains('DELIVERY') ? 'delivery' : 'ride';
+          offerKey = DriverJobAlertService.offerKey(kind, refId);
+        }
+        await DriverJobAlertService.notify(
+          title: title,
+          body: body,
+          payload: jobKind,
+          ringUntilStopped: isOffer,
+          offerKey: offerKey,
+        );
       });
 
       final token = await messaging.getToken();

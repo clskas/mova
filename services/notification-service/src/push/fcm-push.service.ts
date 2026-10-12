@@ -7,8 +7,8 @@ export interface FcmPushMessage {
   data?: Record<string, string>;
 }
 
-/** Canal + son SENGA (doit matcher DriverJobAlertService côté app). */
-export const SENGA_DRIVER_JOB_CHANNEL = 'mova_driver_jobs_v3';
+/** Canal + son SENGA (doit matcher DriverJobAlertService côté app — v5). */
+export const SENGA_DRIVER_JOB_CHANNEL = 'mova_driver_jobs_v5';
 /** Android raw `senga_job` ; iOS bundle `senga_job.wav` (extension requise pour APNs). */
 export const SENGA_DRIVER_JOB_SOUND_ANDROID = 'senga_job';
 export const SENGA_DRIVER_JOB_SOUND_IOS = 'senga_job.wav';

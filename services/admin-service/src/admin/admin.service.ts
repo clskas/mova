@@ -93,12 +93,14 @@ export class AdminService {
     if (!city) {
       return this.getMetricsNational(reportDays);
     }
-    const [driversRes, rides, deliveries, incidents, reports] = await Promise.all([
+    const [driversRes, rides, deliveries, incidents, reports, cityUserIds] = await Promise.all([
       this.listDrivers(0, 500, { includeHidden: false }, city).catch(() => ({ data: [] as Array<Record<string, unknown>> })),
       this.listRides({ skip: 0, take: 200 }, city).catch(() => [] as Array<Record<string, unknown>>),
       this.listDeliveries({ skip: 0, take: 200 }, city).catch(() => [] as Array<Record<string, unknown>>),
       this.fetchJson<{ status?: string; type?: string; lat?: number; lng?: number }[]>('driver', '/internal/incidents').catch(() => []),
       this.getReports(reportDays, city).catch(() => null),
+      // Même logique que la page Utilisateurs (admins ville, passagers, partenaires, chauffeurs).
+      this.collectUserIdsForCities([city]).catch(() => new Set<string>()),
     ]);
     const drivers = Array.isArray(driversRes) ? driversRes : (driversRes as { data?: Array<Record<string, unknown>> }).data ?? [];
     const availableDrivers = drivers.filter((d) => d.isAvailable === true).length;
@@ -129,7 +131,7 @@ export class AdminService {
         ? (reports as { serviceBreakdown?: Record<string, number> }).serviceBreakdown
         : undefined;
     return {
-      users: drivers.length,
+      users: cityUserIds.size,
       drivers: drivers.length,
       availableDrivers,
       pendingKyc,
@@ -365,35 +367,30 @@ export class AdminService {
   }
 
   /**
-   * Users attached to one or more cities: drivers (operatingCity), partners (GPS/city),
-   * passengers (homeCity + ride pickup history), CITY_ADMIN (managedCity).
-   * Builds the allow-list first, then loads those accounts.
+   * IDs utilisateurs rattachés à une/des villes — aligné page Utilisateurs :
+   * chauffeurs, partenaires, passagers (homeCity + courses), CITY_ADMIN (managedCity).
    */
-  private async listUsersInCities(
-    cityList: string[],
-    skip: number,
-    take: number,
-    search?: string,
-    includePlayPrelaunch = false,
-  ) {
-    const cityKeys = new Set(cityList.map((c) => c.toLowerCase()));
-    const citiesParam = encodeURIComponent(cityList.join(','));
+  private async collectUserIdsForCities(cityList: string[]): Promise<Set<string>> {
+    const cities = cityList.map((c) => c.trim()).filter(Boolean);
+    if (cities.length === 0) return new Set();
+    const cityKeys = new Set(cities.map((c) => c.toLowerCase()));
+    const citiesParam = encodeURIComponent(cities.join(','));
     const [driversBundles, restaurantsBundles, rentalBundles, opsStaff, homeCityPassengers, ridePassengerBundles] =
       await Promise.all([
         Promise.all(
-          cityList.map((city) =>
+          cities.map((city) =>
             this.listDrivers(0, 500, { includeHidden: true }, city).catch(() => ({
               data: [] as Array<{ userId?: string; id?: string }>,
             })),
           ),
         ),
         Promise.all(
-          cityList.map((city) =>
+          cities.map((city) =>
             this.listRestaurants(city).catch(() => [] as Array<{ ownerUserId?: string | null }>),
           ),
         ),
         Promise.all(
-          cityList.map((city) =>
+          cities.map((city) =>
             this.listRentalVehicles(city).catch(() => [] as Array<{ ownerUserId?: string | null }>),
           ),
         ),
@@ -405,7 +402,7 @@ export class AdminService {
           `/internal/users/by-home-city?cities=${citiesParam}&role=PASSENGER`,
         ).catch(() => []),
         Promise.all(
-          cityList.map((city) =>
+          cities.map((city) =>
             this.fetchJson<{ passengerIds?: string[] }>(
               'ride',
               `/internal/rides/passengers-by-city?city=${encodeURIComponent(city)}&take=2000`,
@@ -450,7 +447,22 @@ export class AdminService {
         if (id) allowedIds.add(String(id));
       }
     }
+    return allowedIds;
+  }
 
+  /**
+   * Users attached to one or more cities: drivers (operatingCity), partners (GPS/city),
+   * passengers (homeCity + ride pickup history), CITY_ADMIN (managedCity).
+   * Builds the allow-list first, then loads those accounts.
+   */
+  private async listUsersInCities(
+    cityList: string[],
+    skip: number,
+    take: number,
+    search?: string,
+    includePlayPrelaunch = false,
+  ) {
+    const allowedIds = await this.collectUserIdsForCities(cityList);
     const ids = [...allowedIds];
     type Row = {
       id: string;

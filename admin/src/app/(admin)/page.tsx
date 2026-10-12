@@ -90,14 +90,15 @@ export default function DashboardPage() {
   const m = useMemo(() => {
     const base = normalizeMetrics(metrics);
     const kpis = reports?.kpis;
-    if (!kpis) return base;
+    const cityLabel = scopedCity || "RDC";
+    if (!kpis) return { ...base, city: cityLabel };
     return {
       ...base,
       totalRides: kpis.totalRides ?? base.totalRides,
       completedRides: kpis.completedRides ?? base.completedRides,
       cancelledRides: kpis.cancelledRides ?? base.cancelledRides,
       totalRevenueCdf: kpis.totalRevenueCdf ?? base.totalRevenueCdf,
-      city: reports?.city?.trim() || scopedCity || base.city,
+      city: cityLabel,
     };
   }, [metrics, reports, scopedCity]);
 
@@ -156,15 +157,18 @@ export default function DashboardPage() {
     <div className="max-w-7xl mx-auto space-y-6">
       <PageHeader
         title="Tableau de bord"
-        subtitle={`${scopedCity || m.city} · ${scopedCity ? `filtre ${scopedCity}` : "couverture nationale"} · ${period}j · ${lastUpdate ? `MAJ ${lastUpdate.toLocaleTimeString("fr-CD")}` : ""}`}
+        subtitle={`${scopedCity || "RDC"} · ${scopedCity ? `filtre ${scopedCity}` : "couverture nationale"} · ${period}j · ${lastUpdate ? `MAJ ${lastUpdate.toLocaleTimeString("fr-CD")}` : ""}`}
         action={
           <div className="flex flex-wrap items-center gap-2 relative z-10">
             {role !== "CITY_ADMIN" && (
-              <div className="min-w-[10rem]">
+              <label className="min-w-[11rem] flex flex-col gap-0.5">
+                <span className="text-[11px] font-medium text-gray-500 px-0.5">Ville</span>
                 <SelectInput
                   value={cityFilter}
                   onChange={(v) => {
                     setCityFilter(v);
+                    setMetrics({});
+                    setReports(null);
                     setLoading(true);
                   }}
                   options={[
@@ -172,38 +176,49 @@ export default function DashboardPage() {
                     ...MOVA_CITIES.map((c) => ({ value: c, label: c })),
                   ]}
                 />
-              </div>
+              </label>
             )}
-            {([7, 30, 90] as Period[]).map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => {
-                  setPeriod(d);
-                  setLoading(true);
-                }}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  period === d ? "bg-[#6366f1] text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                {d}j
-              </button>
-            ))}
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[11px] font-medium text-gray-500 px-0.5">Période</span>
+              <div className="flex gap-1">
+                {([7, 30, 90] as Period[]).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => {
+                      setPeriod(d);
+                      setLoading(true);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      period === d ? "bg-[#6366f1] text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    {d}j
+                  </button>
+                ))}
+              </div>
+            </div>
             <button
               type="button"
               onClick={() => setAutoRefresh((v) => !v)}
-              className={`px-3 py-1.5 rounded-lg text-sm border ${
+              className={`self-end px-3 py-1.5 rounded-lg text-sm border ${
                 autoRefresh ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 text-gray-500"
               }`}
             >
               {autoRefresh ? "Auto 60s" : "Manuel"}
             </button>
-            <button type="button" onClick={() => { setLoading(true); void load(); }} className="mova-btn-primary text-sm">
+            <button type="button" onClick={() => { setLoading(true); void load(); }} className="self-end mova-btn-primary text-sm">
               Actualiser
             </button>
           </div>
         }
       />
+      {scopedCity ? (
+        <p className="text-sm text-[#6366f1] -mt-3">
+          Filtre actif : <strong>{scopedCity}</strong>
+          {typeof m.totalUsers === "number" ? ` · ${m.totalUsers} utilisateur${m.totalUsers === 1 ? "" : "s"}` : null}
+        </p>
+      ) : null}
 
       <ConnectionCard />
 

@@ -3,15 +3,18 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/config/app_version.dart';
 import '../../core/error/result.dart';
+import '../driver/driver_job_alert_service.dart';
+import '../passenger/passenger_alert_service.dart';
 import 'chat_alert_service.dart';
 
-/// Poll léger des notifications serveur pour afficher une bannière chat / reçu
-/// même hors écran chat, sans dépendre de FCM (fonctionne tant que l'app tourne).
+/// Poll léger des notifications serveur pour afficher une bannière chat / SOS
+/// même hors écran dédié, sans dépendre de FCM (fonctionne tant que l'app tourne).
 ///
 /// Le premier passage mémorise les notifications existantes sans alerter (évite
-/// un flot au démarrage) ; ensuite seules les nouvelles notifications `CHAT_MESSAGE`
-/// non lues déclenchent une bannière locale.
+/// un flot au démarrage) ; ensuite les nouvelles `CHAT_MESSAGE` / `INCIDENT_CREATED`
+/// (SOS) non lues déclenchent une bannière locale.
 class ChatPollService {
   ChatPollService(this._api);
 
@@ -61,8 +64,21 @@ class ChatPollService {
         }
         if (_seenNotificationIds.contains(id)) continue;
         _seenNotificationIds.add(id);
-        if (!isChat) continue;
         if (n['read'] == true) continue;
+
+        final type = n['type']?.toString() ?? '';
+        if (type == 'INCIDENT_CREATED') {
+          final title = n['title']?.toString() ?? 'Alerte SOS';
+          final body = n['body']?.toString() ?? 'Urgence signalée sur SENGA';
+          if (AppFlavor.isDriver) {
+            await DriverJobAlertService.notify(title: title, body: body, payload: 'SOS');
+          } else {
+            await PassengerAlertService.notify(title: title, body: body);
+          }
+          continue;
+        }
+
+        if (!isChat) continue;
 
         final data = (n['data'] is Map) ? n['data'] as Map : const {};
         final kind = data['kind']?.toString() ?? 'ride';

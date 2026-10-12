@@ -14,6 +14,8 @@ describe('buildMobileAppVersionResponse', () => {
     expect(payload.passenger.minVersionCode).toBe(0);
     expect(payload.passenger.storeUrl).toContain('cd.mova.mova.passenger');
     expect(payload.driver.storeUrl).toContain('cd.mova.mova.driver');
+    expect(payload.passenger.storeUrlIos).toContain('apps.apple.com');
+    expect(payload.driver.storeUrlIos).toContain('apps.apple.com');
   });
 
   it('reads MOBILE_* and Play Store env vars above the floor', () => {

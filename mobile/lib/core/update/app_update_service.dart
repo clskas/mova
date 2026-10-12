@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -124,9 +125,18 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     unawaited(check());
   }
 
-  static String get defaultStoreUrl => AppFlavor.isDriver
-      ? 'https://play.google.com/store/apps/details?id=cd.mova.mova.driver'
-      : 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger';
+  static bool get _isIos => !kIsWeb && Platform.isIOS;
+
+  static String get defaultStoreUrl {
+    if (_isIos) {
+      return AppFlavor.isDriver
+          ? 'https://apps.apple.com/app/id6818769267'
+          : 'https://apps.apple.com/app/id6818768971';
+    }
+    return AppFlavor.isDriver
+        ? 'https://play.google.com/store/apps/details?id=cd.mova.mova.driver'
+        : 'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger';
+  }
 
   /// Installed Play versionCode (PackageInfo), falling back to compile-time APP_BUILD.
   static Future<int> resolveLocalBuild() async {
@@ -362,7 +372,11 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     if (block == null) return null;
     final current = block['currentVersion']?.toString().trim() ?? '';
     final min = block['minVersion']?.toString().trim() ?? '1.0.0';
-    final storeUrl = block['storeUrl']?.toString();
+    final storeUrlAndroid = block['storeUrl']?.toString().trim();
+    final storeUrlIos = block['storeUrlIos']?.toString().trim();
+    final storeUrl = (!kIsWeb && Platform.isIOS)
+        ? (storeUrlIos?.isNotEmpty == true ? storeUrlIos : storeUrlAndroid)
+        : storeUrlAndroid;
     if (current.isEmpty) return null;
     final minCode = _asInt(block['minVersionCode']);
     final currentCode = _asInt(block['currentVersionCode']);

@@ -87,6 +87,23 @@ export class NotificationsService implements OnModuleInit {
     await this.fcm.sendToTokens(tokens, { title, body, data });
   }
 
+  /** Push FCM tous flavors (passenger + driver) — ops / audiences SOS. */
+  private async pushToUsersAnyFlavor(
+    userIds: string[],
+    title: string,
+    body: string,
+    data?: Record<string, string>,
+  ) {
+    if (!this.fcm.isConfigured() || userIds.length === 0) return 0;
+    const tokens = await this.pushTokens.tokensForUsersAnyFlavor(userIds);
+    if (tokens.length === 0) {
+      this.logger.warn(`FCM SOS: 0 token pour ${userIds.length} destinataire(s)`);
+      return 0;
+    }
+    await this.fcm.sendToTokens(tokens, { title, body, data });
+    return tokens.length;
+  }
+
   /** Web Push + SMS optionnel pour portails restaurant / location. */
   private async alertPartner(options: {
     ownerUserId: string;
@@ -206,7 +223,7 @@ export class NotificationsService implements OnModuleInit {
       payload,
     );
 
-    // Ops: SUPER_ADMIN / ADMIN / SUPPORT / CITY_ADMIN — notif in-app + push + SMS (SOS).
+    // Ops + audiences (PASSENGER/DRIVER/PARTNER) depuis la config admin Alertes SOS.
     const staff = await fetchOpsStaffForAlerts();
     const recipients = staff.filter((s) => s.id !== payload.userId);
     const maps =
@@ -216,30 +233,88 @@ export class NotificationsService implements OnModuleInit {
     const staffBody = isSos
       ? `SOS urgent — ouvrez Litiges dans l'admin.${maps}`
       : `Nouvel incident ${payload.type} — Litiges admin.`;
-    const staffIds: string[] = [];
+    const audienceBody = isSos
+      ? `Alerte SOS SENGA — une urgence a été signalée. L'équipe support intervient.${maps}`
+      : `Incident SENGA (${payload.type}).`;
+
+    const opsIds: string[] = [];
+    const audienceDriverIds: string[] = [];
+    const audiencePassengerIds: string[] = [];
+    const partnerRestaurantIds: string[] = [];
+    const partnerRentalIds: string[] = [];
+    let smsSent = 0;
+
     for (const s of recipients) {
-      await this.create(s.id, title, staffBody, 'INCIDENT_CREATED', {
+      const forOps = !s.audienceOnly;
+      await this.create(s.id, title, forOps ? staffBody : audienceBody, 'INCIDENT_CREATED', {
         ...payload,
-        forOps: true,
+        forOps,
       });
-      staffIds.push(s.id);
-      // SMS reserved for ops agents — never mass-SMS passengers/drivers/partners.
-      if (isSos && s.phone && !s.audienceOnly) {
-        await this.sms.sendMessage(
-          s.phone,
-          `SENGA SOS — ${payload.type}${payload.rideId ? ` course ${payload.rideId.slice(0, 8)}` : ''}.${maps}`.slice(0, 160),
-        );
+      if (forOps) {
+        opsIds.push(s.id);
+        // SMS réservé aux agents ops (jamais de SMS de masse audiences).
+        if (isSos && s.phone) {
+          const smsResult = await this.sms.sendMessage(
+            s.phone,
+            `SENGA SOS — ${payload.type}${payload.rideId ? ` course ${payload.rideId.slice(0, 8)}` : ''}.${maps}`.slice(0, 160),
+          );
+          if (smsResult?.success) smsSent += 1;
+        }
+      } else {
+        const role = String(s.role ?? '').toUpperCase();
+        if (role === 'DRIVER') audienceDriverIds.push(s.id);
+        else if (role === 'PASSENGER') audiencePassengerIds.push(s.id);
+        else if (role === 'RESTAURANT') partnerRestaurantIds.push(s.id);
+        else if (role === 'RENTAL_PARTNER') partnerRentalIds.push(s.id);
       }
     }
-    if (staffIds.length > 0) {
-      await this.pushToDrivers(staffIds, title, staffBody, {
-        type: 'INCIDENT_CREATED',
-        incidentId: payload.incidentId,
-        emergency: isSos ? '1' : '0',
+
+    const pushData = {
+      type: 'INCIDENT_CREATED',
+      incidentId: payload.incidentId,
+      emergency: isSos ? '1' : '0',
+    };
+    // FCM tous flavors — les ops n'ont souvent pas de token « driver ».
+    const fcmOps = await this.pushToUsersAnyFlavor(opsIds, title, staffBody, pushData);
+    const fcmDrivers = await this.pushToUsersAnyFlavor(
+      audienceDriverIds,
+      title,
+      audienceBody,
+      pushData,
+    );
+    const fcmPassengers = await this.pushToUsersAnyFlavor(
+      audiencePassengerIds,
+      title,
+      audienceBody,
+      pushData,
+    );
+
+    for (const ownerId of partnerRestaurantIds) {
+      await this.alertPartner({
+        ownerUserId: ownerId,
+        appFlavor: 'restaurant',
+        title,
+        body: audienceBody,
+        tag: `sos-${payload.incidentId}`,
+        portalPath: '/',
       });
     }
+    for (const ownerId of partnerRentalIds) {
+      await this.alertPartner({
+        ownerUserId: ownerId,
+        appFlavor: 'rental_partner',
+        title,
+        body: audienceBody,
+        tag: `sos-${payload.incidentId}`,
+        portalPath: '/',
+      });
+    }
+
     this.logger.warn(
-      `incident.created ${payload.incidentId} type=${payload.type} emergency=${isSos} staff=${staffIds.length}`,
+      `incident.created ${payload.incidentId} type=${payload.type} emergency=${isSos} ` +
+        `ops=${opsIds.length} sms=${smsSent} fcmOps=${fcmOps} ` +
+        `audDrv=${audienceDriverIds.length}/${fcmDrivers} audPax=${audiencePassengerIds.length}/${fcmPassengers} ` +
+        `partners=${partnerRestaurantIds.length + partnerRentalIds.length}`,
     );
   }
 

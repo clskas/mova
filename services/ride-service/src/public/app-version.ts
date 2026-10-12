@@ -1,7 +1,10 @@
 export type MobileAppVersionBlock = {
   currentVersion: string;
   minVersion: string;
+  /** Android Play Store (défaut historique). */
   storeUrl: string;
+  /** App Store iOS — utilisé par les apps iPhone/iPad. */
+  storeUrlIos: string;
   currentVersionCode: number;
   minVersionCode: number;
 };
@@ -16,6 +19,8 @@ const DEFAULT_PASSENGER_STORE =
   'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger';
 const DEFAULT_DRIVER_STORE =
   'https://play.google.com/store/apps/details?id=cd.mova.mova.driver';
+const DEFAULT_PASSENGER_STORE_IOS = 'https://apps.apple.com/app/id6818768971';
+const DEFAULT_DRIVER_STORE_IOS = 'https://apps.apple.com/app/id6818769267';
 
 /**
  * Marketing name floor must match latest Play / App Store marketing version.
@@ -77,6 +82,7 @@ export function buildMobileAppVersionResponse(
       currentVersion: advertisedVersion(env.MOBILE_PASSENGER_VERSION, CURRENT_VERSION_FLOOR),
       minVersion,
       storeUrl: env.PLAY_STORE_PASSENGER_URL?.trim() || DEFAULT_PASSENGER_STORE,
+      storeUrlIos: env.APP_STORE_PASSENGER_URL?.trim() || DEFAULT_PASSENGER_STORE_IOS,
       currentVersionCode: advertisedVersionCode(
         env.MOBILE_PASSENGER_VERSION_CODE,
         CURRENT_VERSION_CODE_FLOOR,
@@ -87,6 +93,7 @@ export function buildMobileAppVersionResponse(
       currentVersion: advertisedVersion(env.MOBILE_DRIVER_VERSION, CURRENT_VERSION_FLOOR),
       minVersion,
       storeUrl: env.PLAY_STORE_DRIVER_URL?.trim() || DEFAULT_DRIVER_STORE,
+      storeUrlIos: env.APP_STORE_DRIVER_URL?.trim() || DEFAULT_DRIVER_STORE_IOS,
       currentVersionCode: advertisedVersionCode(
         env.MOBILE_DRIVER_VERSION_CODE,
         CURRENT_VERSION_CODE_FLOOR,

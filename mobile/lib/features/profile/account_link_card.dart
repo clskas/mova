@@ -299,6 +299,10 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
                 controller: _otpCtrl,
                 label: 'Code OTP reçu par SMS',
                 enabled: !_busy,
+                forOneTimeCode: true,
+                onCompleted: (_) {
+                  if (!_busy) _linkPhone();
+                },
               ),
             ],
             const SizedBox(height: 12),

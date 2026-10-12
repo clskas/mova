@@ -29,7 +29,8 @@ export interface SmsProvider {
 }
 
 export function otpSmsText(brand: string, code: string): string {
-  return `Votre code ${brand} ${code} Valide 10 minutes`;
+  // Format reconnu par l’autofill iOS/Android (« code: 123456 »).
+  return `Votre code ${brand} : ${code}. Valide 10 minutes. Ne partagez pas ce code.`;
 }
 
 @Injectable()
@@ -96,7 +97,7 @@ export class SerdiPaySmsProvider implements SmsProvider {
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
     const result = await serdiPaySendSms(this.get, {
       to: phone,
-      message: `Votre code MOVA ${code} Valide 10 minutes`,
+      message: otpSmsText('MOVA', code),
     });
     if (!result.success) this.logger.warn(`SerdiPay SMS: ${result.message}`);
     return result;
@@ -119,7 +120,7 @@ export class AfricasTalkingSmsProvider implements SmsProvider {
   async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
     const result = await africasTalkingSendSms(this.get, {
       to: phone,
-      message: `Votre code MOVA ${code} Valide 10 minutes`,
+      message: otpSmsText('MOVA', code),
     });
     if (!result.success) this.logger.warn(`Africa's Talking SMS: ${result.message}`);
     return result;
@@ -177,7 +178,7 @@ export class TwilioSmsProvider implements SmsProvider {
         body: new URLSearchParams({
           To: phone,
           From: from!,
-          Body: `Votre code MOVA ${code} Valide 10 minutes`,
+          Body: otpSmsText('MOVA', code),
         }),
       });
       if (!res.ok) {

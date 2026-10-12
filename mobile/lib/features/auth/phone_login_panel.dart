@@ -74,6 +74,14 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         !_pinSubmitLock) {
       _loginWithPin();
     }
+    // Autofill SMS / saisie : valider dès 6 chiffres (comme WhatsApp).
+    if (!_loading && _codeController.text.trim().length == 6) {
+      if (_step == PhoneLoginStep.otp) {
+        _verifyOtp();
+      } else if (_step == PhoneLoginStep.googleOtp) {
+        _verifyGoogleOtp();
+      }
+    }
   }
 
   Future<void> _restoreSavedPhone() async {
@@ -595,6 +603,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
                 : 'Code reçu par SMS',
             autofocus: true,
             enabled: !_loading,
+            forOneTimeCode: true,
           ),
           if (kDebugMode && _mockHint != null) ...[
             const SizedBox(height: 8),

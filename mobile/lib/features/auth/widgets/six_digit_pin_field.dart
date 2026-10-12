@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/mova_colors.dart';
 
-/// Champ de saisie d'un code à 6 chiffres (PIN ou OTP).
+/// Champ de saisie d'un code à 6 chiffres (PIN local ou OTP SMS/e-mail).
+///
+/// Pour un OTP SMS, passer [forOneTimeCode] afin d’activer l’autofill système
+/// (bannière « De Messages » / clavier Android, comme WhatsApp).
 class SixDigitPinField extends StatelessWidget {
   const SixDigitPinField({
     super.key,
@@ -10,6 +13,8 @@ class SixDigitPinField extends StatelessWidget {
     this.label = 'Code à 6 chiffres',
     this.enabled = true,
     this.autofocus = false,
+    this.forOneTimeCode = false,
+    this.onCompleted,
   });
 
   final TextEditingController controller;
@@ -17,20 +22,38 @@ class SixDigitPinField extends StatelessWidget {
   final bool enabled;
   final bool autofocus;
 
+  /// OTP SMS / e-mail : suggestion automatique du code (pas pour le PIN local).
+  final bool forOneTimeCode;
+
+  /// Appelé quand les 6 chiffres sont saisis (autofill ou clavier).
+  final ValueChanged<String>? onCompleted;
+
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    final field = TextField(
       controller: controller,
       keyboardType: TextInputType.number,
       maxLength: 6,
       autofocus: autofocus,
       enabled: enabled,
-      obscureText: true,
+      // obscureText bloque l’autofill OTP sur iOS/Android — uniquement pour le PIN.
+      obscureText: !forOneTimeCode,
+      autofillHints: forOneTimeCode
+          ? const [AutofillHints.oneTimeCode]
+          : null,
+      enableSuggestions: forOneTimeCode,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      textInputAction: TextInputAction.done,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: const Icon(Icons.pin_outlined),
+        prefixIcon: Icon(
+          forOneTimeCode ? Icons.sms_outlined : Icons.pin_outlined,
+        ),
         counterText: '',
+        helperText: forOneTimeCode
+            ? 'Astuce : acceptez la suggestion du code au-dessus du clavier'
+            : null,
+        helperMaxLines: 2,
       ),
       style: const TextStyle(
         fontSize: 22,
@@ -40,6 +63,14 @@ class SixDigitPinField extends StatelessWidget {
       ),
       textAlign: TextAlign.center,
       scrollPadding: const EdgeInsets.fromLTRB(20, 24, 20, 140),
+      onChanged: (value) {
+        if (value.trim().length == 6) {
+          onCompleted?.call(value.trim());
+        }
+      },
     );
+
+    if (!forOneTimeCode) return field;
+    return AutofillGroup(child: field);
   }
 }

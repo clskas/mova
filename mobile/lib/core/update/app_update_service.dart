@@ -125,7 +125,8 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     unawaited(check());
   }
 
-  static bool get _isIos => !kIsWeb && Platform.isIOS;
+  static bool get _isIos =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   static String get defaultStoreUrl {
     if (_isIos) {
@@ -374,7 +375,8 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     final min = block['minVersion']?.toString().trim() ?? '1.0.0';
     final storeUrlAndroid = block['storeUrl']?.toString().trim();
     final storeUrlIos = block['storeUrlIos']?.toString().trim();
-    final storeUrl = (!kIsWeb && Platform.isIOS)
+    final preferIos = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+    final storeUrl = preferIos
         ? (storeUrlIos?.isNotEmpty == true ? storeUrlIos : storeUrlAndroid)
         : storeUrlAndroid;
     if (current.isEmpty) return null;

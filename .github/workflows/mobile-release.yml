@@ -690,6 +690,7 @@ jobs:
             export ASC_VERSION=1.0.20
             export ASC_BUILD_NUMBER="${{ github.run_number }}"
             export ASC_SUBMIT=true
+            export ASC_REPLACE_IN_REVIEW=true
             export ASC_SUBMIT_ATTEMPTS=8
             export ASC_SUBMIT_RETRY_SECONDS=60
             python "$(git rev-parse --show-toplevel)/scripts/asc_update_review_and_submit.py"
@@ -719,6 +720,8 @@ jobs:
           ASC_VERSION: '1.0.20'
           ASC_BUILD_NUMBER: ${{ inputs.asc_build_number }}
           ASC_SUBMIT: 'true'
+          # Cancel WAITING_FOR_REVIEW so we can attach the new TestFlight build.
+          ASC_REPLACE_IN_REVIEW: 'true'
           ASC_SUBMIT_ATTEMPTS: '8'
           ASC_SUBMIT_RETRY_SECONDS: '60'
         run: |
@@ -728,6 +731,6 @@ jobs:
             exit 1
           fi
           python3 -m pip install --quiet PyJWT cryptography
-          echo "ASC_VERSION=$ASC_VERSION ASC_BUILD_NUMBER=${ASC_BUILD_NUMBER:-<latest VALID>}"
+          echo "ASC_VERSION=$ASC_VERSION ASC_BUILD_NUMBER=${ASC_BUILD_NUMBER:-<latest VALID>} ASC_REPLACE_IN_REVIEW=$ASC_REPLACE_IN_REVIEW"
           python3 scripts/asc_update_review_and_submit.py
           # (ubuntu + setup-python: system pip is fine)

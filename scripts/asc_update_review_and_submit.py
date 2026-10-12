@@ -9,6 +9,9 @@ Env (required):
 Optional:
   ASC_APPS=passenger,driver   # default both
   ASC_SUBMIT=true|false       # default true
+  ASC_REPLACE_IN_REVIEW=true  # cancel WAITING_FOR_REVIEW / IN_REVIEW then attach + resubmit
+  ASC_VERSION=1.0.20          # marketing version to submit
+  ASC_BUILD_NUMBER=126        # prefer this TestFlight build number
 """
 from __future__ import annotations
 
@@ -181,6 +184,24 @@ EDITABLE_STATES = (
 )
 
 
+def patch_version_string(token: str, version_id: str, version_string: str) -> dict:
+    """Rename an editable marketing version (e.g. 1.0.18 → 1.0.20 after reject)."""
+    updated = api(
+        "PATCH",
+        f"/v1/appStoreVersions/{version_id}",
+        token,
+        {
+            "data": {
+                "type": "appStoreVersions",
+                "id": version_id,
+                "attributes": {"versionString": version_string},
+            }
+        },
+    )
+    print(f"patched versionString → {version_string} ({version_id})")
+    return updated.get("data") or {"id": version_id, "attributes": {"versionString": version_string}}
+
+
 def get_or_create_editable_version(token: str, app_id: str, version_string: str) -> dict:
     """Return an editable App Store version, creating `version_string` if needed."""
     for state in EDITABLE_STATES:
@@ -192,8 +213,15 @@ def get_or_create_editable_version(token: str, app_id: str, version_string: str)
                 return row
         rows = data.get("data") or []
         if rows:
-            # Prefer any editable version (even if marketing string differs).
-            return max(rows, key=_version_rank)
+            # Prefer any editable version; rename marketing string if needed.
+            row = max(rows, key=_version_rank)
+            ver = (row.get("attributes") or {}).get("versionString")
+            if ver != version_string:
+                try:
+                    return patch_version_string(token, row["id"], version_string)
+                except Exception as e:
+                    print(f"versionString patch {ver}→{version_string} failed: {e}")
+            return row
 
     # Create a new IOS version for submission.
     try:
@@ -233,14 +261,49 @@ def ensure_whats_new(token: str, version_id: str, text: str | None = None) -> No
     body_text = (text or os.environ.get("ASC_WHATS_NEW") or DEFAULT_WHATS_NEW).strip()
     if not body_text:
         return
-    data = api("GET", f"/v1/appStoreVersions/{version_id}/appStoreVersionLocalizations", token)
-    for loc in data.get("data") or []:
+    q = urllib.parse.urlencode(
+        {
+            "fields[appStoreVersionLocalizations]": "locale,whatsNew,description",
+            "limit": 50,
+        }
+    )
+    data = api(
+        "GET",
+        f"/v1/appStoreVersions/{version_id}/appStoreVersionLocalizations?{q}",
+        token,
+    )
+    locs = data.get("data") or []
+    print(f"localizations found={len(locs)} for version {version_id}", flush=True)
+    if not locs:
+        # Create a French localization with what's new (required for submit).
+        created = api(
+            "POST",
+            "/v1/appStoreVersionLocalizations",
+            token,
+            {
+                "data": {
+                    "type": "appStoreVersionLocalizations",
+                    "attributes": {
+                        "locale": "fr-FR",
+                        "whatsNew": body_text[:4000],
+                    },
+                    "relationships": {
+                        "appStoreVersion": {
+                            "data": {"type": "appStoreVersions", "id": version_id}
+                        }
+                    },
+                }
+            },
+        )
+        print(f"created fr-FR localization {created['data']['id']} with whatsNew", flush=True)
+        return
+    for loc in locs:
         loc_id = loc["id"]
         attrs = loc.get("attributes") or {}
         locale = attrs.get("locale")
         current = (attrs.get("whatsNew") or "").strip()
         if current:
-            print(f"whatsNew already set for {locale}")
+            print(f"whatsNew already set for {locale}", flush=True)
             continue
         api(
             "PATCH",
@@ -254,7 +317,7 @@ def ensure_whats_new(token: str, version_id: str, text: str | None = None) -> No
                 }
             },
         )
-        print(f"whatsNew set for {locale}")
+        print(f"whatsNew set for {locale} ({loc_id})", flush=True)
 
 
 def find_latest_processed_build(token: str, app_id: str, prefer_number: str | None = None) -> dict:
@@ -357,6 +420,69 @@ def find_open_review_submission(token: str, app_id: str) -> dict | None:
     return rows[0] if rows else None
 
 
+def find_in_flight_review_submission(token: str, app_id: str) -> dict | None:
+    """WAITING_FOR_REVIEW / IN_REVIEW — must cancel before attaching a new build."""
+    q = urllib.parse.urlencode(
+        {
+            "filter[app]": app_id,
+            "filter[state]": "WAITING_FOR_REVIEW,IN_REVIEW",
+            "limit": 10,
+        }
+    )
+    data = api("GET", f"/v1/reviewSubmissions?{q}", token)
+    rows = data.get("data") or []
+    return rows[0] if rows else None
+
+
+def cancel_in_flight_review(token: str, app_id: str) -> bool:
+    """Developer-reject: remove submission from App Review queue.
+
+    Version becomes DEVELOPER_REJECTED (editable) so we can attach a new build
+    and resubmit. Returns True if a cancel was issued.
+    """
+    submission = find_in_flight_review_submission(token, app_id)
+    if not submission:
+        print("no WAITING_FOR_REVIEW/IN_REVIEW submission to cancel")
+        return False
+    sid = submission["id"]
+    state = (submission.get("attributes") or {}).get("state")
+    print(f"canceling reviewSubmission id={sid} state={state}")
+    api(
+        "PATCH",
+        f"/v1/reviewSubmissions/{sid}",
+        token,
+        {
+            "data": {
+                "type": "reviewSubmissions",
+                "id": sid,
+                "attributes": {"canceled": True},
+            }
+        },
+    )
+    print(f"canceled reviewSubmission {sid}")
+    return True
+
+
+def wait_version_editable(
+    token: str, app_id: str, version_string: str, timeout_s: int = 120
+) -> dict:
+    """Poll until an editable version appears after cancel (DEVELOPER_REJECTED)."""
+    deadline = time.time() + timeout_s
+    last: dict | None = None
+    while time.time() < deadline:
+        try:
+            last = get_or_create_editable_version(token, app_id, version_string)
+            state = (last.get("attributes") or {}).get("appStoreState")
+            if state in EDITABLE_STATES:
+                return last
+        except Exception as e:
+            print(f"wait editable: {e}")
+        time.sleep(5)
+    if last:
+        return last
+    raise RuntimeError(f"No editable version for app {app_id} after cancel")
+
+
 def submit_version(token: str, app_id: str, version_id: str) -> None:
     """Modern Review Submissions API (appStoreVersionSubmissions CREATE is deprecated)."""
     submission = find_open_review_submission(token, app_id)
@@ -432,6 +558,11 @@ def process_app(token: str, key: str, do_submit: bool) -> None:
     app_id = find_app_id(token, cfg["bundle_id"])
     version_string = os.environ.get("ASC_VERSION", "1.0.18").strip() or "1.0.18"
     prefer_build = os.environ.get("ASC_BUILD_NUMBER", "").strip() or None
+    replace_in_review = os.environ.get("ASC_REPLACE_IN_REVIEW", "false").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
     version = get_or_create_editable_version(token, app_id, version_string)
     attrs = version.get("attributes") or {}
@@ -439,6 +570,17 @@ def process_app(token: str, key: str, do_submit: bool) -> None:
     state = attrs.get("appStoreState")
     ver = attrs.get("versionString")
     print(f"version={ver} state={state} id={version_id}")
+
+    if state in ("WAITING_FOR_REVIEW", "IN_REVIEW") and replace_in_review:
+        print(f"ASC_REPLACE_IN_REVIEW: cancel {state} then attach build {prefer_build or 'latest'}")
+        cancel_in_flight_review(token, app_id)
+        time.sleep(8)
+        version = wait_version_editable(token, app_id, version_string)
+        attrs = version.get("attributes") or {}
+        version_id = version["id"]
+        state = attrs.get("appStoreState")
+        ver = attrs.get("versionString")
+        print(f"after cancel: version={ver} state={state} id={version_id}")
 
     # Attach newest processed TestFlight build (prefer CI build number when set).
     try:
@@ -468,7 +610,7 @@ def process_app(token: str, key: str, do_submit: bool) -> None:
         return "notes_only"
 
     if state in ("WAITING_FOR_REVIEW", "IN_REVIEW"):
-        print(f"already in review state={state} — skip submit")
+        print(f"already in review state={state} — skip submit (set ASC_REPLACE_IN_REVIEW=true to replace)")
         return "already_in_review"
 
     if state not in EDITABLE_STATES:

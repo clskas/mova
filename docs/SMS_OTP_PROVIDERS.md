@@ -31,9 +31,10 @@ Mobile Money reste indépendant (`MOBILE_MONEY_GATEWAY=serdipay`).
 
 | Ce qu’ils veulent en pratique | Lien à donner |
 |-------------------------------|---------------|
-| Endpoint **d’envoi** que SENGA / le hub appelle chez eux | `https://apis.serdipay.com/api/sms-api/v1/send` |
-| Hub AfriSoft (côté SENGA, pas SerdiPay) | `https://sms.afri-soft.com` (`POST /v1/sms/send`) |
-| Callback DLR / webhook (si ils en demandent un) | **Pas encore exposé** côté hub SMS — confirmer avec SerdiPay s’ils exigent un URL de rapport ; sinon N/A |
+| Domaine / IP sortant (whitelist marchand) | `https://sms.afri-soft.com` · IP `178.104.82.66` |
+| Endpoint **d’envoi** que le hub appelle chez eux | `https://apis.serdipay.com/api/sms-api/v1/send` |
+| Callback **paiement** (souvent confondu avec SMS) | `https://pay.afri-soft.com/webhooks/serdipay` |
+| Callback DLR SMS | **Pas exposé** — OTP est synchrone ; confirmer avec SerdiPay s’ils en exigent un |
 
 En prod SENGA n’appelle pas SerdiPay depuis Render : le VPS hub `sms.afri-soft.com` détient `SERDIPAY_SMS_*` et POST vers `apis.serdipay.com`.
 

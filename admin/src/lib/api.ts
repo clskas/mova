@@ -40,6 +40,7 @@ export type AdminMetrics = {
   todayRides?: number;
   todayCompleted?: number;
   todayRevenueCdf?: number;
+  periodDays?: number;
 };
 
 export type AdminReports = {

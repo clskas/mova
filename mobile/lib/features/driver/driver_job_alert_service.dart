@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../core/config/market_config.dart';
@@ -16,6 +16,9 @@ import 'driver_alert_prefs.dart';
 ///
 /// En premier plan, beaucoup d’Android restent muets sur les notifs locales :
 /// on joue donc aussi le WAV via [AudioPlayer] (comme le portail partenaire).
+///
+/// Important : si le canal / son SENGA échoue (OEM, raw manquant, etc.), on
+/// retombe sur le canal système pour que la course/livraison reste visible.
 class DriverJobAlertService {
   DriverJobAlertService._();
 
@@ -24,10 +27,10 @@ class DriverJobAlertService {
   static bool _initialized = false;
   static int _notificationId = 0;
 
-  /// v3 : canal neuf après passage raw mp3 → wav + lecture in-app.
-  static const _channelSengaId = 'mova_driver_jobs_v3';
-  static const _channelSystemId = 'mova_driver_jobs_system_v1';
-  static const _channelSilentId = 'mova_driver_jobs_silent_v1';
+  /// v4 : fallback robuste si le canal SENGA casse la publication de la notif.
+  static const _channelSengaId = 'mova_driver_jobs_v4';
+  static const _channelSystemId = 'mova_driver_jobs_system_v2';
+  static const _channelSilentId = 'mova_driver_jobs_silent_v2';
   static const _channelName = 'Missions & courses SENGA';
   static const _androidSound = RawResourceAndroidNotificationSound('senga_job');
   static const _iosSound = 'senga_job.wav';
@@ -45,19 +48,9 @@ class DriverJobAlertService {
     final androidPlugin =
         _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     final vibration = Int64List.fromList([0, 450, 180, 450]);
-    await androidPlugin?.createNotificationChannel(
-      AndroidNotificationChannel(
-        _channelSengaId,
-        _channelName,
-        description: 'Nouvelles courses, livraisons et missions — son SENGA',
-        importance: Importance.max,
-        playSound: true,
-        sound: _androidSound,
-        enableVibration: true,
-        vibrationPattern: vibration,
-        audioAttributesUsage: AudioAttributesUsage.alarm,
-      ),
-    );
+
+    // Créer d’abord les canaux « sûrs », puis SENGA — un échec SENGA ne doit
+    // pas empêcher les alertes avec son téléphone.
     await androidPlugin?.createNotificationChannel(
       AndroidNotificationChannel(
         _channelSystemId,
@@ -67,7 +60,7 @@ class DriverJobAlertService {
         playSound: true,
         enableVibration: true,
         vibrationPattern: vibration,
-        audioAttributesUsage: AudioAttributesUsage.alarm,
+        audioAttributesUsage: AudioAttributesUsage.notification,
       ),
     );
     await androidPlugin?.createNotificationChannel(
@@ -79,9 +72,26 @@ class DriverJobAlertService {
         playSound: false,
         enableVibration: true,
         vibrationPattern: vibration,
-        audioAttributesUsage: AudioAttributesUsage.alarm,
+        audioAttributesUsage: AudioAttributesUsage.notification,
       ),
     );
+    try {
+      await androidPlugin?.createNotificationChannel(
+        AndroidNotificationChannel(
+          _channelSengaId,
+          _channelName,
+          description: 'Nouvelles courses, livraisons et missions — son SENGA',
+          importance: Importance.max,
+          playSound: true,
+          sound: _androidSound,
+          enableVibration: true,
+          vibrationPattern: vibration,
+          audioAttributesUsage: AudioAttributesUsage.notification,
+        ),
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('Canal SENGA indisponible, fallback système : $e');
+    }
 
     await androidPlugin?.requestNotificationsPermission();
     await DriverAlertPrefs.ensureLoaded();
@@ -99,8 +109,8 @@ class DriverJobAlertService {
     try {
       await _player.stop();
       await _player.play(AssetSource(_assetSound), volume: 1.0);
-    } catch (_) {
-      /* asset / audio session — la notif canal reste le filet de secours */
+    } catch (e) {
+      if (kDebugMode) debugPrint('Lecture son SENGA (in-app) échouée : $e');
     }
   }
 
@@ -114,52 +124,97 @@ class DriverJobAlertService {
     final muted = DriverAlertPrefs.muted;
     final style = DriverAlertPrefs.style;
 
-    await HapticFeedback.heavyImpact();
-    await Future<void>.delayed(const Duration(milliseconds: 100));
-    await HapticFeedback.heavyImpact();
-
-    final useSenga = !muted && style == DriverAlertSoundStyle.senga;
-    if (useSenga) {
-      // Ne pas await la fin du clip — la notif doit partir tout de suite.
-      unawaited(playSengaSound());
+    try {
+      await HapticFeedback.heavyImpact();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await HapticFeedback.heavyImpact();
+    } catch (_) {
+      /* ignore — haptics absents en isolate background */
     }
 
+    final preferSenga = !muted && style == DriverAlertSoundStyle.senga;
     final channelId = muted
         ? _channelSilentId
-        : (style == DriverAlertSoundStyle.system ? _channelSystemId : _channelSengaId);
+        : (preferSenga ? _channelSengaId : _channelSystemId);
     final playSound = !muted;
 
     final id = ++_notificationId;
-    await _plugin.show(
+    final shown = await _showSafe(
       id: id,
       title: title,
       body: body,
-      notificationDetails: NotificationDetails(
-        android: AndroidNotificationDetails(
-          channelId,
-          _channelName,
-          channelDescription: 'Alertes chauffeur SENGA',
-          importance: Importance.max,
-          priority: Priority.max,
-          category: AndroidNotificationCategory.call,
-          fullScreenIntent: true,
-          playSound: playSound,
-          sound: useSenga ? _androidSound : null,
-          enableVibration: true,
-          vibrationPattern: Int64List.fromList([0, 450, 180, 450]),
-          audioAttributesUsage: AudioAttributesUsage.alarm,
-          ticker: title,
-        ),
-        iOS: DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: playSound,
-          sound: useSenga ? _iosSound : null,
-          interruptionLevel: InterruptionLevel.timeSensitive,
-        ),
-      ),
       payload: payload,
+      channelId: channelId,
+      playSound: playSound,
+      useSengaSound: preferSenga,
     );
+
+    // Si le canal SENGA empêche l’affichage, republier sans son custom.
+    if (!shown && preferSenga) {
+      await _showSafe(
+        id: id,
+        title: title,
+        body: body,
+        payload: payload,
+        channelId: _channelSystemId,
+        playSound: true,
+        useSengaSound: false,
+      );
+    }
+
+    // Son in-app après la notif (ne doit jamais bloquer / remplacer le push).
+    if (preferSenga) {
+      unawaited(playSengaSound());
+    }
+  }
+
+  static Future<bool> _showSafe({
+    required int id,
+    required String title,
+    required String body,
+    required String? payload,
+    required String channelId,
+    required bool playSound,
+    required bool useSengaSound,
+  }) async {
+    try {
+      await _plugin.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            channelId,
+            _channelName,
+            channelDescription: 'Alertes chauffeur SENGA',
+            importance: Importance.max,
+            priority: Priority.max,
+            category: AndroidNotificationCategory.message,
+            playSound: playSound,
+            // Le son est déjà sur le canal ; le repasser ici casse certains OEM.
+            sound: null,
+            enableVibration: true,
+            vibrationPattern: Int64List.fromList([0, 450, 180, 450]),
+            audioAttributesUsage: AudioAttributesUsage.notification,
+            ticker: title,
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: playSound,
+            sound: useSengaSound ? _iosSound : null,
+            interruptionLevel: InterruptionLevel.timeSensitive,
+          ),
+        ),
+        payload: payload,
+      );
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Notification locale échouée (canal=$channelId, senga=$useSengaSound) : $e');
+      }
+      return false;
+    }
   }
 
   static String missionKey(Map<String, dynamic> mission) {

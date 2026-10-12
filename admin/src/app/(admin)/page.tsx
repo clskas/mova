@@ -42,10 +42,8 @@ export default function DashboardPage() {
     try {
       const metricsQs = new URLSearchParams();
       if (scopedCity) metricsQs.set("city", scopedCity);
-      if (period) metricsQs.set("days", String(period));
-      const metricsPath = metricsQs.toString()
-        ? `/api/admin/metrics?${metricsQs}`
-        : "/api/admin/metrics";
+      metricsQs.set("days", String(period));
+      const metricsPath = `/api/admin/metrics?${metricsQs}`;
       const [mRes, rRes] = await Promise.allSettled([
         apiFetch<AdminMetrics>(metricsPath),
         fetchAdminReports(period, scopedCity || null),
@@ -53,8 +51,11 @@ export default function DashboardPage() {
       if (mRes.status === "fulfilled") {
         setMetrics(mRes.value);
       }
+      // Ne pas garder un rapport d’une autre ville / période si le fetch échoue.
       if (rRes.status === "fulfilled") {
         setReports(rRes.value);
+      } else {
+        setReports(null);
       }
       const parts: string[] = [];
       if (mRes.status === "rejected") {
@@ -76,6 +77,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setLoading(true);
+    setReports(null);
     load();
   }, [load]);
 
@@ -85,7 +87,19 @@ export default function DashboardPage() {
     return () => clearInterval(id);
   }, [autoRefresh, load]);
 
-  const m = normalizeMetrics(metrics);
+  const m = useMemo(() => {
+    const base = normalizeMetrics(metrics);
+    const kpis = reports?.kpis;
+    if (!kpis) return base;
+    return {
+      ...base,
+      totalRides: kpis.totalRides ?? base.totalRides,
+      completedRides: kpis.completedRides ?? base.completedRides,
+      cancelledRides: kpis.cancelledRides ?? base.cancelledRides,
+      totalRevenueCdf: kpis.totalRevenueCdf ?? base.totalRevenueCdf,
+      city: reports?.city?.trim() || scopedCity || base.city,
+    };
+  }, [metrics, reports, scopedCity]);
 
   const rideSpark = useMemo(
     () => reports?.daily.map((d) => d.rides) ?? [],
@@ -142,14 +156,17 @@ export default function DashboardPage() {
     <div className="max-w-7xl mx-auto space-y-6">
       <PageHeader
         title="Tableau de bord"
-        subtitle={`${scopedCity || m.city} · ${scopedCity ? `filtre ${scopedCity}` : "couverture nationale"} · ${lastUpdate ? `MAJ ${lastUpdate.toLocaleTimeString("fr-CD")}` : ""}`}
+        subtitle={`${scopedCity || m.city} · ${scopedCity ? `filtre ${scopedCity}` : "couverture nationale"} · ${period}j · ${lastUpdate ? `MAJ ${lastUpdate.toLocaleTimeString("fr-CD")}` : ""}`}
         action={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 relative z-10">
             {role !== "CITY_ADMIN" && (
-              <div className="min-w-[9rem]">
+              <div className="min-w-[10rem]">
                 <SelectInput
                   value={cityFilter}
-                  onChange={setCityFilter}
+                  onChange={(v) => {
+                    setCityFilter(v);
+                    setLoading(true);
+                  }}
                   options={[
                     { value: "", label: "Toutes les villes" },
                     ...MOVA_CITIES.map((c) => ({ value: c, label: c })),
@@ -161,7 +178,10 @@ export default function DashboardPage() {
               <button
                 key={d}
                 type="button"
-                onClick={() => setPeriod(d)}
+                onClick={() => {
+                  setPeriod(d);
+                  setLoading(true);
+                }}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   period === d ? "bg-[#6366f1] text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
@@ -178,7 +198,7 @@ export default function DashboardPage() {
             >
               {autoRefresh ? "Auto 60s" : "Manuel"}
             </button>
-            <button type="button" onClick={load} className="mova-btn-primary text-sm">
+            <button type="button" onClick={() => { setLoading(true); void load(); }} className="mova-btn-primary text-sm">
               Actualiser
             </button>
           </div>
@@ -265,19 +285,19 @@ export default function DashboardPage() {
               <h2 className="font-bold text-[#0d0d1a] mb-3">Synthèse globale</h2>
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <div className="p-3 rounded-xl bg-gray-50">
-                  <dt className="text-gray-500 text-xs">Courses totales</dt>
+                  <dt className="text-gray-500 text-xs">Courses ({period}j)</dt>
                   <dd className="font-bold text-lg tabular-nums">{m.totalRides}</dd>
                 </div>
                 <div className="p-3 rounded-xl bg-gray-50">
-                  <dt className="text-gray-500 text-xs">Complétées</dt>
+                  <dt className="text-gray-500 text-xs">Complétées ({period}j)</dt>
                   <dd className="font-bold text-lg tabular-nums text-emerald-600">{m.completedRides}</dd>
                 </div>
                 <div className="p-3 rounded-xl bg-gray-50">
-                  <dt className="text-gray-500 text-xs">Annulées</dt>
+                  <dt className="text-gray-500 text-xs">Annulées ({period}j)</dt>
                   <dd className="font-bold text-lg tabular-nums text-orange-600">{m.cancelledRides}</dd>
                 </div>
                 <div className="p-3 rounded-xl bg-gray-50">
-                  <dt className="text-gray-500 text-xs">Revenus cumulés</dt>
+                  <dt className="text-gray-500 text-xs">Revenus ({period}j)</dt>
                   <dd className="font-bold text-sm tabular-nums">{formatCdf(m.totalRevenueCdf)}</dd>
                 </div>
                 <div className="p-3 rounded-xl bg-gray-50 col-span-2">

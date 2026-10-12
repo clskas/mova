@@ -88,11 +88,11 @@ export class AdminService {
   }
 
   async getMetrics(managedCity?: string | null, days = 30) {
-    if (!managedCity) {
-      return this.getMetricsNational();
+    const reportDays = Math.min(90, Math.max(7, Math.floor(Number(days)) || 30));
+    const city = managedCity?.trim() || '';
+    if (!city) {
+      return this.getMetricsNational(reportDays);
     }
-    const city = managedCity.trim();
-    const reportDays = Math.min(90, Math.max(7, Math.floor(days) || 30));
     const [driversRes, rides, deliveries, incidents, reports] = await Promise.all([
       this.listDrivers(0, 500, { includeHidden: false }, city).catch(() => ({ data: [] as Array<Record<string, unknown>> })),
       this.listRides({ skip: 0, take: 200 }, city).catch(() => [] as Array<Record<string, unknown>>),
@@ -124,6 +124,10 @@ export class AdminService {
       reports && typeof reports === 'object' && reports !== null && 'kpis' in reports
         ? (reports as { kpis: Record<string, number> }).kpis
         : undefined;
+    const service =
+      reports && typeof reports === 'object' && reports !== null && 'serviceBreakdown' in reports
+        ? (reports as { serviceBreakdown?: Record<string, number> }).serviceBreakdown
+        : undefined;
     return {
       users: drivers.length,
       drivers: drivers.length,
@@ -141,54 +145,58 @@ export class AdminService {
       openIncidents,
       sosIncidents,
       activeDeliveries,
-      scheduledRides: 0,
-      carpoolTrips: 0,
-      movingRequests: 0,
+      scheduledRides: service?.scheduled ?? 0,
+      carpoolTrips: service?.carpool ?? 0,
+      movingRequests: service?.moving ?? 0,
       rentalInquiries: 0,
       walletBalanceCdf: 0,
       walletCount: 0,
       walletTransactionsToday: 0,
       city,
+      periodDays: reportDays,
     };
   }
 
-  private async getMetricsNational() {
-    const [users, driverStats, rideStats, incidents, deliveries, scheduled, carpool, moving, rental, wallet] = await Promise.all([
-      this.fetchJson<{ count: number }>('auth', '/internal/users/count').catch(() => ({ count: 0 })),
-      this.fetchJson<{ total?: number; available?: number; pendingKyc?: number; approved?: number }>(
-        'driver',
-        '/internal/drivers/stats',
-      ).catch(() => ({ total: 0, available: 0, pendingKyc: 0, approved: 0 })),
-      this.fetchJson<{
-        rides?: number;
-        completed?: number;
-        revenueCdf?: number;
-        todayRides?: number;
-        todayCompleted?: number;
-        todayRevenueCdf?: number;
-        activeRides?: number;
-        cancelled?: number;
-      }>('ride', '/internal/rides/stats').catch(() => ({
-        rides: 0,
-        completed: 0,
-        revenueCdf: 0,
-        todayRides: 0,
-        todayCompleted: 0,
-        todayRevenueCdf: 0,
-        activeRides: 0,
-        cancelled: 0,
-      })),
-      this.fetchJson<{ status?: string; type?: string }[]>('driver', '/internal/incidents').catch(() => []),
-      this.fetchJson<unknown[]>('ride', '/internal/deliveries?take=100').catch(() => []),
-      this.fetchJson<unknown[]>('ride', '/internal/scheduled-rides?take=100').catch(() => []),
-      this.fetchJson<unknown[]>('ride', '/internal/carpool?take=100').catch(() => []),
-      this.fetchJson<unknown[]>('ride', '/internal/moving?take=100').catch(() => []),
-      this.fetchJson<unknown[]>('ride', '/internal/rental-inquiries?take=100').catch(() => []),
-      this.fetchJson<{ totalBalanceCdf?: number; walletCount?: number; transactionsToday?: number }>(
-        'payment',
-        '/internal/wallets/overview',
-      ).catch(() => ({ totalBalanceCdf: 0, walletCount: 0, transactionsToday: 0 })),
-    ]);
+  private async getMetricsNational(days = 30) {
+    const reportDays = Math.min(90, Math.max(7, Math.floor(Number(days)) || 30));
+    const [users, driverStats, rideStats, incidents, deliveries, scheduled, carpool, moving, rental, wallet, reports] =
+      await Promise.all([
+        this.fetchJson<{ count: number }>('auth', '/internal/users/count').catch(() => ({ count: 0 })),
+        this.fetchJson<{ total?: number; available?: number; pendingKyc?: number; approved?: number }>(
+          'driver',
+          '/internal/drivers/stats',
+        ).catch(() => ({ total: 0, available: 0, pendingKyc: 0, approved: 0 })),
+        this.fetchJson<{
+          rides?: number;
+          completed?: number;
+          revenueCdf?: number;
+          todayRides?: number;
+          todayCompleted?: number;
+          todayRevenueCdf?: number;
+          activeRides?: number;
+          cancelled?: number;
+        }>('ride', '/internal/rides/stats').catch(() => ({
+          rides: 0,
+          completed: 0,
+          revenueCdf: 0,
+          todayRides: 0,
+          todayCompleted: 0,
+          todayRevenueCdf: 0,
+          activeRides: 0,
+          cancelled: 0,
+        })),
+        this.fetchJson<{ status?: string; type?: string }[]>('driver', '/internal/incidents').catch(() => []),
+        this.fetchJson<unknown[]>('ride', '/internal/deliveries?take=100').catch(() => []),
+        this.fetchJson<unknown[]>('ride', '/internal/scheduled-rides?take=100').catch(() => []),
+        this.fetchJson<unknown[]>('ride', '/internal/carpool?take=100').catch(() => []),
+        this.fetchJson<unknown[]>('ride', '/internal/moving?take=100').catch(() => []),
+        this.fetchJson<unknown[]>('ride', '/internal/rental-inquiries?take=100').catch(() => []),
+        this.fetchJson<{ totalBalanceCdf?: number; walletCount?: number; transactionsToday?: number }>(
+          'payment',
+          '/internal/wallets/overview',
+        ).catch(() => ({ totalBalanceCdf: 0, walletCount: 0, transactionsToday: 0 })),
+        this.getReports(reportDays, null).catch(() => null),
+      ]);
     const openIncidents = Array.isArray(incidents) ? incidents.filter((i) => i.status === 'OPEN').length : 0;
     const sosIncidents = Array.isArray(incidents)
       ? incidents.filter((i) => i.status === 'OPEN' && i.type === 'SOS').length
@@ -199,31 +207,41 @@ export class AdminService {
           return !['DELIVERED', 'CANCELLED'].includes(d.status ?? '');
         }).length
       : 0;
+    const kpis =
+      reports && typeof reports === 'object' && reports !== null && 'kpis' in reports
+        ? (reports as { kpis: Record<string, number> }).kpis
+        : undefined;
+    const service =
+      reports && typeof reports === 'object' && reports !== null && 'serviceBreakdown' in reports
+        ? (reports as { serviceBreakdown?: Record<string, number> }).serviceBreakdown
+        : undefined;
     return {
       users: users.count,
       drivers: driverStats.total ?? 0,
       availableDrivers: driverStats.available ?? 0,
       pendingKyc: driverStats.pendingKyc ?? 0,
       approvedDrivers: driverStats.approved ?? 0,
-      rides: rideStats.rides ?? 0,
-      completedRides: rideStats.completed ?? 0,
-      revenueCdf: rideStats.revenueCdf ?? 0,
+      // Période (7/30/90) : KPIs rapports ; sinon stats globales en secours.
+      rides: kpis?.totalRides ?? rideStats.rides ?? 0,
+      completedRides: kpis?.completedRides ?? rideStats.completed ?? 0,
+      revenueCdf: kpis?.totalRevenueCdf ?? rideStats.revenueCdf ?? 0,
       todayRides: rideStats.todayRides ?? 0,
       todayCompleted: rideStats.todayCompleted ?? 0,
       todayRevenueCdf: rideStats.todayRevenueCdf ?? 0,
       activeRides: rideStats.activeRides ?? 0,
-      cancelledRides: rideStats.cancelled ?? 0,
+      cancelledRides: kpis?.cancelledRides ?? rideStats.cancelled ?? 0,
       openIncidents,
       sosIncidents,
       activeDeliveries,
-      scheduledRides: Array.isArray(scheduled) ? scheduled.length : 0,
-      carpoolTrips: Array.isArray(carpool) ? carpool.length : 0,
-      movingRequests: Array.isArray(moving) ? moving.length : 0,
+      scheduledRides: service?.scheduled ?? (Array.isArray(scheduled) ? scheduled.length : 0),
+      carpoolTrips: service?.carpool ?? (Array.isArray(carpool) ? carpool.length : 0),
+      movingRequests: service?.moving ?? (Array.isArray(moving) ? moving.length : 0),
       rentalInquiries: Array.isArray(rental) ? rental.length : 0,
       walletBalanceCdf: wallet.totalBalanceCdf ?? 0,
       walletCount: wallet.walletCount ?? 0,
       walletTransactionsToday: wallet.transactionsToday ?? 0,
       city: 'RDC',
+      periodDays: reportDays,
     };
   }
 

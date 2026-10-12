@@ -158,7 +158,7 @@ jobs:
           set -euo pipefail
           # Floor must stay above the highest versionCode already accepted by Play
           # (123 used; bump when uploads fail with "already been used").
-          FLOOR=132
+          FLOOR=133
           PUBSPEC_LINE=$(grep -E '^version:' mobile/pubspec.yaml | head -1)
           PUBSPEC_NAME=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
@@ -687,7 +687,7 @@ jobs:
             # shellcheck disable=SC1091
             source /tmp/asc-venv/bin/activate
             pip install --quiet PyJWT cryptography
-            export ASC_VERSION=1.0.20
+            export ASC_VERSION=1.0.21
             export ASC_BUILD_NUMBER="${{ github.run_number }}"
             export ASC_SUBMIT=true
             export ASC_REPLACE_IN_REVIEW=true
@@ -717,7 +717,7 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-          ASC_VERSION: '1.0.20'
+          ASC_VERSION: '1.0.21'
           ASC_BUILD_NUMBER: ${{ inputs.asc_build_number }}
           ASC_SUBMIT: 'true'
           # Cancel WAITING_FOR_REVIEW so we can attach the new TestFlight build.

@@ -441,16 +441,16 @@ void main() {
       )!;
       expect(fromApi.updateAvailable, isTrue);
       expect(fromApi.remoteVersion, '1.0.5+65');
-      // After install (or when Play has nothing newer), echoing the installed
-      // code must hide the soft banner — otherwise it sticks forever.
+      // Staged Play rollout: In-App Update may still echo the installed code
+      // while the API already advertises a newer store build — keep the banner.
       final afterPlay = AppUpdateService.reconcileWithPlay(
         fromApi,
         playCode: 50,
         localBuild: 50,
         advertisedCode: 65,
       );
-      expect(afterPlay.updateAvailable, isFalse);
-      expect(afterPlay.showBanner, isFalse);
+      expect(afterPlay.updateAvailable, isTrue);
+      expect(afterPlay.showBanner, isTrue);
     });
 
     test('Play probe failure keeps API soft banner', () {

@@ -384,9 +384,9 @@ envVarGroups:
         value: production
       - key: AFRICAS_TALKING_SMS_SENDER
         value: MOVA
+      # Public API host (serdipay.com = marketing SPA → POST 405). Live MM keys on VPS pay hub.
       - key: SERDIPAY_BASE_URL
-        value: https://serdipay.com
-      # Public API MM — live keys belong on VPS /opt/afrisoft-pay/.env (pay.afri-soft.com), not git.
+        value: https://apis.serdipay.com
       - key: SERDIPAY_EMAIL
         sync: false
       - key: SERDIPAY_PASSWORD
@@ -408,9 +408,10 @@ envVarGroups:
         sync: false
       - key: SERDIPAY_WEBHOOK_SECRET
         sync: false
-      # SerdiPay SMS API (otp) — distinct from payment email/password / API_ID
+      # SerdiPay SMS API (otp) — distinct from payment email/password / API_ID.
+      # Prod OTP uses VPS sms.afri-soft.com; this default is only if auth talks to SerdiPay directly.
       - key: SERDIPAY_SMS_BASE_URL
-        value: https://serdipay.com
+        value: https://apis.serdipay.com
       - key: SERDIPAY_SMS_PATH
         value: /api/sms-api/v1/send
       - key: SERDIPAY_SMS_API_ID

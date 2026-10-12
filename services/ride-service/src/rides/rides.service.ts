@@ -1110,8 +1110,9 @@ export class RidesService {
   }
 
   /**
-   * Distinct passenger IDs who took a ride with pickup inside the named service city.
-   * Used by admin city filters (historical activity, even before homeCity was set).
+   * Distinct passenger / client IDs active in a service city:
+   * rides (pickup), deliveries (pickup), scheduled rides (pickup).
+   * Used by admin city filters (even before homeCity was set).
    */
   async listPassengerIdsByCity(city: string, take = 2000): Promise<{ passengerIds: string[]; city: string }> {
     const name = city.trim();
@@ -1122,23 +1123,48 @@ export class RidesService {
     if (!area) return { passengerIds: [], city: name };
 
     const b = area.bounds;
-    const rows = await this.prisma.ride.findMany({
-      where: {
-        pickupLat: { gte: b.minLat, lte: b.maxLat },
-        pickupLng: { gte: b.minLng, lte: b.maxLng },
-      },
-      select: { passengerId: true, pickupLat: true, pickupLng: true },
-      orderBy: { createdAt: 'desc' },
-      take: Math.min(Math.max(take * 3, 100), 8000),
-    });
+    const boundTake = Math.min(Math.max(take * 3, 100), 8000);
+    const [rideRows, deliveryRows, scheduledRows] = await Promise.all([
+      this.prisma.ride.findMany({
+        where: {
+          pickupLat: { gte: b.minLat, lte: b.maxLat },
+          pickupLng: { gte: b.minLng, lte: b.maxLng },
+        },
+        select: { passengerId: true, pickupLat: true, pickupLng: true },
+        orderBy: { createdAt: 'desc' },
+        take: boundTake,
+      }),
+      this.prisma.delivery.findMany({
+        where: {
+          pickupLat: { gte: b.minLat, lte: b.maxLat },
+          pickupLng: { gte: b.minLng, lte: b.maxLng },
+        },
+        select: { userId: true, pickupLat: true, pickupLng: true },
+        orderBy: { createdAt: 'desc' },
+        take: boundTake,
+      }),
+      this.prisma.scheduledRide.findMany({
+        where: {
+          pickupLat: { gte: b.minLat, lte: b.maxLat },
+          pickupLng: { gte: b.minLng, lte: b.maxLng },
+        },
+        select: { passengerId: true, pickupLat: true, pickupLng: true },
+        orderBy: { createdAt: 'desc' },
+        take: boundTake,
+      }),
+    ]);
 
     const cityKey = area.name.toLowerCase();
     const ids = new Set<string>();
-    for (const r of rows) {
-      if (ids.size >= take) break;
-      const resolved = resolveCityFromCoords(r.pickupLat, r.pickupLng);
-      if (resolved.toLowerCase() === cityKey) ids.add(r.passengerId);
-    }
+    const pushIfInCity = (userId: string, lat?: number | null, lng?: number | null) => {
+      if (ids.size >= take || !userId) return;
+      if (lat == null || lng == null) return;
+      const resolved = resolveCityFromCoords(lat, lng);
+      if (resolved.toLowerCase() === cityKey) ids.add(userId);
+    };
+    for (const r of rideRows) pushIfInCity(r.passengerId, r.pickupLat, r.pickupLng);
+    for (const d of deliveryRows) pushIfInCity(d.userId, d.pickupLat, d.pickupLng);
+    for (const s of scheduledRows) pushIfInCity(s.passengerId, s.pickupLat, s.pickupLng);
     return { passengerIds: [...ids], city: area.name };
   }
 

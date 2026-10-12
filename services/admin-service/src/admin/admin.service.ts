@@ -93,19 +93,21 @@ export class AdminService {
     if (!city) {
       return this.getMetricsNational(reportDays);
     }
-    const [driversRes, rides, deliveries, incidents, reports, cityUserIds] = await Promise.all([
+    const [driversRes, rides, deliveries, incidents, reports, cityUsers] = await Promise.all([
       this.listDrivers(0, 500, { includeHidden: false }, city).catch(() => ({ data: [] as Array<Record<string, unknown>> })),
       this.listRides({ skip: 0, take: 200 }, city).catch(() => [] as Array<Record<string, unknown>>),
       this.listDeliveries({ skip: 0, take: 200 }, city).catch(() => [] as Array<Record<string, unknown>>),
       this.fetchJson<{ status?: string; type?: string; lat?: number; lng?: number }[]>('driver', '/internal/incidents').catch(() => []),
       this.getReports(reportDays, city).catch(() => null),
       // Même logique que la page Utilisateurs (admins ville, passagers, partenaires, chauffeurs).
-      this.collectUserIdsForCities([city]).catch(() => new Set<string>()),
+      this.collectUsersForCities([city]).catch(() => ({ allIds: new Set<string>(), passengerIds: new Set<string>() })),
     ]);
     const drivers = Array.isArray(driversRes) ? driversRes : (driversRes as { data?: Array<Record<string, unknown>> }).data ?? [];
     const availableDrivers = drivers.filter((d) => d.isAvailable === true).length;
     const pendingKyc = drivers.filter((d) => String(d.kycStatus ?? '').toUpperCase() === 'PENDING').length;
     const approvedDrivers = drivers.filter((d) => String(d.kycStatus ?? '').toUpperCase() === 'APPROVED').length;
+    const cityUserIds = cityUsers.allIds;
+    const passengerCount = cityUsers.passengerIds.size;
     const rideRows = Array.isArray(rides) ? rides : [];
     const deliveryRows = Array.isArray(deliveries) ? deliveries : [];
     const activeRides = rideRows.filter((r) =>
@@ -132,6 +134,7 @@ export class AdminService {
         : undefined;
     return {
       users: cityUserIds.size,
+      passengers: passengerCount,
       drivers: drivers.length,
       availableDrivers,
       pendingKyc,
@@ -367,15 +370,17 @@ export class AdminService {
   }
 
   /**
-   * IDs utilisateurs rattachés à une/des villes — aligné page Utilisateurs :
-   * chauffeurs, partenaires, passagers (homeCity + courses), CITY_ADMIN (managedCity).
+   * Utilisateurs rattachés à une/des villes — aligné page Utilisateurs :
+   * chauffeurs, partenaires, passagers (homeCity + courses/livraisons/planifiées), CITY_ADMIN.
    */
-  private async collectUserIdsForCities(cityList: string[]): Promise<Set<string>> {
+  private async collectUsersForCities(
+    cityList: string[],
+  ): Promise<{ allIds: Set<string>; passengerIds: Set<string> }> {
     const cities = cityList.map((c) => c.trim()).filter(Boolean);
-    if (cities.length === 0) return new Set();
+    if (cities.length === 0) return { allIds: new Set(), passengerIds: new Set() };
     const cityKeys = new Set(cities.map((c) => c.toLowerCase()));
     const citiesParam = encodeURIComponent(cities.join(','));
-    const [driversBundles, restaurantsBundles, rentalBundles, opsStaff, homeCityPassengers, ridePassengerBundles] =
+    const [driversBundles, restaurantsBundles, rentalBundles, opsStaff, homeCityPassengers, activityPassengerBundles] =
       await Promise.all([
         Promise.all(
           cities.map((city) =>
@@ -411,24 +416,25 @@ export class AdminService {
         ),
       ]);
 
-    const allowedIds = new Set<string>();
+    const allIds = new Set<string>();
+    const passengerIds = new Set<string>();
     for (const driversRes of driversBundles) {
       const driverRows = Array.isArray(driversRes)
         ? driversRes
         : (driversRes as { data?: Array<{ userId?: string; id?: string }> }).data ?? [];
       for (const d of driverRows) {
         const id = String(d.userId ?? d.id ?? '');
-        if (id) allowedIds.add(id);
+        if (id) allIds.add(id);
       }
     }
     for (const restaurants of restaurantsBundles) {
       for (const r of Array.isArray(restaurants) ? restaurants : []) {
-        if (r.ownerUserId) allowedIds.add(String(r.ownerUserId));
+        if (r.ownerUserId) allIds.add(String(r.ownerUserId));
       }
     }
     for (const rentalVehicles of rentalBundles) {
       for (const r of Array.isArray(rentalVehicles) ? rentalVehicles : []) {
-        if (r.ownerUserId) allowedIds.add(String(r.ownerUserId));
+        if (r.ownerUserId) allIds.add(String(r.ownerUserId));
       }
     }
     for (const s of Array.isArray(opsStaff) ? opsStaff : []) {
@@ -436,23 +442,36 @@ export class AdminService {
         String(s.role ?? '') === UserRole.CITY_ADMIN &&
         cityKeys.has(String(s.managedCity ?? '').trim().toLowerCase())
       ) {
-        allowedIds.add(s.id);
+        allIds.add(s.id);
       }
     }
     for (const p of Array.isArray(homeCityPassengers) ? homeCityPassengers : []) {
-      if (p?.id) allowedIds.add(String(p.id));
-    }
-    for (const bundle of ridePassengerBundles) {
-      for (const id of bundle?.passengerIds ?? []) {
-        if (id) allowedIds.add(String(id));
+      if (p?.id) {
+        const id = String(p.id);
+        allIds.add(id);
+        passengerIds.add(id);
       }
     }
-    return allowedIds;
+    for (const bundle of activityPassengerBundles) {
+      for (const id of bundle?.passengerIds ?? []) {
+        if (!id) continue;
+        const pid = String(id);
+        allIds.add(pid);
+        passengerIds.add(pid);
+      }
+    }
+    return { allIds, passengerIds };
+  }
+
+  /** @deprecated use collectUsersForCities — kept as thin wrapper for call sites. */
+  private async collectUserIdsForCities(cityList: string[]): Promise<Set<string>> {
+    const { allIds } = await this.collectUsersForCities(cityList);
+    return allIds;
   }
 
   /**
    * Users attached to one or more cities: drivers (operatingCity), partners (GPS/city),
-   * passengers (homeCity + ride pickup history), CITY_ADMIN (managedCity).
+   * passengers (homeCity + ride/delivery activity), CITY_ADMIN (managedCity).
    * Builds the allow-list first, then loads those accounts.
    */
   private async listUsersInCities(
@@ -462,7 +481,7 @@ export class AdminService {
     search?: string,
     includePlayPrelaunch = false,
   ) {
-    const allowedIds = await this.collectUserIdsForCities(cityList);
+    const { allIds: allowedIds } = await this.collectUsersForCities(cityList);
     const ids = [...allowedIds];
     type Row = {
       id: string;

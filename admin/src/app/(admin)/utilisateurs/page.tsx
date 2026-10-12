@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   activationPinSmsCopy,
   createUser,
@@ -73,6 +74,7 @@ function roleSelectOptions(actorIsSuperAdmin: boolean): { value: string; label: 
 
 export default function UtilisateursPage() {
   const { canWrite, role, user } = useAdmin();
+  const searchParams = useSearchParams();
   const readOnly = !canWrite("utilisateurs");
   const canPurge = role === "SUPER_ADMIN";
   const canFilterCities = role === "SUPER_ADMIN" || role === "ADMIN";
@@ -112,7 +114,10 @@ export default function UtilisateursPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showPlayPrelaunch, setShowPlayPrelaunch] = useState(false);
   const [purgePlayOpen, setPurgePlayOpen] = useState(false);
-  const [cityFilter, setCityFilter] = useState<string[]>([]);
+  const [cityFilter, setCityFilter] = useState<string[]>(() => {
+    const fromQuery = searchParams.get("city")?.trim();
+    return fromQuery ? [fromQuery] : [];
+  });
 
   const load = useCallback(async () => {
     setLoading(true);

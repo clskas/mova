@@ -13,6 +13,8 @@ const USE_API_MOCK = process.env.NEXT_PUBLIC_USE_API_MOCK === "true";
 
 export type AdminMetrics = {
   users?: number;
+  /** Passagers rattachés à la ville filtrée (homeCity + activité). */
+  passengers?: number;
   drivers?: number;
   availableDrivers?: number;
   pendingKyc?: number;
@@ -1428,6 +1430,7 @@ function mockFor<T>(path: string, init?: RequestInit): T {
 export function normalizeMetrics(raw: AdminMetrics) {
   return {
     totalUsers: raw.totalUsers ?? raw.users ?? 0,
+    passengers: raw.passengers ?? 0,
     activeDrivers: raw.activeDrivers ?? raw.drivers ?? 0,
     availableDrivers: raw.availableDrivers ?? 0,
     pendingKyc: raw.pendingKyc ?? 0,

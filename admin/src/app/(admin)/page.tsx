@@ -125,7 +125,16 @@ export default function DashboardPage() {
   }, [reports, chartMode]);
 
   const kpiCards = [
-    { label: "Utilisateurs", value: m.totalUsers, href: "/utilisateurs", section: "utilisateurs" as const, accent: "midnight" as const },
+    {
+      label: "Utilisateurs",
+      value: m.totalUsers,
+      hint: scopedCity
+        ? `${m.passengers} passager${m.passengers === 1 ? "" : "s"} · ${m.activeDrivers} chauffeur${m.activeDrivers === 1 ? "" : "s"}`
+        : undefined,
+      href: scopedCity ? `/utilisateurs?city=${encodeURIComponent(scopedCity)}` : "/utilisateurs",
+      section: "utilisateurs" as const,
+      accent: "midnight" as const,
+    },
     { label: "Chauffeurs en ligne", value: m.availableDrivers, hint: `${m.approvedDrivers} approuvés`, href: "/chauffeurs", section: "chauffeurs" as const, accent: "green" as const },
     { label: "KYC en attente", value: m.pendingKyc, href: "/kyc", section: "kyc" as const, accent: "orange" as const },
     { label: "Courses actives", value: m.activeRides, hint: `${m.ridesToday} aujourd'hui`, href: "/courses", section: "courses" as const, accent: "violet" as const, sparkline: rideSpark },

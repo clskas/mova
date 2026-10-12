@@ -1,6 +1,9 @@
 let sharedCtx: AudioContext | null = null;
 let htmlAudio: HTMLAudioElement | null = null;
-let audioUnlocked = false;
+/** Sticky: user already tapped « Activer le son » once. */
+let prefWantsSound = false;
+/** This tab can actually play audio (gesture + context OK). */
+let sessionReady = false;
 let pendingChime = false;
 let toast: { title: string; body: string } | null = null;
 let repeatTimer: number | null = null;
@@ -10,6 +13,7 @@ const SOUND_PREF_KEY = "mova_rental_sound_pref";
 
 export type PartnerAlertUi = {
   soundEnabled: boolean;
+  needsUnlock: boolean;
   toast: { title: string; body: string } | null;
 };
 
@@ -41,14 +45,16 @@ function writeSoundPref() {
 }
 
 function restoreSoundPref() {
-  if (!audioUnlocked && readSoundPref()) {
-    audioUnlocked = true;
-  }
+  prefWantsSound = readSoundPref();
 }
 
 export function getPartnerAlertUi(): PartnerAlertUi {
   if (typeof window !== "undefined") restoreSoundPref();
-  return { soundEnabled: audioUnlocked, toast };
+  return {
+    soundEnabled: sessionReady,
+    needsUnlock: !sessionReady,
+    toast,
+  };
 }
 
 function emitUi() {
@@ -110,7 +116,6 @@ function scheduleOscillatorChime(ctx: AudioContext) {
   });
 }
 
-/** Start HTML play in the same turn as the user gesture (before other awaits). */
 function beginHtmlChime(): Promise<boolean> {
   const audio = getHtmlAudio();
   if (!audio) return Promise.resolve(false);
@@ -126,7 +131,7 @@ function beginHtmlChime(): Promise<boolean> {
     try {
       audio.currentTime = 0;
     } catch {
-      /* ignore seek errors before metadata */
+      /* ignore */
     }
     audio.muted = false;
     audio.volume = 1;
@@ -150,15 +155,20 @@ async function playWebAudioChime(): Promise<boolean> {
   return true;
 }
 
-/** Bip sonore : fichier WAV (fiable) puis Web Audio en secours. */
 export async function playPartnerAlertChime(): Promise<boolean> {
   try {
-    if (await beginHtmlChime()) return true;
-    if (await playWebAudioChime()) return true;
+    let ok = (await beginHtmlChime()) || (await playWebAudioChime());
+    if (ok) {
+      sessionReady = true;
+      emitUi();
+      return true;
+    }
     pendingChime = true;
+    emitUi();
     return false;
   } catch {
     pendingChime = true;
+    emitUi();
     return false;
   }
 }
@@ -187,22 +197,17 @@ export function dismissPartnerToast() {
   emitUi();
 }
 
-/**
- * À appeler depuis un clic (bouton « Activer le son »).
- * Débloque l'autoplay, joue un bip de test, demande la permission de notification.
- * `fromBanner: true` = geste explicite : on masque la bannière dès que le contexte audio reprend,
- * même si la détection du bip est floue sur certains navigateurs PWA.
- */
 export async function unlockPartnerAlerts(opts?: { fromBanner?: boolean }) {
   if (typeof window === "undefined") return;
   if (unlockInFlight) {
     await unlockInFlight;
-    if (audioUnlocked || opts?.fromBanner !== true) return;
+    if (sessionReady || opts?.fromBanner !== true) return;
   }
 
   const fromBanner = opts?.fromBanner === true;
 
   unlockInFlight = (async () => {
+    restoreSoundPref();
     const htmlPlay = beginHtmlChime();
     const ctx = getAudioContext();
     const resume =
@@ -215,11 +220,13 @@ export async function unlockPartnerAlerts(opts?: { fromBanner?: boolean }) {
     }
     const ctxReady = ctx?.state === "running";
     if (!played && !ctxReady && !fromBanner) {
+      sessionReady = false;
       emitUi();
       return;
     }
 
-    audioUnlocked = true;
+    sessionReady = true;
+    prefWantsSound = true;
     writeSoundPref();
 
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
@@ -244,7 +251,6 @@ export async function unlockPartnerAlerts(opts?: { fromBanner?: boolean }) {
   }
 }
 
-/** Précharge le WAV. Retourne un cleanup pour le listener de geste (Strict Mode / unmount). */
 export function initPartnerAudioUnlock(): () => void {
   if (typeof window === "undefined") return () => undefined;
   restoreSoundPref();
@@ -252,11 +258,12 @@ export function initPartnerAudioUnlock(): () => void {
   emitUi();
 
   let armed = true;
-  let needsResume = true;
-  // Ne pas auto-unlock sur chaque geste : ça volait le clic « Activer le son ».
   const resumeOnGesture = () => {
-    if (!armed || !audioUnlocked || !needsResume) return;
-    needsResume = false;
+    if (!armed) return;
+    if (prefWantsSound && !sessionReady) {
+      void unlockPartnerAlerts({ fromBanner: true });
+      return;
+    }
     const ctx = getAudioContext();
     if (ctx?.state === "suspended") {
       void ctx.resume().catch(() => undefined);
@@ -273,7 +280,25 @@ export function initPartnerAudioUnlock(): () => void {
   };
 }
 
-/** Conservé pour compat : la permission n'est demandée que dans unlockPartnerAlerts. */
+/** Play chime when a push arrives while a tab is open (SW postMessage). */
+export function bindPartnerPushSoundFromServiceWorker(): () => void {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    return () => undefined;
+  }
+  const onMsg = (event: MessageEvent) => {
+    const data = event.data as { type?: string; title?: string; body?: string; tag?: string } | null;
+    if (!data || data.type !== "MOVA_PARTNER_ALERT") return;
+    notifyPartnerAlert({
+      key: `push:${data.tag ?? Date.now()}`,
+      title: data.title ?? "SENGA Location",
+      body: data.body ?? "Nouvelle activité",
+      tag: data.tag ?? "mova-partner",
+    });
+  };
+  navigator.serviceWorker.addEventListener("message", onMsg);
+  return () => navigator.serviceWorker.removeEventListener("message", onMsg);
+}
+
 export function requestPartnerNotificationPermission() {
   /* permission demandée après clic — voir unlockPartnerAlerts */
 }
@@ -296,7 +321,7 @@ export function notifyPartnerAlert(options: {
 
   if (options.playSound !== false) {
     void playPartnerAlertChime().then((ok) => {
-      if (!ok && !audioUnlocked) {
+      if (!ok && !sessionReady) {
         emitUi();
       }
     });
@@ -310,7 +335,7 @@ export function notifyPartnerAlert(options: {
         tag: options.tag ?? options.key,
       });
     } catch {
-      /* Safari hors PWA : Notification peut exister mais échouer */
+      /* Safari hors PWA */
     }
   }
 }

@@ -365,6 +365,25 @@ export function requestPartnerNotificationPermission() {
   /* permission demandée après clic — voir unlockPartnerAlerts */
 }
 
+/** Play chime when a push arrives while a tab is open (SW postMessage). */
+export function bindPartnerPushSoundFromServiceWorker(): () => void {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    return () => undefined;
+  }
+  const onMsg = (event: MessageEvent) => {
+    const data = event.data as { type?: string; title?: string; body?: string; tag?: string } | null;
+    if (!data || data.type !== "MOVA_PARTNER_ALERT") return;
+    notifyPartnerAlert({
+      key: `push:${data.tag ?? Date.now()}`,
+      title: data.title ?? "SENGA Partenaire",
+      body: data.body ?? "Nouvelle activité",
+      tag: data.tag ?? "mova-partner",
+    });
+  };
+  navigator.serviceWorker.addEventListener("message", onMsg);
+  return () => navigator.serviceWorker.removeEventListener("message", onMsg);
+}
+
 const recentAlertKeys = new Set<string>();
 
 export function notifyPartnerAlert(options: {

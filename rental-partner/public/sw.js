@@ -1,5 +1,5 @@
 /* BUILD_ID: __MOVA_BUILD_ID__ */
-const CACHE = "mova-rental-partner-v15";
+const CACHE = "mova-rental-partner-v16";
 const ICON_V = "location-v1";
 const SHELL = [
   "/manifest.webmanifest",
@@ -69,13 +69,27 @@ self.addEventListener("push", (event) => {
     /* ignore */
   }
   event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      tag: payload.tag,
-      data: { url: payload.url },
-      icon: `/icon-192.png?v=${ICON_V}`,
-      badge: `/icon-192.png?v=${ICON_V}`,
-    }),
+    (async () => {
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of clients) {
+        client.postMessage({
+          type: "MOVA_PARTNER_ALERT",
+          title: payload.title,
+          body: payload.body,
+          tag: payload.tag,
+        });
+      }
+      await self.registration.showNotification(payload.title, {
+        body: payload.body,
+        tag: payload.tag,
+        data: { url: payload.url },
+        icon: `/icon-192.png?v=${ICON_V}`,
+        badge: `/icon-192.png?v=${ICON_V}`,
+        vibrate: [220, 120, 220, 120, 320],
+        requireInteraction: true,
+        silent: false,
+      });
+    })(),
   );
 });
 

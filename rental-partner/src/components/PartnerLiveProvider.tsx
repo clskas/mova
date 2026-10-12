@@ -2,7 +2,12 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getToken } from "@/lib/auth";
-import { alertNewRentalBooking, initPartnerAudioUnlock, onPartnerAlertsUnlocked } from "@/lib/partner-alerts";
+import {
+  alertNewRentalBooking,
+  bindPartnerPushSoundFromServiceWorker,
+  initPartnerAudioUnlock,
+  onPartnerAlertsUnlocked,
+} from "@/lib/partner-alerts";
 import { registerPartnerWebPush } from "@/lib/partner-web-push";
 import { connectPartnerSocket } from "@/lib/partner-socket";
 
@@ -36,6 +41,7 @@ export function PartnerLiveProvider({ children }: { children: React.ReactNode })
     if (!getToken() || typeof window === "undefined") return;
 
     const stopGestureUnlock = initPartnerAudioUnlock();
+    const stopPushSound = bindPartnerPushSoundFromServiceWorker();
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
       void registerPartnerWebPush("rental_partner");
     }
@@ -57,6 +63,7 @@ export function PartnerLiveProvider({ children }: { children: React.ReactNode })
 
     return () => {
       stopGestureUnlock();
+      stopPushSound();
       offUnlock();
       window.clearInterval(pollId);
       socket.disconnect();

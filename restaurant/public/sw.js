@@ -1,12 +1,13 @@
 /* BUILD_ID: __MOVA_BUILD_ID__ */
-const CACHE = "mova-business-v18";
+const CACHE = "mova-business-v19";
 const SHELL = [
   "/manifest.webmanifest",
-  "/icon-192.png?v=partner-v18",
-  "/icon-512.png?v=partner-v18",
-  "/icon-512-maskable.png?v=partner-v18",
-  "/apple-touch-icon.png?v=partner-v18",
+  "/icon-192.png?v=partner-v19",
+  "/icon-512.png?v=partner-v19",
+  "/icon-512-maskable.png?v=partner-v19",
+  "/apple-touch-icon.png?v=partner-v19",
   "/alert-chime.wav",
+  "/senga-partner-alert.wav",
 ];
 
 function isVersionRequest(url) {
@@ -68,13 +69,27 @@ self.addEventListener("push", (event) => {
     /* ignore */
   }
   event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      tag: payload.tag,
-      data: { url: payload.url },
-      icon: "/icon-192.png?v=partner-v18",
-      badge: "/icon-192.png?v=partner-v18",
-    }),
+    (async () => {
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of clients) {
+        client.postMessage({
+          type: "MOVA_PARTNER_ALERT",
+          title: payload.title,
+          body: payload.body,
+          tag: payload.tag,
+        });
+      }
+      await self.registration.showNotification(payload.title, {
+        body: payload.body,
+        tag: payload.tag,
+        data: { url: payload.url },
+        icon: "/icon-192.png?v=partner-v19",
+        badge: "/icon-192.png?v=partner-v19",
+        vibrate: [220, 120, 220, 120, 320],
+        requireInteraction: true,
+        silent: false,
+      });
+    })(),
   );
 });
 

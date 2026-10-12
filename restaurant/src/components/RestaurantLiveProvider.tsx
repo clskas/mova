@@ -2,7 +2,13 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getToken } from "@/lib/auth";
-import { alertNewRestaurantOrder, alertRestaurantOrderPaid, initPartnerAudioUnlock, onPartnerAlertsUnlocked } from "@/lib/partner-alerts";
+import {
+  alertNewRestaurantOrder,
+  alertRestaurantOrderPaid,
+  bindPartnerPushSoundFromServiceWorker,
+  initPartnerAudioUnlock,
+  onPartnerAlertsUnlocked,
+} from "@/lib/partner-alerts";
 import { registerPartnerWebPush } from "@/lib/partner-web-push";
 import { connectRestaurantSocket } from "@/lib/restaurant-socket";
 
@@ -36,6 +42,7 @@ export function RestaurantLiveProvider({ children }: { children: React.ReactNode
     if (!getToken() || typeof window === "undefined") return;
 
     const stopGestureUnlock = initPartnerAudioUnlock();
+    const stopPushSound = bindPartnerPushSoundFromServiceWorker();
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
       void registerPartnerWebPush("restaurant");
     }
@@ -59,6 +66,7 @@ export function RestaurantLiveProvider({ children }: { children: React.ReactNode
 
     return () => {
       stopGestureUnlock();
+      stopPushSound();
       offUnlock();
       window.clearInterval(pollId);
       socket.disconnect();

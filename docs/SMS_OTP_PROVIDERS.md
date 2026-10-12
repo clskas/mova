@@ -27,6 +27,16 @@ Mobile Money reste indépendant (`MOBILE_MONEY_GATEWAY=serdipay`).
 - Activation : admin SerdiPay active l’API SMS ; credentials envoyés par WhatsApp/mail.
 - Ces credentials sont **distincts** de `SERDIPAY_EMAIL` / `SERDIPAY_PASSWORD` (paiement).
 
+### Que répondre si SerdiPay demande « le lien SMS » ?
+
+| Ce qu’ils veulent en pratique | Lien à donner |
+|-------------------------------|---------------|
+| Endpoint **d’envoi** que SENGA / le hub appelle chez eux | `https://apis.serdipay.com/api/sms-api/v1/send` |
+| Hub AfriSoft (côté SENGA, pas SerdiPay) | `https://sms.afri-soft.com` (`POST /v1/sms/send`) |
+| Callback DLR / webhook (si ils en demandent un) | **Pas encore exposé** côté hub SMS — confirmer avec SerdiPay s’ils exigent un URL de rapport ; sinon N/A |
+
+En prod SENGA n’appelle pas SerdiPay depuis Render : le VPS hub `sms.afri-soft.com` détient `SERDIPAY_SMS_*` et POST vers `apis.serdipay.com`.
+
 ### Variables Render (SerdiPay SMS)
 
 | Variable | Exemple | Notes |

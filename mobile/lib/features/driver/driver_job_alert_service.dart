@@ -143,7 +143,6 @@ class DriverJobAlertService {
 
     if (offerKey != null && offerKey.isNotEmpty) {
       _activeOfferKeys.add(offerKey);
-      _ringingOfferKey = offerKey;
     }
 
     if (_ringing) {
@@ -169,10 +168,7 @@ class DriverJobAlertService {
   static Future<void> stopRinging({String? offerKey}) async {
     if (offerKey != null && offerKey.isNotEmpty) {
       _activeOfferKeys.remove(offerKey);
-      if (_activeOfferKeys.isNotEmpty) {
-        _ringingOfferKey = _activeOfferKeys.last;
-        return;
-      }
+      if (_activeOfferKeys.isNotEmpty) return;
     } else {
       _activeOfferKeys.clear();
     }
@@ -191,7 +187,6 @@ class DriverJobAlertService {
     _ringSafetyTimer?.cancel();
     _ringSafetyTimer = null;
     _ringing = false;
-    _ringingOfferKey = null;
     try {
       await _player.stop();
       await _player.setReleaseMode(ReleaseMode.stop);

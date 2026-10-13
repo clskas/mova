@@ -442,6 +442,11 @@ envVarGroups:
         sync: false
       - key: FCM_SERVER_KEY
         sync: false
+      # FCM HTTP v1 (required for new Firebase projects — Legacy Server Key unavailable)
+      - key: FCM_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: FCM_PROJECT_ID
+        value: senga-6ffda
       # In-app update banner (ride-service GET /api/public/app-version). Raise after Play upload.
       - key: MOBILE_PASSENGER_VERSION
         value: "1.0.18"

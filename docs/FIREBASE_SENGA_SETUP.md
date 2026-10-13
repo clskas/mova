@@ -19,12 +19,28 @@ Objectif : push FCM gratuit quand l’app est fermée, SMS seulement si aucun to
 4. Télécharger **`google-services.json`** (un seul fichier qui contient les deux apps).
 5. (iOS) voir section **iOS** ci-dessous.
 
-## 2. Clé serveur FCM (backend)
+## 2. Compte de service FCM HTTP v1 (backend)
+
+Sur les **nouveaux** projets Firebase, l’API Legacy (Server key) est **indisponible**.
+SENGA utilise **FCM HTTP v1** via un JSON de compte de service.
 
 1. Firebase Console → **Paramètres du projet** → **Cloud Messaging**.
-2. Copier la **clé serveur** (API Cloud Messaging legacy), **ou** migrer plus tard vers HTTP v1.
-3. Sur Render, service **notification** : secret `FCM_SERVER_KEY` = cette clé  
-   (`render.yaml` a déjà la clé `FCM_SERVER_KEY` en `sync: false`).
+2. Vérifier **Firebase Cloud Messaging API (V1) = Enabled** (déjà le cas sur `senga-6ffda`).
+3. Cliquer **Manage Service Accounts** (ou onglet **Service accounts**).
+4. **Generate new private key** → télécharger le `.json`.
+5. Sur Render, service **notification** :
+   - `FCM_SERVICE_ACCOUNT_JSON` = contenu entier du JSON (une ligne), **ou**
+   - `FCM_SERVICE_ACCOUNT_JSON_BASE64` = base64 du fichier
+   - `FCM_PROJECT_ID` = `senga-6ffda` (déjà dans `render.yaml`)
+
+Ne **pas** chercher une « Server key » Legacy : elle n’existe plus pour ce projet.
+
+### iOS — clé APNs (obligatoire pour push iPhone)
+
+1. [Apple Developer → Keys](https://developer.apple.com/account/resources/authkeys/list) → **+** → cocher **Apple Push Notifications service (APNs)** → Continue → Register → **Download** le `.p8` (une seule fois).
+2. Noter **Key ID** et **Team ID**.
+3. Firebase → **Cloud Messaging** → apps Apple (`cd.mova.mova` et `cd.mova.mova.driver`) → **APNs Authentication Key** → **Upload** le `.p8` + Key ID + Team ID.
+4. **Ignorer** « Web Push certificates » / « Generate key pair » — inutile pour les apps mobiles SENGA.
 
 ## 3. Brancher le fichier dans le build mobile
 
@@ -65,3 +81,28 @@ Pas de SMS pour les nouvelles réservations/commandes si le portail / PWA est ou
 - Chauffeur : `cd.mova.mova.driver`
 
 SHA-1 upload / debug : à enregistrer aussi dans Firebase (comme pour Google Sign-In).
+
+## iOS (`GoogleService-Info.plist`)
+
+Bundle IDs SENGA (différents d’Android pour le passager) :
+
+| App            | Bundle ID              |
+|----------------|------------------------|
+| SENGA (passager) | `cd.mova.mova`       |
+| SENGA Driver     | `cd.mova.mova.driver` |
+
+### Dans Firebase Console
+
+1. Projet `senga` → **Add app** → icône **Apple (iOS)**.
+2. **iOS bundle ID** : `cd.mova.mova` → Register → **Download `GoogleService-Info.plist`**.
+3. **Add app** encore → iOS → bundle ID : `cd.mova.mova.driver` → Download le 2ᵉ plist.
+4. **Cloud Messaging** → APNs Auth Key (voir §2 ci-dessus). Sans APNs, le push iOS ne marche pas.
+
+### Fichiers dans le repo / CI
+
+- Placer les plists (ou un secret CI) pour le build IPA — typiquement :
+  - `mobile/ios/Runner/GoogleService-Info-passenger.plist`
+  - `mobile/ios/Runner/GoogleService-Info-driver.plist`
+- Le script `mobile/ios/ci_set_flavor.sh` pourra copier le bon fichier vers `GoogleService-Info.plist` avant `flutter build ipa`.
+
+Tant que les plists + APNs ne sont pas en place, le FCM iOS reste inactif ; Android fonctionne dès que `google-services.json` + `FCM_SERVICE_ACCOUNT_JSON` sont configurés.

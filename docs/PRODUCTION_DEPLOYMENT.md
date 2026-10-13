@@ -112,7 +112,9 @@ MOCK_PAYMENTS=false
 | `ALLOW_TEST_OTP` | `true` tant que SMS réel indisponible (OTP `123456` sur numéros seed uniquement) |
 | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Stockage documents (projet **senga**, buckets `uploads` + `kyc-docs`) |
 | `TWILIO_*` | Secours OTP SMS |
-| `FCM_SERVER_KEY` | Push notifications |
+| `FCM_SERVICE_ACCOUNT_JSON` | Push FCM HTTP v1 (service account JSON) |
+| `FCM_PROJECT_ID` | `senga-6ffda` |
+| `FCM_SERVER_KEY` | Legacy only (unused on new Firebase projects) |
 | `MAPBOX_ACCESS_TOKEN` | **Render** groupe `mova-external-apis` (`sync: false`) — token public Mapbox `pk.` pour Search Box (POI + adresses, `country=cd`, bbox nationale). Sans token, repli OSM (Photon/Nominatim) : villes OK, POI informels souvent absents. À poser dans le dashboard Render, jamais dans git. |
 | `MOBILE_PASSENGER_VERSION` / `MOBILE_DRIVER_VERSION` | Version store courante (bannière in-app). Défaut `1.0.2`. **Lever après upload Play** (ex. `1.0.3`) — `GET /api/public/app-version` (sans auth, ride-service) |
 | `MOBILE_MIN_VERSION` | Version minimale (force-update). Défaut `1.0.0` |

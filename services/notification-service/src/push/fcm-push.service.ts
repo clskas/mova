@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { GoogleAuth, JWT } from 'google-auth-library';
 
 export interface FcmPushMessage {
   title: string;
@@ -18,14 +19,25 @@ export const SENGA_DRIVER_JOB_SOUND_IOS = 'senga_job.wav';
 /** Canal chat (ChatAlertService sur passager + chauffeur). Son système. */
 export const SENGA_CHAT_CHANNEL = 'mova_chat';
 
+type ServiceAccount = {
+  type?: string;
+  project_id?: string;
+  private_key?: string;
+  client_email?: string;
+  [key: string]: unknown;
+};
+
 @Injectable()
 export class FcmPushService {
   private readonly logger = new Logger(FcmPushService.name);
+  private cachedAuth: GoogleAuth | null = null;
+  private cachedProjectId: string | null = null;
+  private configLogged = false;
 
   constructor(private config: ConfigService) {}
 
   isConfigured(): boolean {
-    return Boolean(this.config.get<string>('FCM_SERVER_KEY')?.trim());
+    return Boolean(this.loadServiceAccount() || this.config.get<string>('FCM_SERVER_KEY')?.trim());
   }
 
   async sendToTokens(
@@ -33,8 +45,7 @@ export class FcmPushService {
     message: FcmPushMessage,
     opts?: { profile?: FcmPushProfile },
   ): Promise<void> {
-    const serverKey = this.config.get<string>('FCM_SERVER_KEY')?.trim();
-    if (!serverKey || tokens.length === 0) return;
+    if (tokens.length === 0) return;
 
     const unique = [...new Set(tokens.filter(Boolean))];
     const data = Object.fromEntries(
@@ -46,10 +57,190 @@ export class FcmPushService {
     const soundAndroid = isChat ? 'default' : SENGA_DRIVER_JOB_SOUND_ANDROID;
     const soundIos = isChat ? 'default' : SENGA_DRIVER_JOB_SOUND_IOS;
 
+    const sa = this.loadServiceAccount();
+    if (sa) {
+      await this.sendViaHttpV1(unique, message, data, {
+        isChat,
+        channelId,
+        soundAndroid,
+        soundIos,
+      });
+      return;
+    }
+
+    const serverKey = this.config.get<string>('FCM_SERVER_KEY')?.trim();
+    if (!serverKey) return;
+
+    if (!this.configLogged) {
+      this.configLogged = true;
+      this.logger.warn(
+        'FCM_SERVER_KEY (legacy) is set but new Firebase projects cannot use the legacy send API. Prefer FCM_SERVICE_ACCOUNT_JSON.',
+      );
+    }
+
+    await this.sendViaLegacy(unique, message, data, serverKey, {
+      isChat,
+      channelId,
+      soundAndroid,
+      soundIos,
+    });
+  }
+
+  private loadServiceAccount(): ServiceAccount | null {
+    const raw =
+      this.config.get<string>('FCM_SERVICE_ACCOUNT_JSON')?.trim() ||
+      this.decodeBase64(this.config.get<string>('FCM_SERVICE_ACCOUNT_JSON_BASE64')?.trim());
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as ServiceAccount;
+      if (!parsed.client_email || !parsed.private_key) {
+        this.logger.warn('FCM service account JSON missing client_email/private_key');
+        return null;
+      }
+      return parsed;
+    } catch (e) {
+      this.logger.warn('Invalid FCM_SERVICE_ACCOUNT_JSON', e);
+      return null;
+    }
+  }
+
+  private decodeBase64(value?: string | null): string | null {
+    if (!value) return null;
+    try {
+      return Buffer.from(value, 'base64').toString('utf8');
+    } catch {
+      return null;
+    }
+  }
+
+  private getAuth(sa: ServiceAccount): { auth: GoogleAuth; projectId: string } {
+    if (this.cachedAuth && this.cachedProjectId) {
+      return { auth: this.cachedAuth, projectId: this.cachedProjectId };
+    }
+    const projectId =
+      this.config.get<string>('FCM_PROJECT_ID')?.trim() ||
+      sa.project_id ||
+      'senga-6ffda';
+    this.cachedAuth = new GoogleAuth({
+      credentials: sa,
+      scopes: ['https://www.googleapis.com/auth/firebase.messaging'],
+      projectId,
+    });
+    this.cachedProjectId = projectId;
+    if (!this.configLogged) {
+      this.configLogged = true;
+      this.logger.log(`FCM HTTP v1 ready project=${projectId}`);
+    }
+    return { auth: this.cachedAuth, projectId };
+  }
+
+  private async sendViaHttpV1(
+    tokens: string[],
+    message: FcmPushMessage,
+    data: Record<string, string>,
+    opts: {
+      isChat: boolean;
+      channelId: string;
+      soundAndroid: string;
+      soundIos: string;
+    },
+  ): Promise<void> {
+    const sa = this.loadServiceAccount();
+    if (!sa) return;
+    const { auth, projectId } = this.getAuth(sa);
+    const client = (await auth.getClient()) as JWT;
+    const accessToken = (await client.getAccessToken()).token;
+    if (!accessToken) {
+      this.logger.warn('FCM v1: failed to obtain access token');
+      return;
+    }
+
+    const url = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
     await Promise.all(
-      unique.map(async (token) => {
+      tokens.map(async (token) => {
         try {
-          // Legacy FCM HTTP API — android_channel_id + sound (raw resource / iOS bundle)
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: {
+                token,
+                notification: {
+                  title: message.title,
+                  body: message.body,
+                },
+                data: {
+                  ...data,
+                  title: message.title,
+                  body: message.body,
+                  click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                  android_channel_id: opts.channelId,
+                },
+                android: {
+                  priority: 'high',
+                  notification: {
+                    channel_id: opts.channelId,
+                    sound: opts.soundAndroid,
+                    ...(opts.isChat
+                      ? {}
+                      : {
+                          default_vibrate_timings: true,
+                          notification_priority: 'PRIORITY_MAX',
+                          visibility: 'PUBLIC',
+                          tag: data.referenceId ? `job:${data.referenceId}` : 'senga_job',
+                          click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                        }),
+                  },
+                },
+                apns: {
+                  headers: {
+                    'apns-priority': '10',
+                    ...(opts.isChat ? {} : { 'apns-push-type': 'alert' }),
+                  },
+                  payload: {
+                    aps: {
+                      alert: {
+                        title: message.title,
+                        body: message.body,
+                      },
+                      sound: opts.soundIos,
+                      'content-available': 1,
+                      ...(opts.isChat ? {} : { 'interruption-level': 'time-sensitive' }),
+                    },
+                  },
+                },
+              },
+            }),
+          });
+          if (!res.ok) {
+            const text = await res.text();
+            this.logger.warn(`FCM v1 push failed (${res.status}) token=${token.slice(0, 12)}… ${text}`);
+          }
+        } catch (e) {
+          this.logger.warn(`FCM v1 push error token=${token.slice(0, 12)}…`, e);
+        }
+      }),
+    );
+  }
+
+  private async sendViaLegacy(
+    tokens: string[],
+    message: FcmPushMessage,
+    data: Record<string, string>,
+    serverKey: string,
+    opts: {
+      isChat: boolean;
+      channelId: string;
+      soundAndroid: string;
+      soundIos: string;
+    },
+  ): Promise<void> {
+    await Promise.all(
+      tokens.map(async (token) => {
+        try {
           const res = await fetch('https://fcm.googleapis.com/fcm/send', {
             method: 'POST',
             headers: {
@@ -60,13 +251,12 @@ export class FcmPushService {
               to: token,
               priority: 'high',
               content_available: true,
-              // Legacy HTTP: wake device even if app is killed (high priority + notification block).
               notification: {
                 title: message.title,
                 body: message.body,
-                sound: soundIos,
-                android_channel_id: channelId,
-                ...(isChat
+                sound: opts.soundIos,
+                android_channel_id: opts.channelId,
+                ...(opts.isChat
                   ? {}
                   : {
                       click_action: 'FLUTTER_NOTIFICATION_CLICK',
@@ -76,9 +266,9 @@ export class FcmPushService {
               android: {
                 priority: 'high',
                 notification: {
-                  channel_id: channelId,
-                  sound: soundAndroid,
-                  ...(isChat
+                  channel_id: opts.channelId,
+                  sound: opts.soundAndroid,
+                  ...(opts.isChat
                     ? {}
                     : {
                         default_vibrate_timings: true,
@@ -90,13 +280,13 @@ export class FcmPushService {
               apns: {
                 headers: {
                   'apns-priority': '10',
-                  ...(isChat ? {} : { 'apns-push-type': 'alert' }),
+                  ...(opts.isChat ? {} : { 'apns-push-type': 'alert' }),
                 },
                 payload: {
                   aps: {
-                    sound: soundIos,
+                    sound: opts.soundIos,
                     'content-available': 1,
-                    ...(isChat ? {} : { 'interruption-level': 'time-sensitive' }),
+                    ...(opts.isChat ? {} : { 'interruption-level': 'time-sensitive' }),
                   },
                 },
               },
@@ -105,7 +295,7 @@ export class FcmPushService {
                 title: message.title,
                 body: message.body,
                 click_action: 'FLUTTER_NOTIFICATION_CLICK',
-                android_channel_id: channelId,
+                android_channel_id: opts.channelId,
               },
             }),
           });

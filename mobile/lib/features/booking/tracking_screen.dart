@@ -16,8 +16,9 @@ import '../../core/geo/geo_utils.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
-import '../chat/ride_chat_screen.dart';
 import '../chat/chat_alert_service.dart';
+import '../chat/chat_badge_icon.dart';
+import '../chat/ride_chat_screen.dart';
 import '../passenger/passenger_alert_service.dart';
 import '../geo/suggest_place_screen.dart';
 import '../rating/rating_screen.dart';
@@ -891,7 +892,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                     ),
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.chat_bubble_outline, color: MovaColors.violet),
+                                    icon: ChatBadgeIcon(
+                                      kind: 'ride',
+                                      threadId: widget.rideId,
+                                      color: MovaColors.violet,
+                                    ),
                                     tooltip: 'Chat',
                                     onPressed: () {
                                       Navigator.push(

@@ -15,6 +15,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../chat/call_ring_service.dart';
 import '../chat/chat_alert_service.dart';
+import '../chat/chat_badge_icon.dart';
 import '../chat/delivery_chat_screen.dart';
 import '../chat/delivery_voice_call_screen.dart';
 import '../chat/errand_chat_screen.dart';
@@ -484,6 +485,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   }
 
   Future<void> _openVoiceCall() {
+    unawaited(CallRingService.stop(deliveryId: _deliveryId));
     return Navigator.push(
       context,
       MaterialPageRoute(
@@ -590,7 +592,10 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
                   ),
         ),
         IconButton(
-          icon: const Icon(Icons.chat_bubble_outline),
+          icon: ChatBadgeIcon(
+            kind: _isErrand ? 'errand' : 'delivery',
+            threadId: _deliveryId,
+          ),
           tooltip: 'Chat client',
           onPressed: _deliveryId.isEmpty ? null : () => _openChat(peerLabel: 'Client'),
         ),
@@ -711,11 +716,17 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
             ),
           ],
           const SizedBox(height: 8),
-          MovaButton(
-            label: 'Chat avec le client',
-            isSecondary: true,
-            icon: Icons.chat_bubble_outline,
-            onPressed: _deliveryId.isEmpty ? null : () => _openChat(peerLabel: 'Client'),
+          ValueListenableBuilder<Map<String, int>>(
+            valueListenable: ChatAlertService.unreadByThread,
+            builder: (context, unread, _) {
+              final n = unread[ChatAlertService.threadKey(_isErrand ? 'errand' : 'delivery', _deliveryId)] ?? 0;
+              return MovaButton(
+                label: n > 0 ? 'Chat avec le client ($n)' : 'Chat avec le client',
+                isSecondary: true,
+                icon: Icons.chat_bubble_outline,
+                onPressed: _deliveryId.isEmpty ? null : () => _openChat(peerLabel: 'Client'),
+              );
+            },
           ),
           if (_isFood) ...[
             const SizedBox(height: 8),

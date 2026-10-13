@@ -5,7 +5,20 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-/// Sonnerie d'appel vocal LiveKit (livraison) — boucle jusqu'à stop ou timeout.
+class IncomingCallInfo {
+  const IncomingCallInfo({
+    required this.deliveryId,
+    required this.peerLabel,
+    this.starterId = '',
+  });
+
+  final String deliveryId;
+  final String peerLabel;
+  final String starterId;
+}
+
+/// Sonnerie + état UI pour appel vocal LiveKit (livraison).
+/// [incoming] pilote l'overlay Décrocher / Refuser.
 class CallRingService {
   CallRingService._();
 
@@ -13,15 +26,17 @@ class CallRingService {
   static final AudioPlayer _player = AudioPlayer();
   static bool _initialized = false;
   static bool _ringing = false;
-  static String? _activeDeliveryId;
   static Timer? _safetyTimer;
-  static const _maxRing = Duration(seconds: 45);
+  static const _maxRing = Duration(seconds: 60);
   static const _assetSound = 'sounds/senga_job.wav';
-  static const _channelId = 'mova_voice_call';
+  static const _channelId = 'mova_voice_call_v2';
   static const _channelName = 'Appels vocaux SENGA';
 
+  /// Non-null ⇒ afficher l'écran d'appel entrant (Décrocher / Refuser).
+  static final ValueNotifier<IncomingCallInfo?> incoming = ValueNotifier<IncomingCallInfo?>(null);
+
   static bool get isRinging => _ringing;
-  static String? get activeDeliveryId => _activeDeliveryId;
+  static String? get activeDeliveryId => incoming.value?.deliveryId;
 
   static Future<void> init() async {
     if (_initialized) return;
@@ -30,12 +45,13 @@ class CallRingService {
     await _plugin.initialize(
       settings: const InitializationSettings(android: androidInit, iOS: darwinInit),
     );
-    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final android =
+        _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await android?.createNotificationChannel(
       const AndroidNotificationChannel(
         _channelId,
         _channelName,
-        description: 'Sonnerie pour rejoindre un appel vocal livraison',
+        description: 'Appels vocaux livraison SENGA',
         importance: Importance.max,
         playSound: true,
         enableVibration: true,
@@ -45,7 +61,7 @@ class CallRingService {
     _initialized = true;
   }
 
-  /// Démarre la sonnerie pour un appel entrant (ignore si on est déjà l'appelant).
+  /// Démarre sonnerie + overlay (ignore si on est l'appelant).
   static Future<void> startIncoming({
     required String deliveryId,
     required String starterId,
@@ -53,15 +69,21 @@ class CallRingService {
     String peerLabel = 'Contact',
   }) async {
     if (myUserId != null && myUserId.isNotEmpty && starterId == myUserId) return;
+    if (deliveryId.isEmpty) return;
     await init();
-    _activeDeliveryId = deliveryId;
+
+    incoming.value = IncomingCallInfo(
+      deliveryId: deliveryId,
+      peerLabel: peerLabel,
+      starterId: starterId,
+    );
     await HapticFeedback.heavyImpact();
 
     try {
       await _plugin.show(
         id: 77001,
         title: 'Appel vocal SENGA',
-        body: '$peerLabel vous appelle — ouvrez « Appeler » pour répondre.',
+        body: '$peerLabel vous appelle — touchez Décrocher.',
         notificationDetails: const NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,
@@ -105,15 +127,12 @@ class CallRingService {
   }
 
   static Future<void> stop({String? deliveryId}) async {
-    if (deliveryId != null &&
-        _activeDeliveryId != null &&
-        deliveryId != _activeDeliveryId) {
-      return;
-    }
+    final active = incoming.value?.deliveryId;
+    if (deliveryId != null && active != null && deliveryId != active) return;
     _safetyTimer?.cancel();
     _safetyTimer = null;
     _ringing = false;
-    _activeDeliveryId = null;
+    incoming.value = null;
     try {
       await _player.stop();
       await _player.setReleaseMode(ReleaseMode.stop);

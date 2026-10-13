@@ -6,6 +6,7 @@ import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
+import 'chat_alert_service.dart';
 import 'chat_receipt.dart';
 import 'ride_chat_screen.dart';
 
@@ -35,11 +36,16 @@ class _ErrandChatScreenState extends ConsumerState<ErrandChatScreen> {
   @override
   void initState() {
     super.initState();
+    ChatAlertService.activeThreadKey = ChatAlertService.threadKey('errand', widget.errandId);
+    ChatAlertService.clearUnread('errand', widget.errandId);
     _load();
   }
 
   @override
   void dispose() {
+    if (ChatAlertService.activeThreadKey == ChatAlertService.threadKey('errand', widget.errandId)) {
+      ChatAlertService.activeThreadKey = null;
+    }
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();

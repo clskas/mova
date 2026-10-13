@@ -1,21 +1,24 @@
-import 'dart:typed_data';
-
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-/// Notifications sonores + vibration pour les messages chat (hors écran chat ouvert).
+/// Notifications sonores + vibration + badge non-lus pour le chat.
 class ChatAlertService {
   ChatAlertService._();
 
   static final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+  static final AudioPlayer _player = AudioPlayer();
   static bool _initialized = false;
   static int _notificationId = 10000;
 
   /// Ex. `ride:abc`, `delivery:xyz` — pas de notification si le fil est ouvert.
   static String? activeThreadKey;
 
-  /// Déduplique les messages déjà signalés (WebSocket temps réel ET poll serveur
-  /// partagent le même id de message → une seule bannière).
+  /// Compteurs non-lus par fil (`ride:id` → n). Écoutez pour badges UI.
+  static final ValueNotifier<Map<String, int>> unreadByThread =
+      ValueNotifier<Map<String, int>>(const {});
+
   static final Set<String> _shownMessageIds = <String>{};
 
   static bool _markShown(String? messageId) {
@@ -28,8 +31,9 @@ class ChatAlertService {
     return true;
   }
 
-  static const _channelId = 'mova_chat';
+  static const _channelId = 'mova_chat_v2';
   static const _channelName = 'Messages SENGA';
+  static const _assetSound = 'sounds/senga_job.wav';
 
   static Future<void> init() async {
     if (_initialized) return;
@@ -40,7 +44,8 @@ class ChatAlertService {
       settings: const InitializationSettings(android: androidInit, iOS: darwinInit),
     );
 
-    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin =
+        _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.createNotificationChannel(
       AndroidNotificationChannel(
         _channelId,
@@ -54,10 +59,63 @@ class ChatAlertService {
     );
 
     await androidPlugin?.requestNotificationsPermission();
+    try {
+      await _player.setReleaseMode(ReleaseMode.stop);
+      await _player.setVolume(1.0);
+    } catch (_) {
+      /* ignore */
+    }
     _initialized = true;
   }
 
   static String threadKey(String kind, String id) => '$kind:$id';
+
+  static int unreadCount(String kind, String threadId) {
+    if (threadId.isEmpty) return 0;
+    return unreadByThread.value[threadKey(kind, threadId)] ?? 0;
+  }
+
+  static int get totalUnread {
+    var n = 0;
+    for (final v in unreadByThread.value.values) {
+      n += v;
+    }
+    return n;
+  }
+
+  static void clearUnread(String kind, String threadId) {
+    if (threadId.isEmpty) return;
+    final key = threadKey(kind, threadId);
+    final next = Map<String, int>.from(unreadByThread.value);
+    if (!next.containsKey(key)) return;
+    next.remove(key);
+    unreadByThread.value = next;
+  }
+
+  static void _bumpUnread(String kind, String threadId) {
+    if (threadId.isEmpty) return;
+    final key = threadKey(kind, threadId);
+    if (activeThreadKey == key) return;
+    final next = Map<String, int>.from(unreadByThread.value);
+    next[key] = (next[key] ?? 0) + 1;
+    unreadByThread.value = next;
+  }
+
+  static Future<void> _playChatSound() async {
+    await HapticFeedback.mediumImpact();
+    try {
+      await _player.stop();
+      await _player.setReleaseMode(ReleaseMode.stop);
+      await _player.play(AssetSource(_assetSound), volume: 1.0);
+    } catch (e) {
+      if (kDebugMode) debugPrint('ChatAlert sound: $e');
+      try {
+        await SystemSound.play(SystemSoundType.alert);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }
 
   static Future<void> notifyIncoming({
     required String kind,
@@ -73,13 +131,14 @@ class ChatAlertService {
     if (!_markShown(messageId)) return;
 
     await init();
-    await HapticFeedback.mediumImpact();
-    await SystemSound.play(SystemSoundType.alert);
+    _bumpUnread(kind, threadId);
+    await _playChatSound();
 
     final from = switch (senderRole) {
       'driver' => 'Chauffeur',
       'passenger' => 'Passager',
       'courier' => 'Livreur',
+      'partner' => 'Restaurant',
       _ => peerLabel,
     };
 
@@ -98,20 +157,20 @@ class ChatAlertService {
           enableVibration: true,
           vibrationPattern: Int64List.fromList([0, 250, 100, 250]),
           ticker: 'Nouveau message SENGA',
+          channelShowBadge: true,
+          number: unreadCount(kind, threadId),
         ),
-        iOS: const DarwinNotificationDetails(
+        iOS: DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
+          badgeNumber: totalUnread,
         ),
       ),
       payload: key,
     );
   }
 
-  /// Bannière issue d'une notification serveur (poll local, sans FCM). Le titre
-  /// et le corps sont déjà formatés côté serveur (« Message du passager », « Reçu
-  /// de paiement »…). Respecte le fil ouvert et la déduplication par messageId.
   static Future<void> notifyFromServer({
     required String kind,
     required String threadId,
@@ -124,8 +183,8 @@ class ChatAlertService {
     if (title.trim().isEmpty && body.trim().isEmpty) return;
 
     await init();
-    await HapticFeedback.mediumImpact();
-    await SystemSound.play(SystemSoundType.alert);
+    if (threadId.isNotEmpty) _bumpUnread(kind, threadId);
+    await _playChatSound();
 
     final id = ++_notificationId;
     await _plugin.show(
@@ -142,11 +201,14 @@ class ChatAlertService {
           enableVibration: true,
           vibrationPattern: Int64List.fromList([0, 250, 100, 250]),
           ticker: 'Nouveau message SENGA',
+          channelShowBadge: true,
+          number: threadId.isEmpty ? null : unreadCount(kind, threadId),
         ),
-        iOS: const DarwinNotificationDetails(
+        iOS: DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
+          badgeNumber: totalUnread,
         ),
       ),
       payload: threadId.isEmpty ? null : threadKey(kind, threadId),

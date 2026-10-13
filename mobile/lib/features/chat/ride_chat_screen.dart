@@ -62,6 +62,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
   void initState() {
     super.initState();
     ChatAlertService.activeThreadKey = ChatAlertService.threadKey('ride', widget.rideId);
+    ChatAlertService.clearUnread('ride', widget.rideId);
     _bootstrap();
   }
 

@@ -14,6 +14,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../passenger/passenger_alert_service.dart';
 import '../booking/payment_screen.dart';
+import '../chat/chat_alert_service.dart';
 import '../chat/delivery_chat_screen.dart';
 import 'delivery_live_tracking.dart';
 import 'delivery_payment_state.dart';
@@ -499,20 +500,26 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (courier != null || _delivery?['driverId'] != null) ...[
-                            MovaButton(
-                              label: 'Contacter le livreur',
-                              isSecondary: true,
-                              icon: Icons.chat_bubble_outline,
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => DeliveryChatScreen(
-                                      deliveryId: widget.parcelId,
-                                      myRole: 'passenger',
-                                      peerLabel: courier?['firstName']?.toString() ?? 'Livreur',
-                                    ),
-                                  ),
+                            ValueListenableBuilder<Map<String, int>>(
+                              valueListenable: ChatAlertService.unreadByThread,
+                              builder: (context, unread, _) {
+                                final n = unread[ChatAlertService.threadKey('delivery', widget.parcelId)] ?? 0;
+                                return MovaButton(
+                                  label: n > 0 ? 'Contacter le livreur ($n)' : 'Contacter le livreur',
+                                  isSecondary: true,
+                                  icon: Icons.chat_bubble_outline,
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => DeliveryChatScreen(
+                                          deliveryId: widget.parcelId,
+                                          myRole: 'passenger',
+                                          peerLabel: courier?['firstName']?.toString() ?? 'Livreur',
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 );
                               },
                             ),

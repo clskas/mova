@@ -10,11 +10,15 @@ import 'core/update/app_update_service.dart';
 import 'core/widgets/offline_shell.dart';
 import 'core/widgets/maintenance_gate.dart';
 import 'features/auth/auth_session_gate.dart';
+import 'features/chat/call_ring_service.dart';
 import 'features/chat/chat_alert_service.dart';
 import 'features/chat/chat_poll_service.dart';
+import 'features/chat/incoming_call_overlay.dart';
 import 'features/driver/driver_job_alert_service.dart';
 import 'features/passenger/passenger_alert_service.dart';
 import 'features/splash/mova_splash_screen.dart';
+
+final movaNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Point d'entrée partagé — évite SyncQueue non initialisé si le mauvais main.dart est ciblé.
 Future<void> runMovaPassengerApp() async {
@@ -23,6 +27,7 @@ Future<void> runMovaPassengerApp() async {
   await SyncQueue.init();
   await PassengerAlertService.init();
   await ChatAlertService.init();
+  await CallRingService.init();
   runApp(
     const ProviderScope(
       child: MovaPassengerApp(),
@@ -36,6 +41,7 @@ Future<void> runMovaDriverApp() async {
   await SyncQueue.init();
   await DriverJobAlertService.init();
   await ChatAlertService.init();
+  await CallRingService.init();
   runApp(
     const ProviderScope(
       child: MovaDriverApp(),
@@ -81,6 +87,7 @@ class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
     return movaMediaQueryWrapper(
       child: MaterialApp(
         title: 'Senga',
+        navigatorKey: movaNavigatorKey,
         theme: buildMovaTheme(),
         home: MovaSplashScreen(
           role: MovaSplashRole.passenger,
@@ -88,7 +95,12 @@ class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
         ),
         debugShowCheckedModeBanner: false,
         builder: (context, child) => MaintenanceGate(
-          child: MovaOfflineShell(child: child),
+          child: MovaOfflineShell(
+            child: IncomingCallOverlay(
+              navigatorKey: movaNavigatorKey,
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
         ),
       ),
     );
@@ -133,6 +145,7 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
     return movaMediaQueryWrapper(
       child: MaterialApp(
         title: 'SENGA Driver',
+        navigatorKey: movaNavigatorKey,
         theme: buildMovaTheme(),
         home: MovaSplashScreen(
           role: MovaSplashRole.driver,
@@ -140,7 +153,12 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
         ),
         debugShowCheckedModeBanner: false,
         builder: (context, child) => MaintenanceGate(
-          child: MovaOfflineShell(child: child),
+          child: MovaOfflineShell(
+            child: IncomingCallOverlay(
+              navigatorKey: movaNavigatorKey,
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
         ),
       ),
     );

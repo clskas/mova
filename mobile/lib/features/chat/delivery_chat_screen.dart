@@ -45,6 +45,7 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
   void initState() {
     super.initState();
     ChatAlertService.activeThreadKey = ChatAlertService.threadKey('delivery', widget.deliveryId);
+    ChatAlertService.clearUnread('delivery', widget.deliveryId);
     _load();
     _checkVoice();
     _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _load());

@@ -14,6 +14,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../chat/chat_alert_service.dart';
+import '../chat/chat_badge_icon.dart';
 import '../chat/ride_chat_screen.dart';
 import '../geo/suggest_place_screen.dart';
 import '../../core/safety/sos_helper.dart';
@@ -449,7 +450,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.chat_bubble_outline),
+          icon: ChatBadgeIcon(kind: 'ride', threadId: _rideId),
           tooltip: 'Chat passager',
           onPressed: () {
             Navigator.push(

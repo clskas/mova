@@ -32,6 +32,16 @@ else
   GOOGLE_IOS_CLIENT_ID="${GOOGLE_IOS_CLIENT_ID_PASSENGER}"
 fi
 
+# Firebase / FCM: pick the plist matching this flavor's bundle ID.
+FIREBASE_SRC="$ROOT/Runner/GoogleService-Info-${FLAVOR}.plist"
+FIREBASE_DST="$ROOT/Runner/GoogleService-Info.plist"
+if [[ -f "$FIREBASE_SRC" ]]; then
+  cp -f "$FIREBASE_SRC" "$FIREBASE_DST"
+  echo "GoogleService-Info.plist ← GoogleService-Info-${FLAVOR}.plist"
+else
+  echo "WARNING: missing ${FIREBASE_SRC} — FCM iOS inactive for ${FLAVOR}" >&2
+fi
+
 # Swap App Store / home-screen icon (ASC list icon comes from the IPA AppIcon).
 ICON_SRC="$ROOT/Runner/Assets.xcassets/${ICON_SET}"
 ICON_DST="$ROOT/Runner/Assets.xcassets/AppIcon.appiconset"

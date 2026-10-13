@@ -600,6 +600,14 @@ jobs:
             echo "::error::GOOGLE_IOS_CLIENT_ID empty for ${{ matrix.flavor }}"
             exit 1
           fi
+          # Firebase iOS plists (fallback if not committed): secrets per flavor.
+          if [ ! -f "ios/Runner/GoogleService-Info-${{ matrix.flavor }}.plist" ]; then
+            if [ "${{ matrix.flavor }}" = "driver" ] && [ -n "${GOOGLE_SERVICE_INFO_DRIVER_BASE64:-}" ]; then
+              echo "$GOOGLE_SERVICE_INFO_DRIVER_BASE64" | base64 -d > "ios/Runner/GoogleService-Info-driver.plist"
+            elif [ "${{ matrix.flavor }}" = "passenger" ] && [ -n "${GOOGLE_SERVICE_INFO_PASSENGER_BASE64:-}" ]; then
+              echo "$GOOGLE_SERVICE_INFO_PASSENGER_BASE64" | base64 -d > "ios/Runner/GoogleService-Info-passenger.plist"
+            fi
+          fi
           bash ios/ci_set_flavor.sh "${{ matrix.flavor }}"
           rm -rf ~/Library/Developer/Xcode/DerivedData/* || true
           echo "::group::flutter build ipa (${{ matrix.flavor }})"

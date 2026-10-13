@@ -92,12 +92,24 @@ class ChatPollService {
           final starterId = data['senderId']?.toString() ??
               data['starterId']?.toString() ??
               '';
+          // `kind` vient du CHAT_MESSAGE (ride|delivery|…). Sans ça, Décrocher
+          // appelle /deliveries/:id → « Livraison introuvable » sur une course.
+          final callKind = kind == 'ride' ? 'ride' : 'delivery';
+          final peerFromTitle = n['title']?.toString().trim();
+          final peerLabel = (peerFromTitle != null &&
+                  peerFromTitle.isNotEmpty &&
+                  peerFromTitle.toLowerCase() != 'message senga')
+              ? peerFromTitle
+              : (callKind == 'ride' ? 'Course' : 'Livraison');
+          // Nouvelle notification = nouvel appel : lever la suppression post-raccroché.
+          CallRingService.allowNewIncoming(threadId);
           await CallRingService.startIncoming(
             deliveryId: threadId,
             starterId: starterId,
             myUserId: myId,
-            peerLabel: 'Contact',
-            fromRealtime: false,
+            peerLabel: peerLabel,
+            kind: callKind,
+            fromRealtime: true,
           );
         }
 

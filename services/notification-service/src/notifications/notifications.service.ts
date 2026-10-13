@@ -197,6 +197,7 @@ export class NotificationsService implements OnModuleInit {
       kind: payload.kind,
       threadId: payload.threadId,
       messageId: payload.messageId,
+      senderId: payload.senderId,
       senderRole: payload.senderRole,
       isReceipt,
     };
@@ -210,6 +211,7 @@ export class NotificationsService implements OnModuleInit {
       type: 'CHAT_MESSAGE',
       kind: payload.kind,
       threadId: payload.threadId,
+      senderId: payload.senderId ?? '',
     }, { profile: 'chat' });
     this.logger.log(
       `chat.message notification → ${recipients.length} destinataire(s), FCM tokens=${pushed} (${payload.kind}:${payload.threadId})`,

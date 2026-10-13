@@ -136,18 +136,27 @@ class CallRingService {
     if (myUserId != null && myUserId.isNotEmpty && starterId == myUserId) return;
     if (deliveryId.isEmpty) return;
 
-    // Déjà en communication sur cette livraison : ne pas re-sonner.
-    if (_inCallDeliveryId == deliveryId) return;
-
     if (!fromRealtime && _suppressChatRestart.contains(deliveryId)) {
       return;
     }
     if (fromRealtime) {
       allowNewIncoming(deliveryId);
+      // Nouvel `action: start` = l'appel précédent est terminé (évite blocage
+      // si clearInCall n'a pas tourné après un échec « livraison introuvable »).
+      if (_inCallDeliveryId == deliveryId) {
+        _inCallDeliveryId = null;
+      }
     }
+
+    // Déjà en communication connectée sur ce fil : ne pas re-sonner.
+    if (_inCallDeliveryId == deliveryId) return;
 
     await init();
 
+    // Forcer une notification ValueNotifier même si un overlay fantôme restait.
+    if (incoming.value?.deliveryId == deliveryId) {
+      incoming.value = null;
+    }
     incoming.value = IncomingCallInfo(
       deliveryId: deliveryId,
       peerLabel: peerLabel,

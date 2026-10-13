@@ -120,7 +120,7 @@ class _IncomingCallSheet extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Livraison #$shortId',
+                info.kind == 'ride' ? 'Course #$shortId' : 'Livraison #$shortId',
                 style: const TextStyle(color: Colors.white54, fontSize: 13),
               ),
               const Spacer(),

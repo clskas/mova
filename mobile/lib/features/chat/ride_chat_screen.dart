@@ -134,6 +134,16 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
     final message = RideChatMessage(id: id, text: text, senderRole: role, ts: ts, isMine: mine);
     _messages.add(message);
     if (!fromHistory && !mine) {
+      if (text.contains('Appel vocal SENGA')) {
+        CallRingService.allowNewIncoming(widget.rideId);
+        unawaited(CallRingService.startIncoming(
+          deliveryId: widget.rideId,
+          starterId: payload['senderId']?.toString() ?? '',
+          peerLabel: widget.peerLabel,
+          kind: 'ride',
+          fromRealtime: true,
+        ));
+      }
       unawaited(ChatAlertService.notifyIncoming(
         kind: 'ride',
         threadId: widget.rideId,

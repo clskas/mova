@@ -112,13 +112,14 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
         _knownIds.add(m.id);
         if (_chatHistoryLoaded && !m.isMine) {
           if (m.text.contains('Appel vocal SENGA')) {
-            // Sonnerie chat = secours ; le socket `delivery:call` est prioritaire.
-            // Après raccroché, CallRingService ignore ces relances (fromRealtime: false).
+            // Nouveau message d'annonce = nouvel appel (pas une relecture d'historique).
+            CallRingService.allowNewIncoming(widget.deliveryId);
             unawaited(CallRingService.startIncoming(
               deliveryId: widget.deliveryId,
               starterId: '',
               peerLabel: widget.peerLabel,
-              fromRealtime: false,
+              kind: 'delivery',
+              fromRealtime: true,
             ));
           }
           ChatAlertService.notifyIncoming(

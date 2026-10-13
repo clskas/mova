@@ -475,14 +475,22 @@ jobs:
           echo "Using API_URL=$API"
           echo "Using WS_URL=$WS"
 
-      - name: Resolve iOS marketing version
+      - name: Resolve iOS marketing version + build number
         id: iosver
         run: |
           set -euo pipefail
+          # Aligné Android : max(run_number, pubspec +N) pour que la bannière
+          # currentVersionCode (API) ne reste pas collée après TestFlight.
+          FLOOR=136
           PUBSPEC_LINE=$(grep -E '^version:' mobile/pubspec.yaml | head -1)
           NAME=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+          PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
+          CODE="${{ github.run_number }}"
+          if [ "$CODE" -lt "$FLOOR" ]; then CODE="$FLOOR"; fi
+          if [ -n "$PUBSPEC_CODE" ] && [ "$PUBSPEC_CODE" -gt "$CODE" ]; then CODE="$PUBSPEC_CODE"; fi
           echo "name=${NAME}" >> "$GITHUB_OUTPUT"
-          echo "iOS CFBundleShortVersionString=$NAME (from pubspec)"
+          echo "code=${CODE}" >> "$GITHUB_OUTPUT"
+          echo "iOS CFBundleShortVersionString=$NAME CFBundleVersion=$CODE (pubspec +${PUBSPEC_CODE:-?}; run_number=${{ github.run_number }})"
 
       - name: Check iOS credentials
         id: ios_creds
@@ -617,7 +625,8 @@ jobs:
           flutter build ipa --release \
             -t ${{ matrix.entry }} \
             --build-name=${{ steps.iosver.outputs.name }} \
-            --build-number=${{ github.run_number }} \
+            --build-number=${{ steps.iosver.outputs.code }} \
+            --dart-define=APP_BUILD=${{ steps.iosver.outputs.code }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT \
@@ -720,7 +729,14 @@ jobs:
             source /tmp/asc-venv/bin/activate
             pip install --quiet PyJWT cryptography
             export ASC_VERSION=1.0.24
-            export ASC_BUILD_NUMBER="${{ github.run_number }}"
+            # Même logique que build-ios (max run_number / pubspec +N), pas run_number seul.
+            FLOOR=136
+            PUBSPEC_LINE=$(grep -E '^version:' "$(git rev-parse --show-toplevel)/mobile/pubspec.yaml" | head -1)
+            PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
+            ASC_CODE="${{ github.run_number }}"
+            if [ "$ASC_CODE" -lt "$FLOOR" ]; then ASC_CODE="$FLOOR"; fi
+            if [ -n "$PUBSPEC_CODE" ] && [ "$PUBSPEC_CODE" -gt "$ASC_CODE" ]; then ASC_CODE="$PUBSPEC_CODE"; fi
+            export ASC_BUILD_NUMBER="$ASC_CODE"
             export ASC_SUBMIT=true
             export ASC_REPLACE_IN_REVIEW=true
             export ASC_SUBMIT_ATTEMPTS=8

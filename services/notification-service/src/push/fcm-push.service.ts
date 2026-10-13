@@ -60,24 +60,43 @@ export class FcmPushService {
               to: token,
               priority: 'high',
               content_available: true,
+              // Legacy HTTP: wake device even if app is killed (high priority + notification block).
               notification: {
                 title: message.title,
                 body: message.body,
                 sound: soundIos,
                 android_channel_id: channelId,
+                ...(isChat
+                  ? {}
+                  : {
+                      click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                      tag: data.referenceId ? `job:${data.referenceId}` : 'senga_job',
+                    }),
               },
               android: {
                 priority: 'high',
                 notification: {
                   channel_id: channelId,
                   sound: soundAndroid,
+                  ...(isChat
+                    ? {}
+                    : {
+                        default_vibrate_timings: true,
+                        notification_priority: 'PRIORITY_MAX',
+                        visibility: 'PUBLIC',
+                      }),
                 },
               },
               apns: {
+                headers: {
+                  'apns-priority': '10',
+                  ...(isChat ? {} : { 'apns-push-type': 'alert' }),
+                },
                 payload: {
                   aps: {
                     sound: soundIos,
                     'content-available': 1,
+                    ...(isChat ? {} : { 'interruption-level': 'time-sensitive' }),
                   },
                 },
               },

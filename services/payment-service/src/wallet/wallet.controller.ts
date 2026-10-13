@@ -107,6 +107,15 @@ export class WalletController {
     return this.walletService.topUp(req.user.id, dto.amountCdf, dto.provider ?? '', dto.phone);
   }
 
+  @Post('top-up/cancel-pending')
+  @ApiOperation({ summary: 'Annuler une recharge Mobile Money en attente (PIN Cancel)' })
+  cancelPendingTopUp(
+    @Request() req: { user: { id: string } },
+    @Body() body: { providerRef?: string },
+  ) {
+    return this.walletService.cancelPendingTopUp(req.user.id, body.providerRef ?? '');
+  }
+
   @Post('topup')
   @ApiOperation({ summary: 'Alias recharge portefeuille' })
   topUpAlias(@Request() req: { user: { id: string } }, @Body() dto: TopUpDto) {

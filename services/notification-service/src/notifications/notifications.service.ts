@@ -411,18 +411,48 @@ export class NotificationsService implements OnModuleInit {
       });
     }
     const fcmReady = this.fcm.isConfigured();
-    if (!fcmReady) {
-      this.logger.warn(
-        `driver.job.alert ${payload.jobKind} → ${userIds.length} chauffeur(s) (FCM non configuré — alerte via polling app)`,
+    const tokens = fcmReady ? await this.pushTokens.tokensForUsers(userIds) : [];
+    if (fcmReady && tokens.length > 0) {
+      await this.fcm.sendToTokens(tokens, {
+        title: payload.title,
+        body: payload.body,
+        data: {
+          type: payload.jobKind,
+          referenceId: payload.referenceId,
+          jobKind: payload.jobKind,
+        },
+      });
+      this.logger.log(
+        `driver.job.alert FCM ${payload.jobKind} → ${userIds.length} chauffeur(s), tokens=${tokens.length}`,
       );
-      return;
+    } else if (fcmReady) {
+      this.logger.warn(
+        `driver.job.alert ${payload.jobKind} → ${userIds.length} chauffeur(s) (0 token FCM — SMS secours)`,
+      );
+    } else {
+      this.logger.warn(
+        `driver.job.alert ${payload.jobKind} → ${userIds.length} chauffeur(s) (FCM non configuré — SMS secours)`,
+      );
     }
-    await this.pushToDrivers(userIds, payload.title, payload.body, {
-      type: payload.jobKind,
-      referenceId: payload.referenceId,
-      jobKind: payload.jobKind,
-    });
-    this.logger.log(`driver.job.alert push ${payload.jobKind} → ${userIds.length} chauffeur(s)`);
+
+    // App fermée / sans token FCM : SMS pour que le chauffeur soit quand même alerté.
+    const withToken = fcmReady && tokens.length > 0
+      ? new Set(await this.pushTokens.userIdsWithTokens(userIds))
+      : new Set<string>();
+    // Cap SMS blast (nearby matching can be large).
+    const smsCap = userIds.filter((id) => !withToken.has(id)).slice(0, 12);
+    let smsSent = 0;
+    for (const userId of smsCap) {
+      const brief = await fetchAuthUserBrief(userId);
+      const phone = brief?.phone?.trim();
+      if (!phone) continue;
+      const smsBody = `SENGA Driver: ${payload.title}. ${payload.body}`.slice(0, 160);
+      const result = await this.sms.sendMessage(phone, smsBody);
+      if (result.success) smsSent++;
+    }
+    if (smsSent > 0) {
+      this.logger.log(`driver.job.alert SMS ${payload.jobKind} → ${smsSent} chauffeur(s)`);
+    }
   }
 
   async onScheduledReminder(payload: ScheduledReminderPayload) {

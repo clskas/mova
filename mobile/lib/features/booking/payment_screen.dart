@@ -239,6 +239,28 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     _mmPollTimer = null;
   }
 
+  /// Stop waiting and void the PENDING MM payment so Cancel on the operator
+  /// PIN sheet does not leave a sticky intent that re-opens the dialog.
+  Future<void> _cancelMobileMoneyWait() async {
+    _stopMmPoll();
+    if (!mounted) return;
+    setState(() {
+      _awaitingMobileMoney = false;
+      _error =
+          'Paiement Mobile Money annulé. Si le PIN réapparaît encore une fois, refusez-le ; '
+          'puis réessayez le paiement dans l\'app.';
+    });
+    final api = ref.read(apiClientProvider);
+    if (widget.rideId != null) {
+      await api.post('/payments/rides/${widget.rideId}/mobile-money/cancel-pending', {});
+    } else if (widget.serviceType != null && widget.serviceId != null) {
+      await api.post(
+        '/payments/services/${widget.serviceType}/${widget.serviceId}/mobile-money/cancel-pending',
+        {},
+      );
+    }
+  }
+
   Future<void> _startMobileMoneyWait() async {
     _stopMmPoll();
     _mmPollAttempts = 0;
@@ -552,11 +574,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   ),
                   const SizedBox(height: 12),
                   TextButton(
-                    onPressed: () {
-                      _stopMmPoll();
-                      setState(() => _awaitingMobileMoney = false);
-                    },
-                    child: const Text('Annuler l\'attente'),
+                    onPressed: _cancelMobileMoneyWait,
+                    child: const Text('Annuler (PIN Cancel)'),
                   ),
                 ],
               ),

@@ -35,6 +35,22 @@ export class PaymentsController {
     return this.paymentsService.payRide(rideId, req.user.id, dto.method, dto.phone);
   }
 
+  @Post('rides/:rideId/mobile-money/cancel-pending')
+  @ApiOperation({ summary: 'Annuler un paiement Mobile Money en cours (PIN Cancel / abandon)' })
+  cancelPendingMmRide(@Request() req: { user: { id: string } }, @Param('rideId') rideId: string) {
+    return this.paymentsService.cancelPendingMobileMoneyRide(rideId, req.user.id);
+  }
+
+  @Post('services/:referenceType/:referenceId/mobile-money/cancel-pending')
+  @ApiOperation({ summary: 'Annuler un paiement Mobile Money service en cours' })
+  cancelPendingMmService(
+    @Request() req: { user: { id: string } },
+    @Param('referenceType') referenceType: string,
+    @Param('referenceId') referenceId: string,
+  ) {
+    return this.paymentsService.cancelPendingMobileMoneyService(referenceType, referenceId, req.user.id);
+  }
+
   @Post('rides/:rideId/cash/confirm')
   @ApiOperation({ summary: 'Confirmer paiement espèces (chauffeur — Cash reçu)' })
   confirmCashRide(

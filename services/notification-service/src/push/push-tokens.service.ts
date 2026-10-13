@@ -22,6 +22,17 @@ export class PushTokensService {
     return rows.map((r) => r.token);
   }
 
+  /** User IDs among [userIds] that have at least one FCM token for [appFlavor]. */
+  async userIdsWithTokens(userIds: string[], appFlavor = 'driver'): Promise<string[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.prisma.pushDevice.findMany({
+      where: { userId: { in: userIds }, appFlavor },
+      select: { userId: true },
+      distinct: ['userId'],
+    });
+    return rows.map((r) => r.userId);
+  }
+
   /** Tous les tokens FCM d’un utilisateur (passenger + driver) — requis pour SOS. */
   async tokensForUsersAnyFlavor(userIds: string[]): Promise<string[]> {
     if (userIds.length === 0) return [];

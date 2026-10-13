@@ -41,6 +41,23 @@ const MOBILE_MONEY_METHODS = new Set<PaymentMethod>([
 const PAY_LOCK_PREFIX = 'pay:intent:';
 const PAY_LOCK_TTL_SEC = 60;
 
+/**
+ * Only forward hosted checkout URLs (CinetPay). SerdiPay/AfriMomo already push
+ * STK — returning their payment_url makes old clients open it and re-trigger
+ * the PIN dialog (Cancel loop).
+ */
+function clientSafePaymentUrl(url?: string | null): string | undefined {
+  const raw = url?.trim() ?? '';
+  if (!raw) return undefined;
+  try {
+    const host = new URL(raw).hostname.toLowerCase();
+    if (host.includes('cinetpay')) return raw;
+  } catch {
+    /* ignore */
+  }
+  return undefined;
+}
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
@@ -424,7 +441,7 @@ export class PaymentsService {
         payment,
         providerRef: result.providerRef,
         message: result.message ?? 'Confirmez le paiement sur votre téléphone Mobile Money.',
-        ...(result.paymentUrl ? { paymentUrl: result.paymentUrl } : {}),
+        ...(clientSafePaymentUrl(result.paymentUrl) ? { paymentUrl: clientSafePaymentUrl(result.paymentUrl) } : {}),
         // Never return ussdCode — clients must not tel:-dial (Cancel loop on all MM ops).
       };
     }
@@ -892,7 +909,7 @@ export class PaymentsService {
         message: result.message ?? 'Confirmez le paiement sur votre téléphone Mobile Money.',
         amountCdf,
         currency: 'CDF',
-        ...(result.paymentUrl ? { paymentUrl: result.paymentUrl } : {}),
+        ...(clientSafePaymentUrl(result.paymentUrl) ? { paymentUrl: clientSafePaymentUrl(result.paymentUrl) } : {}),
         // Never return ussdCode — clients must not tel:-dial (Cancel loop on all MM ops).
       };
     }
@@ -1426,6 +1443,60 @@ export class PaymentsService {
         failureReason: reason?.slice(0, 240) || 'Course annulée — encaissement espèces annulé.',
       },
     });
+    return { success: true, cancelled: true, payment };
+  }
+
+  /**
+   * Passenger cancelled the STK PIN sheet (or gave up waiting). Mark MM PENDING
+   * as FAILED so a later retry can start a fresh C2B (no sticky Cancel loop).
+   */
+  async cancelPendingMobileMoneyRide(rideId: string, userId: string, reason?: string) {
+    const existing = await this.prisma.payment.findUnique({ where: { rideId } });
+    if (!existing || existing.userId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    if (!MOBILE_MONEY_METHODS.has(existing.method) || existing.status !== PaymentStatus.PENDING) {
+      return { success: true, cancelled: false, status: existing.status };
+    }
+    const payment = await this.prisma.payment.update({
+      where: { rideId },
+      data: {
+        status: PaymentStatus.FAILED,
+        failureReason:
+          reason?.slice(0, 240) ||
+          'Paiement Mobile Money annulé par le passager (PIN refusé ou attente stoppée).',
+      },
+    });
+    await this.releasePayLock('RIDE', rideId).catch(() => undefined);
+    return { success: true, cancelled: true, payment };
+  }
+
+  async cancelPendingMobileMoneyService(
+    referenceType: string,
+    referenceId: string,
+    userId: string,
+    reason?: string,
+  ) {
+    const type = referenceType.toUpperCase();
+    const existing = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (!existing || existing.userId !== userId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    if (!MOBILE_MONEY_METHODS.has(existing.method) || existing.status !== PaymentStatus.PENDING) {
+      return { success: true, cancelled: false, status: existing.status };
+    }
+    const payment = await this.prisma.servicePayment.update({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+      data: {
+        status: PaymentStatus.FAILED,
+        failureReason:
+          reason?.slice(0, 240) ||
+          'Paiement Mobile Money annulé par le passager (PIN refusé ou attente stoppée).',
+      },
+    });
+    await this.releasePayLock(type, referenceId).catch(() => undefined);
     return { success: true, cancelled: true, payment };
   }
 

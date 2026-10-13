@@ -49,6 +49,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   _WalletTxFilter _txFilter = _WalletTxFilter.all;
   bool _loading = true;
   bool _topUpLoading = false;
+  String? _pendingTopUpRef;
   bool _withdrawLoading = false;
   bool _topUpSheetOpen = false;
   bool _withdrawSheetOpen = false;
@@ -350,6 +351,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
             });
             return;
           }
+          _pendingTopUpRef = providerRef;
           await openMobileMoneyPrompt(
             paymentUrl: data['paymentUrl']?.toString(),
             providerRef: providerRef,
@@ -541,11 +543,24 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                   ),
                   TextButton(
-                    onPressed: () {
+                    onPressed: () async {
                       _topUpPollTimer?.cancel();
-                      setState(() => _topUpLoading = false);
+                      final ref = _pendingTopUpRef;
+                      setState(() {
+                        _topUpLoading = false;
+                        _pendingTopUpRef = null;
+                        _error =
+                            'Recharge annulée. Si le PIN réapparaît, refusez-le puis réessayez.';
+                      });
+                      if (ref != null && ref.isNotEmpty) {
+                        await apiClientProvider;
+                        await this.ref.read(apiClientProvider).post(
+                          '/wallet/top-up/cancel-pending',
+                          {'providerRef': ref},
+                        );
+                      }
                     },
-                    child: const Text('Annuler l\'attente'),
+                    child: const Text('Annuler (PIN Cancel)'),
                   ),
                 ],
               ),

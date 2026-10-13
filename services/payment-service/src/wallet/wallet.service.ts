@@ -701,8 +701,8 @@ export class WalletService {
         balanceCdf: wallet.balanceCdf,
         formattedBalance: formatCdf(wallet.balanceCdf),
         providerRef,
-        ...(paymentUrl ? { paymentUrl } : {}),
-        // Do not return ussdCode — clients must not tel:-dial; AfriMomo STK already pushed.
+        // Only CinetPay hosted checkout — SerdiPay/AfriMomo STK already pushed (Cancel loop if opened).
+        ...(paymentUrl && /cinetpay/i.test(paymentUrl) ? { paymentUrl } : {}),
       };
     }
 
@@ -1547,6 +1547,29 @@ export class WalletService {
 
   private topUpLockKey(userId: string, amountCdf: number, providerKey: string) {
     return `${TOPUP_LOCK_PREFIX}${userId}:${providerKey}:${amountCdf}`;
+  }
+
+  /** User cancelled STK / stopped waiting — free the pending so retry can start clean. */
+  async cancelPendingTopUp(userId: string, providerRef: string) {
+    const ref = providerRef?.trim();
+    if (!ref) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Référence recharge requise.');
+    }
+    const wallet = await this.createWallet(userId);
+    const pending = await this.prisma.walletTransaction.findFirst({
+      where: { walletId: wallet.id, reference: ref, type: 'TOPUP_PENDING' },
+    });
+    if (!pending) {
+      return { success: true, cancelled: false, balanceCdf: wallet.balanceCdf };
+    }
+    await this.prisma.walletTransaction.update({
+      where: { id: pending.id },
+      data: {
+        type: 'TOPUP_FAILED',
+        description: `${pending.description ?? 'Recharge'} — annulée par l'utilisateur`,
+      },
+    });
+    return { success: true, cancelled: true, balanceCdf: wallet.balanceCdf };
   }
 
   /** Recent pending C2B for same user/amount/operator — avoid a second STK push. */

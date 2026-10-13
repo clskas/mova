@@ -32,8 +32,8 @@ const DEFAULT_DRIVER_STORE_IOS = 'https://apps.apple.com/app/id6818769267';
  * users who already installed the previous store build. Stale Render env below
  * this floor also hid banners.
  */
-const CURRENT_VERSION_FLOOR = '1.0.30';
-const CURRENT_VERSION_CODE_FLOOR = 142;
+const CURRENT_VERSION_FLOOR = '1.0.31';
+const CURRENT_VERSION_CODE_FLOOR = 143;
 
 function parseVersionCode(raw: string | undefined, fallback: number): number {
   const n = Number.parseInt(raw?.trim() || '', 10);

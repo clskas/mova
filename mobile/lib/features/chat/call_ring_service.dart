@@ -52,6 +52,10 @@ class CallRingService {
 
   static void notifyPeerEnded(String threadId) {
     if (threadId.isEmpty) return;
+    // Toujours notifier (ValueNotifier ignore si la valeur est identique).
+    if (peerEndedThreadId.value == threadId) {
+      peerEndedThreadId.value = null;
+    }
     peerEndedThreadId.value = threadId;
   }
 

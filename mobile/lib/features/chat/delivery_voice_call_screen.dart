@@ -9,6 +9,8 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/api/ride_chat_socket.dart';
+import '../../core/api/ride_socket.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
@@ -17,6 +19,8 @@ import 'call_ring_service.dart';
 enum VoiceCallKind { ride, delivery }
 
 enum _CallPhase { connecting, ringingOut, inCall, peerLeft, error }
+
+enum _PeerLeftReason { hungUp, declined, noAnswer }
 
 /// Appel vocal LiveKit (course ou livraison).
 class DeliveryVoiceCallScreen extends ConsumerStatefulWidget {
@@ -62,9 +66,12 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
   bool _muted = false;
   bool _endedSignaled = false;
   _CallPhase _phase = _CallPhase.connecting;
+  _PeerLeftReason _peerLeftReason = _PeerLeftReason.hungUp;
   String? _error;
   List<String> _remoteNames = const [];
   ApiClient? _api;
+  Timer? _ringTimeout;
+  late final void Function(Map<String, dynamic>) _socketCallListener;
 
   String get _scope => widget.kind == VoiceCallKind.ride ? 'ride' : 'delivery';
 
@@ -74,15 +81,30 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     _api = ref.read(apiClientProvider);
     CallRingService.markInCall(widget.threadId);
     CallRingService.peerEndedThreadId.addListener(_onPeerEndedSignal);
+    _socketCallListener = _onSocketCallEvent;
+    ref.read(rideSocketProvider).addCallListener(_socketCallListener);
+    ref.read(rideChatSocketProvider).addCallListener(_socketCallListener);
     unawaited(_prepareAndConnect());
   }
 
   @override
   void dispose() {
+    _ringTimeout?.cancel();
     CallRingService.peerEndedThreadId.removeListener(_onPeerEndedSignal);
+    ref.read(rideSocketProvider).removeCallListener(_socketCallListener);
+    ref.read(rideChatSocketProvider).removeCallListener(_socketCallListener);
     unawaited(_signalEndAndStopRing());
     unawaited(_tearDownRoom());
     super.dispose();
+  }
+
+  void _onSocketCallEvent(Map<String, dynamic> payload) {
+    final id = payload['rideId']?.toString() ?? payload['deliveryId']?.toString();
+    if (id != null && id != widget.threadId) return;
+    final action = payload['action']?.toString() ?? 'start';
+    if (action != 'end') return;
+    // Refus / raccroché distant via socket — même si l'écran parent n'écoute plus.
+    CallRingService.notifyPeerEnded(widget.threadId);
   }
 
   void _onPeerEndedSignal() {
@@ -93,8 +115,30 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     }
     if (!mounted) return;
     if (_phase == _CallPhase.peerLeft || _phase == _CallPhase.error) return;
-    setState(() => _phase = _CallPhase.peerLeft);
+    final reason = _phase == _CallPhase.ringingOut || _phase == _CallPhase.connecting
+        ? _PeerLeftReason.declined
+        : _PeerLeftReason.hungUp;
+    _ringTimeout?.cancel();
+    setState(() {
+      _peerLeftReason = reason;
+      _phase = _CallPhase.peerLeft;
+    });
     unawaited(_tearDownRoom());
+  }
+
+  void _armRingTimeout() {
+    _ringTimeout?.cancel();
+    if (!widget.announce) return;
+    _ringTimeout = Timer(const Duration(seconds: 55), () {
+      if (!mounted) return;
+      if (_phase != _CallPhase.ringingOut && _phase != _CallPhase.connecting) return;
+      setState(() {
+        _peerLeftReason = _PeerLeftReason.noAnswer;
+        _phase = _CallPhase.peerLeft;
+      });
+      unawaited(_signalEndAndStopRing());
+      unawaited(_tearDownRoom());
+    });
   }
 
   Future<void> _prepareAndConnect() async {
@@ -291,6 +335,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
             ? (widget.announce ? _CallPhase.ringingOut : _CallPhase.connecting)
             : _CallPhase.inCall;
       });
+      if (_phase == _CallPhase.ringingOut) _armRingTimeout();
       await _ensureRemoteAudio(room);
     } catch (e) {
       if (!mounted) return;
@@ -307,8 +352,10 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     final hasPeer = room.remoteParticipants.isNotEmpty;
     setState(() {
       if (hasPeer) {
+        _ringTimeout?.cancel();
         _phase = _CallPhase.inCall;
       } else if (_phase == _CallPhase.inCall) {
+        _peerLeftReason = _PeerLeftReason.hungUp;
         _phase = _CallPhase.peerLeft;
       } else if (widget.announce) {
         _phase = _CallPhase.ringingOut;
@@ -391,6 +438,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
   }
 
   Future<void> _hangUp() async {
+    _ringTimeout?.cancel();
     await _signalEndAndStopRing();
     await _tearDownRoom();
     if (mounted) Navigator.of(context).pop();
@@ -422,7 +470,14 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
             ? 'Connecté'
             : 'Avec : ${_remoteNames.join(', ')}';
       case _CallPhase.peerLeft:
-        return '${widget.peerLabel} a raccroché';
+        switch (_peerLeftReason) {
+          case _PeerLeftReason.declined:
+            return '${widget.peerLabel} a refusé l\'appel';
+          case _PeerLeftReason.noAnswer:
+            return 'Pas de réponse';
+          case _PeerLeftReason.hungUp:
+            return '${widget.peerLabel} a raccroché';
+        }
       case _CallPhase.error:
         return _error ?? 'Erreur';
     }

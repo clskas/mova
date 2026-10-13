@@ -19,6 +19,7 @@ class RideChatSocket {
 
   void Function(Map<String, dynamic> payload)? _onChat;
   void Function(Map<String, dynamic> payload)? _onDeliveryCall;
+  final List<void Function(Map<String, dynamic> payload)> _callListeners = [];
   void Function()? _onConnected;
   void Function()? _onDisconnected;
   final List<Completer<bool>> _connectWaiters = [];
@@ -28,9 +29,25 @@ class RideChatSocket {
   set onDeliveryCall(void Function(Map<String, dynamic> payload)? handler) =>
       _onDeliveryCall = handler;
 
+  void addCallListener(void Function(Map<String, dynamic> payload) listener) {
+    if (!_callListeners.contains(listener)) _callListeners.add(listener);
+  }
+
+  void removeCallListener(void Function(Map<String, dynamic> payload) listener) {
+    _callListeners.remove(listener);
+  }
+
+  void _emitCall(Map<String, dynamic> payload) {
+    _onDeliveryCall?.call(payload);
+    for (final listener in List.of(_callListeners)) {
+      listener(payload);
+    }
+  }
+
   void clearHandlers() {
     _onChat = null;
     _onDeliveryCall = null;
+    _callListeners.clear();
     _onConnected = null;
     _onDisconnected = null;
   }
@@ -127,7 +144,7 @@ class RideChatSocket {
             final m = Map<String, dynamic>.from(data);
             m['kind'] = 'ride';
             m['deliveryId'] = m['rideId'] ?? m['deliveryId'];
-            _onDeliveryCall?.call(m);
+            _emitCall(m);
           }
         })
         ..onConnectError((_) {

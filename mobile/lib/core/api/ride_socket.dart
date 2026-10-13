@@ -26,6 +26,7 @@ class RideSocket {
   void Function(Map<String, dynamic> payload)? _onCashPending;
   void Function(Map<String, dynamic> payload)? _onPaymentCompleted;
   void Function(Map<String, dynamic> payload)? _onDeliveryCall;
+  final List<void Function(Map<String, dynamic> payload)> _callListeners = [];
   void Function(Map<String, dynamic> payload)? _onRideNew;
   void Function(Map<String, dynamic> payload)? _onRideCancelled;
   void Function(Map<String, dynamic> payload)? _onOfferTaken;
@@ -37,6 +38,22 @@ class RideSocket {
   set onCashPending(void Function(Map<String, dynamic> payload)? handler) => _onCashPending = handler;
   set onPaymentCompleted(void Function(Map<String, dynamic> payload)? handler) => _onPaymentCompleted = handler;
   set onDeliveryCall(void Function(Map<String, dynamic> payload)? handler) => _onDeliveryCall = handler;
+
+  /// Écoute supplémentaire (ex. écran d'appel) sans écraser le handler de l'écran parent.
+  void addCallListener(void Function(Map<String, dynamic> payload) listener) {
+    if (!_callListeners.contains(listener)) _callListeners.add(listener);
+  }
+
+  void removeCallListener(void Function(Map<String, dynamic> payload) listener) {
+    _callListeners.remove(listener);
+  }
+
+  void _emitCall(Map<String, dynamic> payload) {
+    _onDeliveryCall?.call(payload);
+    for (final listener in List.of(_callListeners)) {
+      listener(payload);
+    }
+  }
 
   /// Retire les callbacks sans couper la connexion (écran fermé).
   void clearHandlers({bool chatOnly = false}) {
@@ -196,7 +213,7 @@ class RideSocket {
           if (data is Map) {
             final m = Map<String, dynamic>.from(data);
             m['kind'] = m['kind'] ?? 'delivery';
-            _onDeliveryCall?.call(m);
+            _emitCall(m);
           }
         })
         ..on('ride:call', (data) {
@@ -205,7 +222,7 @@ class RideSocket {
             m['kind'] = 'ride';
             // Compat CallRing / handlers historiques (deliveryId).
             m['deliveryId'] = m['rideId'] ?? m['deliveryId'];
-            _onDeliveryCall?.call(m);
+            _emitCall(m);
           }
         })
         ..on('ride:cash-pending', (data) {

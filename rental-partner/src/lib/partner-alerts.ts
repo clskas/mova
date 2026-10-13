@@ -4,16 +4,24 @@ let htmlAudio: HTMLAudioElement | null = null;
 let prefWantsSound = false;
 /** This tab can actually play audio (gesture + context OK). */
 let sessionReady = false;
+let soundMuted = false;
+let soundStyle: PartnerSoundStyle = "senga";
 let pendingChime = false;
 let toast: { title: string; body: string } | null = null;
 let repeatTimer: number | null = null;
 let unlockInFlight: Promise<void> | null = null;
 
 const SOUND_PREF_KEY = "mova_rental_sound_pref";
+const SOUND_MUTED_KEY = "mova_rental_sound_muted_v1";
+const SOUND_STYLE_KEY = "mova_rental_sound_style_v1";
+
+export type PartnerSoundStyle = "senga" | "chime";
 
 export type PartnerAlertUi = {
   soundEnabled: boolean;
   needsUnlock: boolean;
+  soundMuted: boolean;
+  soundStyle: PartnerSoundStyle;
   toast: { title: string; body: string } | null;
 };
 
@@ -44,15 +52,54 @@ function writeSoundPref() {
   }
 }
 
+function readMutedPref(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(SOUND_MUTED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeMutedPref(muted: boolean) {
+  try {
+    localStorage.setItem(SOUND_MUTED_KEY, muted ? "1" : "0");
+  } catch {
+    /* private mode */
+  }
+}
+
+function readStylePref(): PartnerSoundStyle {
+  if (typeof window === "undefined") return "senga";
+  try {
+    const raw = localStorage.getItem(SOUND_STYLE_KEY);
+    return raw === "chime" ? "chime" : "senga";
+  } catch {
+    return "senga";
+  }
+}
+
+function writeStylePref(style: PartnerSoundStyle) {
+  try {
+    localStorage.setItem(SOUND_STYLE_KEY, style);
+  } catch {
+    /* private mode */
+  }
+}
+
 function restoreSoundPref() {
   prefWantsSound = readSoundPref();
+  soundMuted = readMutedPref();
+  soundStyle = readStylePref();
 }
 
 export function getPartnerAlertUi(): PartnerAlertUi {
   if (typeof window !== "undefined") restoreSoundPref();
   return {
-    soundEnabled: sessionReady,
-    needsUnlock: !sessionReady,
+    soundEnabled: sessionReady && !soundMuted,
+    needsUnlock: !soundMuted && !sessionReady,
+    soundMuted,
+    soundStyle,
     toast,
   };
 }
@@ -77,6 +124,19 @@ export function onPartnerAlertsUnlocked(fn: () => void) {
   };
 }
 
+export function setPartnerSoundMuted(muted: boolean) {
+  soundMuted = muted;
+  writeMutedPref(muted);
+  if (muted) stopRepeat();
+  emitUi();
+}
+
+export function setPartnerSoundStyle(style: PartnerSoundStyle) {
+  soundStyle = style === "chime" ? "chime" : "senga";
+  writeStylePref(soundStyle);
+  emitUi();
+}
+
 function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
   const Ctx =
@@ -90,7 +150,7 @@ function getAudioContext(): AudioContext | null {
 function getHtmlAudio(): HTMLAudioElement | null {
   if (typeof window === "undefined") return null;
   if (!htmlAudio) {
-    htmlAudio = new Audio("/alert-chime.wav");
+    htmlAudio = new Audio("/senga-partner-alert.wav");
     htmlAudio.preload = "auto";
     htmlAudio.setAttribute("playsinline", "true");
     (htmlAudio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
@@ -99,15 +159,15 @@ function getHtmlAudio(): HTMLAudioElement | null {
 }
 
 function scheduleOscillatorChime(ctx: AudioContext) {
-  const notes = [720, 960, 1200];
+  const notes = [1568, 1175, 784, 988];
   notes.forEach((freq, i) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = "sine";
+    osc.type = "triangle";
     osc.frequency.value = freq;
     const start = ctx.currentTime + i * 0.15;
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.25, start + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.32, start + 0.025);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28);
     osc.connect(gain);
     gain.connect(ctx.destination);
@@ -155,18 +215,28 @@ async function playWebAudioChime(): Promise<boolean> {
   return true;
 }
 
+/** Bip selon le style ; respect du mute. false = échec autoplay → bannière. */
 export async function playPartnerAlertChime(): Promise<boolean> {
+  if (typeof window !== "undefined") restoreSoundPref();
+  if (soundMuted) return false;
   try {
-    let ok = (await beginHtmlChime()) || (await playWebAudioChime());
+    let ok = false;
+    if (soundStyle === "chime") {
+      ok = (await playWebAudioChime()) || (await beginHtmlChime());
+    } else {
+      ok = (await beginHtmlChime()) || (await playWebAudioChime());
+    }
     if (ok) {
       sessionReady = true;
       emitUi();
       return true;
     }
+    sessionReady = false;
     pendingChime = true;
     emitUi();
     return false;
   } catch {
+    sessionReady = false;
     pendingChime = true;
     emitUi();
     return false;
@@ -183,6 +253,7 @@ function stopRepeat() {
 function startRepeat() {
   stopRepeat();
   if (typeof window === "undefined") return;
+  if (soundMuted) return;
   let remaining = 8;
   repeatTimer = window.setInterval(() => {
     remaining -= 1;
@@ -208,7 +279,8 @@ export async function unlockPartnerAlerts(opts?: { fromBanner?: boolean }) {
 
   unlockInFlight = (async () => {
     restoreSoundPref();
-    const htmlPlay = beginHtmlChime();
+    const preferChime = soundStyle === "chime";
+    const htmlPlay = preferChime ? Promise.resolve(false) : beginHtmlChime();
     const ctx = getAudioContext();
     const resume =
       ctx?.state === "suspended" ? ctx.resume().catch(() => undefined) : Promise.resolve();
@@ -216,7 +288,9 @@ export async function unlockPartnerAlerts(opts?: { fromBanner?: boolean }) {
     let played = await htmlPlay;
     await resume;
     if (!played) {
-      played = await playWebAudioChime();
+      played = preferChime
+        ? (await playWebAudioChime()) || (await beginHtmlChime())
+        : await playWebAudioChime();
     }
     const ctxReady = ctx?.state === "running";
     if (!played && !ctxReady && !fromBanner) {
@@ -228,6 +302,10 @@ export async function unlockPartnerAlerts(opts?: { fromBanner?: boolean }) {
     sessionReady = true;
     prefWantsSound = true;
     writeSoundPref();
+    if (fromBanner || soundMuted) {
+      soundMuted = false;
+      writeMutedPref(false);
+    }
 
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
       await Notification.requestPermission().catch(() => undefined);
@@ -259,7 +337,7 @@ export function initPartnerAudioUnlock(): () => void {
 
   let armed = true;
   const resumeOnGesture = () => {
-    if (!armed) return;
+    if (!armed || soundMuted) return;
     if (prefWantsSound && !sessionReady) {
       void unlockPartnerAlerts({ fromBanner: true });
       return;
@@ -278,6 +356,10 @@ export function initPartnerAudioUnlock(): () => void {
     window.removeEventListener("pointerdown", resumeOnGesture, true);
     window.removeEventListener("keydown", resumeOnGesture, true);
   };
+}
+
+export function requestPartnerNotificationPermission() {
+  /* permission demandée après clic — voir unlockPartnerAlerts */
 }
 
 /** Play chime when a push arrives while a tab is open (SW postMessage). */
@@ -299,10 +381,6 @@ export function bindPartnerPushSoundFromServiceWorker(): () => void {
   return () => navigator.serviceWorker.removeEventListener("message", onMsg);
 }
 
-export function requestPartnerNotificationPermission() {
-  /* permission demandée après clic — voir unlockPartnerAlerts */
-}
-
 const recentAlertKeys = new Set<string>();
 
 export function notifyPartnerAlert(options: {
@@ -319,12 +397,8 @@ export function notifyPartnerAlert(options: {
   toast = { title: options.title, body: options.body };
   emitUi();
 
-  if (options.playSound !== false) {
-    void playPartnerAlertChime().then((ok) => {
-      if (!ok && !sessionReady) {
-        emitUi();
-      }
-    });
+  if (options.playSound !== false && !soundMuted) {
+    void playPartnerAlertChime();
     startRepeat();
   }
 

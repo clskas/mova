@@ -12,7 +12,13 @@ import {
 export function PartnerAlertHost() {
   const [ui, setUi] = useState<PartnerAlertUi>(() =>
     typeof window === "undefined"
-      ? { soundEnabled: false, needsUnlock: true, toast: null }
+      ? {
+          soundEnabled: false,
+          needsUnlock: true,
+          soundMuted: false,
+          soundStyle: "senga",
+          toast: null,
+        }
       : getPartnerAlertUi(),
   );
 
@@ -23,7 +29,8 @@ export function PartnerAlertHost() {
       {ui.needsUnlock && (
         <div className="fixed top-[max(0.5rem,env(safe-area-inset-top))] left-3 right-3 z-[10060] mx-auto max-w-lg rounded-xl border border-indigo-200 bg-indigo-50 shadow-lg px-3 py-2.5 flex items-center justify-between gap-2">
           <p className="text-sm text-indigo-950 min-w-0">
-            Activez le son pour entendre les <span className="font-semibold">nouvelles demandes de location</span>.
+            Activez le son pour entendre les{" "}
+            <span className="font-semibold">nouvelles demandes de location</span>.
           </p>
           <button
             type="button"

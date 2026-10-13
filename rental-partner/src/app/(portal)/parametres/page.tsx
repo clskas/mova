@@ -6,6 +6,14 @@ import { GpsCoordButton } from "@/components/GpsCoordButton";
 import { fetchProfile, updateRentalBusiness } from "@/lib/api";
 import { MOVA_CITIES } from "@/lib/mova-cities";
 import { toUserErrorMessage } from "@/lib/user-messages";
+import {
+  playPartnerAlertChime,
+  setPartnerSoundMuted,
+  setPartnerSoundStyle,
+  subscribePartnerAlertUi,
+  unlockPartnerAlerts,
+  type PartnerSoundStyle,
+} from "@/lib/partner-alerts";
 
 function parseCoord(value: string): number | null {
   const n = Number.parseFloat(value.replace(",", "."));
@@ -23,6 +31,20 @@ export default function ParametresPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [canOperate, setCanOperate] = useState(true);
+  const [soundMuted, setSoundMuted] = useState(false);
+  const [soundStyle, setSoundStyle] = useState<PartnerSoundStyle>("senga");
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [needsUnlock, setNeedsUnlock] = useState(true);
+  const [soundTesting, setSoundTesting] = useState(false);
+
+  useEffect(() => {
+    return subscribePartnerAlertUi((ui) => {
+      setSoundMuted(ui.soundMuted);
+      setSoundStyle(ui.soundStyle);
+      setSoundEnabled(ui.soundEnabled);
+      setNeedsUnlock(ui.needsUnlock);
+    });
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -176,6 +198,89 @@ export default function ParametresPage() {
             className="w-full py-3 rounded-xl bg-indigo-600 text-white font-medium disabled:opacity-60"
           >
             {saving ? "Enregistrement…" : "Enregistrer"}
+          </button>
+        </div>
+      )}
+
+      {!loading && (
+        <div className="bg-white rounded-2xl border p-6 space-y-4">
+          <h3 className="font-semibold text-sm text-gray-700">Son des notifications</h3>
+          <p className="text-xs text-gray-500">
+            Alertes pour les nouvelles demandes de location. Le navigateur peut exiger un clic pour
+            autoriser le son.
+          </p>
+          {needsUnlock && (
+            <button
+              type="button"
+              onClick={() => void unlockPartnerAlerts({ fromBanner: true })}
+              className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium"
+            >
+              Activer le son du navigateur
+            </button>
+          )}
+          <label className="flex items-center justify-between gap-4">
+            <span className="text-sm">
+              Son des alertes
+              <span className="block text-xs text-gray-400">
+                {soundMuted
+                  ? "Coupé (toasts sans bip)"
+                  : needsUnlock
+                    ? "Autorisation navigateur requise"
+                    : "Activé"}
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              className="w-5 h-5"
+              checked={!soundMuted}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setPartnerSoundMuted(!on);
+                if (on) {
+                  void unlockPartnerAlerts({ fromBanner: true });
+                }
+              }}
+            />
+          </label>
+          <fieldset className="space-y-2" disabled={soundMuted}>
+            <legend className="text-sm text-gray-600 mb-1">Choix du son</legend>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                name="partner-sound-style"
+                checked={soundStyle === "senga"}
+                onChange={() => setPartnerSoundStyle("senga")}
+              />
+              Son SENGA Partenaire
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                name="partner-sound-style"
+                checked={soundStyle === "chime"}
+                onChange={() => setPartnerSoundStyle("chime")}
+              />
+              Mélodie courte (navigateur)
+            </label>
+          </fieldset>
+          <button
+            type="button"
+            disabled={soundTesting || soundMuted}
+            onClick={async () => {
+              setSoundTesting(true);
+              try {
+                if (needsUnlock || !soundEnabled) {
+                  await unlockPartnerAlerts({ fromBanner: true });
+                } else {
+                  await playPartnerAlertChime();
+                }
+              } finally {
+                setSoundTesting(false);
+              }
+            }}
+            className="w-full py-2.5 rounded-xl border border-indigo-200 text-indigo-700 text-sm font-medium disabled:opacity-60"
+          >
+            {soundTesting ? "Test…" : "Tester le son"}
           </button>
         </div>
       )}

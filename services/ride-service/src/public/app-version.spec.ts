@@ -6,11 +6,11 @@ describe('buildMobileAppVersionResponse', () => {
   it('uses defaults when env is empty', () => {
     const payload = buildMobileAppVersionResponse({}, now);
     expect(payload.generatedAt).toBe('2026-08-15T10:00:00.000Z');
-    expect(payload.passenger.currentVersion).toBe('1.0.27');
-    expect(payload.driver.currentVersion).toBe('1.0.27');
+    expect(payload.passenger.currentVersion).toBe('1.0.29');
+    expect(payload.driver.currentVersion).toBe('1.0.29');
     expect(payload.passenger.minVersion).toBe('1.0.0');
-    expect(payload.passenger.currentVersionCode).toBe(139);
-    expect(payload.driver.currentVersionCode).toBe(139);
+    expect(payload.passenger.currentVersionCode).toBe(141);
+    expect(payload.driver.currentVersionCode).toBe(141);
     expect(payload.passenger.minVersionCode).toBe(0);
     expect(payload.passenger.storeUrl).toContain('cd.mova.mova.passenger');
     expect(payload.driver.storeUrl).toContain('cd.mova.mova.driver');
@@ -21,21 +21,21 @@ describe('buildMobileAppVersionResponse', () => {
   it('reads MOBILE_* and Play Store env vars above the floor', () => {
     const payload = buildMobileAppVersionResponse(
       {
-        MOBILE_PASSENGER_VERSION: '1.0.27',
-        MOBILE_DRIVER_VERSION: '1.0.28',
+        MOBILE_PASSENGER_VERSION: '1.0.29',
+        MOBILE_DRIVER_VERSION: '1.0.30',
         MOBILE_MIN_VERSION: '1.0.1',
-        MOBILE_PASSENGER_VERSION_CODE: '139',
-        MOBILE_DRIVER_VERSION_CODE: '140',
+        MOBILE_PASSENGER_VERSION_CODE: '141',
+        MOBILE_DRIVER_VERSION_CODE: '142',
         MOBILE_MIN_VERSION_CODE: '8',
         PLAY_STORE_PASSENGER_URL: 'https://play.example/passenger',
         PLAY_STORE_DRIVER_URL: 'https://play.example/driver',
       },
       now,
     );
-    expect(payload.passenger.currentVersion).toBe('1.0.27');
-    expect(payload.driver.currentVersion).toBe('1.0.28');
-    expect(payload.passenger.currentVersionCode).toBe(139);
-    expect(payload.driver.currentVersionCode).toBe(140);
+    expect(payload.passenger.currentVersion).toBe('1.0.29');
+    expect(payload.driver.currentVersion).toBe('1.0.30');
+    expect(payload.passenger.currentVersionCode).toBe(141);
+    expect(payload.driver.currentVersionCode).toBe(142);
   });
 
   it('raises stale Render env below the shipped floor so banners can show', () => {
@@ -48,14 +48,14 @@ describe('buildMobileAppVersionResponse', () => {
       },
       now,
     );
-    expect(payload.passenger.currentVersion).toBe('1.0.27');
-    expect(payload.driver.currentVersion).toBe('1.0.27');
-    expect(payload.passenger.currentVersionCode).toBe(139);
-    expect(payload.driver.currentVersionCode).toBe(139);
+    expect(payload.passenger.currentVersion).toBe('1.0.29');
+    expect(payload.driver.currentVersion).toBe('1.0.29');
+    expect(payload.passenger.currentVersionCode).toBe(141);
+    expect(payload.driver.currentVersionCode).toBe(141);
   });
 
-  it('raises a stale env below Play floor 139', () => {
-    for (const code of ['102', '122', '130', '133', '137']) {
+  it('raises a stale env below Play floor 141', () => {
+    for (const code of ['102', '122', '130', '133', '137', '139', '140']) {
       const payload = buildMobileAppVersionResponse(
         {
           MOBILE_PASSENGER_VERSION_CODE: code,
@@ -63,8 +63,8 @@ describe('buildMobileAppVersionResponse', () => {
         },
         now,
       );
-      expect(payload.passenger.currentVersionCode).toBe(139);
-      expect(payload.driver.currentVersionCode).toBe(139);
+      expect(payload.passenger.currentVersionCode).toBe(141);
+      expect(payload.driver.currentVersionCode).toBe(141);
     }
   });
 });

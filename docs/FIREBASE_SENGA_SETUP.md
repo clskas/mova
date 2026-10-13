@@ -17,7 +17,7 @@ Objectif : push FCM gratuit quand l’app est fermée, SMS seulement si aucun to
 | SENGA Driver    | `cd.mova.mova.driver`    |
 
 4. Télécharger **`google-services.json`** (un seul fichier qui contient les deux apps).
-5. (iOS, plus tard) ajouter les apps iOS + `GoogleService-Info.plist` + clé APNs.
+5. (iOS) voir section **iOS** ci-dessous.
 
 ## 2. Clé serveur FCM (backend)
 

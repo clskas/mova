@@ -63,6 +63,8 @@ export class DeliveryLiveKitService {
       metadata: JSON.stringify({ role: participants.role, deliveryId }),
     });
     at.addGrant({
+      // roomCreate: sans ça le 1er participant reçoit souvent « permission denied ».
+      roomCreate: true,
       roomJoin: true,
       room: roomName,
       canPublish: true,

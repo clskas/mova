@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   apiFetch,
@@ -34,26 +34,43 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  /** Ignore les réponses obsolètes quand ville + période changent vite. */
+  const loadSeq = useRef(0);
 
   const scopedCity = role === "CITY_ADMIN" ? (user?.managedCity?.trim() || "") : cityFilter;
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
+    const cityAtRequest = scopedCity;
+    const periodAtRequest = period;
     setError(null);
     try {
       const metricsQs = new URLSearchParams();
-      if (scopedCity) metricsQs.set("city", scopedCity);
-      metricsQs.set("days", String(period));
+      if (cityAtRequest) metricsQs.set("city", cityAtRequest);
+      metricsQs.set("days", String(periodAtRequest));
       const metricsPath = `/api/admin/metrics?${metricsQs}`;
       const [mRes, rRes] = await Promise.allSettled([
         apiFetch<AdminMetrics>(metricsPath),
-        fetchAdminReports(period, scopedCity || null),
+        fetchAdminReports(periodAtRequest, cityAtRequest || null),
       ]);
+      if (seq !== loadSeq.current) return;
       if (mRes.status === "fulfilled") {
         setMetrics(mRes.value);
       }
       // Ne pas garder un rapport d’une autre ville / période si le fetch échoue.
       if (rRes.status === "fulfilled") {
-        setReports(rRes.value);
+        const payload = rRes.value;
+        const payloadCity = (payload.city ?? "").trim().toLowerCase();
+        const wantedCity = cityAtRequest.trim().toLowerCase();
+        const cityOk = !wantedCity || payloadCity === wantedCity;
+        const periodOk = !payload.periodDays || payload.periodDays === periodAtRequest;
+        if (cityOk && periodOk) {
+          setReports(payload);
+        } else {
+          // Réponse désynchronisée (proxy / cache) — ne pas afficher de mauvais croisement.
+          setReports(null);
+          setError("Filtres ville / période incohérents — réessayez Actualiser.");
+        }
       } else {
         setReports(null);
       }
@@ -64,26 +81,30 @@ export default function DashboardPage() {
       if (rRes.status === "rejected") {
         parts.push(rRes.reason instanceof Error ? rRes.reason.message : "Rapports indisponibles");
       }
-      setError(parts.length ? parts.join(" · ") : null);
+      if (parts.length) setError(parts.join(" · "));
       if (mRes.status === "fulfilled" || rRes.status === "fulfilled") {
         setLastUpdate(new Date());
       }
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       setError(e instanceof Error ? e.message : "Impossible de charger le tableau de bord");
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [period, scopedCity]);
 
   useEffect(() => {
     setLoading(true);
     setReports(null);
-    load();
+    setMetrics({});
+    void load();
   }, [load]);
 
   useEffect(() => {
     if (!autoRefresh) return;
-    const id = setInterval(load, 60_000);
+    const id = setInterval(() => {
+      void load();
+    }, 60_000);
     return () => clearInterval(id);
   }, [autoRefresh, load]);
 
@@ -179,6 +200,7 @@ export default function DashboardPage() {
                     setMetrics({});
                     setReports(null);
                     setLoading(true);
+                    setError(null);
                   }}
                   options={[
                     { value: "", label: "Toutes les villes" },
@@ -195,8 +217,12 @@ export default function DashboardPage() {
                     key={d}
                     type="button"
                     onClick={() => {
+                      if (d === period) return;
                       setPeriod(d);
+                      setMetrics({});
+                      setReports(null);
                       setLoading(true);
+                      setError(null);
                     }}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                       period === d ? "bg-[#6366f1] text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -241,6 +267,12 @@ export default function DashboardPage() {
         <LoadingState message="Chargement des métriques…" />
       ) : (
         <>
+          {scopedCity && reports && reports.kpis.totalRides === 0 && reports.kpis.totalDeliveries === 0 ? (
+            <Card className="p-4 border border-amber-100 bg-amber-50/70 text-sm text-amber-950">
+              Aucune activité enregistrée à <strong>{scopedCity}</strong> sur les <strong>{period} derniers jours</strong>.
+              Essayez une autre période ou vérifiez que les courses de cette ville ont un GPS de prise en charge.
+            </Card>
+          ) : null}
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
             {kpiCards.map((card) => (
               <MetricCard key={card.label} {...card} value={card.value ?? "—"} />

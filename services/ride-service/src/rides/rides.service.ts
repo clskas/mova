@@ -2101,10 +2101,27 @@ export class RidesService {
   /** Séries temporelles et KPIs pour rapports admin (7–90 jours). */
   async getReportAnalytics(days = 30, cityFilter?: string | null) {
     const periodDays = Math.min(Math.max(Number(days) || 30, 7), 90);
-    const since = new Date();
+    /** Calendrier RDC (évite le décalage UTC qui fausse ville+période). */
+    const tz = 'Africa/Kinshasa';
+    const dayKeyInTz = (value: Date | string) => {
+      const d = value instanceof Date ? value : new Date(value);
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: tz,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+    };
+    const todayKey = dayKeyInTz(new Date());
+    const since = new Date(`${todayKey}T00:00:00+01:00`);
     since.setDate(since.getDate() - periodDays + 1);
-    since.setHours(0, 0, 0, 0);
-    const cityKey = cityFilter?.trim().toLowerCase() || null;
+    const normalizeCity = (name: string) =>
+      name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase();
+    const cityKey = cityFilter?.trim() ? normalizeCity(cityFilter) : null;
 
     const [rides, deliveries, errands, moving, scheduled, carpool, rideRule, deliveryRule, foodRule] =
       await Promise.all([
@@ -2154,7 +2171,7 @@ export class RidesService {
 
     const inCity = (lat?: number | null, lng?: number | null) => {
       if (!cityKey) return true;
-      return cityOf(lat, lng).toLowerCase() === cityKey;
+      return normalizeCity(cityOf(lat, lng)) === cityKey;
     };
 
     const filteredRides = rides.filter((r) => inCity(r.pickupLat, r.pickupLng));
@@ -2168,7 +2185,7 @@ export class RidesService {
     for (let i = 0; i < periodDays; i++) {
       const d = new Date(since);
       d.setDate(d.getDate() + i);
-      const key = d.toISOString().slice(0, 10);
+      const key = dayKeyInTz(d);
       dailyMap.set(key, { date: key, rides: 0, completed: 0, revenueCdf: 0, cancelled: 0, deliveries: 0 });
     }
 
@@ -2212,7 +2229,7 @@ export class RidesService {
     const platformFee = (gross: number, percent: number) => Math.ceil((gross * percent) / 100);
 
     for (const ride of filteredRides) {
-      const key = ride.createdAt.toISOString().slice(0, 10);
+      const key = dayKeyInTz(ride.createdAt);
       const bucket = dailyMap.get(key);
       if (bucket) {
         bucket.rides++;
@@ -2234,7 +2251,7 @@ export class RidesService {
     }
 
     for (const delivery of filteredDeliveries) {
-      const key = delivery.createdAt.toISOString().slice(0, 10);
+      const key = dayKeyInTz(delivery.createdAt);
       if (dailyMap.has(key)) dailyMap.get(key)!.deliveries += 1;
       const completed = delivery.status === DeliveryStatus.DELIVERED;
       if (completed) {
@@ -2248,7 +2265,7 @@ export class RidesService {
       }
     }
     for (const errand of filteredErrands) {
-      const key = errand.createdAt.toISOString().slice(0, 10);
+      const key = dayKeyInTz(errand.createdAt);
       if (dailyMap.has(key)) dailyMap.get(key)!.deliveries += 1;
     }
 

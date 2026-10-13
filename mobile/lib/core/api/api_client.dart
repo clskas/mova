@@ -1569,6 +1569,39 @@ class ApiClient {
     };
   }
 
+  /// Signale la fin d’appel pour couper la sonnerie chez les autres participants.
+  Future<Result<Map<String, dynamic>>> endDeliveryLiveKitCall(String deliveryId) async {
+    final result = await post('/deliveries/$deliveryId/livekit-end', {});
+    return switch (result) {
+      Success(:final data) => Success(Map<String, dynamic>.from(data as Map? ?? {})),
+      Failure(:final error) => Failure(error),
+    };
+  }
+
+  /// `sub` / `userId` du JWT courant (pour ignorer sa propre sonnerie d’appel).
+  Future<String?> currentUserId() async {
+    final token = await authToken();
+    if (token == null || token.isEmpty) return null;
+    try {
+      final parts = token.split('.');
+      if (parts.length < 2) return null;
+      var payload = parts[1].replaceAll('-', '+').replaceAll('_', '/');
+      switch (payload.length % 4) {
+        case 2:
+          payload += '==';
+          break;
+        case 3:
+          payload += '=';
+          break;
+      }
+      final map = jsonDecode(utf8.decode(base64Decode(payload))) as Map<String, dynamic>;
+      final id = map['sub']?.toString() ?? map['userId']?.toString() ?? map['id']?.toString();
+      return (id != null && id.isNotEmpty) ? id : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Result<List<Map<String, dynamic>>>> getRentalChatMessages(String inquiryId) async {
     final result = await get('/rental/inquiries/$inquiryId/chat');
     return switch (result) {

@@ -297,4 +297,10 @@ export class DeliveriesController {
   ) {
     return this.deliveryLiveKit.createToken(id, req.user.id, { announce: body?.announce === true });
   }
+
+  @Post(':id/livekit-end')
+  @ApiOperation({ summary: 'Signaler la fin d’un appel vocal (arrête la sonnerie chez les autres)' })
+  liveKitEnd(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.deliveryLiveKit.endCall(id, req.user.id);
+  }
 }

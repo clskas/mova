@@ -32,21 +32,37 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
   Room? _room;
   bool _connecting = true;
   bool _muted = false;
+  bool _endedSignaled = false;
   String? _error;
   List<String> _remoteNames = const [];
+  ApiClient? _api;
 
   @override
   void initState() {
     super.initState();
+    _api = ref.read(apiClientProvider);
+    CallRingService.markInCall(widget.deliveryId);
     unawaited(CallRingService.stop(deliveryId: widget.deliveryId));
     _connect();
   }
 
   @override
   void dispose() {
-    unawaited(CallRingService.stop(deliveryId: widget.deliveryId));
+    unawaited(_signalEndAndStopRing());
     _room?.dispose();
     super.dispose();
+  }
+
+  Future<void> _signalEndAndStopRing() async {
+    if (_endedSignaled) return;
+    _endedSignaled = true;
+    CallRingService.clearInCall(widget.deliveryId);
+    await CallRingService.forceStop();
+    try {
+      await _api?.endDeliveryLiveKitCall(widget.deliveryId);
+    } catch (_) {
+      /* best-effort */
+    }
   }
 
   Future<void> _connect() async {
@@ -134,6 +150,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
   Future<void> _hangUp() async {
     final room = _room;
     _room = null;
+    await _signalEndAndStopRing();
     await room?.disconnect();
     room?.dispose();
     if (mounted) Navigator.of(context).pop();

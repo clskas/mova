@@ -119,13 +119,15 @@ class DeliveryLiveTracking {
         if (id != null && id != deliveryId) return;
         final action = payload['action']?.toString() ?? 'start';
         if (action != 'start') {
-          unawaited(CallRingService.stop(deliveryId: deliveryId));
+          unawaited(CallRingService.forceStop());
           return;
         }
+        CallRingService.allowNewIncoming(deliveryId);
         unawaited(CallRingService.startIncoming(
           deliveryId: deliveryId,
           starterId: payload['starterId']?.toString() ?? '',
           peerLabel: 'Livreur',
+          fromRealtime: true,
         ));
       },
       onDisconnected: () {

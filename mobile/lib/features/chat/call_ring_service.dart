@@ -32,11 +32,37 @@ class CallRingService {
   static const _channelId = 'mova_voice_call_v2';
   static const _channelName = 'Appels vocaux SENGA';
 
+  /// Après raccroché / refus : ignore les relances chat tant qu’un nouvel
+  /// événement socket `action: start` n’a pas clear la suppression.
+  static final Set<String> _suppressChatRestart = <String>{};
+
+  /// Livraison actuellement en appel connecté (pas seulement sonnerie).
+  static String? _inCallDeliveryId;
+
   /// Non-null ⇒ afficher l'écran d'appel entrant (Décrocher / Refuser).
   static final ValueNotifier<IncomingCallInfo?> incoming = ValueNotifier<IncomingCallInfo?>(null);
 
   static bool get isRinging => _ringing;
   static String? get activeDeliveryId => incoming.value?.deliveryId;
+  static String? get inCallDeliveryId => _inCallDeliveryId;
+
+  static void markInCall(String deliveryId) {
+    if (deliveryId.isEmpty) return;
+    _inCallDeliveryId = deliveryId;
+    _suppressChatRestart.add(deliveryId);
+  }
+
+  static void clearInCall(String? deliveryId) {
+    if (deliveryId == null || deliveryId.isEmpty || _inCallDeliveryId == deliveryId) {
+      _inCallDeliveryId = null;
+    }
+  }
+
+  /// Autorise une nouvelle sonnerie (événement LiveKit socket `start`).
+  static void allowNewIncoming(String deliveryId) {
+    if (deliveryId.isEmpty) return;
+    _suppressChatRestart.remove(deliveryId);
+  }
 
   static Future<void> init() async {
     if (_initialized) return;
@@ -62,14 +88,27 @@ class CallRingService {
   }
 
   /// Démarre sonnerie + overlay (ignore si on est l'appelant).
+  /// [fromRealtime] true = événement socket `delivery:call` (peut relancer après raccroché).
   static Future<void> startIncoming({
     required String deliveryId,
     required String starterId,
     String? myUserId,
     String peerLabel = 'Contact',
+    bool fromRealtime = false,
   }) async {
     if (myUserId != null && myUserId.isNotEmpty && starterId == myUserId) return;
     if (deliveryId.isEmpty) return;
+
+    // Déjà en communication sur cette livraison : ne pas re-sonner.
+    if (_inCallDeliveryId == deliveryId) return;
+
+    if (!fromRealtime && _suppressChatRestart.contains(deliveryId)) {
+      return;
+    }
+    if (fromRealtime) {
+      allowNewIncoming(deliveryId);
+    }
+
     await init();
 
     incoming.value = IncomingCallInfo(
@@ -128,14 +167,47 @@ class CallRingService {
 
   static Future<void> stop({String? deliveryId}) async {
     final active = incoming.value?.deliveryId;
-    if (deliveryId != null && active != null && deliveryId != active) return;
+    if (deliveryId != null && active != null && deliveryId != active) {
+      // Même si l’overlay a déjà été fermé, couper l’audio si on est encore
+      // en sonnerie « fantôme » pour cette livraison.
+      if (_ringing && _suppressChatRestart.contains(deliveryId)) {
+        await _haltAudioAndNotif();
+      }
+      if (deliveryId.isNotEmpty) _suppressChatRestart.add(deliveryId);
+      clearInCall(deliveryId);
+      return;
+    }
+    final endedId = deliveryId ?? active;
+    if (endedId != null && endedId.isNotEmpty) {
+      _suppressChatRestart.add(endedId);
+    }
+    clearInCall(endedId);
     _safetyTimer?.cancel();
     _safetyTimer = null;
     _ringing = false;
     incoming.value = null;
+    await _haltAudioAndNotif();
+  }
+
+  /// Force l’arrêt audio (raccroché) même sans match d’overlay.
+  static Future<void> forceStop() async {
+    final endedId = incoming.value?.deliveryId ?? _inCallDeliveryId;
+    if (endedId != null && endedId.isNotEmpty) {
+      _suppressChatRestart.add(endedId);
+    }
+    _inCallDeliveryId = null;
+    _safetyTimer?.cancel();
+    _safetyTimer = null;
+    _ringing = false;
+    incoming.value = null;
+    await _haltAudioAndNotif();
+  }
+
+  static Future<void> _haltAudioAndNotif() async {
     try {
       await _player.stop();
       await _player.setReleaseMode(ReleaseMode.stop);
+      await _player.release();
     } catch (_) {
       /* ignore */
     }

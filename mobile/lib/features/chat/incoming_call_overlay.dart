@@ -2,12 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/api/api_client.dart';
 import '../../core/theme/mova_colors.dart';
 import 'call_ring_service.dart';
 import 'delivery_voice_call_screen.dart';
 
 /// Overlay global : bouton Décrocher / Refuser quand un appel LiveKit arrive.
-class IncomingCallOverlay extends StatelessWidget {
+class IncomingCallOverlay extends ConsumerWidget {
   const IncomingCallOverlay({
     super.key,
     required this.navigatorKey,
@@ -18,7 +21,7 @@ class IncomingCallOverlay extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -30,7 +33,7 @@ class IncomingCallOverlay extends StatelessWidget {
             return _IncomingCallSheet(
               info: info,
               onAnswer: () => _answer(info),
-              onDecline: () => unawaited(CallRingService.stop(deliveryId: info.deliveryId)),
+              onDecline: () => unawaited(_decline(ref, info)),
             );
           },
         ),
@@ -38,7 +41,17 @@ class IncomingCallOverlay extends StatelessWidget {
     );
   }
 
+  Future<void> _decline(WidgetRef ref, IncomingCallInfo info) async {
+    await CallRingService.forceStop();
+    try {
+      await ref.read(apiClientProvider).endDeliveryLiveKitCall(info.deliveryId);
+    } catch (_) {
+      /* best-effort */
+    }
+  }
+
   void _answer(IncomingCallInfo info) {
+    CallRingService.markInCall(info.deliveryId);
     unawaited(CallRingService.stop(deliveryId: info.deliveryId));
     final nav = navigatorKey.currentState;
     if (nav == null) return;

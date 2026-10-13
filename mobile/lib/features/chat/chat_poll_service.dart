@@ -88,10 +88,16 @@ class ChatPollService {
 
         final body = n['body']?.toString() ?? '';
         if (body.contains('Appel vocal SENGA') && threadId.isNotEmpty) {
+          final myId = await _api.currentUserId();
+          final starterId = data['senderId']?.toString() ??
+              data['starterId']?.toString() ??
+              '';
           await CallRingService.startIncoming(
             deliveryId: threadId,
-            starterId: '',
+            starterId: starterId,
+            myUserId: myId,
             peerLabel: 'Contact',
+            fromRealtime: false,
           );
         }
 

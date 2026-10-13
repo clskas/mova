@@ -249,6 +249,12 @@ export class RestaurantPortalController {
     return this.deliveryLiveKit.createToken(id, req.user.id, { announce: body?.announce === true });
   }
 
+  @Post('orders/:id/livekit-end')
+  @ApiOperation({ summary: 'Fin d’appel vocal (partenaire) — coupe la sonnerie' })
+  orderLiveKitEnd(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.deliveryLiveKit.endCall(id, req.user.id);
+  }
+
   @Patch('menu')
   @ApiOperation({ summary: 'Mettre à jour menu et disponibilité' })
   menu(@Request() req: { user: { id: string } }, @Body() dto: UpdateRestaurantMenuDto) {

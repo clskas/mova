@@ -162,14 +162,16 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
         if (id != null && id != _deliveryId) return;
         final action = payload['action']?.toString() ?? 'start';
         if (action != 'start') {
-          unawaited(CallRingService.stop(deliveryId: _deliveryId));
+          unawaited(CallRingService.forceStop());
           return;
         }
+        CallRingService.allowNewIncoming(_deliveryId);
         unawaited(CallRingService.startIncoming(
           deliveryId: _deliveryId,
           starterId: payload['starterId']?.toString() ?? '',
           myUserId: _userId,
           peerLabel: 'Client',
+          fromRealtime: true,
         ));
       },
     );

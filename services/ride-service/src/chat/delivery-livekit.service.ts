@@ -101,4 +101,17 @@ export class DeliveryLiveKitService {
       ts: Date.now(),
     });
   }
+
+  /** Notifie les autres participants que l’appel est terminé (raccroché / refusé). */
+  async endCall(deliveryId: string, userId: string) {
+    const participants = await this.chat.requireParticipant(deliveryId, userId);
+    this.trackingGateway.broadcastDeliveryCall({
+      deliveryId,
+      starterId: userId,
+      starterRole: participants.role,
+      action: 'end',
+      ts: Date.now(),
+    });
+    return { ok: true };
+  }
 }

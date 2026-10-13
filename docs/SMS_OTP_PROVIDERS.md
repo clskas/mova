@@ -29,12 +29,16 @@ Mobile Money reste indépendant (`MOBILE_MONEY_GATEWAY=serdipay`).
 
 ### Que répondre si SerdiPay demande « le lien SMS » ?
 
-| Ce qu’ils veulent en pratique | Lien à donner |
-|-------------------------------|---------------|
-| Domaine / IP sortant (whitelist marchand) | `https://sms.afri-soft.com` · IP `178.104.82.66` |
-| Endpoint **d’envoi** que le hub appelle chez eux | `https://apis.serdipay.com/api/sms-api/v1/send` |
+Deux choses distinctes — ne pas les mélanger :
+
+| Ce qu’ils veulent | Lien à donner |
+|-------------------|---------------|
+| **Leur** API SMS (souvent : « donnez-nous le lien SerdiPay ») | `https://apis.serdipay.com` — endpoint d’envoi : `https://apis.serdipay.com/api/sms-api/v1/send` |
+| **Votre** domaine / IP à whitelister (sortant vers eux) | `https://sms.afri-soft.com` · IP `178.104.82.66` |
 | Callback **paiement** (souvent confondu avec SMS) | `https://pay.afri-soft.com/webhooks/serdipay` |
 | Callback DLR SMS | **Pas exposé** — OTP est synchrone ; confirmer avec SerdiPay s’ils en exigent un |
+
+Si l’agent SerdiPay dit « le lien SerdiPay » : il parle en général de **`https://apis.serdipay.com`** (leur plateforme), pas de `sms.afri-soft.com` (c’est *votre* hub).
 
 En prod SENGA n’appelle pas SerdiPay depuis Render : le VPS hub `sms.afri-soft.com` détient `SERDIPAY_SMS_*` et POST vers `apis.serdipay.com`.
 

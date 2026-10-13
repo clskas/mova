@@ -207,7 +207,8 @@ class CallRingService {
     try {
       await _player.stop();
       await _player.setReleaseMode(ReleaseMode.stop);
-      await _player.release();
+      // Ne pas `release()` : ça casse souvent le son chat (autre AudioPlayer)
+      // juste après un appel / une sonnerie.
     } catch (_) {
       /* ignore */
     }

@@ -110,7 +110,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         threadId: _rideId,
         senderRole: role,
         text: payload['text']?.toString() ?? '',
-        peerLabel: 'Chauffeur',
+        peerLabel: 'Passager',
         messageId: payload['id']?.toString(),
       );
     };

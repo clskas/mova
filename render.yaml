@@ -449,16 +449,16 @@ envVarGroups:
         value: senga-6ffda
       # In-app update banner (ride-service GET /api/public/app-version). Raise after Play upload.
       - key: MOBILE_PASSENGER_VERSION
-        value: "1.0.25"
+        value: "1.0.27"
       - key: MOBILE_DRIVER_VERSION
-        value: "1.0.25"
+        value: "1.0.27"
       - key: MOBILE_MIN_VERSION
         value: "1.0.0"
       # Play production versionCode — keep in sync with pubspec +N after each AAB upload.
       - key: MOBILE_PASSENGER_VERSION_CODE
-        value: "137"
+        value: "139"
       - key: MOBILE_DRIVER_VERSION_CODE
-        value: "137"
+        value: "139"
       - key: MOBILE_MIN_VERSION_CODE
         value: "0"
       - key: PLAY_STORE_PASSENGER_URL

@@ -25,7 +25,7 @@ class ChatPollService {
   bool _inFlight = false;
   final Set<String> _seenNotificationIds = <String>{};
 
-  static const _interval = Duration(seconds: 15);
+  static const _interval = Duration(seconds: 8);
 
   void start() {
     if (_timer != null) return;

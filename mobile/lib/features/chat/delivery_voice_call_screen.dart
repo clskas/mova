@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -12,18 +14,43 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import 'call_ring_service.dart';
 
-/// Appel vocal LiveKit sur une livraison (partenaire / livreur / client).
+enum VoiceCallKind { ride, delivery }
+
+enum _CallPhase { connecting, ringingOut, inCall, peerLeft, error }
+
+/// Appel vocal LiveKit (course ou livraison).
 class DeliveryVoiceCallScreen extends ConsumerStatefulWidget {
   const DeliveryVoiceCallScreen({
     super.key,
-    required this.deliveryId,
+    required this.threadId,
+    this.kind = VoiceCallKind.delivery,
     this.peerLabel = 'Appel',
     this.announce = true,
   });
 
-  final String deliveryId;
+  /// Compat anciens appels `deliveryId:`.
+  factory DeliveryVoiceCallScreen.delivery({
+    Key? key,
+    required String deliveryId,
+    String peerLabel = 'Appel',
+    bool announce = true,
+  }) {
+    return DeliveryVoiceCallScreen(
+      key: key,
+      threadId: deliveryId,
+      kind: VoiceCallKind.delivery,
+      peerLabel: peerLabel,
+      announce: announce,
+    );
+  }
+
+  final String threadId;
+  final VoiceCallKind kind;
   final String peerLabel;
   final bool announce;
+
+  /// Ancien nom de paramètre.
+  String get deliveryId => threadId;
 
   @override
   ConsumerState<DeliveryVoiceCallScreen> createState() => _DeliveryVoiceCallScreenState();
@@ -32,44 +59,74 @@ class DeliveryVoiceCallScreen extends ConsumerStatefulWidget {
 class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScreen> {
   Room? _room;
   EventsListener<RoomEvent>? _listener;
-  bool _connecting = true;
   bool _muted = false;
   bool _endedSignaled = false;
+  _CallPhase _phase = _CallPhase.connecting;
   String? _error;
   List<String> _remoteNames = const [];
   ApiClient? _api;
+
+  String get _scope => widget.kind == VoiceCallKind.ride ? 'ride' : 'delivery';
 
   @override
   void initState() {
     super.initState();
     _api = ref.read(apiClientProvider);
-    CallRingService.markInCall(widget.deliveryId);
+    CallRingService.markInCall(widget.threadId);
+    CallRingService.peerEndedThreadId.addListener(_onPeerEndedSignal);
     unawaited(_prepareAndConnect());
   }
 
   @override
   void dispose() {
+    CallRingService.peerEndedThreadId.removeListener(_onPeerEndedSignal);
     unawaited(_signalEndAndStopRing());
     unawaited(_tearDownRoom());
     super.dispose();
   }
 
+  void _onPeerEndedSignal() {
+    final ended = CallRingService.peerEndedThreadId.value;
+    if (ended == null || ended != widget.threadId) return;
+    if (CallRingService.peerEndedThreadId.value == ended) {
+      CallRingService.peerEndedThreadId.value = null;
+    }
+    if (!mounted) return;
+    if (_phase == _CallPhase.peerLeft || _phase == _CallPhase.error) return;
+    setState(() => _phase = _CallPhase.peerLeft);
+    unawaited(_tearDownRoom());
+  }
+
   Future<void> _prepareAndConnect() async {
-    // Libérer la sonnerie (audioplayers) avant LiveKit — sinon audio à sens unique /
-    // « permission denied » sur la session micro/haut-parleur.
     await CallRingService.forceStop();
-    await Future<void>.delayed(const Duration(milliseconds: 350));
+    // Laisser l'AudioPlayer abandonner le focus avant WebRTC.
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (!mounted) return;
+    await _prepareAudioSession();
     if (!mounted) return;
     await _connect();
+  }
+
+  Future<void> _prepareAudioSession() async {
+    try {
+      if (!kIsWeb && Platform.isAndroid) {
+        await rtc.Helper.setAndroidAudioConfiguration(
+          rtc.AndroidAudioConfiguration.communication,
+        );
+      }
+      await Hardware.instance.setSpeakerphoneOn(true, forceSpeakerOutput: true);
+    } catch (e) {
+      if (kDebugMode) debugPrint('LiveKit audio session: $e');
+    }
   }
 
   Future<void> _signalEndAndStopRing() async {
     if (_endedSignaled) return;
     _endedSignaled = true;
-    CallRingService.clearInCall(widget.deliveryId);
+    CallRingService.clearInCall(widget.threadId);
     await CallRingService.forceStop();
     try {
-      await _api?.endDeliveryLiveKitCall(widget.deliveryId);
+      await _api?.endLiveKitCall(scope: _scope, threadId: widget.threadId);
     } catch (_) {
       /* best-effort */
     }
@@ -99,7 +156,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     if (!mic.isGranted) {
       if (!mounted) return;
       setState(() {
-        _connecting = false;
+        _phase = _CallPhase.error;
         _error = mic.isPermanentlyDenied
             ? 'Microphone refusé. Activez-le dans les réglages du téléphone.'
             : 'Autorisez le microphone pour l\'appel vocal.';
@@ -108,14 +165,15 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     }
 
     final api = ref.read(apiClientProvider);
-    final tokenResult = await api.createDeliveryLiveKitToken(
-      widget.deliveryId,
+    final tokenResult = await api.createLiveKitToken(
+      scope: _scope,
+      threadId: widget.threadId,
       announce: widget.announce,
     );
     if (!mounted) return;
     if (tokenResult case Failure(:final error)) {
       setState(() {
-        _connecting = false;
+        _phase = _CallPhase.error;
         _error = error.message;
       });
       return;
@@ -125,7 +183,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     final token = data['token']?.toString() ?? '';
     if (url.isEmpty || token.isEmpty) {
       setState(() {
-        _connecting = false;
+        _phase = _CallPhase.error;
         _error = 'Configuration appel invalide.';
       });
       return;
@@ -147,10 +205,22 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
       room.addListener(_onRoomChange);
       final listener = room.createListener();
       listener
-        ..on<ParticipantConnectedEvent>((_) => _ensureRemoteAudio(room))
-        ..on<TrackSubscribedEvent>((e) {
-          if (e.track is! AudioTrack) return;
-          _ensureRemoteAudio(room);
+        ..on<ParticipantConnectedEvent>((_) {
+          _onPeerPresenceChanged(room);
+        })
+        ..on<ParticipantDisconnectedEvent>((_) {
+          _onPeerPresenceChanged(room);
+        })
+        ..on<TrackSubscribedEvent>((e) async {
+          final subscribed = e.track;
+          if (subscribed is! AudioTrack) return;
+          try {
+            await subscribed.start();
+          } catch (_) {
+            /* déjà démarré */
+          }
+          await _ensureSpeaker();
+          _onPeerPresenceChanged(room);
         })
         ..on<TrackPublishedEvent>((e) async {
           final pub = e.publication;
@@ -162,7 +232,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
               if (kDebugMode) debugPrint('LiveKit subscribe: $err');
             }
           }
-          _ensureRemoteAudio(room);
+          _onPeerPresenceChanged(room);
         });
       _listener = listener;
 
@@ -172,23 +242,37 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
         connectOptions: const ConnectOptions(autoSubscribe: true),
       );
 
-      try {
-        await Hardware.instance.setSpeakerphoneOn(true, forceSpeakerOutput: true);
-      } catch (e) {
-        if (kDebugMode) debugPrint('LiveKit speaker: $e');
+      await _ensureSpeaker();
+
+      // Publier le micro après un court délai (évite permission denied / session audio).
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      if (!mounted) {
+        await room.disconnect();
+        await room.dispose();
+        return;
       }
 
-      try {
-        await room.localParticipant?.setMicrophoneEnabled(true);
-      } catch (e) {
+      Object? micError;
+      for (var attempt = 0; attempt < 3; attempt++) {
+        try {
+          await room.localParticipant?.setMicrophoneEnabled(true);
+          micError = null;
+          break;
+        } catch (e) {
+          micError = e;
+          await _prepareAudioSession();
+          await Future<void>.delayed(Duration(milliseconds: 350 * (attempt + 1)));
+        }
+      }
+      if (micError != null) {
         if (!mounted) {
           await room.disconnect();
           await room.dispose();
           return;
         }
         setState(() {
-          _connecting = false;
-          _error = _friendlyLiveKitError(e);
+          _phase = _CallPhase.error;
+          _error = _friendlyLiveKitError(micError!);
         });
         await room.disconnect();
         await room.dispose();
@@ -202,26 +286,47 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
       }
       setState(() {
         _room = room;
-        _connecting = false;
         _refreshRemotes();
+        _phase = _remoteNames.isEmpty
+            ? (widget.announce ? _CallPhase.ringingOut : _CallPhase.connecting)
+            : _CallPhase.inCall;
       });
-      // Second pass: certains appareils n’activent le micro qu’après le 1er frame.
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      if (!mounted || _room != room) return;
-      if (room.localParticipant?.isMicrophoneEnabled() != true) {
-        try {
-          await room.localParticipant?.setMicrophoneEnabled(true);
-        } catch (e) {
-          if (kDebugMode) debugPrint('LiveKit mic retry: $e');
-        }
-      }
       await _ensureRemoteAudio(room);
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _connecting = false;
+        _phase = _CallPhase.error;
         _error = _friendlyLiveKitError(e);
       });
+    }
+  }
+
+  void _onPeerPresenceChanged(Room room) {
+    if (!mounted || _room != room) return;
+    _refreshRemotes();
+    final hasPeer = room.remoteParticipants.isNotEmpty;
+    setState(() {
+      if (hasPeer) {
+        _phase = _CallPhase.inCall;
+      } else if (_phase == _CallPhase.inCall) {
+        _phase = _CallPhase.peerLeft;
+      } else if (widget.announce) {
+        _phase = _CallPhase.ringingOut;
+      }
+    });
+    unawaited(_ensureRemoteAudio(room));
+  }
+
+  Future<void> _ensureSpeaker() async {
+    try {
+      if (!kIsWeb && Platform.isAndroid) {
+        await rtc.Helper.setAndroidAudioConfiguration(
+          rtc.AndroidAudioConfiguration.communication,
+        );
+      }
+      await Hardware.instance.setSpeakerphoneOn(true, forceSpeakerOutput: true);
+    } catch (e) {
+      if (kDebugMode) debugPrint('LiveKit speaker: $e');
     }
   }
 
@@ -235,8 +340,17 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
             /* ignore */
           }
         }
+        final remoteTrack = pub.track;
+        if (remoteTrack != null) {
+          try {
+            await remoteTrack.start();
+          } catch (_) {
+            /* ignore */
+          }
+        }
       }
     }
+    await _ensureSpeaker();
     if (!mounted) return;
     _refreshRemotes();
   }
@@ -245,7 +359,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     final raw = e.toString();
     final lower = raw.toLowerCase();
     if (lower.contains('permission') || lower.contains('not allowed')) {
-      return 'Accès micro / salle refusé. Vérifiez la permission microphone et réessayez.';
+      return 'Accès micro / salle refusé. Fermez l\'app, réautorisez le micro, puis réessayez.';
     }
     if (lower.contains('timeout') || lower.contains('network')) {
       return 'Réseau insuffisant pour l\'appel. Réessayez avec une meilleure connexion.';
@@ -257,18 +371,15 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
   void _onRoomChange() {
     if (!mounted) return;
     final room = _room;
-    if (room != null) unawaited(_ensureRemoteAudio(room));
-    _refreshRemotes();
+    if (room != null) _onPeerPresenceChanged(room);
   }
 
   void _refreshRemotes() {
     final room = _room;
     if (room == null) return;
-    setState(() {
-      _remoteNames = room.remoteParticipants.values
-          .map((p) => p.name.isNotEmpty ? p.name : p.identity)
-          .toList();
-    });
+    _remoteNames = room.remoteParticipants.values
+        .map((p) => p.name.isNotEmpty ? p.name : p.identity)
+        .toList();
   }
 
   Future<void> _toggleMute() async {
@@ -285,8 +396,42 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     if (mounted) Navigator.of(context).pop();
   }
 
+  String get _statusTitle {
+    switch (_phase) {
+      case _CallPhase.connecting:
+        return 'Connexion…';
+      case _CallPhase.ringingOut:
+        return 'Appel en cours…';
+      case _CallPhase.inCall:
+        return 'En conversation';
+      case _CallPhase.peerLeft:
+        return 'Appel terminé';
+      case _CallPhase.error:
+        return 'Échec de l\'appel';
+    }
+  }
+
+  String get _statusSubtitle {
+    switch (_phase) {
+      case _CallPhase.connecting:
+        return 'Préparation de l\'appel vocal SENGA';
+      case _CallPhase.ringingOut:
+        return 'En attente que ${widget.peerLabel} décroche…';
+      case _CallPhase.inCall:
+        return _remoteNames.isEmpty
+            ? 'Connecté'
+            : 'Avec : ${_remoteNames.join(', ')}';
+      case _CallPhase.peerLeft:
+        return '${widget.peerLabel} a raccroché';
+      case _CallPhase.error:
+        return _error ?? 'Erreur';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final inCall = _phase == _CallPhase.inCall;
+    final canMute = _room != null && (inCall || _phase == _CallPhase.ringingOut);
     return MovaScreen(
       title: 'Appel · ${widget.peerLabel}',
       scrollable: false,
@@ -296,28 +441,47 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '#${widget.deliveryId.length > 8 ? widget.deliveryId.substring(0, 8) : widget.deliveryId}',
+              '#${widget.threadId.length > 8 ? widget.threadId.substring(0, 8) : widget.threadId}',
               textAlign: TextAlign.center,
               style: const TextStyle(color: MovaColors.textSecondary),
             ),
             const Spacer(),
-            if (_connecting)
-              const Center(child: CircularProgressIndicator(color: MovaColors.violet))
-            else if (_error != null)
-              Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red))
-            else ...[
-              const Icon(Icons.call, size: 64, color: MovaColors.violet),
-              const SizedBox(height: 16),
+            Icon(
+              _phase == _CallPhase.error
+                  ? Icons.call_end
+                  : (_phase == _CallPhase.peerLeft
+                      ? Icons.phone_disabled
+                      : (inCall ? Icons.call : Icons.ring_volume)),
+              size: 72,
+              color: _phase == _CallPhase.error || _phase == _CallPhase.peerLeft
+                  ? Colors.red
+                  : MovaColors.violet,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              _statusTitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            if (_phase == _CallPhase.connecting)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: Center(child: CircularProgressIndicator(color: MovaColors.violet)),
+              )
+            else
               Text(
-                _remoteNames.isEmpty
-                    ? 'En attente des autres participants…'
-                    : 'Avec : ${_remoteNames.join(', ')}',
+                _statusSubtitle,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 16),
+                style: TextStyle(
+                  fontSize: 15,
+                  color: _phase == _CallPhase.error ? Colors.red : MovaColors.textSecondary,
+                ),
               ),
-              const SizedBox(height: 8),
+            if (inCall) ...[
+              const SizedBox(height: 12),
               const Text(
-                'Appel via Internet (données) — haut-parleur activé',
+                'Appel via Internet — haut-parleur activé',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
               ),
@@ -327,7 +491,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _room == null ? null : _toggleMute,
+                    onPressed: canMute ? _toggleMute : null,
                     icon: Icon(_muted ? Icons.mic_off : Icons.mic),
                     label: Text(_muted ? 'Micro coupé' : 'Couper micro'),
                   ),
@@ -338,7 +502,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
                     style: FilledButton.styleFrom(backgroundColor: Colors.red),
                     onPressed: _hangUp,
                     icon: const Icon(Icons.call_end),
-                    label: const Text('Raccrocher'),
+                    label: Text(_phase == _CallPhase.peerLeft ? 'Fermer' : 'Raccrocher'),
                   ),
                 ),
               ],

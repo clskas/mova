@@ -10,11 +10,15 @@ class IncomingCallInfo {
     required this.deliveryId,
     required this.peerLabel,
     this.starterId = '',
+    this.kind = 'delivery',
   });
 
+  /// Identifiant course ou livraison (clé de salle LiveKit).
   final String deliveryId;
   final String peerLabel;
   final String starterId;
+  /// `ride` | `delivery`
+  final String kind;
 }
 
 /// Sonnerie + état UI pour appel vocal LiveKit (livraison).
@@ -41,6 +45,15 @@ class CallRingService {
 
   /// Non-null ⇒ afficher l'écran d'appel entrant (Décrocher / Refuser).
   static final ValueNotifier<IncomingCallInfo?> incoming = ValueNotifier<IncomingCallInfo?>(null);
+
+  /// Thread (ride/delivery id) dont l'autre partie a refusé / raccroché via socket.
+  /// L'écran d'appel sortant écoute ça pour passer en « Appel terminé ».
+  static final ValueNotifier<String?> peerEndedThreadId = ValueNotifier<String?>(null);
+
+  static void notifyPeerEnded(String threadId) {
+    if (threadId.isEmpty) return;
+    peerEndedThreadId.value = threadId;
+  }
 
   static bool get isRinging => _ringing;
   static String? get activeDeliveryId => incoming.value?.deliveryId;
@@ -84,6 +97,29 @@ class CallRingService {
       ),
     );
     await android?.requestNotificationsPermission();
+    try {
+      // Focus transitoire : LiveKit doit pouvoir reprendre le micro après stop.
+      await _player.setAudioContext(
+        AudioContext(
+          android: const AudioContextAndroid(
+            isSpeakerphoneOn: true,
+            stayAwake: false,
+            contentType: AndroidContentType.sonification,
+            usageType: AndroidUsageType.notificationRingtone,
+            audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+          ),
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+            options: const {
+              AVAudioSessionOptions.duckOthers,
+              AVAudioSessionOptions.mixWithOthers,
+            },
+          ),
+        ),
+      );
+    } catch (_) {
+      /* ignore */
+    }
     _initialized = true;
   }
 
@@ -94,6 +130,7 @@ class CallRingService {
     required String starterId,
     String? myUserId,
     String peerLabel = 'Contact',
+    String kind = 'delivery',
     bool fromRealtime = false,
   }) async {
     if (myUserId != null && myUserId.isNotEmpty && starterId == myUserId) return;
@@ -115,6 +152,7 @@ class CallRingService {
       deliveryId: deliveryId,
       peerLabel: peerLabel,
       starterId: starterId,
+      kind: kind,
     );
     await HapticFeedback.heavyImpact();
 
@@ -207,6 +245,22 @@ class CallRingService {
     try {
       await _player.stop();
       await _player.setReleaseMode(ReleaseMode.stop);
+      // Abandonner le focus audio pour que WebRTC / LiveKit prenne le micro.
+      try {
+        await _player.setAudioContext(
+          AudioContext(
+            android: const AudioContextAndroid(
+              audioFocus: AndroidAudioFocus.none,
+            ),
+            iOS: AudioContextIOS(
+              category: AVAudioSessionCategory.ambient,
+              options: const {AVAudioSessionOptions.mixWithOthers},
+            ),
+          ),
+        );
+      } catch (_) {
+        /* ignore */
+      }
       // Ne pas `release()` : ça casse souvent le son chat (autre AudioPlayer)
       // juste après un appel / une sonnerie.
     } catch (_) {

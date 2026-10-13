@@ -13,8 +13,10 @@ import '../../core/billing/driver_earnings_display.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../chat/call_ring_service.dart';
 import '../chat/chat_alert_service.dart';
 import '../chat/chat_badge_icon.dart';
+import '../chat/delivery_voice_call_screen.dart';
 import '../chat/ride_chat_screen.dart';
 import '../geo/suggest_place_screen.dart';
 import '../../core/safety/sos_helper.dart';
@@ -114,6 +116,25 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         messageId: payload['id']?.toString(),
       );
     };
+    socket.onDeliveryCall = (payload) {
+      final id = payload['rideId']?.toString() ?? payload['deliveryId']?.toString();
+      if (id != null && id != _rideId) return;
+      final action = payload['action']?.toString() ?? 'start';
+      if (action != 'start') {
+        CallRingService.notifyPeerEnded(_rideId);
+        unawaited(CallRingService.forceStop());
+        return;
+      }
+      CallRingService.allowNewIncoming(_rideId);
+      unawaited(CallRingService.startIncoming(
+        deliveryId: _rideId,
+        starterId: payload['starterId']?.toString() ?? '',
+        myUserId: _userId,
+        peerLabel: 'Passager',
+        kind: 'ride',
+        fromRealtime: true,
+      ));
+    };
     // Le passager a réglé en espèces → ouvrir automatiquement la confirmation.
     socket.onCashPending = (payload) async {
       final rideId = payload['rideId']?.toString();
@@ -122,6 +143,21 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       if (!mounted || !_cashPending) return;
       _autoOpenCashConfirm();
     };
+  }
+
+  Future<void> _openVoiceCall() {
+    unawaited(CallRingService.stop(deliveryId: _rideId));
+    return Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DeliveryVoiceCallScreen(
+          threadId: _rideId,
+          kind: VoiceCallKind.ride,
+          peerLabel: 'Passager',
+          announce: true,
+        ),
+      ),
+    );
   }
 
   void _autoOpenCashConfirm() {
@@ -622,6 +658,13 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          MovaButton(
+            label: 'Appel SENGA',
+            isSecondary: true,
+            icon: Icons.call_outlined,
+            onPressed: _rideId.isEmpty ? null : _openVoiceCall,
           ),
           const SizedBox(height: 12),
           if (!headingToPickup)

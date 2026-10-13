@@ -1,7 +1,7 @@
 name: mova
 description: SENGA — Plateforme de mobilité RDC
 publish_to: 'none'
-version: 1.0.28+140
+version: 1.0.29+141
 
 environment:
   sdk: ^3.8.1
@@ -42,6 +42,7 @@ dependencies:
   package_info_plus: ^8.3.0
   # 2.5.4+: io.livekit:noise (16 KB page size). Stay <2.13 (needs Dart 3.10 / Flutter 3.38).
   livekit_client: 2.5.4
+  flutter_webrtc: ^1.2.1
   permission_handler: ^11.3.1
   audioplayers: ^6.6.0
 

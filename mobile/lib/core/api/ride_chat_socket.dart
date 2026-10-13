@@ -18,14 +18,19 @@ class RideChatSocket {
   static const _maxReconnectAttempts = 8;
 
   void Function(Map<String, dynamic> payload)? _onChat;
+  void Function(Map<String, dynamic> payload)? _onDeliveryCall;
   void Function()? _onConnected;
   void Function()? _onDisconnected;
   final List<Completer<bool>> _connectWaiters = [];
 
   bool get isConnected => _socket?.connected == true;
 
+  set onDeliveryCall(void Function(Map<String, dynamic> payload)? handler) =>
+      _onDeliveryCall = handler;
+
   void clearHandlers() {
     _onChat = null;
+    _onDeliveryCall = null;
     _onConnected = null;
     _onDisconnected = null;
   }
@@ -115,6 +120,14 @@ class RideChatSocket {
         ..on('ride:chat', (data) {
           if (data is Map) {
             _onChat?.call(Map<String, dynamic>.from(data));
+          }
+        })
+        ..on('ride:call', (data) {
+          if (data is Map) {
+            final m = Map<String, dynamic>.from(data);
+            m['kind'] = 'ride';
+            m['deliveryId'] = m['rideId'] ?? m['deliveryId'];
+            _onDeliveryCall?.call(m);
           }
         })
         ..onConnectError((_) {

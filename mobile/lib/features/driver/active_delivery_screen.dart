@@ -162,6 +162,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
         if (id != null && id != _deliveryId) return;
         final action = payload['action']?.toString() ?? 'start';
         if (action != 'start') {
+          CallRingService.notifyPeerEnded(_deliveryId);
           unawaited(CallRingService.forceStop());
           return;
         }
@@ -171,6 +172,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           starterId: payload['starterId']?.toString() ?? '',
           myUserId: _userId,
           peerLabel: 'Client',
+          kind: payload['kind']?.toString() == 'ride' ? 'ride' : 'delivery',
           fromRealtime: true,
         ));
       },
@@ -492,7 +494,8 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => DeliveryVoiceCallScreen(
-          deliveryId: _deliveryId,
+          threadId: _deliveryId,
+          kind: VoiceCallKind.delivery,
           peerLabel: _isFood ? _restaurantName : 'Client',
           announce: true,
         ),

@@ -44,7 +44,10 @@ class IncomingCallOverlay extends ConsumerWidget {
   Future<void> _decline(WidgetRef ref, IncomingCallInfo info) async {
     await CallRingService.forceStop();
     try {
-      await ref.read(apiClientProvider).endDeliveryLiveKitCall(info.deliveryId);
+      await ref.read(apiClientProvider).endLiveKitCall(
+            scope: info.kind == 'ride' ? 'ride' : 'delivery',
+            threadId: info.deliveryId,
+          );
     } catch (_) {
       /* best-effort */
     }
@@ -58,7 +61,8 @@ class IncomingCallOverlay extends ConsumerWidget {
     nav.push(
       MaterialPageRoute<void>(
         builder: (_) => DeliveryVoiceCallScreen(
-          deliveryId: info.deliveryId,
+          threadId: info.deliveryId,
+          kind: info.kind == 'ride' ? VoiceCallKind.ride : VoiceCallKind.delivery,
           peerLabel: info.peerLabel,
           announce: false,
         ),

@@ -28,6 +28,10 @@ export class RideChatService {
     private redis: RedisService,
   ) {}
 
+  async requireParticipant(rideId: string, userId: string): Promise<RideParticipants> {
+    return this.assertParticipant(rideId, userId);
+  }
+
   private async assertParticipant(rideId: string, userId: string): Promise<RideParticipants> {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },

@@ -584,6 +584,8 @@ jobs:
           CI: 'true'
           GOOGLE_IOS_CLIENT_ID_PASSENGER: ${{ secrets.GOOGLE_IOS_CLIENT_ID_PASSENGER }}
           GOOGLE_IOS_CLIENT_ID_DRIVER: ${{ secrets.GOOGLE_IOS_CLIENT_ID_DRIVER }}
+          GOOGLE_SERVICE_INFO_PASSENGER_BASE64: ${{ secrets.GOOGLE_SERVICE_INFO_PASSENGER_BASE64 }}
+          GOOGLE_SERVICE_INFO_DRIVER_BASE64: ${{ secrets.GOOGLE_SERVICE_INFO_DRIVER_BASE64 }}
         run: |
           set -euo pipefail
           WEB_CLIENT="58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com"

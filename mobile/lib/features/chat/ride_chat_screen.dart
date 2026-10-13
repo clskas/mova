@@ -10,7 +10,9 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import 'call_ring_service.dart';
 import 'chat_receipt.dart';
+import 'delivery_voice_call_screen.dart';
 
 class RideChatMessage {
   RideChatMessage({
@@ -178,6 +180,24 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
         }
       },
     );
+    socket.onDeliveryCall = (payload) {
+      final id = payload['rideId']?.toString() ?? payload['deliveryId']?.toString();
+      if (id != null && id != widget.rideId) return;
+      final action = payload['action']?.toString() ?? 'start';
+      if (action != 'start') {
+        CallRingService.notifyPeerEnded(widget.rideId);
+        unawaited(CallRingService.forceStop());
+        return;
+      }
+      CallRingService.allowNewIncoming(widget.rideId);
+      unawaited(CallRingService.startIncoming(
+        deliveryId: widget.rideId,
+        starterId: payload['starterId']?.toString() ?? '',
+        peerLabel: widget.peerLabel,
+        kind: 'ride',
+        fromRealtime: true,
+      ));
+    };
     final ok = await socket.ensureConnected(timeout: const Duration(seconds: 8));
     if (!mounted) return;
     setState(() {
@@ -233,11 +253,32 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
     }
   }
 
+  void _openVoiceCall() {
+    unawaited(CallRingService.stop(deliveryId: widget.rideId));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DeliveryVoiceCallScreen(
+          threadId: widget.rideId,
+          kind: VoiceCallKind.ride,
+          peerLabel: widget.peerLabel,
+          announce: true,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
       title: 'Chat — ${widget.peerLabel}',
       scrollable: false,
+      actions: [
+        IconButton(
+          tooltip: 'Appel SENGA',
+          icon: const Icon(Icons.call_outlined),
+          onPressed: _openVoiceCall,
+        ),
+      ],
       child: Column(
         children: [
           if (_error != null) ...[

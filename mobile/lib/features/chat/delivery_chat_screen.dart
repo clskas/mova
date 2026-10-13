@@ -65,7 +65,8 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => DeliveryVoiceCallScreen(
-          deliveryId: widget.deliveryId,
+          threadId: widget.deliveryId,
+          kind: VoiceCallKind.delivery,
           peerLabel: widget.peerLabel,
           announce: true,
         ),

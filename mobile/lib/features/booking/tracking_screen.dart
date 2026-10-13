@@ -16,8 +16,10 @@ import '../../core/geo/geo_utils.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../chat/call_ring_service.dart';
 import '../chat/chat_alert_service.dart';
 import '../chat/chat_badge_icon.dart';
+import '../chat/delivery_voice_call_screen.dart';
 import '../chat/ride_chat_screen.dart';
 import '../passenger/passenger_alert_service.dart';
 import '../geo/suggest_place_screen.dart';
@@ -95,6 +97,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   Timer? _mockTimer;
   Timer? _trackingPollTimer;
   RideSocket? _socket;
+  String? _userId;
   int _mockStep = 0;
   bool _autoPaymentLaunched = false;
 
@@ -505,6 +508,42 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         }
       },
     );
+    _userId ??= await api.currentUserId();
+    socket.onDeliveryCall = (payload) {
+      final id = payload['rideId']?.toString() ?? payload['deliveryId']?.toString();
+      if (id != null && id != widget.rideId) return;
+      final action = payload['action']?.toString() ?? 'start';
+      if (action != 'start') {
+        CallRingService.notifyPeerEnded(widget.rideId);
+        unawaited(CallRingService.forceStop());
+        return;
+      }
+      CallRingService.allowNewIncoming(widget.rideId);
+      unawaited(CallRingService.startIncoming(
+        deliveryId: widget.rideId,
+        starterId: payload['starterId']?.toString() ?? '',
+        myUserId: _userId,
+        peerLabel: _driver?['name']?.toString() ?? 'Chauffeur',
+        kind: 'ride',
+        fromRealtime: true,
+      ));
+    };
+  }
+
+  Future<void> _openVoiceCall() {
+    final peer = _driver?['name']?.toString() ?? 'Chauffeur';
+    unawaited(CallRingService.stop(deliveryId: widget.rideId));
+    return Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DeliveryVoiceCallScreen(
+          threadId: widget.rideId,
+          kind: VoiceCallKind.ride,
+          peerLabel: peer,
+          announce: true,
+        ),
+      ),
+    );
   }
 
   void _appendTracePoint(LatLng pos) {
@@ -910,6 +949,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                         ),
                                       );
                                     },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.call_outlined, color: MovaColors.violet),
+                                    tooltip: 'Appel SENGA',
+                                    onPressed: _openVoiceCall,
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.phone, color: MovaColors.green),

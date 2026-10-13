@@ -194,7 +194,18 @@ class RideSocket {
         })
         ..on('delivery:call', (data) {
           if (data is Map) {
-            _onDeliveryCall?.call(Map<String, dynamic>.from(data));
+            final m = Map<String, dynamic>.from(data);
+            m['kind'] = m['kind'] ?? 'delivery';
+            _onDeliveryCall?.call(m);
+          }
+        })
+        ..on('ride:call', (data) {
+          if (data is Map) {
+            final m = Map<String, dynamic>.from(data);
+            m['kind'] = 'ride';
+            // Compat CallRing / handlers historiques (deliveryId).
+            m['deliveryId'] = m['rideId'] ?? m['deliveryId'];
+            _onDeliveryCall?.call(m);
           }
         })
         ..on('ride:cash-pending', (data) {

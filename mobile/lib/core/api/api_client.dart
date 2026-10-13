@@ -1561,17 +1561,39 @@ class ApiClient {
   Future<Result<Map<String, dynamic>>> createDeliveryLiveKitToken(
     String deliveryId, {
     bool announce = false,
+  }) {
+    return createLiveKitToken(scope: 'delivery', threadId: deliveryId, announce: announce);
+  }
+
+  Future<Result<Map<String, dynamic>>> endDeliveryLiveKitCall(String deliveryId) {
+    return endLiveKitCall(scope: 'delivery', threadId: deliveryId);
+  }
+
+  /// Jeton LiveKit — [scope] = `delivery` | `ride`.
+  Future<Result<Map<String, dynamic>>> createLiveKitToken({
+    required String scope,
+    required String threadId,
+    bool announce = false,
   }) async {
-    final result = await post('/deliveries/$deliveryId/livekit-token', {'announce': announce});
+    final path = scope == 'ride'
+        ? '/rides/$threadId/livekit-token'
+        : '/deliveries/$threadId/livekit-token';
+    final result = await post(path, {'announce': announce});
     return switch (result) {
       Success(:final data) => Success(Map<String, dynamic>.from(data as Map)),
       Failure(:final error) => Failure(error),
     };
   }
 
-  /// Signale la fin d’appel pour couper la sonnerie chez les autres participants.
-  Future<Result<Map<String, dynamic>>> endDeliveryLiveKitCall(String deliveryId) async {
-    final result = await post('/deliveries/$deliveryId/livekit-end', {});
+  /// Fin d’appel — coupe la sonnerie / signale raccroché chez l’autre.
+  Future<Result<Map<String, dynamic>>> endLiveKitCall({
+    required String scope,
+    required String threadId,
+  }) async {
+    final path = scope == 'ride'
+        ? '/rides/$threadId/livekit-end'
+        : '/deliveries/$threadId/livekit-end';
+    final result = await post(path, {});
     return switch (result) {
       Success(:final data) => Success(Map<String, dynamic>.from(data as Map? ?? {})),
       Failure(:final error) => Failure(error),

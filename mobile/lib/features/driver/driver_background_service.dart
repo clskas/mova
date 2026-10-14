@@ -5,6 +5,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../sos/notification_tap_router.dart';
 import 'driver_job_alert_service.dart';
 
 const _prefsKnownJobs = 'driver_known_job_keys';
@@ -77,10 +78,15 @@ class _DriverJobTaskHandler extends TaskHandler {
               : DriverJobAlertService.missionKey(row);
           discovered.add(key);
           if (!known.contains(key)) {
+            final jobPayload = kind == 'offer' && id.isNotEmpty
+                ? NotificationTapRouter.encodeJobPayload(kind: offerKind, id: id)
+                : key;
             await DriverJobAlertService.notify(
               title: kind == 'offer' ? 'Nouvelle offre SENGA' : 'Nouvelle mission SENGA',
               body: message(row),
-              payload: key,
+              payload: jobPayload,
+              ringUntilStopped: kind == 'offer',
+              offerKey: kind == 'offer' ? key : null,
             );
           }
         }

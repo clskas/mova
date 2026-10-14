@@ -172,7 +172,7 @@ jobs:
           set -euo pipefail
           # Floor must stay above the highest versionCode already accepted by Play
           # (123 used; bump when uploads fail with "already been used").
-          FLOOR=136
+          FLOOR=153
           PUBSPEC_LINE=$(grep -E '^version:' mobile/pubspec.yaml | head -1)
           PUBSPEC_NAME=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
@@ -481,7 +481,7 @@ jobs:
           set -euo pipefail
           # Aligné Android : max(run_number, pubspec +N) pour que la bannière
           # currentVersionCode (API) ne reste pas collée après TestFlight.
-          FLOOR=136
+          FLOOR=153
           PUBSPEC_LINE=$(grep -E '^version:' mobile/pubspec.yaml | head -1)
           NAME=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
@@ -728,9 +728,9 @@ jobs:
             # shellcheck disable=SC1091
             source /tmp/asc-venv/bin/activate
             pip install --quiet PyJWT cryptography
-            export ASC_VERSION=1.0.24
+            export ASC_VERSION=1.0.32
             # Même logique que build-ios (max run_number / pubspec +N), pas run_number seul.
-            FLOOR=136
+            FLOOR=153
             PUBSPEC_LINE=$(grep -E '^version:' "$(git rev-parse --show-toplevel)/mobile/pubspec.yaml" | head -1)
             PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
             ASC_CODE="${{ github.run_number }}"
@@ -765,7 +765,7 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-          ASC_VERSION: '1.0.24'
+          ASC_VERSION: '1.0.32'
           ASC_BUILD_NUMBER: ${{ inputs.asc_build_number }}
           ASC_SUBMIT: 'true'
           # Cancel WAITING_FOR_REVIEW so we can attach the new TestFlight build.

@@ -119,7 +119,8 @@ class DriverPushService {
             (jobKind.contains('RIDE') ||
                 jobKind.contains('DELIVERY') ||
                 jobKind.contains('OFFER') ||
-                jobKind.contains('JOB'));
+                jobKind.contains('JOB') ||
+                jobKind.contains('CALL'));
         // Évite un 2ᵉ bip « système » pendant que la sonnerie SENGA tourne déjà via le poll.
         if (isOffer && DriverJobAlertService.isRinging) return;
         String? offerKey;

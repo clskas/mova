@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/api/api_client.dart';
 import '../../core/contact/contact_actions.dart';
-import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
-import '../help/company_contact.dart';
 
-/// Détail d'une alerte SOS + actions d'intervention (Maps, secours, support).
-class SosAlertScreen extends ConsumerStatefulWidget {
+/// Détail d'une alerte SOS + actions d'intervention (Maps, secours).
+class SosAlertScreen extends StatelessWidget {
   const SosAlertScreen({
     super.key,
     this.incidentId,
@@ -35,41 +31,15 @@ class SosAlertScreen extends ConsumerStatefulWidget {
   final String? referenceId;
   final bool forOps;
 
-  @override
-  ConsumerState<SosAlertScreen> createState() => _SosAlertScreenState();
-}
+  bool get _hasGps => lat != null && lng != null;
 
-class _SosAlertScreenState extends ConsumerState<SosAlertScreen> {
-  List<CompanyContact> _support = const [];
-
-  bool get _hasGps => widget.lat != null && widget.lng != null;
-
-  String get _mapsUrl => 'https://maps.google.com/?q=${widget.lat},${widget.lng}';
+  String get _mapsUrl => 'https://maps.google.com/?q=$lat,$lng';
 
   static const _adminLitigesUrl = 'https://admin.mova.cd/litiges';
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSupport();
-  }
-
-  Future<void> _loadSupport() async {
-    final result = await ref.read(apiClientProvider).getCompanyContacts();
-    if (!mounted) return;
-    if (result case Success(:final data)) {
-      setState(() {
-        _support = data
-            .map(CompanyContact.fromJson)
-            .where((c) => (c.phone ?? '').trim().isNotEmpty)
-            .toList();
-      });
-    }
-  }
-
-  Future<void> _open(String url) async {
+  Future<void> _open(BuildContext context, String url) async {
     final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    if (!ok && mounted) {
+    if (!ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Impossible d\'ouvrir le lien')),
       );
@@ -77,22 +47,22 @@ class _SosAlertScreenState extends ConsumerState<SosAlertScreen> {
   }
 
   Future<void> _callEmergency() async {
-    // Numéros d’urgence courants RDC / internationaux.
     await launchPhoneCall('112');
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final heading = (widget.title != null && widget.title!.trim().isNotEmpty)
-        ? widget.title!.trim()
+    final heading = (title != null && title!.trim().isNotEmpty)
+        ? title!.trim()
         : 'Alerte SOS';
-    final detail = (widget.body != null && widget.body!.trim().isNotEmpty)
-        ? widget.body!.trim()
+    final detail = (body != null && body!.trim().isNotEmpty)
+        ? body!.trim()
         : 'Une urgence a été signalée sur SENGA.';
 
     return MovaScreen(
       title: 'Alerte SOS',
+      scrollable: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -129,34 +99,34 @@ class _SosAlertScreenState extends ConsumerState<SosAlertScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(detail, style: theme.textTheme.bodyMedium),
-                if (widget.rideId != null && widget.rideId!.isNotEmpty) ...[
+                if (rideId != null && rideId!.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(
-                    'Course : ${widget.rideId}',
+                    'Course : $rideId',
                     style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
                   ),
                 ],
-                if (widget.referenceType != null &&
-                    widget.referenceType!.isNotEmpty &&
-                    widget.referenceId != null &&
-                    widget.referenceId!.isNotEmpty) ...[
+                if (referenceType != null &&
+                    referenceType!.isNotEmpty &&
+                    referenceId != null &&
+                    referenceId!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    '${widget.referenceType} : ${widget.referenceId}',
+                    '$referenceType : $referenceId',
                     style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
                   ),
                 ],
-                if (widget.incidentId != null && widget.incidentId!.isNotEmpty) ...[
+                if (incidentId != null && incidentId!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    'Réf. ${widget.incidentId!.length > 12 ? '${widget.incidentId!.substring(0, 8)}…' : widget.incidentId}',
+                    'Réf. ${incidentId!.length > 12 ? '${incidentId!.substring(0, 8)}…' : incidentId}',
                     style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textMuted),
                   ),
                 ],
                 if (_hasGps) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'GPS : ${widget.lat!.toStringAsFixed(5)}, ${widget.lng!.toStringAsFixed(5)}',
+                    'GPS : ${lat!.toStringAsFixed(5)}, ${lng!.toStringAsFixed(5)}',
                     style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
                   ),
                 ],
@@ -171,7 +141,7 @@ class _SosAlertScreenState extends ConsumerState<SosAlertScreen> {
           const SizedBox(height: 8),
           if (_hasGps)
             FilledButton.icon(
-              onPressed: () => _open(_mapsUrl),
+              onPressed: () => _open(context, _mapsUrl),
               icon: const Icon(Icons.map_outlined),
               style: FilledButton.styleFrom(
                 backgroundColor: MovaColors.red,
@@ -186,31 +156,19 @@ class _SosAlertScreenState extends ConsumerState<SosAlertScreen> {
             icon: const Icon(Icons.emergency_outlined, color: MovaColors.red),
             label: const Text('Appeler les secours (112)'),
           ),
-          if (_support.isNotEmpty) ...[
+          if (forOps) ...[
             const SizedBox(height: 10),
             OutlinedButton.icon(
-              onPressed: () => showCallWhatsAppSheet(
-                context,
-                phone: _support.first.phone,
-                peerLabel: _support.first.name,
-              ),
-              icon: const Icon(Icons.support_agent_outlined),
-              label: Text('Contacter ${_support.first.name}'),
-            ),
-          ],
-          if (widget.forOps) ...[
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: () => _open(_adminLitigesUrl),
+              onPressed: () => _open(context, _adminLitigesUrl),
               icon: const Icon(Icons.admin_panel_settings_outlined),
               label: const Text('Ouvrir Litiges (admin)'),
             ),
           ],
           const SizedBox(height: 20),
           Text(
-            widget.forOps
+            forOps
                 ? 'Traitez l’urgence dans Litiges admin. La position GPS et les appels ci-dessus aident l’intervention.'
-                : 'L’équipe support SENGA a été alertée. Vous pouvez ouvrir la carte, appeler les secours ou le support.',
+                : 'L’équipe SENGA a été alertée. Ouvrez la carte ou appelez les secours si vous pouvez intervenir.',
             style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
           ),
         ],

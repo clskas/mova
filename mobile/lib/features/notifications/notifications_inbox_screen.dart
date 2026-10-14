@@ -169,8 +169,10 @@ class _NotificationsInboxScreenState extends ConsumerState<NotificationsInboxScr
   @override
   Widget build(BuildContext context) {
     final unread = _items.where((n) => n['read'] != true).length;
+    // scrollable:false — ListView a besoin d’une hauteur bornée (sinon liste vide).
     return MovaScreen(
       title: 'Notifications',
+      scrollable: false,
       actions: [
         if (unread > 0)
           TextButton(

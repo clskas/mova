@@ -100,6 +100,12 @@ class DriverJobAlertService {
     }
 
     await androidPlugin?.requestNotificationsPermission();
+    // Android 14+ : sans ça, fullScreenIntent ne réveille pas l’UI app fermée.
+    try {
+      await androidPlugin?.requestFullScreenIntentPermission();
+    } catch (_) {
+      /* ignore — API absente / déjà accordée */
+    }
     await DriverAlertPrefs.ensureLoaded();
     try {
       await _player.setReleaseMode(ReleaseMode.stop);
@@ -269,7 +275,8 @@ class DriverJobAlertService {
     if (muted) return;
 
     if (ringUntilStopped) {
-      // Boucle in-app (volume sonnerie) — fiable au premier plan et avec l’écran offres.
+      // Boucle in-app : fiable au 1er plan. App tuée → le son canal / APNs suffit
+      // jusqu’à l’ouverture de l’offre (qui relance startRinging).
       unawaited(startRinging(offerKey: offerKey));
     } else if (preferSenga) {
       unawaited(playSengaSound());
@@ -298,11 +305,13 @@ class DriverJobAlertService {
             channelDescription: 'Alertes chauffeur SENGA',
             importance: Importance.max,
             priority: Priority.max,
+            // CALL + fullScreenIntent : réveille l’UI (MainActivity showWhenLocked).
             category: asCall
                 ? AndroidNotificationCategory.call
                 : AndroidNotificationCategory.message,
             playSound: playSound,
-            sound: null,
+            // Son explicite : app tuée, AudioPlayer ne tourne souvent pas.
+            sound: (playSound && useSengaSound) ? _androidSound : null,
             enableVibration: true,
             vibrationPattern: Int64List.fromList([0, 450, 180, 450]),
             audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
@@ -315,9 +324,9 @@ class DriverJobAlertService {
           iOS: DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: true,
-            presentSound: playSound && !asCall,
-            // La boucle in-app gère le son « appel » ; évite un bip unique court.
-            sound: (!asCall && useSengaSound) ? _iosSound : null,
+            // App fermée : seul le son APNs joue — ne jamais le couper pour les offres.
+            presentSound: playSound,
+            sound: (playSound && useSengaSound) ? _iosSound : null,
             interruptionLevel: InterruptionLevel.timeSensitive,
           ),
         ),

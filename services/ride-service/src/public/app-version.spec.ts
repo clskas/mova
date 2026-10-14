@@ -63,8 +63,8 @@ describe('buildMobileAppVersionResponse', () => {
         },
         now,
       );
-      expect(payload.passenger.currentVersionCode).toBe(146);
-      expect(payload.driver.currentVersionCode).toBe(146);
+      expect(payload.passenger.currentVersionCode).toBe(147);
+      expect(payload.driver.currentVersionCode).toBe(147);
     }
   });
 });

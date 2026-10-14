@@ -26,16 +26,13 @@ const DEFAULT_DRIVER_STORE_IOS = 'https://apps.apple.com/app/id6818769267';
  * Marketing name floor must match latest Play / App Store marketing version.
  * Phones still on older binaries see behindName and get the in-app banner
  * until they install the matching store build.
- * versionCode floor tracks production (currently 143 = 1.0.31).
+ * versionCode floor tracks production (currently 146 = 1.0.31 on Play + TestFlight).
  * Raise both floors ONLY after the matching AAB/IPA is live on Play / App Store.
- * Raising early (e.g. to 1.0.32 before promote) keeps the banner forever for
- * users who already installed the previous store build. Stale Render env below
- * this floor also hid banners.
- *
- * Keep floor at 143 until 144 is live on Play / TestFlight, then bump to 144.
+ * Raising early keeps the banner forever for users who already installed the
+ * previous store build. Stale Render env below this floor also hid banners.
  */
 const CURRENT_VERSION_FLOOR = '1.0.31';
-const CURRENT_VERSION_CODE_FLOOR = 143;
+const CURRENT_VERSION_CODE_FLOOR = 146;
 
 function parseVersionCode(raw: string | undefined, fallback: number): number {
   const n = Number.parseInt(raw?.trim() || '', 10);

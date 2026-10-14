@@ -84,7 +84,36 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     _socketCallListener = _onSocketCallEvent;
     ref.read(rideSocketProvider).addCallListener(_socketCallListener);
     ref.read(rideChatSocketProvider).addCallListener(_socketCallListener);
+    // Sans subscribe room, l’appelant ne reçoit pas `action:end` (refus → « Pas de réponse » à 35s).
+    unawaited(_ensureCallSocketRoom());
     unawaited(_prepareAndConnect());
+  }
+
+  /// Garantit socket tracking + room ride/delivery pour raccroché / refus pair.
+  Future<void> _ensureCallSocketRoom() async {
+    final api = _api;
+    if (api == null) return;
+    final token = await api.authToken();
+    final rideSocket = ref.read(rideSocketProvider);
+    final chatSocket = ref.read(rideChatSocketProvider);
+    final isDelivery = widget.kind == VoiceCallKind.delivery;
+
+    if (!rideSocket.isConnected) {
+      if (isDelivery) {
+        rideSocket.connectDelivery(deliveryId: widget.threadId, token: token);
+      } else {
+        rideSocket.connect(rideId: widget.threadId, token: token);
+      }
+      await rideSocket.ensureConnected(timeout: const Duration(seconds: 10));
+    }
+    rideSocket.subscribeCallThread(threadId: widget.threadId, isDelivery: isDelivery);
+
+    if (!isDelivery) {
+      chatSocket.connect(rideId: widget.threadId, token: token);
+      await chatSocket.ensureConnected(timeout: const Duration(seconds: 8));
+    } else if (chatSocket.isConnected) {
+      chatSocket.subscribeDelivery(widget.threadId);
+    }
   }
 
   @override

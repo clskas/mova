@@ -430,6 +430,17 @@ class RideSocket {
     });
   }
 
+  /// Rejoint la room course/livraison pour les événements `*:call` sans écraser
+  /// l’inbox chauffeur (`driver:subscribe`) déjà active.
+  void subscribeCallThread({required String threadId, required bool isDelivery}) {
+    if (threadId.isEmpty || _socket?.connected != true) return;
+    if (isDelivery) {
+      _socket?.emit('delivery:subscribe', {'deliveryId': threadId});
+    } else {
+      _socket?.emit('ride:subscribe', {'rideId': threadId});
+    }
+  }
+
   void emitChat(Map<String, dynamic> payload) {
     if (_socket?.connected != true) return;
     final rideId = payload['rideId']?.toString();

@@ -150,6 +150,14 @@ class RideChatSocket {
             _emitCall(m);
           }
         })
+        ..on('delivery:call', (data) {
+          if (data is Map) {
+            final m = Map<String, dynamic>.from(data);
+            m['kind'] = m['kind'] ?? 'delivery';
+            m['deliveryId'] = m['deliveryId'] ?? m['rideId'];
+            _emitCall(m);
+          }
+        })
         ..onConnectError((_) {
           _scheduleReconnect();
         })
@@ -189,5 +197,10 @@ class RideChatSocket {
     if (isConnected) {
       _socket?.emit('ride:subscribe', {'rideId': rideId});
     }
+  }
+
+  void subscribeDelivery(String deliveryId) {
+    if (deliveryId.isEmpty || !isConnected) return;
+    _socket?.emit('delivery:subscribe', {'deliveryId': deliveryId});
   }
 }

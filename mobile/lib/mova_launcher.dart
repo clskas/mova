@@ -18,6 +18,7 @@ import 'features/chat/chat_alert_service.dart';
 import 'features/chat/chat_poll_service.dart';
 import 'features/chat/incoming_call_overlay.dart';
 import 'features/driver/driver_job_alert_service.dart';
+import 'features/driver/driver_push_service.dart';
 import 'features/passenger/passenger_alert_service.dart';
 import 'features/sos/notification_tap_router.dart';
 import 'features/splash/mova_splash_screen.dart';
@@ -49,6 +50,7 @@ Future<void> runMovaDriverApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppFlavor.current = MovaAppFlavor.driver;
   await SyncQueue.init();
+  await DriverPushService.registerBackgroundHandlerEarly();
   await DriverJobAlertService.init();
   await ChatAlertService.init();
   await CallRingService.init();

@@ -105,8 +105,15 @@ class ChatPollService {
         if (threadId.isNotEmpty &&
             (body.contains('Appel vocal SENGA terminé') ||
                 body.contains('Appel SENGA terminé'))) {
-          CallRingService.notifyPeerEnded(threadId);
-          await CallRingService.forceStop();
+          // Ignore un « terminé » périmé du 1er appel si plus rien ne sonne
+          // (évite de couper un 2ᵉ appel sur le même fil dans le même batch).
+          final activeId = CallRingService.incoming.value?.deliveryId;
+          final inCall = CallRingService.inCallDeliveryId == threadId;
+          final ringingThis = CallRingService.isRinging && activeId == threadId;
+          if (ringingThis || inCall || activeId == threadId) {
+            CallRingService.notifyPeerEnded(threadId);
+            await CallRingService.forceStop();
+          }
           continue;
         }
         if (body.contains('Appel vocal SENGA') && threadId.isNotEmpty) {

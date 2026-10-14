@@ -26,11 +26,12 @@ String? _sosPayloadFromFcm(Map<String, dynamic> data, {String? title, String? bo
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  // Si FCM a déjà affiché une notification système (son inclus), éviter le double bip.
-  if (message.notification != null) return;
-  await DriverJobAlertService.init();
-  final title = message.data['title']?.toString() ?? 'SENGA Driver';
-  final body = message.data['body']?.toString() ?? 'Nouvelle alerte';
+  final title = message.notification?.title ??
+      message.data['title']?.toString() ??
+      'SENGA Driver';
+  final body = message.notification?.body ??
+      message.data['body']?.toString() ??
+      'Nouvelle alerte';
   final jobKind = message.data['jobKind']?.toString() ?? message.data['type']?.toString() ?? '';
   final sosPayload = _sosPayloadFromFcm(message.data, title: title, body: body);
   final refId = message.data['referenceId']?.toString() ??
@@ -42,6 +43,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           jobKind.contains('OFFER') ||
           jobKind.contains('JOB') ||
           jobKind.contains('CALL'));
+  // Jobs : toujours une notif locale (fullScreenIntent) — les push job sont
+  // data-only côté Android. Chat/SOS avec tray FCM : éviter le double bip.
+  if (message.notification != null && !isOffer && sosPayload == null) return;
+
+  await DriverJobAlertService.init();
   String? offerKey;
   if (isOffer && refId != null && refId.isNotEmpty) {
     final kind = jobKind.contains('DELIVERY') ? 'delivery' : 'ride';
@@ -71,12 +77,30 @@ class DriverPushService {
   DriverPushService._();
 
   static bool _initialized = false;
+  static bool _backgroundHandlerRegistered = false;
+
+  /// À appeler avant `runApp` (exigence Firebase) pour les jobs app fermée.
+  static Future<void> registerBackgroundHandlerEarly() async {
+    if (_backgroundHandlerRegistered) return;
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      _backgroundHandlerRegistered = true;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('FCM background handler early register: $e');
+      }
+    }
+  }
 
   static Future<void> init(ApiClient api) async {
     if (_initialized) return;
     try {
       await Firebase.initializeApp();
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      if (!_backgroundHandlerRegistered) {
+        FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+        _backgroundHandlerRegistered = true;
+      }
       await DriverJobAlertService.init();
 
       final messaging = FirebaseMessaging.instance;

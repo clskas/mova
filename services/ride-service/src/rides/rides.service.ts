@@ -768,8 +768,15 @@ export class RidesService {
       rideId,
       'Course annulée — encaissement espèces annulé.',
     ).catch(() => undefined);
-    if (notifiedDriverIds.length > 0) {
-      this.trackingGateway.broadcastDriverJob(notifiedDriverIds, 'ride:cancelled', { rideId });
+    // Offres non matchées : notifier les chauffeurs alertés.
+    // Course acceptée : aussi `ride:cancelled` vers le chauffeur assigné (banner home).
+    const cancelNotifyIds = [
+      ...notifiedDriverIds,
+      ...(ride.driverId ? [ride.driverId] : []),
+    ];
+    const uniqueCancelNotify = [...new Set(cancelNotifyIds.filter(Boolean))];
+    if (uniqueCancelNotify.length > 0) {
+      this.trackingGateway.broadcastDriverJob(uniqueCancelNotify, 'ride:cancelled', { rideId });
     }
 
     return {

@@ -166,57 +166,68 @@ export class FcmPushService {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              message: {
-                token,
-                notification: {
-                  title: message.title,
-                  body: message.body,
-                },
-                data: {
-                  ...data,
-                  title: message.title,
-                  body: message.body,
-                  click_action: 'FLUTTER_NOTIFICATION_CLICK',
-                  android_channel_id: opts.channelId,
-                },
-                android: {
-                  priority: 'high',
-                  // Réveille l’app en arrière-plan / fermée (data + notif haute priorité).
-                  direct_boot_ok: true,
-                  notification: {
-                    channel_id: opts.channelId,
-                    sound: opts.soundAndroid,
-                    ...(opts.isChat
-                      ? {}
-                      : {
-                          default_vibrate_timings: true,
-                          notification_priority: 'PRIORITY_MAX',
-                          visibility: 'PUBLIC',
-                          tag: data.referenceId ? `job:${data.referenceId}` : 'senga_job',
-                          click_action: 'FLUTTER_NOTIFICATION_CLICK',
-                          // Aide les OEM à amener l’activité au premier plan au tap.
-                          default_light_settings: true,
-                        }),
-                  },
-                },
-                apns: {
-                  headers: {
-                    'apns-priority': '10',
-                    ...(opts.isChat ? {} : { 'apns-push-type': 'alert' }),
-                  },
-                  payload: {
-                    aps: {
-                      alert: {
-                        title: message.title,
-                        body: message.body,
+              message: opts.isChat
+                ? {
+                    token,
+                    notification: {
+                      title: message.title,
+                      body: message.body,
+                    },
+                    data: {
+                      ...data,
+                      title: message.title,
+                      body: message.body,
+                      click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                      android_channel_id: opts.channelId,
+                    },
+                    android: {
+                      priority: 'high',
+                      notification: {
+                        channel_id: opts.channelId,
+                        sound: opts.soundAndroid,
                       },
-                      sound: opts.soundIos,
-                      'content-available': 1,
-                      ...(opts.isChat ? {} : { 'interruption-level': 'time-sensitive' }),
+                    },
+                    apns: {
+                      headers: { 'apns-priority': '10' },
+                      payload: {
+                        aps: {
+                          alert: { title: message.title, body: message.body },
+                          sound: opts.soundIos,
+                          'content-available': 1,
+                        },
+                      },
+                    },
+                  }
+                : {
+                    // Jobs : data-only Android → background handler affiche la notif
+                    // locale fullScreenIntent (sinon le tray FCM court-circuite le handler).
+                    token,
+                    data: {
+                      ...data,
+                      title: message.title,
+                      body: message.body,
+                      click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                      android_channel_id: opts.channelId,
+                    },
+                    android: {
+                      priority: 'high',
+                      direct_boot_ok: true,
+                    },
+                    apns: {
+                      headers: {
+                        'apns-priority': '10',
+                        'apns-push-type': 'alert',
+                      },
+                      payload: {
+                        aps: {
+                          alert: { title: message.title, body: message.body },
+                          sound: opts.soundIos,
+                          'content-available': 1,
+                          'interruption-level': 'time-sensitive',
+                        },
+                      },
                     },
                   },
-                },
-              },
             }),
           });
           if (!res.ok) {
@@ -251,57 +262,46 @@ export class FcmPushService {
               Authorization: `key=${serverKey}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              to: token,
-              priority: 'high',
-              content_available: true,
-              notification: {
-                title: message.title,
-                body: message.body,
-                sound: opts.soundIos,
-                android_channel_id: opts.channelId,
-                ...(opts.isChat
-                  ? {}
-                  : {
+            body: JSON.stringify(
+              opts.isChat
+                ? {
+                    to: token,
+                    priority: 'high',
+                    content_available: true,
+                    notification: {
+                      title: message.title,
+                      body: message.body,
+                      sound: opts.soundIos,
+                      android_channel_id: opts.channelId,
+                    },
+                    data: {
+                      ...data,
+                      title: message.title,
+                      body: message.body,
                       click_action: 'FLUTTER_NOTIFICATION_CLICK',
-                      tag: data.referenceId ? `job:${data.referenceId}` : 'senga_job',
-                    }),
-              },
-              android: {
-                priority: 'high',
-                notification: {
-                  channel_id: opts.channelId,
-                  sound: opts.soundAndroid,
-                  ...(opts.isChat
-                    ? {}
-                    : {
-                        default_vibrate_timings: true,
-                        notification_priority: 'PRIORITY_MAX',
-                        visibility: 'PUBLIC',
-                      }),
-                },
-              },
-              apns: {
-                headers: {
-                  'apns-priority': '10',
-                  ...(opts.isChat ? {} : { 'apns-push-type': 'alert' }),
-                },
-                payload: {
-                  aps: {
-                    sound: opts.soundIos,
-                    'content-available': 1,
-                    ...(opts.isChat ? {} : { 'interruption-level': 'time-sensitive' }),
+                      android_channel_id: opts.channelId,
+                    },
+                  }
+                : {
+                    to: token,
+                    priority: 'high',
+                    content_available: true,
+                    // Jobs Android : data-only (handler local + fullScreenIntent).
+                    data: {
+                      ...data,
+                      title: message.title,
+                      body: message.body,
+                      click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                      android_channel_id: opts.channelId,
+                    },
+                    // iOS legacy : garder une alerte APNs.
+                    notification: {
+                      title: message.title,
+                      body: message.body,
+                      sound: opts.soundIos,
+                    },
                   },
-                },
-              },
-              data: {
-                ...data,
-                title: message.title,
-                body: message.body,
-                click_action: 'FLUTTER_NOTIFICATION_CLICK',
-                android_channel_id: opts.channelId,
-              },
-            }),
+            ),
           });
           if (!res.ok) {
             const text = await res.text();

@@ -197,7 +197,7 @@ class CallRingService {
             importance: Importance.max,
             priority: Priority.max,
             category: AndroidNotificationCategory.call,
-            // fullScreenIntent: true — réactiver après déclaration Play Console FSI.
+            fullScreenIntent: true,
             playSound: true,
             enableVibration: true,
             ongoing: true,

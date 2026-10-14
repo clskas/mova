@@ -305,8 +305,7 @@ class DriverJobAlertService {
             ticker: title,
             ongoing: asCall,
             autoCancel: !asCall,
-            // fullScreenIntent désactivé tant que USE_FULL_SCREEN_INTENT n’est pas
-            // déclaré dans Play Console (sinon rejet upload AAB).
+            fullScreenIntent: asCall,
             visibility: NotificationVisibility.public,
           ),
           iOS: DarwinNotificationDetails(

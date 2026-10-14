@@ -7,8 +7,8 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <!-- USE_FULL_SCREEN_INTENT : à réactiver seulement après déclaration Play Console
-         (App content → Full-screen intent), sinon upload AAB rejeté. -->
+    <!-- Réveil UI appels SENGA (déclaration Play Console requise après upload). -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>

@@ -199,9 +199,14 @@ export class FcmPushService {
                     },
                   }
                 : {
-                    // Jobs : data-only Android → background handler affiche la notif
-                    // locale fullScreenIntent (sinon le tray FCM court-circuite le handler).
+                    // Jobs : notification Android + data. App tuée → le tray FCM
+                    // sonne même sans isolate Dart (data-only ne réveillait pas
+                    // assez d’OEM). Handler local ajoute fullScreenIntent si vivant.
                     token,
+                    notification: {
+                      title: message.title,
+                      body: message.body,
+                    },
                     data: {
                       ...data,
                       title: message.title,
@@ -212,6 +217,13 @@ export class FcmPushService {
                     android: {
                       priority: 'high',
                       direct_boot_ok: true,
+                      notification: {
+                        channel_id: opts.channelId,
+                        sound: opts.soundAndroid,
+                        default_vibrate_timings: true,
+                        notification_priority: 'PRIORITY_MAX',
+                        visibility: 'PUBLIC',
+                      },
                     },
                     apns: {
                       headers: {
@@ -286,7 +298,7 @@ export class FcmPushService {
                     to: token,
                     priority: 'high',
                     content_available: true,
-                    // Jobs Android : data-only (handler local + fullScreenIntent).
+                    // Jobs : tray FCM sonne app tuée ; data pour deep-link / FSI.
                     data: {
                       ...data,
                       title: message.title,
@@ -294,11 +306,11 @@ export class FcmPushService {
                       click_action: 'FLUTTER_NOTIFICATION_CLICK',
                       android_channel_id: opts.channelId,
                     },
-                    // iOS legacy : garder une alerte APNs.
                     notification: {
                       title: message.title,
                       body: message.body,
                       sound: opts.soundIos,
+                      android_channel_id: opts.channelId,
                     },
                   },
             ),

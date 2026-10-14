@@ -43,8 +43,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           jobKind.contains('OFFER') ||
           jobKind.contains('JOB') ||
           jobKind.contains('CALL'));
-  // Jobs : toujours une notif locale (fullScreenIntent) — les push job sont
-  // data-only côté Android. Chat/SOS avec tray FCM : éviter le double bip.
+  // Chat/SOS : tray FCM déjà affiché → pas de 2ᵉ bip.
   if (message.notification != null && !isOffer && sosPayload == null) return;
 
   await DriverJobAlertService.init();
@@ -59,6 +58,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           id: refId,
         )
       : null;
+  // Jobs avec payload notification FCM : le système a déjà sonné — locale
+  // silencieuse pour fullScreenIntent + boucle AudioPlayer si l’isolate vit.
+  final fcmAlreadyRang = message.notification != null;
   await DriverJobAlertService.notify(
     title: title,
     body: body,
@@ -67,6 +69,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         (jobKind.isNotEmpty ? jobKind : message.data['type']?.toString()),
     ringUntilStopped: isOffer,
     offerKey: offerKey,
+    suppressTraySound: fcmAlreadyRang && isOffer,
   );
 }
 
@@ -134,12 +137,14 @@ class DriverPushService {
                 id: refId,
               )
             : null;
+        final fcmAlreadyRang = message.notification != null;
         await DriverJobAlertService.notify(
           title: title,
           body: body,
           payload: sosPayload ?? jobPayload ?? jobKind,
           ringUntilStopped: isOffer,
           offerKey: offerKey,
+          suppressTraySound: fcmAlreadyRang && isOffer,
         );
       });
 

@@ -227,10 +227,12 @@ class DriverJobAlertService {
     /// Sonnerie continue (courses / livraisons) jusqu’à [stopRinging].
     bool ringUntilStopped = false,
     String? offerKey,
+    /// true = le tray FCM a déjà sonné ; notif locale silencieuse (FSI seulement).
+    bool suppressTraySound = false,
   }) async {
     await init();
     await DriverAlertPrefs.ensureLoaded();
-    final muted = DriverAlertPrefs.muted;
+    final muted = DriverAlertPrefs.muted || suppressTraySound;
     final style = DriverAlertPrefs.style;
 
     try {
@@ -272,13 +274,13 @@ class DriverJobAlertService {
       );
     }
 
-    if (muted) return;
+    // Boucle in-app même si le tray FCM a déjà bipé (suppressTraySound).
+    if (DriverAlertPrefs.muted) return;
 
     if (ringUntilStopped) {
-      // Boucle in-app : fiable au 1er plan. App tuée → le son canal / APNs suffit
-      // jusqu’à l’ouverture de l’offre (qui relance startRinging).
+      // Boucle in-app : fiable au 1er plan. App tuée → son FCM / canal.
       unawaited(startRinging(offerKey: offerKey));
-    } else if (preferSenga) {
+    } else if (preferSenga && !suppressTraySound) {
       unawaited(playSengaSound());
     }
   }

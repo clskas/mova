@@ -305,8 +305,8 @@ class DriverJobAlertService {
             ticker: title,
             ongoing: asCall,
             autoCancel: !asCall,
-            // Ouvre / ramène SENGA Driver si l’app était fermée ou en arrière-plan.
-            fullScreenIntent: asCall,
+            // fullScreenIntent désactivé tant que USE_FULL_SCREEN_INTENT n’est pas
+            // déclaré dans Play Console (sinon rejet upload AAB).
             visibility: NotificationVisibility.public,
           ),
           iOS: DarwinNotificationDetails(

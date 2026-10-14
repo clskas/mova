@@ -2270,6 +2270,14 @@ class ApiClient {
     };
   }
 
+  Future<Result<Map<String, dynamic>>> markNotificationRead(String id) {
+    return patch('/notifications/$id/read', {});
+  }
+
+  Future<Result<Map<String, dynamic>>> markAllNotificationsRead() {
+    return patch('/notifications/read-all', {});
+  }
+
   /// Publicités actives (passager, chauffeur, etc.) — endpoint public.
   Future<Result<List<Map<String, dynamic>>>> getPublicites({String? cible}) async {
     final q = cible != null && cible.isNotEmpty ? '?cible=${Uri.encodeComponent(cible)}' : '';

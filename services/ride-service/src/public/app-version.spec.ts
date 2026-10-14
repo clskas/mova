@@ -9,8 +9,8 @@ describe('buildMobileAppVersionResponse', () => {
     expect(payload.passenger.currentVersion).toBe('1.0.31');
     expect(payload.driver.currentVersion).toBe('1.0.31');
     expect(payload.passenger.minVersion).toBe('1.0.0');
-    expect(payload.passenger.currentVersionCode).toBe(150);
-    expect(payload.driver.currentVersionCode).toBe(150);
+    expect(payload.passenger.currentVersionCode).toBe(151);
+    expect(payload.driver.currentVersionCode).toBe(151);
     expect(payload.passenger.minVersionCode).toBe(0);
     expect(payload.passenger.storeUrl).toContain('cd.mova.mova.passenger');
     expect(payload.driver.storeUrl).toContain('cd.mova.mova.driver');
@@ -24,8 +24,8 @@ describe('buildMobileAppVersionResponse', () => {
         MOBILE_PASSENGER_VERSION: '1.0.31',
         MOBILE_DRIVER_VERSION: '1.0.31',
         MOBILE_MIN_VERSION: '1.0.1',
-        MOBILE_PASSENGER_VERSION_CODE: '150',
-        MOBILE_DRIVER_VERSION_CODE: '150',
+        MOBILE_PASSENGER_VERSION_CODE: '151',
+        MOBILE_DRIVER_VERSION_CODE: '151',
         MOBILE_MIN_VERSION_CODE: '8',
         PLAY_STORE_PASSENGER_URL: 'https://play.example/passenger',
         PLAY_STORE_DRIVER_URL: 'https://play.example/driver',
@@ -34,8 +34,8 @@ describe('buildMobileAppVersionResponse', () => {
     );
     expect(payload.passenger.currentVersion).toBe('1.0.31');
     expect(payload.driver.currentVersion).toBe('1.0.31');
-    expect(payload.passenger.currentVersionCode).toBe(150);
-    expect(payload.driver.currentVersionCode).toBe(150);
+    expect(payload.passenger.currentVersionCode).toBe(151);
+    expect(payload.driver.currentVersionCode).toBe(151);
   });
 
   it('raises stale Render env below the shipped floor so banners can show', () => {
@@ -50,12 +50,12 @@ describe('buildMobileAppVersionResponse', () => {
     );
     expect(payload.passenger.currentVersion).toBe('1.0.31');
     expect(payload.driver.currentVersion).toBe('1.0.31');
-    expect(payload.passenger.currentVersionCode).toBe(150);
-    expect(payload.driver.currentVersionCode).toBe(150);
+    expect(payload.passenger.currentVersionCode).toBe(151);
+    expect(payload.driver.currentVersionCode).toBe(151);
   });
 
-  it('raises a stale env below Play floor 150', () => {
-    for (const code of ['102', '122', '130', '143', '145', '146', '147', '148', '149']) {
+  it('raises a stale env below Play floor 151', () => {
+    for (const code of ['102', '122', '130', '143', '145', '146', '147', '148', '149', '150']) {
       const payload = buildMobileAppVersionResponse(
         {
           MOBILE_PASSENGER_VERSION_CODE: code,
@@ -63,8 +63,8 @@ describe('buildMobileAppVersionResponse', () => {
         },
         now,
       );
-      expect(payload.passenger.currentVersionCode).toBe(150);
-      expect(payload.driver.currentVersionCode).toBe(150);
+      expect(payload.passenger.currentVersionCode).toBe(151);
+      expect(payload.driver.currentVersionCode).toBe(151);
     }
   });
 });

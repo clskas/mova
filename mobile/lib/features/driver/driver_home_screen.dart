@@ -38,6 +38,7 @@ import 'driver_push_service.dart';
 import 'driver_rental_mission_screen.dart';
 import 'driver_scheduled_mission_screen.dart';
 import '../delivery/delivery_payment_state.dart';
+import '../notifications/notifications_inbox_screen.dart';
 import '../sos/notification_tap_router.dart';
 
 enum _DriverMenuAction {
@@ -45,6 +46,7 @@ enum _DriverMenuAction {
   history,
   carpool,
   dossier,
+  inbox,
   notifications,
   profile,
   help,
@@ -1403,6 +1405,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       title: 'SENGA Driver',
       scrollable: false,
       actions: [
+        const NotificationsBellButton(),
         IconButton(
           icon: const Icon(Icons.sos, color: MovaColors.red),
           tooltip: 'Alerte SOS',
@@ -1445,6 +1448,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   MaterialPageRoute(builder: (_) => const DriverOnboardingScreen(canSkipToHome: true)),
                 );
                 if (mounted) await _loadProfile(clearCache: true);
+              case _DriverMenuAction.inbox:
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationsInboxScreen()),
+                );
               case _DriverMenuAction.notifications:
                 await Navigator.push(
                   context,
@@ -1522,10 +1530,19 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               ),
             ),
             PopupMenuItem(
+              value: _DriverMenuAction.inbox,
+              child: ListTile(
+                leading: Icon(Icons.inbox_outlined),
+                title: Text('Boîte de réception'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            PopupMenuItem(
               value: _DriverMenuAction.notifications,
               child: ListTile(
                 leading: Icon(Icons.notifications_outlined),
-                title: Text('Notifications'),
+                title: Text('Sons notifications'),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),

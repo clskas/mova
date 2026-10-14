@@ -38,6 +38,14 @@ export class NotificationsController {
     return this.notifications.list(req.user.id);
   }
 
+  @Patch('read-all')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Tout marquer comme lu' })
+  readAll(@Request() req: { user: { id: string } }) {
+    return this.notifications.markAllRead(req.user.id);
+  }
+
   @Patch(':id/read')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

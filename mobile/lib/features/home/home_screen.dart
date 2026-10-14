@@ -30,11 +30,12 @@ import '../errands/errand_tracking_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../help/help_screen.dart';
+import '../notifications/notifications_inbox_screen.dart';
 import '../profile/profile_screen.dart';
 import '../history/history_screen.dart';
 import 'service_card.dart';
 
-enum _HomeMenuAction { wallet, subscriptions, history, help, logout }
+enum _HomeMenuAction { notifications, wallet, subscriptions, history, help, logout }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -318,6 +319,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     return MovaScreen(
       title: 'Senga',
       actions: [
+        const NotificationsBellButton(),
         IconButton(
           icon: const Icon(Icons.person_outline),
           tooltip: 'Mon profil',
@@ -327,6 +329,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           tooltip: 'Plus',
           onSelected: (action) async {
             switch (action) {
+              case _HomeMenuAction.notifications:
+                _open(context, const NotificationsInboxScreen());
               case _HomeMenuAction.wallet:
                 _open(context, const WalletScreen());
               case _HomeMenuAction.subscriptions:
@@ -353,6 +357,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             }
           },
           itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: _HomeMenuAction.notifications,
+              child: ListTile(
+                leading: Icon(Icons.notifications_outlined),
+                title: Text('Notifications'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
             const PopupMenuItem(
               value: _HomeMenuAction.wallet,
               child: ListTile(

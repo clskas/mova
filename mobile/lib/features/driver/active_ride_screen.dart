@@ -21,6 +21,7 @@ import '../chat/ride_chat_screen.dart';
 import '../geo/suggest_place_screen.dart';
 import '../../core/safety/sos_helper.dart';
 import '../../core/services/cancel_eligibility.dart';
+import 'driver_job_alert_service.dart';
 import 'widgets/driver_cash_received_dialog.dart';
 
 class ActiveRideScreen extends ConsumerStatefulWidget {
@@ -102,6 +103,27 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     socket.connect(
       rideId: _rideId,
       token: token,
+      onStatus: (payload) {
+        final id = payload['rideId']?.toString();
+        if (id != null && id.isNotEmpty && id != _rideId) return;
+        final status = payload['status']?.toString().toUpperCase() ?? '';
+        if (!mounted) return;
+        if (status == 'CANCELLED') {
+          unawaited(DriverJobAlertService.stopRinging());
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            const SnackBar(
+              content: Text('Course annulée par le passager'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+          Navigator.of(context).popUntil((r) => r.isFirst);
+          return;
+        }
+        setState(() {
+          _ride = {..._ride, ...Map<String, dynamic>.from(payload), 'status': status.isNotEmpty ? status : _status};
+        });
+        if (status == 'COMPLETED') _syncPaymentPolling();
+      },
     );
     socket.onChat = (payload) {
       if (payload['rideId']?.toString() != _rideId) return;

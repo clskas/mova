@@ -47,10 +47,18 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     final kind = jobKind.contains('DELIVERY') ? 'delivery' : 'ride';
     offerKey = DriverJobAlertService.offerKey(kind, refId);
   }
+  final jobPayload = (isOffer && refId != null && refId.isNotEmpty)
+      ? NotificationTapRouter.encodeJobPayload(
+          kind: jobKind.contains('DELIVERY') ? 'delivery' : 'ride',
+          id: refId,
+        )
+      : null;
   await DriverJobAlertService.notify(
     title: title,
     body: body,
-    payload: sosPayload ?? (jobKind.isNotEmpty ? jobKind : message.data['type']?.toString()),
+    payload: sosPayload ??
+        jobPayload ??
+        (jobKind.isNotEmpty ? jobKind : message.data['type']?.toString()),
     ringUntilStopped: isOffer,
     offerKey: offerKey,
   );
@@ -95,10 +103,16 @@ class DriverPushService {
           final kind = jobKind.contains('DELIVERY') ? 'delivery' : 'ride';
           offerKey = DriverJobAlertService.offerKey(kind, refId);
         }
+        final jobPayload = (isOffer && refId != null && refId.isNotEmpty)
+            ? NotificationTapRouter.encodeJobPayload(
+                kind: jobKind.contains('DELIVERY') ? 'delivery' : 'ride',
+                id: refId,
+              )
+            : null;
         await DriverJobAlertService.notify(
           title: title,
           body: body,
-          payload: sosPayload ?? jobKind,
+          payload: sosPayload ?? jobPayload ?? jobKind,
           ringUntilStopped: isOffer,
           offerKey: offerKey,
         );

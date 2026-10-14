@@ -8,15 +8,18 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../core/navigation/mova_navigator.dart';
 import 'sos_alert_screen.dart';
 
-/// Routage des taps notifications (SOS, etc.) vers un écran utile.
+/// Routage des taps notifications (SOS, offres course/livraison, appels).
 class NotificationTapRouter {
   NotificationTapRouter._();
 
-  static SosOpenRequest? _pending;
+  static SosOpenRequest? _pendingSos;
+  static JobOpenRequest? _pendingJob;
   static bool _launchDetailsConsumed = false;
   static Timer? _retryTimer;
 
-  /// Encode un payload SOS pour [FlutterLocalNotificationsPlugin.show].
+  /// Enregistré par [DriverHomeScreen] pour ouvrir une offre hors cold-start.
+  static Future<void> Function(JobOpenRequest request)? onJobOfferOpen;
+
   static String encodeSosPayload({
     String? incidentId,
     String? title,
@@ -42,14 +45,16 @@ class NotificationTapRouter {
     });
   }
 
+  static String encodeJobPayload({required String kind, required String id}) {
+    return jsonEncode({'t': 'job', 'kind': kind, 'id': id});
+  }
+
   static void onLocalNotificationResponse(NotificationResponse response) {
     handlePayload(response.payload);
   }
 
   @pragma('vm:entry-point')
   static void onBackgroundNotificationResponse(NotificationResponse response) {
-    // Isolate background : la navigation se fera via getNotificationAppLaunchDetails
-    // au prochain démarrage / reprise. On ne peut pas pousser de route ici.
     if (kDebugMode) {
       debugPrint('NotificationTapRouter background payload=${response.payload}');
     }
@@ -57,10 +62,21 @@ class NotificationTapRouter {
 
   static void handlePayload(String? payload) {
     if (payload == null || payload.isEmpty) return;
-    final req = parsePayload(payload);
-    if (req != null) {
-      openSos(req);
+    final trimmed = payload.trim();
+
+    if (trimmed.startsWith('call:')) {
+      // L’overlay d’appel se gère via socket / poll ; le tap réveille juste l’app.
+      return;
     }
+
+    final job = parseJobPayload(trimmed);
+    if (job != null) {
+      openJob(job);
+      return;
+    }
+
+    final sos = parseSosPayload(trimmed);
+    if (sos != null) openSos(sos);
   }
 
   static void openFromFcmData(
@@ -69,23 +85,65 @@ class NotificationTapRouter {
     String? body,
   }) {
     final type = data['type']?.toString() ?? '';
-    if (type != 'INCIDENT_CREATED' && type != 'SOS') return;
-    openSos(
-      SosOpenRequest(
-        incidentId: data['incidentId']?.toString(),
-        title: title ?? data['title']?.toString() ?? 'Alerte SOS',
-        body: body ?? data['body']?.toString(),
-        lat: _asDouble(data['lat']),
-        lng: _asDouble(data['lng']),
-        rideId: data['rideId']?.toString(),
-        referenceType: data['referenceType']?.toString(),
-        referenceId: data['referenceId']?.toString(),
-        forOps: data['forOps']?.toString() == '1' || data['forOps'] == true,
-      ),
-    );
+    final jobKind = data['jobKind']?.toString() ?? type;
+    final refId = data['referenceId']?.toString() ??
+        data['rideId']?.toString() ??
+        data['deliveryId']?.toString() ??
+        '';
+
+    if (type == 'INCIDENT_CREATED' || type == 'SOS') {
+      openSos(
+        SosOpenRequest(
+          incidentId: data['incidentId']?.toString(),
+          title: title ?? data['title']?.toString() ?? 'Alerte SOS',
+          body: body ?? data['body']?.toString(),
+          lat: _asDouble(data['lat']),
+          lng: _asDouble(data['lng']),
+          rideId: data['rideId']?.toString(),
+          referenceType: data['referenceType']?.toString(),
+          referenceId: data['referenceId']?.toString(),
+          forOps: data['forOps']?.toString() == '1' || data['forOps'] == true,
+        ),
+      );
+      return;
+    }
+
+    final isOffer = jobKind.contains('RIDE') ||
+        jobKind.contains('DELIVERY') ||
+        jobKind.contains('OFFER') ||
+        jobKind.contains('JOB');
+    if (isOffer && refId.isNotEmpty) {
+      final kind = jobKind.contains('DELIVERY') ? 'delivery' : 'ride';
+      openJob(JobOpenRequest(kind: kind, id: refId));
+    }
   }
 
-  static SosOpenRequest? parsePayload(String payload) {
+  static JobOpenRequest? parseJobPayload(String payload) {
+    if (payload.startsWith('ride:') || payload.startsWith('delivery:')) {
+      final i = payload.indexOf(':');
+      return JobOpenRequest(kind: payload.substring(0, i), id: payload.substring(i + 1));
+    }
+    if (!payload.startsWith('{')) {
+      // Anciens payloads texte type "RIDE_OFFER"
+      if (payload.contains('RIDE') || payload.contains('DELIVERY') || payload.contains('OFFER')) {
+        return null;
+      }
+      return null;
+    }
+    try {
+      final map = jsonDecode(payload);
+      if (map is! Map) return null;
+      if (map['t']?.toString() != 'job') return null;
+      final kind = map['kind']?.toString() ?? 'ride';
+      final id = map['id']?.toString() ?? '';
+      if (id.isEmpty) return null;
+      return JobOpenRequest(kind: kind, id: id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static SosOpenRequest? parseSosPayload(String payload) {
     final trimmed = payload.trim();
     if (trimmed == 'SOS' || trimmed.toLowerCase() == 'sos') {
       return const SosOpenRequest(title: 'Alerte SOS');
@@ -99,6 +157,7 @@ class NotificationTapRouter {
       final map = jsonDecode(jsonStr);
       if (map is! Map) return null;
       final t = map['t']?.toString();
+      if (t == 'job') return null;
       if (t != null && t != 'sos' && t.toUpperCase() != 'SOS') return null;
       return SosOpenRequest(
         incidentId: map['id']?.toString() ?? map['incidentId']?.toString(),
@@ -112,7 +171,7 @@ class NotificationTapRouter {
         forOps: map['forOps'] == true || map['forOps']?.toString() == '1',
       );
     } catch (e) {
-      if (kDebugMode) debugPrint('NotificationTapRouter parse: $e');
+      if (kDebugMode) debugPrint('NotificationTapRouter parse SOS: $e');
       return const SosOpenRequest(title: 'Alerte SOS');
     }
   }
@@ -120,11 +179,11 @@ class NotificationTapRouter {
   static void openSos(SosOpenRequest request) {
     final nav = movaNavigatorKey.currentState;
     if (nav == null) {
-      _pending = request;
+      _pendingSos = request;
       _armRetry();
       return;
     }
-    _pending = null;
+    _pendingSos = null;
     _retryTimer?.cancel();
     nav.push(
       MaterialPageRoute<void>(
@@ -143,8 +202,17 @@ class NotificationTapRouter {
     );
   }
 
-  /// À appeler après démarrage (splash / home) pour vider une ouverture différée
-  /// et consommer le tap qui a lancé l’app.
+  static void openJob(JobOpenRequest request) {
+    final opener = onJobOfferOpen;
+    if (opener == null) {
+      _pendingJob = request;
+      _armRetry();
+      return;
+    }
+    _pendingJob = null;
+    unawaited(opener(request));
+  }
+
   static Future<void> flushPendingAndLaunchDetails() async {
     if (!_launchDetailsConsumed) {
       _launchDetailsConsumed = true;
@@ -158,8 +226,10 @@ class NotificationTapRouter {
         if (kDebugMode) debugPrint('NotificationTapRouter launchDetails: $e');
       }
     }
-    final pending = _pending;
-    if (pending != null) openSos(pending);
+    final pendingSos = _pendingSos;
+    if (pendingSos != null) openSos(pendingSos);
+    final pendingJob = _pendingJob;
+    if (pendingJob != null) openJob(pendingJob);
   }
 
   static void _armRetry() {
@@ -167,13 +237,17 @@ class NotificationTapRouter {
     var attempts = 0;
     _retryTimer = Timer.periodic(const Duration(milliseconds: 400), (t) {
       attempts++;
-      if (_pending == null || movaNavigatorKey.currentState != null) {
+      final canNav = movaNavigatorKey.currentState != null;
+      final canJob = onJobOfferOpen != null;
+      if ((_pendingSos == null || canNav) && (_pendingJob == null || canJob)) {
         t.cancel();
-        final pending = _pending;
-        if (pending != null) openSos(pending);
+        final pendingSos = _pendingSos;
+        if (pendingSos != null) openSos(pendingSos);
+        final pendingJob = _pendingJob;
+        if (pendingJob != null) openJob(pendingJob);
         return;
       }
-      if (attempts >= 40) t.cancel();
+      if (attempts >= 50) t.cancel();
     });
   }
 
@@ -206,4 +280,11 @@ class SosOpenRequest {
   final String? referenceType;
   final String? referenceId;
   final bool forOps;
+}
+
+class JobOpenRequest {
+  const JobOpenRequest({required this.kind, required this.id});
+
+  final String kind;
+  final String id;
 }

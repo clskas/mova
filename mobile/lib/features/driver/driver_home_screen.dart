@@ -38,6 +38,7 @@ import 'driver_push_service.dart';
 import 'driver_rental_mission_screen.dart';
 import 'driver_scheduled_mission_screen.dart';
 import '../delivery/delivery_payment_state.dart';
+import '../sos/notification_tap_router.dart';
 
 enum _DriverMenuAction {
   earnings,
@@ -103,14 +104,19 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    NotificationTapRouter.onJobOfferOpen = _openJobFromNotification;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) GpsEnablePrompt.promptIfNeeded(context);
+      unawaited(NotificationTapRouter.flushPendingAndLaunchDetails());
     });
     _bootstrap();
   }
 
   @override
   void dispose() {
+    if (NotificationTapRouter.onJobOfferOpen == _openJobFromNotification) {
+      NotificationTapRouter.onJobOfferOpen = null;
+    }
     WidgetsBinding.instance.removeObserver(this);
     _offerPollTimer?.cancel();
     _cashPollTimer?.cancel();
@@ -119,6 +125,65 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     _assignmentsPollTimer?.cancel();
     unawaited(DriverJobAlertService.stopRinging());
     super.dispose();
+  }
+
+  /// Tap notif FCM / locale (app fermée ou en fond) → écran d'offre.
+  Future<void> _openJobFromNotification(JobOpenRequest request) async {
+    if (!mounted || request.id.isEmpty) return;
+    if (_showingOffer && _openOfferId == request.id) return;
+
+    // Attendre la fin du bootstrap si besoin.
+    for (var i = 0; i < 25 && _bootstrapping && mounted; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+    if (!mounted) return;
+
+    Map<String, dynamic>? findOffer(List<Map<String, dynamic>> list) {
+      for (final o in list) {
+        if (o['id']?.toString() == request.id) return o;
+      }
+      return null;
+    }
+
+    if (request.kind == 'delivery') {
+      var offer = findOffer(_deliveryOffers);
+      if (offer == null) {
+        await _pollOffers();
+        if (!mounted) return;
+        offer = findOffer(_deliveryOffers);
+      }
+      if (offer != null) {
+        await _openDeliveryOfferPopup(offer);
+        return;
+      }
+    } else {
+      var offer = findOffer(_rideOffers);
+      if (offer == null) {
+        await _pollOffers();
+        if (!mounted) return;
+        offer = findOffer(_rideOffers);
+      }
+      if (offer != null) {
+        await _openRideOffer(offer);
+        return;
+      }
+      // Fallback : détail course (peut déjà être assignée).
+      final ride = await ref.read(apiClientProvider).getRide(request.id);
+      if (!mounted) return;
+      if (ride case Success(:final data)) {
+        final status = data['status']?.toString().toUpperCase() ?? '';
+        if (status == 'CANCELLED' || status == 'COMPLETED') return;
+        if (status == 'SEARCHING' || status == 'REQUESTED' || status == 'PENDING') {
+          await _openRideOffer(data);
+          return;
+        }
+        setState(() => _activeRide = data);
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(builder: (_) => ActiveRideScreen(ride: data)),
+        );
+      }
+    }
   }
 
   @override
@@ -545,13 +610,24 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         // Stop immédiat — ne pas attendre le pop de l'écran d'offre.
         unawaited(DriverJobAlertService.stopRinging(offerKey: offerKey));
         _dismissedOffers.add('ride:$id');
+        final wasActive = _activeRide?['id']?.toString() == id;
         setState(() {
           _rideOffers = _rideOffers.where((o) => o['id']?.toString() != id).toList();
+          if (wasActive) _activeRide = null;
         });
         final onThisOffer =
             _showingOffer && _openOfferId == id && _openOfferKind == 'ride';
         if (onThisOffer) {
           Navigator.of(context).pop('cancelled');
+        } else if (wasActive) {
+          // Ferme « Course en cours » (ActiveRideScreen) si encore empilé.
+          Navigator.of(context).popUntil((r) => r.isFirst);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Course annulée par le passager'),
+              duration: Duration(seconds: 3),
+            ),
+          );
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -1037,6 +1113,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         await DriverJobAlertService.notify(
           title: title,
           body: body,
+          payload: id.isEmpty
+              ? null
+              : NotificationTapRouter.encodeJobPayload(
+                  kind: isRide ? 'ride' : 'delivery',
+                  id: id,
+                ),
           ringUntilStopped: true,
           offerKey: offerKey,
         );

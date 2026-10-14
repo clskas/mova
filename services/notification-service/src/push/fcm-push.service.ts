@@ -181,6 +181,8 @@ export class FcmPushService {
                 },
                 android: {
                   priority: 'high',
+                  // Réveille l’app en arrière-plan / fermée (data + notif haute priorité).
+                  direct_boot_ok: true,
                   notification: {
                     channel_id: opts.channelId,
                     sound: opts.soundAndroid,
@@ -192,6 +194,8 @@ export class FcmPushService {
                           visibility: 'PUBLIC',
                           tag: data.referenceId ? `job:${data.referenceId}` : 'senga_job',
                           click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                          // Aide les OEM à amener l’activité au premier plan au tap.
+                          default_light_settings: true,
                         }),
                   },
                 },

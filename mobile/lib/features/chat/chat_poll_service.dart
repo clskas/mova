@@ -123,15 +123,16 @@ class ChatPollService {
                   peerFromTitle.toLowerCase() != 'message senga')
               ? peerFromTitle
               : (callKind == 'ride' ? 'Course' : 'Livraison');
-          // fromRealtime:false — respecte la suppression après raccroché/refus
-          // (évite de relancer la sonnerie via un vieux message chat).
+          // fromRealtime:true — un NOUVEAU message chat (id non vu) = nouvel appel.
+          // La suppression ne doit bloquer que les relances du même message après refus.
+          CallRingService.allowNewIncoming(threadId);
           await CallRingService.startIncoming(
             deliveryId: threadId,
             starterId: starterId,
             myUserId: myId,
             peerLabel: peerLabel,
             kind: callKind,
-            fromRealtime: false,
+            fromRealtime: true,
           );
         }
 

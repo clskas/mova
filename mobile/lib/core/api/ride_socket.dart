@@ -59,6 +59,8 @@ class RideSocket {
   }
 
   /// Retire les callbacks sans couper la connexion (écran fermé).
+  /// Conserve les handlers inbox chauffeur (`onRideNew` / cancel / offerTaken)
+  /// pour que l’accueil continue de recevoir annulations après sortie d’une course.
   void clearHandlers({bool chatOnly = false}) {
     if (chatOnly) {
       _onChat = null;
@@ -70,9 +72,6 @@ class RideSocket {
     _onCashPending = null;
     _onPaymentCompleted = null;
     _onDeliveryCall = null;
-    _onRideNew = null;
-    _onRideCancelled = null;
-    _onOfferTaken = null;
     _onConnected = null;
     _onDisconnected = null;
   }

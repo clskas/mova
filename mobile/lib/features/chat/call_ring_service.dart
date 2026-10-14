@@ -61,8 +61,8 @@ class CallRingService {
     peerEndedThreadId.value = threadId;
   }
 
-  /// Hook global socket `ride:call` / `delivery:call` — coupe la sonnerie dès `end`
-  /// même si l’écran tracking n’écoute plus (appelant raccroche / destinataire refuse).
+  /// Hook global socket `ride:call` / `delivery:call` — ouvre l’overlay sur `start`
+  /// (même après un refus / raccroché) et coupe la sonnerie dès `end`.
   static void handleRealtimeCallEvent(Map<String, dynamic> payload) {
     final action = payload['action']?.toString() ?? 'start';
     final id = payload['rideId']?.toString() ??
@@ -71,6 +71,19 @@ class CallRingService {
     if (id.isEmpty) return;
     if (action == 'start') {
       allowNewIncoming(id);
+      final starterId = payload['starterId']?.toString() ?? '';
+      final isRide = payload['rideId'] != null && payload['rideId'].toString().isNotEmpty;
+      final starterRole = payload['starterRole']?.toString() ?? '';
+      final peerLabel = starterRole == 'driver' || starterRole == 'courier'
+          ? (isRide ? 'Chauffeur' : 'Livreur')
+          : (isRide ? 'Passager' : 'Contact');
+      unawaited(startIncoming(
+        deliveryId: id,
+        starterId: starterId,
+        peerLabel: peerLabel,
+        kind: isRide ? 'ride' : 'delivery',
+        fromRealtime: true,
+      ));
       return;
     }
     notifyPeerEnded(id);

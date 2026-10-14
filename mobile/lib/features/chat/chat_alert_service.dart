@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../sos/notification_tap_router.dart';
+
 /// Notifications sonores + vibration + badge non-lus pour le chat.
 class ChatAlertService {
   ChatAlertService._();
@@ -51,6 +53,9 @@ class ChatAlertService {
     );
     await _plugin.initialize(
       settings: const InitializationSettings(android: androidInit, iOS: darwinInit),
+      onDidReceiveNotificationResponse: NotificationTapRouter.onLocalNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse:
+          NotificationTapRouter.onBackgroundNotificationResponse,
     );
 
     final androidPlugin =

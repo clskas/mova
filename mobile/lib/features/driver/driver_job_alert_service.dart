@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../core/config/market_config.dart';
 import '../../core/billing/driver_earnings_display.dart';
 import '../../core/geo/geo_utils.dart';
+import '../sos/notification_tap_router.dart';
 import 'driver_alert_prefs.dart';
 
 /// Alertes chauffeur : vibration + **son SENGA dédié** (ou son système / mute).
@@ -47,6 +48,9 @@ class DriverJobAlertService {
     const darwinInit = DarwinInitializationSettings();
     await _plugin.initialize(
       settings: const InitializationSettings(android: androidInit, iOS: darwinInit),
+      onDidReceiveNotificationResponse: NotificationTapRouter.onLocalNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse:
+          NotificationTapRouter.onBackgroundNotificationResponse,
     );
 
     final androidPlugin =

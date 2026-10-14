@@ -5,6 +5,7 @@ import 'core/api/api_client.dart';
 import 'core/api/ride_chat_socket.dart';
 import 'core/api/ride_socket.dart';
 import 'core/config/app_version.dart';
+import 'core/navigation/mova_navigator.dart';
 import 'core/offline/mova_app_lifecycle.dart';
 import 'core/offline/sync_queue.dart';
 import 'core/theme/mova_theme.dart';
@@ -18,9 +19,10 @@ import 'features/chat/chat_poll_service.dart';
 import 'features/chat/incoming_call_overlay.dart';
 import 'features/driver/driver_job_alert_service.dart';
 import 'features/passenger/passenger_alert_service.dart';
+import 'features/sos/notification_tap_router.dart';
 import 'features/splash/mova_splash_screen.dart';
 
-final movaNavigatorKey = GlobalKey<NavigatorState>();
+export 'core/navigation/mova_navigator.dart' show movaNavigatorKey;
 
 void _wireCallRingSocketHooks() {
   RideSocket.onCallEventHook = CallRingService.handleRealtimeCallEvent;
@@ -74,6 +76,9 @@ class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
     super.initState();
     _chatPoll = ChatPollService(ref.read(apiClientProvider))..start();
     ref.read(appUpdateServiceProvider.notifier).start();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationTapRouter.flushPendingAndLaunchDetails();
+    });
   }
 
   @override
@@ -88,6 +93,7 @@ class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
     if (state == AppLifecycleState.resumed) {
       _chatPoll?.poke();
       ref.read(appUpdateServiceProvider.notifier).onAppResumed();
+      NotificationTapRouter.flushPendingAndLaunchDetails();
     }
   }
 
@@ -132,6 +138,9 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
     super.initState();
     _chatPoll = ChatPollService(ref.read(apiClientProvider))..start();
     ref.read(appUpdateServiceProvider.notifier).start();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationTapRouter.flushPendingAndLaunchDetails();
+    });
   }
 
   @override
@@ -146,6 +155,7 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
     if (state == AppLifecycleState.resumed) {
       _chatPoll?.poke();
       ref.read(appUpdateServiceProvider.notifier).onAppResumed();
+      NotificationTapRouter.flushPendingAndLaunchDetails();
     }
   }
 

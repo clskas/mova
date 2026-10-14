@@ -4,7 +4,24 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
+import '../sos/notification_tap_router.dart';
 import 'driver_job_alert_service.dart';
+
+String? _sosPayloadFromFcm(Map<String, dynamic> data, {String? title, String? body}) {
+  final type = data['type']?.toString() ?? '';
+  if (type != 'INCIDENT_CREATED' && type != 'SOS') return null;
+  return NotificationTapRouter.encodeSosPayload(
+    incidentId: data['incidentId']?.toString(),
+    title: title ?? data['title']?.toString() ?? 'Alerte SOS',
+    body: body ?? data['body']?.toString(),
+    lat: double.tryParse(data['lat']?.toString() ?? ''),
+    lng: double.tryParse(data['lng']?.toString() ?? ''),
+    rideId: data['rideId']?.toString(),
+    referenceType: data['referenceType']?.toString(),
+    referenceId: data['referenceId']?.toString(),
+    forOps: data['forOps']?.toString() == '1' || data['forOps'] == true,
+  );
+}
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -15,14 +32,16 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final title = message.data['title']?.toString() ?? 'SENGA Driver';
   final body = message.data['body']?.toString() ?? 'Nouvelle alerte';
   final jobKind = message.data['jobKind']?.toString() ?? message.data['type']?.toString() ?? '';
+  final sosPayload = _sosPayloadFromFcm(message.data, title: title, body: body);
   final refId = message.data['referenceId']?.toString() ??
       message.data['rideId']?.toString() ??
       message.data['deliveryId']?.toString();
-  final isOffer = jobKind.contains('RIDE') ||
-      jobKind.contains('DELIVERY') ||
-      jobKind.contains('OFFER') ||
-      jobKind.contains('JOB') ||
-      jobKind.contains('CALL');
+  final isOffer = sosPayload == null &&
+      (jobKind.contains('RIDE') ||
+          jobKind.contains('DELIVERY') ||
+          jobKind.contains('OFFER') ||
+          jobKind.contains('JOB') ||
+          jobKind.contains('CALL'));
   String? offerKey;
   if (isOffer && refId != null && refId.isNotEmpty) {
     final kind = jobKind.contains('DELIVERY') ? 'delivery' : 'ride';
@@ -31,7 +50,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await DriverJobAlertService.notify(
     title: title,
     body: body,
-    payload: jobKind.isNotEmpty ? jobKind : message.data['type']?.toString(),
+    payload: sosPayload ?? (jobKind.isNotEmpty ? jobKind : message.data['type']?.toString()),
     ringUntilStopped: isOffer,
     offerKey: offerKey,
   );
@@ -60,13 +79,15 @@ class DriverPushService {
         final title = message.notification?.title ?? message.data['title']?.toString() ?? 'SENGA Driver';
         final body = message.notification?.body ?? message.data['body']?.toString() ?? 'Nouvelle alerte';
         final jobKind = message.data['jobKind']?.toString() ?? message.data['type']?.toString() ?? '';
+        final sosPayload = _sosPayloadFromFcm(message.data, title: title, body: body);
         final refId = message.data['referenceId']?.toString() ??
             message.data['rideId']?.toString() ??
             message.data['deliveryId']?.toString();
-        final isOffer = jobKind.contains('RIDE') ||
-            jobKind.contains('DELIVERY') ||
-            jobKind.contains('OFFER') ||
-            jobKind.contains('JOB');
+        final isOffer = sosPayload == null &&
+            (jobKind.contains('RIDE') ||
+                jobKind.contains('DELIVERY') ||
+                jobKind.contains('OFFER') ||
+                jobKind.contains('JOB'));
         // Évite un 2ᵉ bip « système » pendant que la sonnerie SENGA tourne déjà via le poll.
         if (isOffer && DriverJobAlertService.isRinging) return;
         String? offerKey;
@@ -77,11 +98,27 @@ class DriverPushService {
         await DriverJobAlertService.notify(
           title: title,
           body: body,
-          payload: jobKind,
+          payload: sosPayload ?? jobKind,
           ringUntilStopped: isOffer,
           offerKey: offerKey,
         );
       });
+
+      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        NotificationTapRouter.openFromFcmData(
+          Map<String, dynamic>.from(message.data),
+          title: message.notification?.title,
+          body: message.notification?.body,
+        );
+      });
+      final initial = await messaging.getInitialMessage();
+      if (initial != null) {
+        NotificationTapRouter.openFromFcmData(
+          Map<String, dynamic>.from(initial.data),
+          title: initial.notification?.title,
+          body: initial.notification?.body,
+        );
+      }
 
       final token = await messaging.getToken();
       if (token != null) {

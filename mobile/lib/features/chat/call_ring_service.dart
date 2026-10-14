@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../sos/notification_tap_router.dart';
+
 class IncomingCallInfo {
   const IncomingCallInfo({
     required this.deliveryId,
@@ -103,6 +105,9 @@ class CallRingService {
     const darwinInit = DarwinInitializationSettings();
     await _plugin.initialize(
       settings: const InitializationSettings(android: androidInit, iOS: darwinInit),
+      onDidReceiveNotificationResponse: NotificationTapRouter.onLocalNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse:
+          NotificationTapRouter.onBackgroundNotificationResponse,
     );
     final android =
         _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();

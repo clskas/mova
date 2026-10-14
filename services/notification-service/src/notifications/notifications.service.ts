@@ -275,24 +275,34 @@ export class NotificationsService implements OnModuleInit {
       }
     }
 
-    const pushData = {
+    const pushBase = {
       type: 'INCIDENT_CREATED',
       incidentId: payload.incidentId,
       emergency: isSos ? '1' : '0',
+      lat: payload.lat != null ? String(payload.lat) : '',
+      lng: payload.lng != null ? String(payload.lng) : '',
+      rideId: payload.rideId ?? '',
+      referenceType: payload.referenceType ?? '',
+      referenceId: payload.referenceId ?? '',
+      title,
     };
     // FCM tous flavors — les ops n'ont souvent pas de token « driver ».
-    const fcmOps = await this.pushToUsersAnyFlavor(opsIds, title, staffBody, pushData);
+    const fcmOps = await this.pushToUsersAnyFlavor(opsIds, title, staffBody, {
+      ...pushBase,
+      body: staffBody,
+      forOps: '1',
+    });
     const fcmDrivers = await this.pushToUsersAnyFlavor(
       audienceDriverIds,
       title,
       audienceBody,
-      pushData,
+      { ...pushBase, body: audienceBody, forOps: '0' },
     );
     const fcmPassengers = await this.pushToUsersAnyFlavor(
       audiencePassengerIds,
       title,
       audienceBody,
-      pushData,
+      { ...pushBase, body: audienceBody, forOps: '0' },
     );
 
     for (const ownerId of partnerRestaurantIds) {

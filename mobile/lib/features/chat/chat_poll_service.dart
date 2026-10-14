@@ -7,6 +7,7 @@ import '../../core/config/app_version.dart';
 import '../../core/error/result.dart';
 import '../driver/driver_job_alert_service.dart';
 import '../passenger/passenger_alert_service.dart';
+import '../sos/notification_tap_router.dart';
 import 'call_ring_service.dart';
 import 'chat_alert_service.dart';
 
@@ -71,10 +72,24 @@ class ChatPollService {
         if (type == 'INCIDENT_CREATED') {
           final title = n['title']?.toString() ?? 'Alerte SOS';
           final body = n['body']?.toString() ?? 'Urgence signalée sur SENGA';
+          final data = (n['data'] is Map) ? Map<String, dynamic>.from(n['data'] as Map) : const <String, dynamic>{};
+          final lat = data['lat'] is num ? (data['lat'] as num).toDouble() : double.tryParse('${data['lat'] ?? ''}');
+          final lng = data['lng'] is num ? (data['lng'] as num).toDouble() : double.tryParse('${data['lng'] ?? ''}');
+          final payload = NotificationTapRouter.encodeSosPayload(
+            incidentId: data['incidentId']?.toString(),
+            title: title,
+            body: body,
+            lat: lat,
+            lng: lng,
+            rideId: data['rideId']?.toString(),
+            referenceType: data['referenceType']?.toString(),
+            referenceId: data['referenceId']?.toString(),
+            forOps: data['forOps'] == true,
+          );
           if (AppFlavor.isDriver) {
-            await DriverJobAlertService.notify(title: title, body: body, payload: 'SOS');
+            await DriverJobAlertService.notify(title: title, body: body, payload: payload);
           } else {
-            await PassengerAlertService.notify(title: title, body: body);
+            await PassengerAlertService.notify(title: title, body: body, payload: payload);
           }
           continue;
         }

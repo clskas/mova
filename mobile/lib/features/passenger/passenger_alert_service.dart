@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../sos/notification_tap_router.dart';
+
 /// Alertes passager : chauffeur trouvé, arrivée, course terminée.
 class PassengerAlertService {
   PassengerAlertService._();
@@ -22,6 +24,9 @@ class PassengerAlertService {
       const darwinInit = DarwinInitializationSettings();
       await _plugin.initialize(
         settings: const InitializationSettings(android: androidInit, iOS: darwinInit),
+        onDidReceiveNotificationResponse: NotificationTapRouter.onLocalNotificationResponse,
+        onDidReceiveBackgroundNotificationResponse:
+            NotificationTapRouter.onBackgroundNotificationResponse,
       );
 
       final androidPlugin =
@@ -49,6 +54,7 @@ class PassengerAlertService {
   static Future<void> notify({
     required String title,
     required String body,
+    String? payload,
   }) async {
     if (!_initialized) await init();
     try {
@@ -66,6 +72,7 @@ class PassengerAlertService {
           ),
           iOS: DarwinNotificationDetails(),
         ),
+        payload: payload,
       );
     } catch (_) {
       // Ignore when the notifications plugin is unavailable (tests / desktop).

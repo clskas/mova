@@ -78,7 +78,8 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
     'Ce numéro ou ce compte Google est déjà lié à un autre utilisateur SENGA.',
 
   [MovaErrorCode.RIDE_NOT_FOUND]: 'Course introuvable.',
-  [MovaErrorCode.RIDE_INVALID_STATUS]: 'Statut de course invalide pour cette action.',
+  [MovaErrorCode.RIDE_INVALID_STATUS]:
+    'Impossible : cette course est déjà terminée, annulée, ou n’est plus à l’étape où cette action est possible. Actualisez l’écran.',
   [MovaErrorCode.RIDE_NO_DRIVERS]:
     'Aucun chauffeur disponible dans votre zone pour le moment. Réessayez dans 2 min.',
   [MovaErrorCode.RIDE_ALREADY_ACTIVE]: 'Vous avez déjà une course en cours.',
@@ -90,10 +91,12 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND]: 'Réservation planifiée introuvable.',
   [MovaErrorCode.SCHEDULED_RIDE_TOO_FAR]: 'La réservation ne peut pas dépasser 7 jours.',
   [MovaErrorCode.SCHEDULED_RIDE_PAST]: 'La date de réservation doit être dans le futur.',
-  [MovaErrorCode.SCHEDULED_RIDE_INVALID_STATUS]: 'Statut de réservation invalide pour cette action.',
+  [MovaErrorCode.SCHEDULED_RIDE_INVALID_STATUS]:
+    'Impossible : cette réservation ne peut plus être modifiée (déjà passée, annulée ou confirmée).',
 
   [MovaErrorCode.DELIVERY_NOT_FOUND]: 'Livraison introuvable.',
-  [MovaErrorCode.DELIVERY_INVALID_STATUS]: 'Statut de livraison invalide pour cette action.',
+  [MovaErrorCode.DELIVERY_INVALID_STATUS]:
+    'Impossible : cette livraison est déjà terminée, annulée, ou n’est plus à l’étape où cette action est possible. Actualisez l’écran.',
   [MovaErrorCode.RESTAURANT_NOT_FOUND]: 'Restaurant introuvable.',
   [MovaErrorCode.DELIVERY_ESCROW_REQUIRED]:
     'Le client doit d\'abord payer (portefeuille ou Mobile Money). Ensuite seulement le restaurant prépare et le livreur part.',
@@ -109,13 +112,15 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
     'Seuls les chauffeurs SENGA validés (KYC approuvé) peuvent publier un covoiturage.',
 
   [MovaErrorCode.ERRAND_NOT_FOUND]: 'Commande de course introuvable.',
-  [MovaErrorCode.ERRAND_INVALID_STATUS]: 'Statut de commande invalide pour cette action.',
+  [MovaErrorCode.ERRAND_INVALID_STATUS]:
+    'Impossible : cette commande ne peut plus être modifiée à cette étape. Actualisez l’écran.',
 
   [MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND]: 'Demande de location introuvable.',
   [MovaErrorCode.RENTAL_VEHICLE_NOT_FOUND]: 'Véhicule de location introuvable.',
 
   [MovaErrorCode.MOVING_NOT_FOUND]: 'Demande de déménagement introuvable.',
-  [MovaErrorCode.MOVING_INVALID_STATUS]: 'Statut de déménagement invalide pour cette action.',
+  [MovaErrorCode.MOVING_INVALID_STATUS]:
+    'Impossible : ce déménagement ne peut plus être modifié à cette étape. Actualisez l’écran.',
 
   [MovaErrorCode.PAYMENT_FAILED]:
     'Le paiement ou la recharge a échoué. Réessayez ou contactez le support SENGA.',

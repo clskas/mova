@@ -27,6 +27,8 @@ class RideSocket {
   void Function(Map<String, dynamic> payload)? _onPaymentCompleted;
   void Function(Map<String, dynamic> payload)? _onDeliveryCall;
   final List<void Function(Map<String, dynamic> payload)> _callListeners = [];
+  /// Hook global (ex. CallRingService) — toujours appelé avant les handlers d’écran.
+  static void Function(Map<String, dynamic> payload)? onCallEventHook;
   void Function(Map<String, dynamic> payload)? _onRideNew;
   void Function(Map<String, dynamic> payload)? _onRideCancelled;
   void Function(Map<String, dynamic> payload)? _onOfferTaken;
@@ -49,6 +51,7 @@ class RideSocket {
   }
 
   void _emitCall(Map<String, dynamic> payload) {
+    onCallEventHook?.call(payload);
     _onDeliveryCall?.call(payload);
     for (final listener in List.of(_callListeners)) {
       listener(payload);

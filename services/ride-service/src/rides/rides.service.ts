@@ -693,7 +693,13 @@ export class RidesService {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
     if (ride.status === RideStatus.COMPLETED || ride.status === RideStatus.CANCELLED) {
-      throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
+      throw new MovaHttpException(
+        MovaErrorCode.RIDE_INVALID_STATUS,
+        undefined,
+        ride.status === RideStatus.CANCELLED
+          ? 'Cette course est déjà annulée.'
+          : 'Cette course est déjà terminée.',
+      );
     }
 
     const actor: 'passenger' | 'driver' =
@@ -704,7 +710,8 @@ export class RidesService {
       throw new MovaHttpException(
         MovaErrorCode.RIDE_INVALID_STATUS,
         undefined,
-        cancelEligibility.cancelBlockReason,
+        cancelEligibility.cancelBlockReason ??
+          'Impossible d’annuler : la course n’est plus à une étape qui le permet. Actualisez l’écran.',
       );
     }
 

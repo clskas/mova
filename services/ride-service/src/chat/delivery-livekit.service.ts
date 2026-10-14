@@ -120,7 +120,7 @@ export class DeliveryLiveKitService {
     const expiresAt = new Date(Date.now() + TOKEN_TTL_SECONDS * 1000).toISOString();
 
     if (opts?.announce === true) {
-      await this.announceCall(scope, id, userId, participants.role);
+      await this.announceCall(scope, id, userId, participants.role, participants);
     }
 
     return {
@@ -144,6 +144,11 @@ export class DeliveryLiveKitService {
     id: string,
     starterId: string,
     starterRole: string,
+    participants: {
+      passengerId?: string | null;
+      driverId?: string | null;
+      partnerId?: string | null;
+    },
   ) {
     const text = 'Appel vocal SENGA — ouvrez « Appel SENGA » pour rejoindre.';
     try {
@@ -155,44 +160,79 @@ export class DeliveryLiveKitService {
     } catch {
       /* ignore duplicate / race */
     }
+    const recipients = this.participantUserIds(participants);
     if (scope === 'ride') {
-      this.trackingGateway.broadcastRideCall({
-        rideId: id,
-        starterId,
-        starterRole,
-        action: 'start',
-        ts: Date.now(),
-      });
+      this.trackingGateway.broadcastRideCall(
+        {
+          rideId: id,
+          starterId,
+          starterRole,
+          action: 'start',
+          ts: Date.now(),
+        },
+        recipients,
+      );
     } else {
-      this.trackingGateway.broadcastDeliveryCall({
-        deliveryId: id,
-        starterId,
-        starterRole,
-        action: 'start',
-        ts: Date.now(),
-      });
+      this.trackingGateway.broadcastDeliveryCall(
+        {
+          deliveryId: id,
+          starterId,
+          starterRole,
+          action: 'start',
+          ts: Date.now(),
+        },
+        recipients,
+      );
     }
   }
 
   async endCall(scope: LiveKitCallScope, id: string, userId: string) {
     const participants = await this.assertParticipant(scope, id, userId);
+    const recipients = this.participantUserIds(participants);
+    // Message chat : le poll mobile coupe la sonnerie même sans socket tracking.
+    try {
+      const endText = 'Appel vocal SENGA terminé.';
+      if (scope === 'ride') {
+        await this.rideChat.sendMessage(id, userId, endText);
+      } else {
+        await this.deliveryChat.sendMessage(id, userId, endText);
+      }
+    } catch {
+      /* best-effort */
+    }
     if (scope === 'ride') {
-      this.trackingGateway.broadcastRideCall({
-        rideId: id,
-        starterId: userId,
-        starterRole: participants.role,
-        action: 'end',
-        ts: Date.now(),
-      });
+      this.trackingGateway.broadcastRideCall(
+        {
+          rideId: id,
+          starterId: userId,
+          starterRole: participants.role,
+          action: 'end',
+          ts: Date.now(),
+        },
+        recipients,
+      );
     } else {
-      this.trackingGateway.broadcastDeliveryCall({
-        deliveryId: id,
-        starterId: userId,
-        starterRole: participants.role,
-        action: 'end',
-        ts: Date.now(),
-      });
+      this.trackingGateway.broadcastDeliveryCall(
+        {
+          deliveryId: id,
+          starterId: userId,
+          starterRole: participants.role,
+          action: 'end',
+          ts: Date.now(),
+        },
+        recipients,
+      );
     }
     return { ok: true };
+  }
+
+  private participantUserIds(participants: {
+    passengerId?: string | null;
+    driverId?: string | null;
+    partnerId?: string | null;
+  }): string[] {
+    return [participants.passengerId, participants.driverId, participants.partnerId].filter(
+      (id): id is string => typeof id === 'string' && id.length > 0,
+    );
   }
 }

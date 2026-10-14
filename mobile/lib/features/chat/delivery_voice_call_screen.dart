@@ -129,7 +129,8 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
   void _armRingTimeout() {
     _ringTimeout?.cancel();
     if (!widget.announce) return;
-    _ringTimeout = Timer(const Duration(seconds: 55), () {
+    // Filet si le refus distant n’arrive pas (réseau). Socket/poll doivent être plus rapides.
+    _ringTimeout = Timer(const Duration(seconds: 35), () {
       if (!mounted) return;
       if (_phase != _CallPhase.ringingOut && _phase != _CallPhase.connecting) return;
       setState(() {

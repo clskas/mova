@@ -14,7 +14,8 @@ const movaErrorMessages = <String, String>{
   'MOVA_AUTH_009': 'Connexion Google refusée. Réessayez ou utilisez le numéro de téléphone.',
   'MOVA_AUTH_010': 'Ce numéro ou ce compte Google est déjà lié à un autre utilisateur SENGA.',
   'MOVA_RIDE_001': 'Course introuvable.',
-  'MOVA_RIDE_002': 'Statut de course invalide pour cette action.',
+  'MOVA_RIDE_002':
+      'Impossible : cette course est déjà terminée, annulée, ou n’est plus à l’étape où cette action est possible. Actualisez l’écran.',
   'MOVA_RIDE_003':
       'Aucun chauffeur disponible dans votre zone pour le moment. Réessayez dans 2 min.',
   'MOVA_RIDE_004': 'Vous avez déjà une course en cours.',
@@ -22,13 +23,15 @@ const movaErrorMessages = <String, String>{
   'MOVA_RIDE_006': 'Réservation planifiée introuvable.',
   'MOVA_RIDE_007': 'La réservation ne peut pas dépasser 7 jours.',
   'MOVA_RIDE_008': 'La date de réservation doit être dans le futur.',
-  'MOVA_RIDE_009': 'Statut de réservation invalide pour cette action.',
+  'MOVA_RIDE_009':
+      'Impossible : cette réservation ne peut plus être modifiée (déjà passée, annulée ou confirmée).',
   'MOVA_RIDE_010': 'Vous avez déjà noté cette course.',
   'MOVA_RIDE_011': 'Transition de statut non autorisée pour cette course.',
   'MOVA_RIDE_012':
       'Vous avez une course terminée non payée. Réglez le paiement avant d\'en commander une nouvelle.',
   'MOVA_DEL_001': 'Livraison introuvable.',
-  'MOVA_DEL_002': 'Statut de livraison invalide pour cette action.',
+  'MOVA_DEL_002':
+      'Impossible : cette livraison est déjà terminée, annulée, ou n’est plus à l’étape où cette action est possible. Actualisez l’écran.',
   'MOVA_DEL_003': 'Restaurant introuvable.',
   'MOVA_DEL_004':
       'Le client doit d\'abord payer (portefeuille ou Mobile Money). Ensuite seulement le restaurant prépare et le livreur part.',
@@ -39,11 +42,13 @@ const movaErrorMessages = <String, String>{
   'MOVA_CAR_003': 'Vous avez déjà rejoint ce trajet.',
   'MOVA_CAR_004': 'Seuls les chauffeurs SENGA validés peuvent publier un covoiturage.',
   'MOVA_ERR_001': 'Commande de course introuvable.',
-  'MOVA_ERR_002': 'Statut de commande invalide pour cette action.',
+  'MOVA_ERR_002':
+      'Impossible : cette commande ne peut plus être modifiée à cette étape. Actualisez l’écran.',
   'MOVA_REN_001': 'Demande de location introuvable.',
   'MOVA_REN_002': 'Véhicule de location introuvable.',
   'MOVA_MOV_001': 'Demande de déménagement introuvable.',
-  'MOVA_MOV_002': 'Statut de déménagement invalide pour cette action.',
+  'MOVA_MOV_002':
+      'Impossible : ce déménagement ne peut plus être modifié à cette étape. Actualisez l’écran.',
   'MOVA_PAY_001':
       'Le paiement ou la recharge a échoué. Réessayez ou contactez le support SENGA.',
   'MOVA_PAY_002': 'Solde insuffisant dans votre portefeuille.',

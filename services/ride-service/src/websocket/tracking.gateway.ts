@@ -77,6 +77,8 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       return;
     }
     client.data.user = user;
+    // Salon personnel : appels LiveKit (start/end) même hors room ride/delivery.
+    client.join(`user:${user.id}`);
     this.logger.log(`Client connected: ${client.id}`);
     client.emit('ping', { ts: Date.now() });
   }
@@ -375,24 +377,48 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(`delivery:${payload.deliveryId}`).emit('delivery:chat', payload);
   }
 
-  broadcastDeliveryCall(payload: {
-    deliveryId: string;
-    starterId: string;
-    starterRole: string;
-    action: 'start' | 'end';
-    ts: number;
-  }) {
+  broadcastDeliveryCall(
+    payload: {
+      deliveryId: string;
+      starterId: string;
+      starterRole: string;
+      action: 'start' | 'end';
+      ts: number;
+    },
+    recipientUserIds: Array<string | null | undefined> = [],
+  ) {
     this.server.to(`delivery:${payload.deliveryId}`).emit('delivery:call', payload);
+    this.emitCallToUsers('delivery:call', payload, recipientUserIds);
   }
 
-  broadcastRideCall(payload: {
-    rideId: string;
-    starterId: string;
-    starterRole: string;
-    action: 'start' | 'end';
-    ts: number;
-  }) {
+  broadcastRideCall(
+    payload: {
+      rideId: string;
+      starterId: string;
+      starterRole: string;
+      action: 'start' | 'end';
+      ts: number;
+    },
+    recipientUserIds: Array<string | null | undefined> = [],
+  ) {
     this.server.to(`ride:${payload.rideId}`).emit('ride:call', payload);
+    this.emitCallToUsers('ride:call', payload, recipientUserIds);
+  }
+
+  /** Diffuse aussi vers `user:{id}` / `driver:{id}` pour couper la sonnerie hors écran tracking. */
+  private emitCallToUsers(
+    event: 'ride:call' | 'delivery:call',
+    payload: Record<string, unknown>,
+    recipientUserIds: Array<string | null | undefined>,
+  ) {
+    const seen = new Set<string>();
+    for (const raw of recipientUserIds) {
+      const id = typeof raw === 'string' ? raw.trim() : '';
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      this.server.to(`user:${id}`).emit(event, payload);
+      this.server.to(`driver:${id}`).emit(event, payload);
+    }
   }
 
   @SubscribeMessage('rental:chat')

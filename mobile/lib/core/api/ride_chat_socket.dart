@@ -20,6 +20,8 @@ class RideChatSocket {
   void Function(Map<String, dynamic> payload)? _onChat;
   void Function(Map<String, dynamic> payload)? _onDeliveryCall;
   final List<void Function(Map<String, dynamic> payload)> _callListeners = [];
+  /// Même hook que [RideSocket.onCallEventHook] (CallRingService).
+  static void Function(Map<String, dynamic> payload)? onCallEventHook;
   void Function()? _onConnected;
   void Function()? _onDisconnected;
   final List<Completer<bool>> _connectWaiters = [];
@@ -38,6 +40,7 @@ class RideChatSocket {
   }
 
   void _emitCall(Map<String, dynamic> payload) {
+    onCallEventHook?.call(payload);
     _onDeliveryCall?.call(payload);
     for (final listener in List.of(_callListeners)) {
       listener(payload);

@@ -42,6 +42,8 @@ class IncomingCallOverlay extends ConsumerWidget {
   }
 
   Future<void> _decline(WidgetRef ref, IncomingCallInfo info) async {
+    // Couper tout de suite côté local, puis signaler l’appelant (socket + chat).
+    CallRingService.notifyPeerEnded(info.deliveryId);
     await CallRingService.forceStop();
     try {
       await ref.read(apiClientProvider).endLiveKitCall(
@@ -49,7 +51,7 @@ class IncomingCallOverlay extends ConsumerWidget {
             threadId: info.deliveryId,
           );
     } catch (_) {
-      /* best-effort */
+      /* best-effort — le message chat « terminé » / timeout appelant restent des filets */
     }
   }
 

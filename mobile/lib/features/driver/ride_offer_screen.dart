@@ -172,7 +172,11 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
         );
       case Failure(:final error):
         final msg = error.message;
-        final looksInvalidStatus = msg.contains('Statut de course invalide');
+        final looksInvalidStatus = msg.contains('Statut de course invalide') ||
+            msg.contains('n’est plus à l’étape') ||
+            msg.contains('n\'est plus à l\'étape') ||
+            msg.contains('déjà terminée') ||
+            msg.contains('déjà annulée');
         if (looksInvalidStatus) {
           final rideResult = await api.getRide(_rideId);
           if (!mounted) return;
@@ -206,7 +210,11 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
         Navigator.pop(context, 'rejected');
       case Failure(:final error):
         final msg = error.message;
-        if (msg.contains('Statut de course invalide')) {
+        if (msg.contains('Statut de course invalide') ||
+            msg.contains('n’est plus à l’étape') ||
+            msg.contains('n\'est plus à l\'étape') ||
+            msg.contains('déjà terminée') ||
+            msg.contains('déjà annulée')) {
           _closeAsCancelled();
           return;
         }

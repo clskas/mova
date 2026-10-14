@@ -14,7 +14,27 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await DriverJobAlertService.init();
   final title = message.data['title']?.toString() ?? 'SENGA Driver';
   final body = message.data['body']?.toString() ?? 'Nouvelle alerte';
-  await DriverJobAlertService.notify(title: title, body: body, payload: message.data['type']?.toString());
+  final jobKind = message.data['jobKind']?.toString() ?? message.data['type']?.toString() ?? '';
+  final refId = message.data['referenceId']?.toString() ??
+      message.data['rideId']?.toString() ??
+      message.data['deliveryId']?.toString();
+  final isOffer = jobKind.contains('RIDE') ||
+      jobKind.contains('DELIVERY') ||
+      jobKind.contains('OFFER') ||
+      jobKind.contains('JOB') ||
+      jobKind.contains('CALL');
+  String? offerKey;
+  if (isOffer && refId != null && refId.isNotEmpty) {
+    final kind = jobKind.contains('DELIVERY') ? 'delivery' : 'ride';
+    offerKey = DriverJobAlertService.offerKey(kind, refId);
+  }
+  await DriverJobAlertService.notify(
+    title: title,
+    body: body,
+    payload: jobKind.isNotEmpty ? jobKind : message.data['type']?.toString(),
+    ringUntilStopped: isOffer,
+    offerKey: offerKey,
+  );
 }
 
 /// Enregistre le token FCM (si Firebase configuré) pour les push même app fermée.

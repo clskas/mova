@@ -59,6 +59,22 @@ class CallRingService {
     peerEndedThreadId.value = threadId;
   }
 
+  /// Hook global socket `ride:call` / `delivery:call` — coupe la sonnerie dès `end`
+  /// même si l’écran tracking n’écoute plus (appelant raccroche / destinataire refuse).
+  static void handleRealtimeCallEvent(Map<String, dynamic> payload) {
+    final action = payload['action']?.toString() ?? 'start';
+    final id = payload['rideId']?.toString() ??
+        payload['deliveryId']?.toString() ??
+        '';
+    if (id.isEmpty) return;
+    if (action == 'start') {
+      allowNewIncoming(id);
+      return;
+    }
+    notifyPeerEnded(id);
+    unawaited(forceStop());
+  }
+
   static bool get isRinging => _ringing;
   static String? get activeDeliveryId => incoming.value?.deliveryId;
   static String? get inCallDeliveryId => _inCallDeliveryId;

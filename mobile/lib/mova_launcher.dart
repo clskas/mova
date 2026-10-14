@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/api/api_client.dart';
+import 'core/api/ride_chat_socket.dart';
+import 'core/api/ride_socket.dart';
 import 'core/config/app_version.dart';
 import 'core/offline/mova_app_lifecycle.dart';
 import 'core/offline/sync_queue.dart';
@@ -20,6 +22,11 @@ import 'features/splash/mova_splash_screen.dart';
 
 final movaNavigatorKey = GlobalKey<NavigatorState>();
 
+void _wireCallRingSocketHooks() {
+  RideSocket.onCallEventHook = CallRingService.handleRealtimeCallEvent;
+  RideChatSocket.onCallEventHook = CallRingService.handleRealtimeCallEvent;
+}
+
 /// Point d'entrée partagé — évite SyncQueue non initialisé si le mauvais main.dart est ciblé.
 Future<void> runMovaPassengerApp() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +35,7 @@ Future<void> runMovaPassengerApp() async {
   await PassengerAlertService.init();
   await ChatAlertService.init();
   await CallRingService.init();
+  _wireCallRingSocketHooks();
   runApp(
     const ProviderScope(
       child: MovaPassengerApp(),
@@ -42,6 +50,7 @@ Future<void> runMovaDriverApp() async {
   await DriverJobAlertService.init();
   await ChatAlertService.init();
   await CallRingService.init();
+  _wireCallRingSocketHooks();
   runApp(
     const ProviderScope(
       child: MovaDriverApp(),

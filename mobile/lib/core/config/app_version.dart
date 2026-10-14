@@ -3,9 +3,9 @@
 /// defaultValue must match pubspec `+N` so a missing dart-define cannot leave
 /// the in-app update banner stuck after a Play install.
 class AppVersion {
-  /// Doit suivre `pubspec.yaml` (`1.0.24+136`) pour que la bannière disparaisse après maj.
-  static const name = '1.0.24';
-  static const build = int.fromEnvironment('APP_BUILD', defaultValue: 136);
+  /// Doit suivre `pubspec.yaml` (`1.0.31+144`) pour que la bannière disparaisse après maj.
+  static const name = '1.0.31';
+  static const build = int.fromEnvironment('APP_BUILD', defaultValue: 144);
 
   static int compare(String a, String b) {
     List<int> parts(String raw) => raw

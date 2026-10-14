@@ -87,6 +87,13 @@ class ChatPollService {
         final messageId = data['messageId']?.toString();
 
         final body = n['body']?.toString() ?? '';
+        if (threadId.isNotEmpty &&
+            (body.contains('Appel vocal SENGA terminé') ||
+                body.contains('Appel SENGA terminé'))) {
+          CallRingService.notifyPeerEnded(threadId);
+          await CallRingService.forceStop();
+          continue;
+        }
         if (body.contains('Appel vocal SENGA') && threadId.isNotEmpty) {
           final myId = await _api.currentUserId();
           final starterId = data['senderId']?.toString() ??
@@ -101,15 +108,15 @@ class ChatPollService {
                   peerFromTitle.toLowerCase() != 'message senga')
               ? peerFromTitle
               : (callKind == 'ride' ? 'Course' : 'Livraison');
-          // Nouvelle notification = nouvel appel : lever la suppression post-raccroché.
-          CallRingService.allowNewIncoming(threadId);
+          // fromRealtime:false — respecte la suppression après raccroché/refus
+          // (évite de relancer la sonnerie via un vieux message chat).
           await CallRingService.startIncoming(
             deliveryId: threadId,
             starterId: starterId,
             myUserId: myId,
             peerLabel: peerLabel,
             kind: callKind,
-            fromRealtime: true,
+            fromRealtime: false,
           );
         }
 

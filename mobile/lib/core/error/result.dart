@@ -5,7 +5,7 @@ sealed class MovaFailure {
 
 class NetworkFailure extends MovaFailure {
   const NetworkFailure([
-    super.message = 'Connexion difficile. Vérifiez votre réseau et réessayez.',
+    super.message = 'Connexion Internet instable. Vérifiez votre réseau et réessayez.',
   ]);
 }
 

@@ -59,7 +59,7 @@ void main() {
     );
     expect(
       sanitizeUserMessage('SocketException: Failed host lookup'),
-      'Connexion difficile. Vérifiez votre réseau et réessayez.',
+      'Connexion Internet instable. Vérifiez votre réseau et réessayez.',
     );
     expect(
       sanitizeUserMessage('MOVA_DEL_004'),

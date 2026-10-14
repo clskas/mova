@@ -128,7 +128,7 @@ String sanitizeUserMessage(
       msg.contains('Failed to fetch') ||
       msg.contains('NetworkError') ||
       msg.contains('Network request failed')) {
-    return 'Connexion difficile. Vérifiez votre réseau et réessayez.';
+    return 'Connexion Internet instable. Vérifiez votre réseau et réessayez.';
   }
   if (msg.contains('Exception:') ||
       msg.contains('FormatException') ||

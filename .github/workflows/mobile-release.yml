@@ -52,7 +52,8 @@ on:
         default: ""
 
 permissions:
-  contents: read
+  contents: write
+  actions: read
 
 env:
   # Keep in sync with CI mobile job — livekit_client 2.5.4 (16 KB noise) on Flutter 3.32.6.
@@ -308,6 +309,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # Needed so sync-mobile-app-version-env.sh can commit the store file.
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - uses: ruby/setup-ruby@v1
         with:
@@ -376,12 +380,14 @@ jobs:
             bundle exec fastlane promote_internal_to_production
           fi
 
-      - name: Sync in-app update banners (Render MOBILE_*)
+      - name: Lock in-app update banners (store file + Render)
         if: success()
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           VERSION_NAME: ${{ needs.build-android.outputs.version_name }}
           VERSION_CODE: ${{ needs.build-android.outputs.version_code }}
+          # Optional: push the store-version commit to afri-soft-com/mova (Render git source).
+          AFRI_SOFT_PUSH_TOKEN: ${{ secrets.AFRI_SOFT_PUSH_TOKEN }}
         run: bash scripts/sync-mobile-app-version-env.sh
 
   promote-android-production:

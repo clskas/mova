@@ -1,3 +1,6 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
 export type MobileAppVersionBlock = {
   currentVersion: string;
   minVersion: string;
@@ -15,6 +18,12 @@ export type MobileAppVersionResponse = {
   driver: MobileAppVersionBlock;
 };
 
+export type MobileStoreVersionFile = {
+  version: string;
+  versionCode: number;
+  updatedAt?: string;
+};
+
 const DEFAULT_PASSENGER_STORE =
   'https://play.google.com/store/apps/details?id=cd.mova.mova.passenger';
 const DEFAULT_DRIVER_STORE =
@@ -23,17 +32,15 @@ const DEFAULT_PASSENGER_STORE_IOS = 'https://apps.apple.com/app/id6818768971';
 const DEFAULT_DRIVER_STORE_IOS = 'https://apps.apple.com/app/id6818769267';
 
 /**
- * Marketing name floor must match latest Play / App Store marketing version.
- * Phones still on older binaries see behindName and get the in-app banner
- * until they install the matching store build.
- * versionCode floor tracks production (currently 157 = 1.0.32 on Play).
- * Raise both floors ONLY after the matching AAB/IPA is live on Play / App Store.
- * Raising early hides banners for anyone already on that build while a newer
- * store build exists. Stale Render MOBILE_* below this floor also hid banners —
- * mobile-release syncs those env vars after each Play promote.
+ * Fallback only if mobile-store-version.json is missing from the image.
+ * The JSON file (updated by mobile-release) is the real source of truth —
+ * Render MOBILE_* env can raise above it, never lower it, so deploys and
+ * stale blueprint values cannot hide in-app update banners again.
  */
-const CURRENT_VERSION_FLOOR = '1.0.32';
-const CURRENT_VERSION_CODE_FLOOR = 157;
+const BUILTIN_FLOOR: MobileStoreVersionFile = {
+  version: '1.0.32',
+  versionCode: 157,
+};
 
 function parseVersionCode(raw: string | undefined, fallback: number): number {
   const n = Number.parseInt(raw?.trim() || '', 10);
@@ -57,47 +64,81 @@ export function compareSemver(a: string, b: string): number {
   return 0;
 }
 
-/** Never advertise an older store version than the shipped floor (that hid in-app banners). */
 function advertisedVersion(raw: string | undefined, floor: string): string {
   const v = raw?.trim();
   if (!v) return floor;
   return compareSemver(v, floor) >= 0 ? v : floor;
 }
 
-/** Play store versionCode must never be advertised below the shipped floor. */
 function advertisedVersionCode(raw: string | undefined, floor: number): number {
   const n = parseVersionCode(raw, floor);
   return n >= floor ? n : floor;
 }
 
-/** Versions store exposées aux apps (sans auth). Lever MOBILE_*_VERSION après un upload Play. */
+/** Load the committed store version shipped inside the ride-service image. */
+export function loadMobileStoreVersion(
+  readFile: (path: string) => string = (p) => readFileSync(p, 'utf8'),
+  dirname: string = __dirname,
+): MobileStoreVersionFile {
+  const candidates = [
+    join(dirname, 'mobile-store-version.json'),
+    join(dirname, '..', 'public', 'mobile-store-version.json'),
+    join(process.cwd(), 'src', 'public', 'mobile-store-version.json'),
+    join(process.cwd(), 'dist', 'public', 'mobile-store-version.json'),
+  ];
+  for (const path of candidates) {
+    try {
+      const parsed = JSON.parse(readFile(path)) as Partial<MobileStoreVersionFile>;
+      const version = parsed.version?.trim();
+      const versionCode = Number(parsed.versionCode);
+      if (version && Number.isFinite(versionCode) && versionCode >= 0) {
+        return { version, versionCode };
+      }
+    } catch {
+      /* try next */
+    }
+  }
+  return { ...BUILTIN_FLOOR };
+}
+
+/**
+ * Versions store exposées aux apps (sans auth).
+ * Plancher = fichier mobile-store-version.json (CI après Play).
+ * Env MOBILE_* ne peut que monter au-dessus — jamais casser les bannières.
+ */
 export function buildMobileAppVersionResponse(
   env: NodeJS.ProcessEnv = process.env,
   now: Date = new Date(),
+  store: MobileStoreVersionFile = loadMobileStoreVersion(),
 ): MobileAppVersionResponse {
+  const floorVersion = advertisedVersion(store.version, BUILTIN_FLOOR.version);
+  const floorCode = advertisedVersionCode(
+    String(store.versionCode),
+    BUILTIN_FLOOR.versionCode,
+  );
   const minVersion = env.MOBILE_MIN_VERSION?.trim() || '1.0.0';
   const minVersionCode = parseVersionCode(env.MOBILE_MIN_VERSION_CODE, 0);
   return {
     generatedAt: now.toISOString(),
     passenger: {
-      currentVersion: advertisedVersion(env.MOBILE_PASSENGER_VERSION, CURRENT_VERSION_FLOOR),
+      currentVersion: advertisedVersion(env.MOBILE_PASSENGER_VERSION, floorVersion),
       minVersion,
       storeUrl: env.PLAY_STORE_PASSENGER_URL?.trim() || DEFAULT_PASSENGER_STORE,
       storeUrlIos: env.APP_STORE_PASSENGER_URL?.trim() || DEFAULT_PASSENGER_STORE_IOS,
       currentVersionCode: advertisedVersionCode(
         env.MOBILE_PASSENGER_VERSION_CODE,
-        CURRENT_VERSION_CODE_FLOOR,
+        floorCode,
       ),
       minVersionCode,
     },
     driver: {
-      currentVersion: advertisedVersion(env.MOBILE_DRIVER_VERSION, CURRENT_VERSION_FLOOR),
+      currentVersion: advertisedVersion(env.MOBILE_DRIVER_VERSION, floorVersion),
       minVersion,
       storeUrl: env.PLAY_STORE_DRIVER_URL?.trim() || DEFAULT_DRIVER_STORE,
       storeUrlIos: env.APP_STORE_DRIVER_URL?.trim() || DEFAULT_DRIVER_STORE_IOS,
       currentVersionCode: advertisedVersionCode(
         env.MOBILE_DRIVER_VERSION_CODE,
-        CURRENT_VERSION_CODE_FLOOR,
+        floorCode,
       ),
       minVersionCode,
     },

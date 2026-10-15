@@ -12,9 +12,17 @@ export type FcmPushProfile = 'job' | 'chat';
 
 /** Canal + son SENGA (doit matcher JobRing / DriverJobAlertService — v7). */
 export const SENGA_DRIVER_JOB_CHANNEL = 'mova_driver_jobs_v7';
-/** Android raw `senga_job` ; iOS bundle `senga_job.caf` (CAF PCM — WAV custom échoue souvent en silence APNs). */
+/** Android raw `senga_job`. */
 export const SENGA_DRIVER_JOB_SOUND_ANDROID = 'senga_job';
-export const SENGA_DRIVER_JOB_SOUND_IOS = 'senga_job.caf';
+/**
+ * iOS APNs : `default` est le seul son garanti app tuée.
+ * Un fichier custom illisible = silence total (pas de repli). Le son SENGA
+ * (senga_job.caf) est joué via JobRingIOS / notifs locales quand iOS réveille l’app.
+ */
+export const SENGA_DRIVER_JOB_SOUND_IOS = 'default';
+export const SENGA_DRIVER_JOB_SOUND_IOS_CUSTOM = 'senga_job.caf';
+
+export type FcmPushPlatform = 'android' | 'ios' | 'all';
 
 /** Canal chat (ChatAlertService sur passager + chauffeur). Son système. */
 export const SENGA_CHAT_CHANNEL = 'mova_chat';
@@ -43,7 +51,7 @@ export class FcmPushService {
   async sendToTokens(
     tokens: string[],
     message: FcmPushMessage,
-    opts?: { profile?: FcmPushProfile },
+    opts?: { profile?: FcmPushProfile; platform?: FcmPushPlatform; iosSound?: string },
   ): Promise<void> {
     if (tokens.length === 0) return;
 
@@ -53,14 +61,18 @@ export class FcmPushService {
     );
     const profile = opts?.profile ?? 'job';
     const isChat = profile === 'chat';
+    const platform = opts?.platform ?? 'all';
     const channelId = isChat ? SENGA_CHAT_CHANNEL : SENGA_DRIVER_JOB_CHANNEL;
     const soundAndroid = isChat ? 'default' : SENGA_DRIVER_JOB_SOUND_ANDROID;
-    const soundIos = isChat ? 'default' : SENGA_DRIVER_JOB_SOUND_IOS;
+    const soundIos = isChat
+      ? 'default'
+      : (opts?.iosSound?.trim() || SENGA_DRIVER_JOB_SOUND_IOS);
 
     const sa = this.loadServiceAccount();
     if (sa) {
       await this.sendViaHttpV1(unique, message, data, {
         isChat,
+        platform,
         channelId,
         soundAndroid,
         soundIos,
@@ -140,6 +152,7 @@ export class FcmPushService {
     data: Record<string, string>,
     opts: {
       isChat: boolean;
+      platform: FcmPushPlatform;
       channelId: string;
       soundAndroid: string;
       soundIos: string;
@@ -159,82 +172,16 @@ export class FcmPushService {
     await Promise.all(
       tokens.map(async (token) => {
         try {
+          const messageBody = opts.isChat
+            ? this.buildChatMessage(token, message, data, opts)
+            : this.buildJobMessage(token, message, data, opts);
           const res = await fetch(url, {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              message: opts.isChat
-                ? {
-                    token,
-                    notification: {
-                      title: message.title,
-                      body: message.body,
-                    },
-                    data: {
-                      ...data,
-                      title: message.title,
-                      body: message.body,
-                      click_action: 'FLUTTER_NOTIFICATION_CLICK',
-                      android_channel_id: opts.channelId,
-                    },
-                    android: {
-                      priority: 'high',
-                      notification: {
-                        channel_id: opts.channelId,
-                        sound: opts.soundAndroid,
-                      },
-                    },
-                    apns: {
-                      headers: { 'apns-priority': '10' },
-                      payload: {
-                        aps: {
-                          alert: { title: message.title, body: message.body },
-                          sound: opts.soundIos,
-                          'content-available': 1,
-                        },
-                      },
-                    },
-                  }
-                : {
-                    // Jobs Android : data-only. Un payload `notification` est
-                    // affiché par le système SANS appeler onMessageReceived
-                    // (app tuée) — donc pas de sonnerie ni d’ouverture.
-                    // SengaJobMessagingService poste la notif plein écran.
-                    token,
-                    data: {
-                      ...data,
-                      title: message.title,
-                      body: message.body,
-                      click_action: 'FLUTTER_NOTIFICATION_CLICK',
-                      android_channel_id: opts.channelId,
-                    },
-                    android: {
-                      priority: 'high',
-                      direct_boot_ok: true,
-                    },
-                    apns: {
-                      headers: {
-                        'apns-priority': '10',
-                        'apns-push-type': 'alert',
-                      },
-                      payload: {
-                        aps: {
-                          alert: { title: message.title, body: message.body },
-                          sound: opts.soundIos,
-                          // content-available réveille JobRingIOS pour reprogrammer
-                          // des notifs locales (écran verrouillé). L’alerte + sound
-                          // restent le chemin principal app tuée.
-                          'content-available': 1,
-                          'interruption-level': 'time-sensitive',
-                          badge: 1,
-                        },
-                      },
-                    },
-                  },
-            }),
+            body: JSON.stringify({ message: messageBody }),
           });
           if (!res.ok) {
             const text = await res.text();
@@ -245,6 +192,127 @@ export class FcmPushService {
         }
       }),
     );
+  }
+
+  private buildChatMessage(
+    token: string,
+    message: FcmPushMessage,
+    data: Record<string, string>,
+    opts: { channelId: string; soundAndroid: string; soundIos: string },
+  ) {
+    return {
+      token,
+      notification: {
+        title: message.title,
+        body: message.body,
+      },
+      data: {
+        ...data,
+        title: message.title,
+        body: message.body,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        android_channel_id: opts.channelId,
+      },
+      android: {
+        priority: 'high' as const,
+        notification: {
+          channel_id: opts.channelId,
+          sound: opts.soundAndroid,
+        },
+      },
+      apns: {
+        headers: { 'apns-priority': '10' },
+        payload: {
+          aps: {
+            alert: { title: message.title, body: message.body },
+            sound: opts.soundIos,
+          },
+        },
+      },
+    };
+  }
+
+  private buildJobMessage(
+    token: string,
+    message: FcmPushMessage,
+    data: Record<string, string>,
+    opts: {
+      platform: FcmPushPlatform;
+      channelId: string;
+      soundAndroid: string;
+      soundIos: string;
+    },
+  ) {
+    const baseData = {
+      ...data,
+      title: message.title,
+      body: message.body,
+      click_action: 'FLUTTER_NOTIFICATION_CLICK',
+      android_channel_id: opts.channelId,
+    };
+
+    // Android only: data-only → SengaJobMessagingService (sonnerie native).
+    if (opts.platform === 'android') {
+      return {
+        token,
+        data: baseData,
+        android: {
+          priority: 'high' as const,
+          direct_boot_ok: true,
+        },
+      };
+    }
+
+    // iOS only: notification visible + son système (garanti). Pas de
+    // interruption-level (sans entitlement → peut livrer en silence).
+    if (opts.platform === 'ios') {
+      return {
+        token,
+        notification: {
+          title: message.title,
+          body: message.body,
+        },
+        data: baseData,
+        apns: {
+          headers: {
+            'apns-priority': '10',
+            'apns-push-type': 'alert',
+          },
+          payload: {
+            aps: {
+              alert: { title: message.title, body: message.body },
+              sound: opts.soundIos,
+              badge: 1,
+              'content-available': 1,
+            },
+          },
+        },
+      };
+    }
+
+    // Unknown platform: data + apns (Android native + iOS alert).
+    return {
+      token,
+      data: baseData,
+      android: {
+        priority: 'high' as const,
+        direct_boot_ok: true,
+      },
+      apns: {
+        headers: {
+          'apns-priority': '10',
+          'apns-push-type': 'alert',
+        },
+        payload: {
+          aps: {
+            alert: { title: message.title, body: message.body },
+            sound: opts.soundIos,
+            badge: 1,
+            'content-available': 1,
+          },
+        },
+      },
+    };
   }
 
   private async sendViaLegacy(

@@ -436,22 +436,43 @@ export class NotificationsService implements OnModuleInit {
           body: payload.body,
         },
       };
-      await this.fcm.sendToTokens(tokens, pushBody);
-      // iOS : l’AudioPlayer Dart meurt écran verrouillé. Relancer APNs pour
-      // rejouer senga_job.caf (~8 s) tant que l’offre est fraîche.
+      const androidTokens = await this.pushTokens.tokensForUsers(userIds, 'driver', 'android');
       const iosTokens = await this.pushTokens.tokensForUsers(userIds, 'driver', 'ios');
+      const known = new Set([...androidTokens, ...iosTokens]);
+      const unknownTokens = tokens.filter((t) => !known.has(t));
+
+      if (androidTokens.length > 0) {
+        await this.fcm.sendToTokens(androidTokens, pushBody, {
+          profile: 'job',
+          platform: 'android',
+        });
+      }
       if (iosTokens.length > 0) {
-        for (const delayMs of [8000, 16000, 24000]) {
+        await this.fcm.sendToTokens(iosTokens, pushBody, {
+          profile: 'job',
+          platform: 'ios',
+          iosSound: 'default',
+        });
+        // Relancer le son système iOS (écran verrouillé / app tuée).
+        for (const delayMs of [7000, 14000, 21000]) {
           setTimeout(() => {
-            void this.fcm.sendToTokens(iosTokens, pushBody, { profile: 'job' });
+            void this.fcm.sendToTokens(iosTokens, pushBody, {
+              profile: 'job',
+              platform: 'ios',
+              iosSound: 'default',
+            });
           }, delayMs);
         }
-        this.logger.log(
-          `driver.job.alert iOS re-ring ×3 → ${iosTokens.length} token(s)`,
-        );
+      }
+      if (unknownTokens.length > 0) {
+        await this.fcm.sendToTokens(unknownTokens, pushBody, {
+          profile: 'job',
+          platform: 'all',
+          iosSound: 'default',
+        });
       }
       this.logger.log(
-        `driver.job.alert FCM ${payload.jobKind} → ${userIds.length} chauffeur(s), tokens=${tokens.length}`,
+        `driver.job.alert FCM ${payload.jobKind} → users=${userIds.length} android=${androidTokens.length} ios=${iosTokens.length} unknown=${unknownTokens.length}`,
       );
     } else if (fcmReady) {
       this.logger.warn(

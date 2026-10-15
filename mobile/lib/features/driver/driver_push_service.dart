@@ -180,9 +180,12 @@ class DriverPushService {
   }
 
   static Future<void> _registerToken(ApiClient api, String token) async {
+    final platform = defaultTargetPlatform == TargetPlatform.iOS
+        ? 'ios'
+        : (defaultTargetPlatform == TargetPlatform.android ? 'android' : defaultTargetPlatform.name);
     final result = await api.post('/notifications/push-tokens', {
       'token': token,
-      'platform': defaultTargetPlatform.name,
+      'platform': platform,
       'appFlavor': 'driver',
     });
     if (result case Failure(:final error)) {

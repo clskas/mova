@@ -41,20 +41,22 @@ enum JobRingIOS {
 
   private static func schedulePulses(title: String, body: String) {
     let center = UNUserNotificationCenter.current()
-    let ids = (0..<5).map { "\(prefix)\($0)" }
+    let ids = (0..<6).map { "\(prefix)\($0)" }
     center.removePendingNotificationRequests(withIdentifiers: ids)
 
-    for i in 0..<5 {
+    for i in 0..<6 {
       let content = UNMutableNotificationContent()
       content.title = title
       content.body = body
-      content.sound = UNNotificationSound(named: UNNotificationSoundName(soundFile))
-      content.threadIdentifier = "senga-driver-jobs"
-      if #available(iOS 15.0, *) {
-        content.interruptionLevel = .timeSensitive
+      // Alternate SENGA custom + system default (custom alone was silent on many devices).
+      if i % 2 == 0 {
+        content.sound = UNNotificationSound(named: UNNotificationSoundName(soundFile))
+      } else {
+        content.sound = .default
       }
-      // i=0 quasi immédiat, puis toutes les ~8 s (survivent à la suspension).
-      let delay = max(0.3, Double(i) * 8.0)
+      content.threadIdentifier = "senga-driver-jobs"
+      // i=0 quasi immédiat, puis toutes les ~7 s (survivent à la suspension).
+      let delay = max(0.3, Double(i) * 7.0)
       let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
       let request = UNNotificationRequest(
         identifier: ids[i],

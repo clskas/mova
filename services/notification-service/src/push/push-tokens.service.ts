@@ -13,10 +13,20 @@ export class PushTokensService {
     });
   }
 
-  async tokensForUsers(userIds: string[], appFlavor = 'driver'): Promise<string[]> {
+  async tokensForUsers(
+    userIds: string[],
+    appFlavor = 'driver',
+    platform?: string,
+  ): Promise<string[]> {
     if (userIds.length === 0) return [];
     const rows = await this.prisma.pushDevice.findMany({
-      where: { userId: { in: userIds }, appFlavor },
+      where: {
+        userId: { in: userIds },
+        appFlavor,
+        ...(platform
+          ? { platform: { equals: platform, mode: 'insensitive' as const } }
+          : {}),
+      },
       select: { token: true },
     });
     return rows.map((r) => r.token);

@@ -12,9 +12,9 @@ export type FcmPushProfile = 'job' | 'chat';
 
 /** Canal + son SENGA (doit matcher JobRing / DriverJobAlertService — v7). */
 export const SENGA_DRIVER_JOB_CHANNEL = 'mova_driver_jobs_v7';
-/** Android raw `senga_job` ; iOS bundle `senga_job.wav` (extension requise pour APNs). */
+/** Android raw `senga_job` ; iOS bundle `senga_job.caf` (CAF PCM — WAV custom échoue souvent en silence APNs). */
 export const SENGA_DRIVER_JOB_SOUND_ANDROID = 'senga_job';
-export const SENGA_DRIVER_JOB_SOUND_IOS = 'senga_job.wav';
+export const SENGA_DRIVER_JOB_SOUND_IOS = 'senga_job.caf';
 
 /** Canal chat (ChatAlertService sur passager + chauffeur). Son système. */
 export const SENGA_CHAT_CHANNEL = 'mova_chat';
@@ -224,8 +224,12 @@ export class FcmPushService {
                         aps: {
                           alert: { title: message.title, body: message.body },
                           sound: opts.soundIos,
+                          // content-available réveille JobRingIOS pour reprogrammer
+                          // des notifs locales (écran verrouillé). L’alerte + sound
+                          // restent le chemin principal app tuée.
                           'content-available': 1,
                           'interruption-level': 'time-sensitive',
+                          badge: 1,
                         },
                       },
                     },

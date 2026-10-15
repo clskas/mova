@@ -425,15 +425,31 @@ export class NotificationsService implements OnModuleInit {
     const fcmReady = this.fcm.isConfigured();
     const tokens = fcmReady ? await this.pushTokens.tokensForUsers(userIds) : [];
     if (fcmReady && tokens.length > 0) {
-      await this.fcm.sendToTokens(tokens, {
+      const pushBody = {
         title: payload.title,
         body: payload.body,
         data: {
           type: payload.jobKind,
           referenceId: payload.referenceId,
           jobKind: payload.jobKind,
+          title: payload.title,
+          body: payload.body,
         },
-      });
+      };
+      await this.fcm.sendToTokens(tokens, pushBody);
+      // iOS : l’AudioPlayer Dart meurt écran verrouillé. Relancer APNs pour
+      // rejouer senga_job.caf (~8 s) tant que l’offre est fraîche.
+      const iosTokens = await this.pushTokens.tokensForUsers(userIds, 'driver', 'ios');
+      if (iosTokens.length > 0) {
+        for (const delayMs of [8000, 16000, 24000]) {
+          setTimeout(() => {
+            void this.fcm.sendToTokens(iosTokens, pushBody, { profile: 'job' });
+          }, delayMs);
+        }
+        this.logger.log(
+          `driver.job.alert iOS re-ring ×3 → ${iosTokens.length} token(s)`,
+        );
+      }
       this.logger.log(
         `driver.job.alert FCM ${payload.jobKind} → ${userIds.length} chauffeur(s), tokens=${tokens.length}`,
       );

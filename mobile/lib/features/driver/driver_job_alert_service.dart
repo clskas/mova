@@ -38,7 +38,8 @@ class DriverJobAlertService {
   static const _channelSilentId = 'mova_driver_jobs_silent_v3';
   static const _channelName = 'Missions & courses SENGA';
   static const _androidSound = RawResourceAndroidNotificationSound('senga_job');
-  static const _iosSound = 'senga_job.wav';
+  /// CAF dans le bundle iOS (APNs) — le WAV custom était souvent silencieux.
+  static const _iosSound = 'senga_job.caf';
   static const _assetSound = 'sounds/senga_job.wav';
 
   static bool get isRinging => _ringing;

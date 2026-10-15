@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -8,6 +9,15 @@ import UIKit
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+
+    if #available(iOS 10.0, *) {
+      UNUserNotificationCenter.current().delegate = self
+      UNUserNotificationCenter.current().requestAuthorization(
+        options: [.alert, .badge, .sound]
+      ) { _, _ in }
+    }
+    application.registerForRemoteNotifications()
+
     let ok = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
     // google_sign_in_ios still resolves the presenting VC via deprecated
@@ -20,6 +30,19 @@ import UIKit
     signal(SIGPIPE, SIG_IGN)
 
     return ok
+  }
+
+  override func application(
+    _ application: UIApplication,
+    didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+    fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+  ) {
+    JobRingIOS.handleRemote(userInfo: userInfo)
+    super.application(
+      application,
+      didReceiveRemoteNotification: userInfo,
+      fetchCompletionHandler: completionHandler
+    )
   }
 
   private func ensureKeyWindow(_ application: UIApplication) {

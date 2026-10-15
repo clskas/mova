@@ -61,6 +61,11 @@
 	<string>SENGA utilise votre position en arrière-plan pour que les chauffeurs restent localisables pendant une course ou une livraison active.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>SENGA utilise votre position en arrière-plan pour que les chauffeurs restent localisables pendant une course ou une livraison active.</string>
+	<!-- remote-notification : réveil bref pour programmer la sonnerie SENGA (JobRingIOS). -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<!-- Google Sign-In (iOS): passenger defaults; ci_set_flavor.sh overwrites per flavor. -->
 	<key>GIDClientID</key>
 	<string>58917716638-9qupcijrhjr7dvd5v1efmi9elitmndnd.apps.googleusercontent.com</string>

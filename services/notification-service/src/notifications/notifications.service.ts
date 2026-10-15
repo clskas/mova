@@ -448,21 +448,12 @@ export class NotificationsService implements OnModuleInit {
         });
       }
       if (iosTokens.length > 0) {
+        // Un seul push iOS : les re-alertes continuaient après annulation passager.
         await this.fcm.sendToTokens(iosTokens, pushBody, {
           profile: 'job',
           platform: 'ios',
           iosSound: 'default',
         });
-        // Relancer le son système iOS (écran verrouillé / app tuée).
-        for (const delayMs of [7000, 14000, 21000]) {
-          setTimeout(() => {
-            void this.fcm.sendToTokens(iosTokens, pushBody, {
-              profile: 'job',
-              platform: 'ios',
-              iosSound: 'default',
-            });
-          }, delayMs);
-        }
       }
       if (unknownTokens.length > 0) {
         await this.fcm.sendToTokens(unknownTokens, pushBody, {

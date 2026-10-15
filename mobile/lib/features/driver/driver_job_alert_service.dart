@@ -28,9 +28,7 @@ class DriverJobAlertService {
   static bool _ringing = false;
   static final Set<String> _activeOfferKeys = {};
   static Timer? _ringSafetyTimer;
-  static Timer? _iosLockScreenRingTimer;
   static const _maxRingDuration = Duration(minutes: 3);
-  static const _iosLockScreenRingEvery = Duration(seconds: 8);
 
   /// v7 : aligné JobRing / FCM — les canaux Android sont immuables.
   static const _channelSengaId = 'mova_driver_jobs_v7';
@@ -169,7 +167,6 @@ class DriverJobAlertService {
 
     _ringing = true;
     _armRingSafety();
-    _armIosLockScreenRing();
     try {
       await _player.stop();
       await _player.setReleaseMode(ReleaseMode.loop);

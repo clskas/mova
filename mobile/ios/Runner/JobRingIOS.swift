@@ -3,7 +3,7 @@ import UserNotifications
 import AVFoundation
 
 /// Sonnerie course/livraison côté iOS quand l’app est en fond / écran verrouillé.
-/// Les Timer Dart sont suspendus : on programme des notifs locales + lecture AVAudio.
+/// Pas de pulses locales répétées : elles continuaient après annulation passager.
 enum JobRingIOS {
   static let soundFile = "senga_job.caf"
   private static let prefix = "senga_job_ring_"
@@ -14,6 +14,11 @@ enum JobRingIOS {
     if kind.isEmpty { return false }
     if kind == "INCIDENT_CREATED" || kind == "SOS" || kind == "CHAT_MESSAGE" { return false }
     let upper = kind.uppercased()
+    // Arrêt si annulation / fin.
+    if upper.contains("CANCEL") || upper.contains("COMPLETED") || upper.contains("TAKEN") {
+      stop()
+      return false
+    }
     return upper.contains("RIDE")
       || upper.contains("DELIVERY")
       || upper.contains("OFFER")
@@ -23,48 +28,23 @@ enum JobRingIOS {
   }
 
   static func handleRemote(userInfo: [AnyHashable: Any]) {
+    // Toujours couper d’anciennes sonneries avant d’évaluer.
+    let kind = (stringValue(userInfo["jobKind"]) ?? stringValue(userInfo["type"]) ?? "").uppercased()
+    if kind.contains("CANCEL") || kind.contains("COMPLETED") {
+      stop()
+      return
+    }
     guard isJob(userInfo) else { return }
-    let title = stringValue(userInfo["title"]) ?? "SENGA Driver"
-    let body = stringValue(userInfo["body"]) ?? "Nouvelle course ou livraison"
-    schedulePulses(title: title, body: body)
     playBundleSound()
   }
 
   static func stop() {
     let center = UNUserNotificationCenter.current()
-    let ids = (0..<5).map { "\(prefix)\($0)" }
+    let ids = (0..<8).map { "\(prefix)\($0)" }
     center.removePendingNotificationRequests(withIdentifiers: ids)
     center.removeDeliveredNotifications(withIdentifiers: ids)
     player?.stop()
     player = nil
-  }
-
-  private static func schedulePulses(title: String, body: String) {
-    let center = UNUserNotificationCenter.current()
-    let ids = (0..<6).map { "\(prefix)\($0)" }
-    center.removePendingNotificationRequests(withIdentifiers: ids)
-
-    for i in 0..<6 {
-      let content = UNMutableNotificationContent()
-      content.title = title
-      content.body = body
-      // Alternate SENGA custom + system default (custom alone was silent on many devices).
-      if i % 2 == 0 {
-        content.sound = UNNotificationSound(named: UNNotificationSoundName(soundFile))
-      } else {
-        content.sound = .default
-      }
-      content.threadIdentifier = "senga-driver-jobs"
-      // i=0 quasi immédiat, puis toutes les ~7 s (survivent à la suspension).
-      let delay = max(0.3, Double(i) * 7.0)
-      let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
-      let request = UNNotificationRequest(
-        identifier: ids[i],
-        content: content,
-        trigger: trigger
-      )
-      center.add(request, withCompletionHandler: nil)
-    }
   }
 
   private static func playBundleSound() {
@@ -76,12 +56,12 @@ enum JobRingIOS {
       try session.setCategory(.playback, options: [.duckOthers, .mixWithOthers])
       try session.setActive(true)
       let p = try AVAudioPlayer(contentsOf: url)
-      p.numberOfLoops = 2
+      p.numberOfLoops = 0
       p.volume = 1.0
       p.play()
       player = p
     } catch {
-      // Silent failure — APNs / local notif sound remains the primary path.
+      // Silent failure — APNs sound remains the primary path.
     }
   }
 

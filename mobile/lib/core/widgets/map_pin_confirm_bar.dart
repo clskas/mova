@@ -35,52 +35,70 @@ class MapPinConfirmBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: MovaColors.white,
-      elevation: 4,
-      borderRadius: BorderRadius.circular(12),
+      color: MovaColors.white.withValues(alpha: 0.82),
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                const Icon(Icons.push_pin, color: MovaColors.violet, size: 18),
-                const SizedBox(width: 8),
+                Icon(Icons.push_pin, color: MovaColors.violet.withValues(alpha: 0.9), size: 14),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     coordsLabel(coords),
-                    style: const TextStyle(
-                      fontSize: 13,
+                    style: TextStyle(
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: MovaColors.midnight,
+                      color: MovaColors.midnight.withValues(alpha: 0.85),
                     ),
                   ),
                 ),
                 if (onCancel != null)
                   IconButton(
                     visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                     tooltip: 'Annuler',
                     onPressed: onCancel,
-                    icon: const Icon(Icons.close, size: 18),
+                    icon: Icon(Icons.close, size: 16, color: MovaColors.midnight.withValues(alpha: 0.7)),
                   ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Wrap(
-              spacing: 8,
-              runSpacing: 4,
+              spacing: 6,
+              runSpacing: 2,
               children: [
                 FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
                   onPressed: onUseLocation,
-                  icon: const Icon(Icons.check, size: 16),
+                  icon: const Icon(Icons.check, size: 14),
                   label: const Text('Utiliser cet emplacement'),
                 ),
                 if (onNamePlace != null)
                   OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      minimumSize: const Size(0, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      backgroundColor: MovaColors.white.withValues(alpha: 0.55),
+                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
                     onPressed: onNamePlace,
-                    icon: const Icon(Icons.edit_location_alt_outlined, size: 16),
+                    icon: const Icon(Icons.edit_location_alt_outlined, size: 14),
                     label: const Text('Nommer ce lieu'),
                   ),
               ],

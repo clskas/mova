@@ -172,7 +172,7 @@ jobs:
           set -euo pipefail
           # Floor must stay above the highest versionCode already accepted by Play
           # (123 used; bump when uploads fail with "already been used").
-          FLOOR=154
+          FLOOR=155
           PUBSPEC_LINE=$(grep -E '^version:' mobile/pubspec.yaml | head -1)
           PUBSPEC_NAME=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
@@ -481,7 +481,7 @@ jobs:
           set -euo pipefail
           # Aligné Android : max(run_number, pubspec +N) pour que la bannière
           # currentVersionCode (API) ne reste pas collée après TestFlight.
-          FLOOR=154
+          FLOOR=155
           PUBSPEC_LINE=$(grep -E '^version:' mobile/pubspec.yaml | head -1)
           NAME=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
@@ -730,7 +730,7 @@ jobs:
             pip install --quiet PyJWT cryptography
             export ASC_VERSION=1.0.32
             # Même logique que build-ios (max run_number / pubspec +N), pas run_number seul.
-            FLOOR=154
+            FLOOR=155
             PUBSPEC_LINE=$(grep -E '^version:' "$(git rev-parse --show-toplevel)/mobile/pubspec.yaml" | head -1)
             PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
             ASC_CODE="${{ github.run_number }}"

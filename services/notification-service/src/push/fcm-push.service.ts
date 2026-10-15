@@ -199,14 +199,11 @@ export class FcmPushService {
                     },
                   }
                 : {
-                    // Jobs : notification Android + data. App tuée → le tray FCM
-                    // sonne même sans isolate Dart (data-only ne réveillait pas
-                    // assez d’OEM). Handler local ajoute fullScreenIntent si vivant.
+                    // Jobs Android : data-only. Un payload `notification` est
+                    // affiché par le système SANS appeler onMessageReceived
+                    // (app tuée) — donc pas de sonnerie ni d’ouverture.
+                    // SengaJobMessagingService poste la notif plein écran.
                     token,
-                    notification: {
-                      title: message.title,
-                      body: message.body,
-                    },
                     data: {
                       ...data,
                       title: message.title,
@@ -217,13 +214,6 @@ export class FcmPushService {
                     android: {
                       priority: 'high',
                       direct_boot_ok: true,
-                      notification: {
-                        channel_id: opts.channelId,
-                        sound: opts.soundAndroid,
-                        default_vibrate_timings: true,
-                        notification_priority: 'PRIORITY_MAX',
-                        visibility: 'PUBLIC',
-                      },
                     },
                     apns: {
                       headers: {

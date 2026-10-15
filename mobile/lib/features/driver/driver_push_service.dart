@@ -6,6 +6,7 @@ import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../sos/notification_tap_router.dart';
 import 'driver_job_alert_service.dart';
+import 'native_job_wake.dart';
 
 String? _sosPayloadFromFcm(Map<String, dynamic> data, {String? title, String? body}) {
   final type = data['type']?.toString() ?? '';
@@ -105,6 +106,7 @@ class DriverPushService {
         _backgroundHandlerRegistered = true;
       }
       await DriverJobAlertService.init();
+      await NativeJobWake.ensureAlerts();
 
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission(alert: true, badge: true, sound: true);

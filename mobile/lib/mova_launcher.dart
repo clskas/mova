@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -18,6 +20,7 @@ import 'features/chat/chat_alert_service.dart';
 import 'features/chat/chat_poll_service.dart';
 import 'features/chat/incoming_call_overlay.dart';
 import 'features/driver/driver_job_alert_service.dart';
+import 'features/driver/native_job_wake.dart';
 import 'features/driver/driver_push_service.dart';
 import 'features/passenger/passenger_alert_service.dart';
 import 'features/sos/notification_tap_router.dart';
@@ -140,8 +143,10 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
     super.initState();
     _chatPoll = ChatPollService(ref.read(apiClientProvider))..start();
     ref.read(appUpdateServiceProvider.notifier).start();
+    NativeJobWake.install();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       NotificationTapRouter.flushPendingAndLaunchDetails();
+      unawaited(NativeJobWake.consumePending());
     });
   }
 
@@ -158,6 +163,7 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
       _chatPoll?.poke();
       ref.read(appUpdateServiceProvider.notifier).onAppResumed();
       NotificationTapRouter.flushPendingAndLaunchDetails();
+      unawaited(NativeJobWake.consumePending());
     }
   }
 

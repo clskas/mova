@@ -130,15 +130,20 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   }
 
   /// Tap notif FCM / locale (app fermée ou en fond) → écran d'offre.
+  ///
+  /// Ne jamais appeler [_pollOffers] ici : ce poll ouvre déjà une fenêtre,
+  /// puis ce handler en rouvrait une 2ᵉ après fermeture/annulation.
   Future<void> _openJobFromNotification(JobOpenRequest request) async {
     if (!mounted || request.id.isEmpty) return;
-    if (_showingOffer && _openOfferId == request.id) return;
+    if (_showingOffer) return;
+    final hideKey = '${request.kind == 'delivery' ? 'delivery' : 'ride'}:${request.id}';
+    if (_isOfferHidden(hideKey)) return;
 
     // Attendre la fin du bootstrap si besoin.
     for (var i = 0; i < 25 && _bootstrapping && mounted; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 200));
     }
-    if (!mounted) return;
+    if (!mounted || _showingOffer) return;
 
     Map<String, dynamic>? findOffer(List<Map<String, dynamic>> list) {
       for (final o in list) {
@@ -150,8 +155,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     if (request.kind == 'delivery') {
       var offer = findOffer(_deliveryOffers);
       if (offer == null) {
-        await _pollOffers();
-        if (!mounted) return;
+        await _refreshRideOffers();
+        if (!mounted || _showingOffer) return;
         offer = findOffer(_deliveryOffers);
       }
       if (offer != null) {
@@ -161,8 +166,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     } else {
       var offer = findOffer(_rideOffers);
       if (offer == null) {
-        await _pollOffers();
-        if (!mounted) return;
+        await _refreshRideOffers();
+        if (!mounted || _showingOffer) return;
         offer = findOffer(_rideOffers);
       }
       if (offer != null) {
@@ -171,11 +176,14 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       }
       // Fallback : détail course (peut déjà être assignée).
       final ride = await ref.read(apiClientProvider).getRide(request.id);
-      if (!mounted) return;
+      if (!mounted || _showingOffer) return;
       if (ride case Success(:final data)) {
         final status = data['status']?.toString().toUpperCase() ?? '';
-        if (status == 'CANCELLED' || status == 'COMPLETED') return;
-        if (status == 'SEARCHING' || status == 'REQUESTED' || status == 'PENDING') {
+        if (status == 'CANCELLED' || status == 'CANCELED' || status == 'COMPLETED') {
+          _dismissedOffers.add('ride:${request.id}');
+          return;
+        }
+        if (status == 'SEARCHING' || status == 'REQUESTED' || status == 'PENDING' || status == 'MATCHING') {
           await _openRideOffer(data);
           return;
         }
@@ -965,6 +973,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   Future<void> _openDeliveryOfferPopup(Map<String, dynamic> offer) async {
     final id = offer['id']?.toString() ?? '';
     if (id.isEmpty) return;
+    if (_showingOffer) return;
+    if (_isOfferHidden('delivery:$id')) return;
     final offerKey = DriverJobAlertService.offerKey('delivery', id);
     _showingOffer = true;
     _openOfferKind = 'delivery';
@@ -1050,6 +1060,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   Future<void> _openRideOffer(Map<String, dynamic> offer) async {
     final id = offer['id']?.toString() ?? '';
     if (id.isEmpty) return;
+    if (_showingOffer) return;
+    if (_isOfferHidden('ride:$id')) return;
     final offerKey = DriverJobAlertService.offerKey('ride', id);
     _showingOffer = true;
     _openOfferKind = 'ride';

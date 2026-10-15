@@ -210,11 +210,16 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
         Navigator.pop(context, 'rejected');
       case Failure(:final error):
         final msg = error.message;
+        // Offre déjà annulée / prise / refusée : toujours fermer (fenêtre fantôme).
         if (msg.contains('Statut de course invalide') ||
             msg.contains('n’est plus à l’étape') ||
             msg.contains('n\'est plus à l\'étape') ||
             msg.contains('déjà terminée') ||
-            msg.contains('déjà annulée')) {
+            msg.contains('déjà annulée') ||
+            msg.contains('annul') ||
+            msg.contains('CANCEL') ||
+            msg.toLowerCase().contains('not found') ||
+            msg.contains('404')) {
           _closeAsCancelled();
           return;
         }

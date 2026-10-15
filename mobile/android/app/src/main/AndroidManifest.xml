@@ -62,7 +62,7 @@
             android:value="2" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="mova_driver_jobs_v6" />
+            android:value="mova_driver_jobs_v7" />
         <!-- Remplace le service FlutterFire : sonnerie native app tuée, puis super → Dart. -->
         <service
             android:name="io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingService"

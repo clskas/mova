@@ -7,17 +7,17 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
-import android.media.Ringtone
-import android.media.RingtoneManager
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 
-/** Sonnerie + plein écran pour une offre course/livraison, process mort compris. */
+/** Sonnerie SENGA + plein écran pour une offre course/livraison, process mort compris. */
 object JobRing {
-    const val CHANNEL_ID = "mova_driver_jobs_v6"
+    /** v7 : MediaPlayer + son SENGA ; les canaux Android sont immuables. */
+    const val CHANNEL_ID = "mova_driver_jobs_v7"
     private const val NOTIF_ID = 7701
-    private var ringtone: Ringtone? = null
+    private var mediaPlayer: MediaPlayer? = null
 
     fun isJob(data: Map<String, String>): Boolean {
         val kind = data["jobKind"] ?: data["type"] ?: return false
@@ -36,7 +36,7 @@ object JobRing {
         val kindRaw = data["jobKind"] ?: data["type"] ?: "RIDE"
         val id = data["referenceId"] ?: data["rideId"] ?: data["deliveryId"] ?: ""
         val kind = if (kindRaw.contains("DELIVERY")) "delivery" else "ride"
-        val sound = Uri.parse("android.resource://${context.packageName}/raw/senga_job")
+        val sound = Uri.parse("android.resource://${context.packageName}/${R.raw.senga_job}")
         ensureChannel(context, sound)
 
         val launch = launchIntent(context, kind, id)
@@ -61,7 +61,7 @@ object JobRing {
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(NOTIF_ID, notification)
-        startLoop(context, sound)
+        startLoop(context)
         try {
             context.startActivity(launch)
         } catch (_: Exception) {
@@ -70,11 +70,7 @@ object JobRing {
     }
 
     fun stop(context: Context) {
-        try {
-            ringtone?.stop()
-        } catch (_: Exception) {
-        }
-        ringtone = null
+        stopPlayer()
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.cancel(NOTIF_ID)
     }
@@ -92,6 +88,7 @@ object JobRing {
     private fun ensureChannel(context: Context, sound: Uri) {
         if (Build.VERSION.SDK_INT < 26) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (nm.getNotificationChannel(CHANNEL_ID) != null) return
         val attrs = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -101,7 +98,7 @@ object JobRing {
             "Missions & courses SENGA",
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
-            description = "Courses et livraisons — sonnerie même app fermée"
+            description = "Courses et livraisons — sonnerie SENGA même app fermée"
             setSound(sound, attrs)
             enableVibration(true)
             vibrationPattern = longArrayOf(0, 700, 300, 700)
@@ -110,14 +107,35 @@ object JobRing {
         nm.createNotificationChannel(channel)
     }
 
-    private fun startLoop(context: Context, sound: Uri) {
+    /**
+     * RingtoneManager + URI resource tombe souvent sur le son système OEM.
+     * MediaPlayer sur R.raw.senga_job joue le WAV SENGA en boucle.
+     */
+    private fun startLoop(context: Context) {
+        stopPlayer()
         try {
-            ringtone?.stop()
-            val tone = RingtoneManager.getRingtone(context, sound) ?: return
-            if (Build.VERSION.SDK_INT >= 28) tone.isLooping = true
-            tone.play()
-            ringtone = tone
+            val attrs = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            val mp = MediaPlayer.create(context, R.raw.senga_job) ?: return
+            mp.setAudioAttributes(attrs)
+            mp.isLooping = true
+            mp.start()
+            mediaPlayer = mp
+        } catch (_: Exception) {
+            mediaPlayer = null
+        }
+    }
+
+    private fun stopPlayer() {
+        try {
+            mediaPlayer?.run {
+                if (isPlaying) stop()
+                release()
+            }
         } catch (_: Exception) {
         }
+        mediaPlayer = null
     }
 }

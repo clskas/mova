@@ -28,10 +28,12 @@ class DriverJobAlertService {
   static bool _ringing = false;
   static final Set<String> _activeOfferKeys = {};
   static Timer? _ringSafetyTimer;
+  static Timer? _iosLockScreenRingTimer;
   static const _maxRingDuration = Duration(minutes: 3);
+  static const _iosLockScreenRingEvery = Duration(seconds: 8);
 
-  /// v5 : aligné FCM (`mova_driver_jobs_v5`) — les canaux Android sont immuables.
-  static const _channelSengaId = 'mova_driver_jobs_v5';
+  /// v7 : aligné JobRing / FCM — les canaux Android sont immuables.
+  static const _channelSengaId = 'mova_driver_jobs_v7';
   static const _channelSystemId = 'mova_driver_jobs_system_v3';
   static const _channelSilentId = 'mova_driver_jobs_silent_v3';
   static const _channelName = 'Missions & courses SENGA';
@@ -45,7 +47,11 @@ class DriverJobAlertService {
     if (_initialized) return;
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const darwinInit = DarwinInitializationSettings();
+    const darwinInit = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
     await _plugin.initialize(
       settings: const InitializationSettings(android: androidInit, iOS: darwinInit),
       onDidReceiveNotificationResponse: NotificationTapRouter.onLocalNotificationResponse,
@@ -162,6 +168,7 @@ class DriverJobAlertService {
 
     _ringing = true;
     _armRingSafety();
+    _armIosLockScreenRing();
     try {
       await _player.stop();
       await _player.setReleaseMode(ReleaseMode.loop);
@@ -196,6 +203,8 @@ class DriverJobAlertService {
   static Future<void> _haltRingPlayer() async {
     _ringSafetyTimer?.cancel();
     _ringSafetyTimer = null;
+    _iosLockScreenRingTimer?.cancel();
+    _iosLockScreenRingTimer = null;
     _ringing = false;
     try {
       await _player.stop();
@@ -208,6 +217,7 @@ class DriverJobAlertService {
       if (_notificationId > 0) {
         await _plugin.cancel(id: _notificationId);
       }
+      await _plugin.cancel(id: _iosLockScreenNotifId);
     } catch (_) {
       /* ignore */
     }
@@ -218,6 +228,46 @@ class DriverJobAlertService {
     _ringSafetyTimer = Timer(_maxRingDuration, () {
       unawaited(_haltRingPlayer());
     });
+  }
+
+  /// iOS suspend l’AudioPlayer écran verrouillé : republier une notif locale
+  /// avec `senga_job.wav` pour que le son sorte sur l’écran de verrouillage.
+  static const _iosLockScreenNotifId = 7702;
+
+  static void _armIosLockScreenRing() {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
+    _iosLockScreenRingTimer?.cancel();
+    _iosLockScreenRingTimer = Timer.periodic(_iosLockScreenRingEvery, (_) {
+      if (!_ringing) {
+        _iosLockScreenRingTimer?.cancel();
+        return;
+      }
+      unawaited(_pulseIosLockScreenSound());
+    });
+    unawaited(_pulseIosLockScreenSound());
+  }
+
+  static Future<void> _pulseIosLockScreenSound() async {
+    if (!_ringing || DriverAlertPrefs.muted) return;
+    if (DriverAlertPrefs.style != DriverAlertSoundStyle.senga) return;
+    try {
+      await _plugin.show(
+        id: _iosLockScreenNotifId,
+        title: 'SENGA Driver',
+        body: 'Nouvelle course ou livraison',
+        notificationDetails: const NotificationDetails(
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+            sound: _iosSound,
+            interruptionLevel: InterruptionLevel.timeSensitive,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('Pulse son iOS lock screen : $e');
+    }
   }
 
   static Future<void> notify({

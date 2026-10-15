@@ -185,7 +185,18 @@ export class FcmPushService {
           });
           if (!res.ok) {
             const text = await res.text();
-            this.logger.warn(`FCM v1 push failed (${res.status}) token=${token.slice(0, 12)}… ${text}`);
+            const apnsBroken =
+              text.includes('Invalid APNs credential') ||
+              text.includes('BadEnvironmentKeyInToken') ||
+              text.includes('THIRD_PARTY_AUTH_ERROR');
+            if (apnsBroken) {
+              this.logger.error(
+                `FCM iOS APNs cassé (${res.status}) token=${token.slice(0, 12)}… ` +
+                  `Uploader la clé APNs (.p8) dans Firebase Console → Cloud Messaging → apps Apple. ${text}`,
+              );
+            } else {
+              this.logger.warn(`FCM v1 push failed (${res.status}) token=${token.slice(0, 12)}… ${text}`);
+            }
           }
         } catch (e) {
           this.logger.warn(`FCM v1 push error token=${token.slice(0, 12)}…`, e);

@@ -201,8 +201,6 @@ class DriverJobAlertService {
   static Future<void> _haltRingPlayer() async {
     _ringSafetyTimer?.cancel();
     _ringSafetyTimer = null;
-    _iosLockScreenRingTimer?.cancel();
-    _iosLockScreenRingTimer = null;
     _ringing = false;
     try {
       await _player.stop();
@@ -215,7 +213,6 @@ class DriverJobAlertService {
       if (_notificationId > 0) {
         await _plugin.cancel(id: _notificationId);
       }
-      await _plugin.cancel(id: _iosLockScreenNotifId);
     } catch (_) {
       /* ignore */
     }
@@ -226,46 +223,6 @@ class DriverJobAlertService {
     _ringSafetyTimer = Timer(_maxRingDuration, () {
       unawaited(_haltRingPlayer());
     });
-  }
-
-  /// iOS suspend l’AudioPlayer écran verrouillé : republier une notif locale
-  /// avec `senga_job.wav` pour que le son sorte sur l’écran de verrouillage.
-  static const _iosLockScreenNotifId = 7702;
-
-  static void _armIosLockScreenRing() {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
-    _iosLockScreenRingTimer?.cancel();
-    _iosLockScreenRingTimer = Timer.periodic(_iosLockScreenRingEvery, (_) {
-      if (!_ringing) {
-        _iosLockScreenRingTimer?.cancel();
-        return;
-      }
-      unawaited(_pulseIosLockScreenSound());
-    });
-    unawaited(_pulseIosLockScreenSound());
-  }
-
-  static Future<void> _pulseIosLockScreenSound() async {
-    if (!_ringing || DriverAlertPrefs.muted) return;
-    if (DriverAlertPrefs.style != DriverAlertSoundStyle.senga) return;
-    try {
-      await _plugin.show(
-        id: _iosLockScreenNotifId,
-        title: 'SENGA Driver',
-        body: 'Nouvelle course ou livraison',
-        notificationDetails: const NotificationDetails(
-          iOS: DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-            sound: _iosSound,
-            interruptionLevel: InterruptionLevel.timeSensitive,
-          ),
-        ),
-      );
-    } catch (e) {
-      if (kDebugMode) debugPrint('Pulse son iOS lock screen : $e');
-    }
   }
 
   static Future<void> notify({

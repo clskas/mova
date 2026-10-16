@@ -293,7 +293,8 @@ export class FcmPushService {
             aps: {
               alert: { title: message.title, body: message.body },
               sound: opts.soundIos,
-              badge: 1,
+              // Pas de badge ici : iOS garde le chiffre même après retrait
+              // des notifs du centre (ghost badge). Le badge est géré in-app (chat).
               'content-available': 1,
             },
           },
@@ -318,7 +319,6 @@ export class FcmPushService {
           aps: {
             alert: { title: message.title, body: message.body },
             sound: opts.soundIos,
-            badge: 1,
             'content-available': 1,
           },
         },

@@ -165,6 +165,48 @@ class ChatAlertService {
     next.remove(key);
     unreadByThread.value = next;
     unawaited(_persistUnread());
+    unawaited(syncLauncherBadge());
+  }
+
+  /// Remet le badge icône iOS au nombre de non-lus chat (0 si plus rien).
+  static Future<void> syncLauncherBadge() async {
+    await init();
+    final n = totalUnread;
+    try {
+      const id = 77003;
+      if (n <= 0) {
+        await _plugin.show(
+          id: id,
+          title: '',
+          body: '',
+          notificationDetails: const NotificationDetails(
+            iOS: DarwinNotificationDetails(
+              presentAlert: false,
+              presentBadge: true,
+              presentSound: false,
+              badgeNumber: 0,
+            ),
+          ),
+        );
+        await _plugin.cancel(id: id);
+        return;
+      }
+      await _plugin.show(
+        id: id,
+        title: '',
+        body: '',
+        notificationDetails: NotificationDetails(
+          iOS: DarwinNotificationDetails(
+            presentAlert: false,
+            presentBadge: true,
+            presentSound: false,
+            badgeNumber: n,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('ChatAlert badge sync: $e');
+    }
   }
 
   static void _bumpUnread(String kind, String threadId) {

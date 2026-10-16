@@ -62,6 +62,7 @@ class _NotificationsInboxScreenState extends ConsumerState<NotificationsInboxScr
     }
     // Remet le badge launcher (iOS) à 0 via le canal chat.
     ChatAlertService.unreadByThread.value = const {};
+    await ChatAlertService.syncLauncherBadge();
     if (!mounted) return;
     await _load();
   }

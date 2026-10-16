@@ -1,5 +1,10 @@
 name: Mobile Release
 
+# Sérialise les runs : des uploads Play parallèles font expirer l'Edit API (« This edit has expired »).
+concurrency:
+  group: mobile-release
+  cancel-in-progress: false
+
 on:
   push:
     tags:

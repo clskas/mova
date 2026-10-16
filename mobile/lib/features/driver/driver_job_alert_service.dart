@@ -333,7 +333,8 @@ class DriverJobAlertService {
           ),
           iOS: DarwinNotificationDetails(
             presentAlert: true,
-            presentBadge: true,
+            // Pas de badge launcher : les offres sont éphémères et laissent sinon un chiffre sans notif.
+            presentBadge: false,
             // App fermée : seul le son APNs joue — ne jamais le couper pour les offres.
             presentSound: playSound,
             sound: (playSound && useSengaSound) ? _iosSound : null,

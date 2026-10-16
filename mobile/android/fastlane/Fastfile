@@ -9,22 +9,39 @@ def play_json_key
   ENV.fetch("PLAY_STORE_JSON_KEY_PATH", "/tmp/play-store-key.json")
 end
 
+def edit_expired?(err)
+  msg = err.to_s
+  msg.include?("edit has expired") || msg.include?("Edit has expired")
+end
+
 def upload_aab_internal(package_name:, aab:)
   UI.user_error!("AAB introuvable : #{aab}") unless File.exist?(aab)
   UI.user_error!("JSON Play Store introuvable : #{play_json_key}") unless File.exist?(play_json_key)
 
-  upload_to_play_store(
-    package_name: package_name,
-    aab: aab,
-    track: "internal",
-    release_status: "completed",
-    json_key: play_json_key,
-    skip_upload_apk: true,
-    skip_upload_metadata: true,
-    skip_upload_images: true,
-    skip_upload_screenshots: true,
-    skip_upload_changelogs: true
-  )
+  attempts = 3
+  attempts.times do |i|
+    begin
+      upload_to_play_store(
+        package_name: package_name,
+        aab: aab,
+        track: "internal",
+        release_status: "completed",
+        json_key: play_json_key,
+        skip_upload_apk: true,
+        skip_upload_metadata: true,
+        skip_upload_images: true,
+        skip_upload_screenshots: true,
+        skip_upload_changelogs: true,
+        timeout: 600
+      )
+      return
+    rescue => e
+      raise e unless edit_expired?(e) && i < attempts - 1
+      wait = 20 * (i + 1)
+      UI.important("Play edit expired for #{package_name} — nouvel essai dans #{wait}s (#{i + 2}/#{attempts})")
+      sleep(wait)
+    end
+  end
 end
 
 platform :android do

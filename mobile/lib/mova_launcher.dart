@@ -99,6 +99,7 @@ class _MovaPassengerAppState extends ConsumerState<MovaPassengerApp>
       _chatPoll?.poke();
       ref.read(appUpdateServiceProvider.notifier).onAppResumed();
       NotificationTapRouter.flushPendingAndLaunchDetails();
+      unawaited(ChatAlertService.syncLauncherBadge());
     }
   }
 
@@ -164,6 +165,7 @@ class _MovaDriverAppState extends ConsumerState<MovaDriverApp>
       ref.read(appUpdateServiceProvider.notifier).onAppResumed();
       NotificationTapRouter.flushPendingAndLaunchDetails();
       unawaited(NativeJobWake.consumePending());
+      unawaited(ChatAlertService.syncLauncherBadge());
     }
   }
 

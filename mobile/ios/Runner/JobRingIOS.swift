@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import UserNotifications
 
 /// Arrêt des sonneries course/livraison iOS (fond / écran verrouillé).
@@ -43,6 +44,10 @@ enum JobRingIOS {
     let ids = (0..<8).map { "\(prefix)\($0)" }
     center.removePendingNotificationRequests(withIdentifiers: ids)
     center.removeDeliveredNotifications(withIdentifiers: ids)
+    // Retirer les notifs sans laisser un badge orphelin.
+    DispatchQueue.main.async {
+      UIApplication.shared.applicationIconBadgeNumber = 0
+    }
   }
 
   private static func stringValue(_ raw: Any?) -> String? {

@@ -45,6 +45,20 @@ import UserNotifications
     )
   }
 
+  /// Évite les badges « fantômes » (chiffre sur l’icône sans entrée dans le Centre de notifications).
+  override func applicationDidBecomeActive(_ application: UIApplication) {
+    super.applicationDidBecomeActive(application)
+    syncIconBadgeWithDeliveredNotifications(application)
+  }
+
+  private func syncIconBadgeWithDeliveredNotifications(_ application: UIApplication) {
+    UNUserNotificationCenter.current().getDeliveredNotifications { notes in
+      DispatchQueue.main.async {
+        application.applicationIconBadgeNumber = notes.count
+      }
+    }
+  }
+
   private func ensureKeyWindow(_ application: UIApplication) {
     if let window = self.window {
       window.makeKeyAndVisible()

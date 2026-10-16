@@ -723,7 +723,8 @@ export class GeoService implements OnModuleInit {
     take?: number;
   }) {
     const skip = Math.max(0, Math.round(opts.skip ?? 0));
-    const take = Math.min(200, Math.max(1, Math.round(opts.take ?? 80)));
+    // Admin catalogue : jusqu’à 500 par page (911+ lieux) pour éviter les « disparitions ».
+    const take = Math.min(500, Math.max(1, Math.round(opts.take ?? 80)));
     const city = opts.city?.trim();
     const q = opts.q?.trim();
     const where: Record<string, unknown> = {};
@@ -739,7 +740,8 @@ export class GeoService implements OnModuleInit {
     const [items, total] = await Promise.all([
       this.prisma.placeOfInterest.findMany({
         where,
-        orderBy: [{ city: 'asc' }, { name: 'asc' }],
+        // USER / récents d’abord — les publications admin ne sont plus noyées sous OSM A→Z.
+        orderBy: [{ updatedAt: 'desc' }, { name: 'asc' }],
         skip,
         take,
       }),

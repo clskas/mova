@@ -19,13 +19,19 @@ export class PushTokensService {
     platform?: string,
   ): Promise<string[]> {
     if (userIds.length === 0) return [];
+    const platformFilter =
+      platform?.toLowerCase() === 'ios'
+        ? { platform: { in: ['ios', 'iOS', 'IOS'] } }
+        : platform?.toLowerCase() === 'android'
+          ? { platform: { in: ['android', 'Android', 'ANDROID'] } }
+          : platform
+            ? { platform }
+            : {};
     const rows = await this.prisma.pushDevice.findMany({
       where: {
         userId: { in: userIds },
         appFlavor,
-        ...(platform
-          ? { platform: { equals: platform, mode: 'insensitive' as const } }
-          : {}),
+        ...platformFilter,
       },
       select: { token: true },
     });

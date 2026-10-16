@@ -223,7 +223,8 @@ class CallRingService {
           iOS: DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: true,
-            presentSound: true,
+            // Son géré uniquement par AudioPlayer (boucle) — évite mélange APNs + asset.
+            presentSound: false,
             interruptionLevel: InterruptionLevel.timeSensitive,
           ),
         ),

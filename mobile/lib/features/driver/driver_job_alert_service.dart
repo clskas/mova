@@ -252,7 +252,10 @@ class DriverJobAlertService {
     final channelId = muted
         ? _channelSilentId
         : (preferSenga ? _channelSengaId : _channelSystemId);
-    final playSound = !muted;
+    // Boucle AudioPlayer = un seul son. Ne pas empiler le son du tray local
+    // (sinon iOS joue APNs/FCM + locale + boucle = « mélange »).
+    final traySound = !muted && !suppressTraySound && !ringUntilStopped;
+    final playSound = traySound;
 
     final id = ++_notificationId;
     final shown = await _showSafe(
@@ -262,11 +265,11 @@ class DriverJobAlertService {
       payload: payload,
       channelId: channelId,
       playSound: playSound,
-      useSengaSound: preferSenga,
+      useSengaSound: preferSenga && traySound,
       asCall: ringUntilStopped,
     );
 
-    if (!shown && preferSenga) {
+    if (!shown && preferSenga && traySound) {
       await _showSafe(
         id: id,
         title: title,

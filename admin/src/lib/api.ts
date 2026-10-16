@@ -1614,7 +1614,7 @@ export type CatalogPoi = {
 export async function fetchPoiCatalog(opts: { city?: string; q?: string; skip?: number; take?: number } = {}) {
   const params = new URLSearchParams({
     skip: String(opts.skip ?? 0),
-    take: String(opts.take ?? 80),
+    take: String(opts.take ?? 200),
   });
   if (opts.city) params.set("city", opts.city);
   if (opts.q?.trim()) params.set("q", opts.q.trim());

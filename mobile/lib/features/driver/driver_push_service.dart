@@ -38,12 +38,12 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final refId = message.data['referenceId']?.toString() ??
       message.data['rideId']?.toString() ??
       message.data['deliveryId']?.toString();
+  // CALL = appel LiveKit (CallRingService) — ne pas démarrer la sonnerie « offre ».
   final isOffer = sosPayload == null &&
       (jobKind.contains('RIDE') ||
           jobKind.contains('DELIVERY') ||
           jobKind.contains('OFFER') ||
-          jobKind.contains('JOB') ||
-          jobKind.contains('CALL'));
+          jobKind.contains('JOB'));
   // Chat/SOS : tray FCM déjà affiché → pas de 2ᵉ bip.
   if (message.notification != null && !isOffer && sosPayload == null) return;
 
@@ -124,8 +124,7 @@ class DriverPushService {
             (jobKind.contains('RIDE') ||
                 jobKind.contains('DELIVERY') ||
                 jobKind.contains('OFFER') ||
-                jobKind.contains('JOB') ||
-                jobKind.contains('CALL'));
+                jobKind.contains('JOB'));
         // Évite un 2ᵉ bip « système » pendant que la sonnerie SENGA tourne déjà via le poll.
         if (isOffer && DriverJobAlertService.isRinging) return;
         String? offerKey;

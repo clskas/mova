@@ -545,18 +545,17 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   TextButton(
                     onPressed: () async {
                       _topUpPollTimer?.cancel();
-                      final ref = _pendingTopUpRef;
+                      final pendingRef = _pendingTopUpRef;
                       setState(() {
                         _topUpLoading = false;
                         _pendingTopUpRef = null;
                         _error =
                             'Recharge annulée. Si le PIN réapparaît, refusez-le puis réessayez.';
                       });
-                      if (ref != null && ref.isNotEmpty) {
-                        await apiClientProvider;
-                        await this.ref.read(apiClientProvider).post(
+                      if (pendingRef != null && pendingRef.isNotEmpty) {
+                        await ref.read(apiClientProvider).post(
                           '/wallet/top-up/cancel-pending',
-                          {'providerRef': ref},
+                          {'providerRef': pendingRef},
                         );
                       }
                     },

@@ -115,8 +115,12 @@ export default function LieuxPage() {
   const [items, setItems] = useState<PoiSuggestion[]>([]);
   const [catalog, setCatalog] = useState<CatalogPoi[]>([]);
   const [catalogTotal, setCatalogTotal] = useState(0);
+  const [catalogSkip, setCatalogSkip] = useState(0);
   const [catalogQ, setCatalogQ] = useState("");
+  const [catalogQDebounced, setCatalogQDebounced] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const CATALOG_PAGE = 200;
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
@@ -131,6 +135,15 @@ export default function LieuxPage() {
   const [editCity, setEditCity] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  useEffect(() => {
+    const t = window.setTimeout(() => setCatalogQDebounced(catalogQ.trim()), 300);
+    return () => window.clearTimeout(t);
+  }, [catalogQ]);
+
+  useEffect(() => {
+    setCatalogSkip(0);
+  }, [catalogQDebounced, managedCity, tab]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -138,11 +151,13 @@ export default function LieuxPage() {
       if (tab === "CATALOG") {
         const data = await fetchPoiCatalog({
           city: managedCity ?? undefined,
-          q: catalogQ,
-          take: 120,
+          q: catalogQDebounced,
+          skip: 0,
+          take: CATALOG_PAGE,
         });
         setCatalog(data.items ?? []);
         setCatalogTotal(data.total ?? 0);
+        setCatalogSkip(data.items?.length ?? 0);
         setItems([]);
       } else {
         const data = await fetchPoiSuggestions(tab);
@@ -154,7 +169,32 @@ export default function LieuxPage() {
     } finally {
       setLoading(false);
     }
-  }, [tab, catalogQ, managedCity]);
+  }, [tab, catalogQDebounced, managedCity]);
+
+  const loadMoreCatalog = useCallback(async () => {
+    if (loadingMore || catalog.length >= catalogTotal) return;
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const data = await fetchPoiCatalog({
+        city: managedCity ?? undefined,
+        q: catalogQDebounced,
+        skip: catalogSkip,
+        take: CATALOG_PAGE,
+      });
+      const next = data.items ?? [];
+      setCatalog((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        return [...prev, ...next.filter((p) => !seen.has(p.id))];
+      });
+      setCatalogTotal(data.total ?? catalogTotal);
+      setCatalogSkip((s) => s + next.length);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur de chargement");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, catalog.length, catalogTotal, catalogSkip, managedCity, catalogQDebounced]);
 
   useEffect(() => {
     void load();
@@ -316,7 +356,12 @@ export default function LieuxPage() {
             onChange={setCatalogQ}
             placeholder="Rechercher un lieu (nom ou adresse)…"
           />
-          <p className="text-xs text-gray-500 mt-1">{catalogTotal} lieu{catalogTotal > 1 ? "x" : ""} dans le catalogue</p>
+          <p className="text-xs text-gray-500 mt-1">
+            {catalogTotal} lieu{catalogTotal > 1 ? "x" : ""} dans le catalogue
+            {catalogTotal > 0
+              ? ` — affichage ${catalog.length} / ${catalogTotal} (plus récents d’abord)`
+              : ""}
+          </p>
         </div>
       )}
 
@@ -347,6 +392,15 @@ export default function LieuxPage() {
                 </div>
               </Card>
             ))}
+            {catalog.length < catalogTotal && (
+              <div className="pt-2">
+                <BtnPrimary onClick={loadMoreCatalog} disabled={loadingMore}>
+                  {loadingMore
+                    ? "Chargement…"
+                    : `Afficher plus (${catalog.length} / ${catalogTotal})`}
+                </BtnPrimary>
+              </div>
+            )}
           </div>
         )
       ) : items.length === 0 ? (

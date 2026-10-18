@@ -140,7 +140,7 @@ backup_via_docker() {
 pg_dump_is_transient() {
   local err_file="$1"
   grep -qiE \
-    'the database system is starting up|SSL connection has been closed unexpectedly|Connection refused|could not connect to server|timeout expired|server closed the connection unexpectedly' \
+    'the database system is starting up|SSL connection has been closed unexpectedly|Connection refused|could not connect to server|timeout expired|server closed the connection unexpectedly|service temporarily unavailable|too many connections|remaining connection slots|FATAL:.*unavailable' \
     "$err_file"
 }
 

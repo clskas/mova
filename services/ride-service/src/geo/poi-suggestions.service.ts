@@ -10,7 +10,8 @@ import { assertServiceAreaCoords } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApprovePoiSuggestionDto, CreatePoiSuggestionDto, RejectPoiSuggestionDto } from './poi-suggestions.dto';
 
-const MAX_PENDING_PER_USER = 10;
+/** Limite anti-spam ; assez haute pour les campagnes de cartographie ville. */
+const MAX_PENDING_PER_USER = 50;
 const DUPLICATE_RADIUS_KM = 0.15;
 
 const OSM_AMENITY_BY_CATEGORY: Partial<Record<PlaceOfInterestCategory, string>> = {

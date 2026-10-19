@@ -46,6 +46,9 @@ describe('serdipay Public API', () => {
     expect(serdiPaySanitizeSmsText('Votre code SENGA : 111111. Valide 10 minutes.')).toBe(
       'Votre code SENGA 111111 Valide 10 minutes',
     );
+    expect(serdiPaySanitizeSmsText('Votre code SENGA est 111111\nAbCdEfGhIjK')).toBe(
+      'Votre code SENGA est 111111\nAbCdEfGhIjK',
+    );
     expect(serdiPaySanitizeSmsText('RECU Token Montant 50.00 USD No.Jeton 12')).toBe(
       'RECU Token Montant 50.00 USD No.Jeton 12',
     );

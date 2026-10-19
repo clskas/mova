@@ -1,7 +1,7 @@
 name: mova
 description: SENGA — Plateforme de mobilité RDC
 publish_to: 'none'
-version: 1.0.33+158
+version: 1.0.34+159
 
 environment:
   sdk: ^3.8.1
@@ -45,6 +45,8 @@ dependencies:
   flutter_webrtc: ^1.2.1
   permission_handler: ^11.3.1
   audioplayers: ^6.6.0
+  # Android SMS Retriever — silent OTP autofill; iOS uses system oneTimeCode.
+  sms_autofill: ^2.4.1
 
 dev_dependencies:
   flutter_test:

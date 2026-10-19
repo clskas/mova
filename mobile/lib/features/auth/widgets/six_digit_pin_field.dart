@@ -53,7 +53,7 @@ class SixDigitPinField extends StatelessWidget {
         ),
         counterText: '',
         helperText: forOneTimeCode
-            ? 'Le code SMS se remplit automatiquement — acceptez la suggestion'
+            ? 'Le code se saisit automatiquement dès réception du SMS'
             : null,
         helperMaxLines: 2,
       ),

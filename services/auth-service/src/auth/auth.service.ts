@@ -130,7 +130,13 @@ export class AuthService {
     return (await this.users.ensureContactEmail(userId))?.trim().toLowerCase() || '';
   }
 
-  async requestOtp(phone: string, role?: UserRole, portal?: string, intendedRole?: string) {
+  async requestOtp(
+    phone: string,
+    role?: UserRole,
+    portal?: string,
+    intendedRole?: string,
+    androidSmsHash?: string,
+  ) {
     const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
     if (phone == null || typeof phone !== 'string' || !phone.trim()) {
       throw new MovaHttpException(
@@ -183,7 +189,7 @@ export class AuthService {
 
     let smsResult: { success: boolean; message?: string };
     try {
-      smsResult = await this.sms.sendOtp(normalized, liveCode);
+      smsResult = await this.sms.sendOtp(normalized, liveCode, androidSmsHash);
     } catch (e) {
       this.logger.error(`OTP SMS threw for ${maskPhoneRdc(normalized)}: ${(e as Error).message}`);
       throw new MovaHttpException(

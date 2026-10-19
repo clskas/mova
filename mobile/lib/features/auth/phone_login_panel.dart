@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sms_autofill/sms_autofill.dart';
 import '../../core/auth/google_sign_in.dart';
 import '../../core/config/market_config.dart';
 import '../../core/api/api_client.dart';
@@ -8,6 +9,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'local_pin_setup_screen.dart';
+import 'otp_sms_autofill.dart';
 import 'pin_session.dart';
 import 'widgets/pin_digit_pad.dart';
 import 'widgets/six_digit_pin_field.dart';
@@ -33,7 +35,7 @@ class PhoneLoginPanel extends ConsumerStatefulWidget {
   ConsumerState<PhoneLoginPanel> createState() => _PhoneLoginPanelState();
 }
 
-class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
+class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> with CodeAutoFill {
   final _phoneController = TextEditingController();
   final _codeController = TextEditingController();
   final _pinController = TextEditingController();
@@ -63,6 +65,20 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     _restoreSavedPhone();
     _pinController.addListener(_onPinOrOtpChanged);
     _codeController.addListener(_onPinOrOtpChanged);
+  }
+
+  /// Android SMS Retriever → fill field as soon as the OTP SMS arrives.
+  @override
+  void codeUpdated() {
+    final digits = (code ?? '').replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 6) return;
+    if (_step != PhoneLoginStep.otp && _step != PhoneLoginStep.googleOtp) return;
+    final six = digits.length == 6 ? digits : digits.substring(digits.length - 6);
+    if (_codeController.text == six) return;
+    _codeController.value = TextEditingValue(
+      text: six,
+      selection: TextSelection.collapsed(offset: six.length),
+    );
   }
 
   void _onPinOrOtpChanged() {
@@ -121,12 +137,19 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
 
   @override
   void dispose() {
+    cancel();
+    stopOtpSmsListen();
     _pinController.removeListener(_onPinOrOtpChanged);
     _codeController.removeListener(_onPinOrOtpChanged);
     _phoneController.dispose();
     _codeController.dispose();
     _pinController.dispose();
     super.dispose();
+  }
+
+  Future<void> _armOtpAutofill() async {
+    await startOtpSmsListen();
+    listenForCode();
   }
 
   Future<void> _continueFromPhone() async {
@@ -207,9 +230,11 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     }
     _normalizedPhone = phone;
     final api = ref.read(apiClientProvider);
+    final smsHash = await androidSmsAppHash();
     final result = await api.post('/auth/otp/request', {
       'phone': phone,
       'role': widget.appRole,
+      if (smsHash != null) 'androidSmsHash': smsHash,
     });
     if (!mounted) return;
     switch (result) {
@@ -220,6 +245,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           _error = null;
           _mockHint = kDebugMode ? data['mockCode'] as String? : null;
         });
+        await _armOtpAutofill();
       case Failure(:final error):
         setState(() {
           _loading = false;
@@ -486,6 +512,8 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   void _backToPhone() {
+    cancel();
+    stopOtpSmsListen();
     setState(() {
       _step = PhoneLoginStep.phone;
       _forgotPinRecovery = false;

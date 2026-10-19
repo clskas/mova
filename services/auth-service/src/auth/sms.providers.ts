@@ -24,13 +24,24 @@ export interface SmsSendResult {
 
 export interface SmsProvider {
   readonly name: string;
-  sendOtp(phone: string, code: string): Promise<SmsSendResult>;
+  sendOtp(phone: string, code: string, androidAppHash?: string): Promise<SmsSendResult>;
   isConfigured(): boolean;
 }
 
-export function otpSmsText(brand: string, code: string): string {
-  // iOS Autofill + Android SMS suggestion: keep “code” + digits contiguous.
-  // Domain-bound line helps iOS Security Code AutoFill when Associated Domains are set.
+/** Android SMS Retriever hash (11 chars). Reject anything else. */
+export function sanitizeAndroidSmsHash(raw?: string | null): string | undefined {
+  const h = String(raw ?? '').trim();
+  if (!/^[A-Za-z0-9+/=]{8,15}$/.test(h)) return undefined;
+  return h;
+}
+
+export function otpSmsText(brand: string, code: string, androidAppHash?: string): string {
+  const hash = sanitizeAndroidSmsHash(androidAppHash);
+  // Android SMS Retriever: silent auto-fill (no user tap) when the app is listening.
+  if (hash) {
+    return `<#> Votre code ${brand} est : ${code}. Valide 10 minutes. Ne partagez pas ce code.\n${hash}`;
+  }
+  // iOS Security Code AutoFill (+ Android suggestion without Retriever).
   const domain = (process.env.OTP_AUTOFILL_DOMAIN ?? 'senga.afri-soft.com').trim();
   return (
     `Votre code ${brand} est : ${code}. Valide 10 minutes. Ne partagez pas ce code.\n` +
@@ -47,7 +58,7 @@ export class MockSmsProvider implements SmsProvider {
     return true;
   }
 
-  async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
+  async sendOtp(phone: string, code: string, _androidAppHash?: string): Promise<SmsSendResult> {
     if (isProductionRuntime() || !isMockOtpAllowed()) {
       this.logger.error('[MOCK SMS] refused outside non-prod MOCK_OTP mode');
       return {
@@ -74,11 +85,11 @@ export class AfriSoftSmsHubProvider implements SmsProvider {
     return isAfrisoftSmsHubClientConfigured(this.get);
   }
 
-  async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
+  async sendOtp(phone: string, code: string, androidAppHash?: string): Promise<SmsSendResult> {
     const brand = this.config.get<string>('APP_BRAND_NAME')?.trim() || 'SENGA';
     const result = await afrisoftSmsHubSendSms(this.get, {
       phone,
-      text: otpSmsText(brand, code),
+      text: otpSmsText(brand, code, androidAppHash),
       purpose: 'login',
     });
     if (!result.success) this.logger.warn(`SMS hub: ${result.message}`);
@@ -99,10 +110,10 @@ export class SerdiPaySmsProvider implements SmsProvider {
     return isSerdiPaySmsConfigured(this.get);
   }
 
-  async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
+  async sendOtp(phone: string, code: string, androidAppHash?: string): Promise<SmsSendResult> {
     const result = await serdiPaySendSms(this.get, {
       to: phone,
-      message: otpSmsText('MOVA', code),
+      message: otpSmsText('MOVA', code, androidAppHash),
     });
     if (!result.success) this.logger.warn(`SerdiPay SMS: ${result.message}`);
     return result;
@@ -122,10 +133,10 @@ export class AfricasTalkingSmsProvider implements SmsProvider {
     return isAfricasTalkingConfigured(this.get);
   }
 
-  async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
+  async sendOtp(phone: string, code: string, androidAppHash?: string): Promise<SmsSendResult> {
     const result = await africasTalkingSendSms(this.get, {
       to: phone,
-      message: otpSmsText('MOVA', code),
+      message: otpSmsText('MOVA', code, androidAppHash),
     });
     if (!result.success) this.logger.warn(`Africa's Talking SMS: ${result.message}`);
     return result;
@@ -143,7 +154,7 @@ export class TwilioSmsProvider implements SmsProvider {
     return isTwilioSmsConfigured((key) => this.config.get<string>(key));
   }
 
-  async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
+  async sendOtp(phone: string, code: string, androidAppHash?: string): Promise<SmsSendResult> {
     if (!this.isConfigured()) {
       return {
         success: false,
@@ -183,7 +194,7 @@ export class TwilioSmsProvider implements SmsProvider {
         body: new URLSearchParams({
           To: phone,
           From: from!,
-          Body: otpSmsText('MOVA', code),
+          Body: otpSmsText('MOVA', code, androidAppHash),
         }),
       });
       if (!res.ok) {
@@ -224,7 +235,7 @@ export class SmsService {
     return null;
   }
 
-  async sendOtp(phone: string, code: string): Promise<SmsSendResult> {
+  async sendOtp(phone: string, code: string, androidAppHash?: string): Promise<SmsSendResult> {
     if (isTestOtpAllowedForPhone(phone)) {
       this.logger.warn(`Skip live SMS for seed/test phone ${maskPhoneRdc(phone)}`);
       return { success: true, message: 'Code OTP envoyé (mode test)' };
@@ -241,7 +252,7 @@ export class SmsService {
     }
     this.logger.log(`SMS OTP attempting via ${provider.name} to ${maskPhoneRdc(phone)}`);
     try {
-      const result = await provider.sendOtp(phone, code);
+      const result = await provider.sendOtp(phone, code, sanitizeAndroidSmsHash(androidAppHash));
       if (!result.success) {
         this.logger.error(`SMS OTP failed (${provider.name}): ${result.message}`);
         return { success: false, message: mapSmsDeliveryFailureToUserMessage(result.message) };

@@ -29,6 +29,13 @@ export class RequestOtpDto extends AuthIntentDto {
   @IsString({ message: 'Numéro de téléphone requis.' })
   @IsNotEmpty({ message: 'Numéro de téléphone requis.' })
   phone: string;
+
+  /** Android SMS Retriever app signature hash — enables silent OTP autofill. */
+  @ApiProperty({ required: false, example: 'FA+9qCX9VSu' })
+  @IsOptional()
+  @IsString()
+  @Length(8, 15)
+  androidSmsHash?: string;
 }
 
 export class VerifyOtpDto extends AuthIntentDto {

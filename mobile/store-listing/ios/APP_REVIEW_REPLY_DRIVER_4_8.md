@@ -3,7 +3,7 @@
 Paste into **Reply to App Review** after the new build is on the submission.
 
 ```
-Thank you for the updated review feedback (Oct 8, 2026).
+Thank you for the review feedback.
 
 We have addressed both issues:
 
@@ -33,11 +33,12 @@ How to sign in on the device under review:
 
 Notes:
 - 123456 works as the local PIN for this seed demo account (App Review mode).
+- The account is provisioned automatically when you tap Continue (PIN pad appears; no SMS required).
 - Account deletion path: Aide → Contacter le support
 - Privacy: https://senga.afri-soft.com/privacy
 
 The demo driver is KYC-approved so Online works immediately.
-Please use the new build **1.0.18 (101)** submitted with this reply
+Please use the new build submitted with this reply
 (Google Sign-In removed on iOS; demo PIN 123456 works on production).
 
 Thank you.

@@ -32,16 +32,18 @@ class SixDigitPinField extends StatelessWidget {
   Widget build(BuildContext context) {
     final field = TextField(
       controller: controller,
+      // number + oneTimeCode: iOS Security Code AutoFill + Android SMS suggestion.
       keyboardType: TextInputType.number,
       maxLength: 6,
       autofocus: autofocus,
       enabled: enabled,
       // obscureText bloque l’autofill OTP sur iOS/Android — uniquement pour le PIN.
       obscureText: !forOneTimeCode,
+      autocorrect: false,
+      enableSuggestions: forOneTimeCode,
       autofillHints: forOneTimeCode
           ? const [AutofillHints.oneTimeCode]
-          : null,
-      enableSuggestions: forOneTimeCode,
+          : const [AutofillHints.password],
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       textInputAction: TextInputAction.done,
       decoration: InputDecoration(
@@ -51,7 +53,7 @@ class SixDigitPinField extends StatelessWidget {
         ),
         counterText: '',
         helperText: forOneTimeCode
-            ? 'Astuce : acceptez la suggestion du code au-dessus du clavier'
+            ? 'Le code SMS se remplit automatiquement — acceptez la suggestion'
             : null,
         helperMaxLines: 2,
       ),

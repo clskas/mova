@@ -59,7 +59,8 @@ model DriverProfile {
   activationPin             String?
   activationPinVerifiedAt   DateTime?
   activationPinExpiresAt    DateTime?
-  operatingCity             String    @default("Kinshasa")
+  /// Ville d'exploitation — définie par GPS / admin, jamais de défaut Kinshasa.
+  operatingCity             String?
   isAvailable   Boolean   @default(false)
   /// false = pas de courses taxi/moto (livraisons uniquement si acceptsDeliveries).
   acceptsRides Boolean @default(true)

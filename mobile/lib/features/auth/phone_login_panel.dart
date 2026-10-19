@@ -49,10 +49,10 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   String? _googleDestinationMasked;
   bool _pinSubmitLock = false;
 
-  /// Google Sign-In on phone / forgot steps (all platforms, including iOS).
-  /// Info.plist + GIDClientID / URL scheme must be set per flavor for iOS.
+  /// Google Sign-In on phone / forgot steps — not on iOS (App Store 4.8).
   bool get _showGoogleSignIn =>
-      _step == PhoneLoginStep.phone || _step == PhoneLoginStep.forgot;
+      defaultTargetPlatform != TargetPlatform.iOS &&
+      (_step == PhoneLoginStep.phone || _step == PhoneLoginStep.forgot);
 
   @override
   void initState() {

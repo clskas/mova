@@ -104,6 +104,11 @@ export class InternalController {
   }
   @Get('drivers/count') count() { return this.drivers.countDrivers().then((count) => ({ count })); }
   @Get('drivers/stats') driverStats() { return this.drivers.getAdminStats(); }
+  /** One-shot: clear false Kinshasa defaults / realign from GPS. */
+  @Post('drivers/reconcile-operating-cities')
+  reconcileOperatingCities() {
+    return this.drivers.reconcileOperatingCitiesFromGps();
+  }
   @Get('drivers') listDrivers(
     @Query('skip') skip?: string,
     @Query('take') take?: string,

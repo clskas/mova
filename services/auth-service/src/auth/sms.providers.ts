@@ -29,8 +29,13 @@ export interface SmsProvider {
 }
 
 export function otpSmsText(brand: string, code: string): string {
-  // Format reconnu par l’autofill iOS/Android (« code: 123456 »).
-  return `Votre code ${brand} : ${code}. Valide 10 minutes. Ne partagez pas ce code.`;
+  // iOS Autofill + Android SMS suggestion: keep “code” + digits contiguous.
+  // Domain-bound line helps iOS Security Code AutoFill when Associated Domains are set.
+  const domain = (process.env.OTP_AUTOFILL_DOMAIN ?? 'senga.afri-soft.com').trim();
+  return (
+    `Votre code ${brand} est : ${code}. Valide 10 minutes. Ne partagez pas ce code.\n` +
+    `@${domain} #${code}`
+  );
 }
 
 @Injectable()

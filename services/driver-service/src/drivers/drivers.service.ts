@@ -6,6 +6,7 @@ import {
   MovaHttpException,
   resolveInternalApiKey,
   resolveCityFromCoords,
+  findServiceAreaByCoords,
   serviceUrl,
   MARKET_RDC,
   KYC_DOCUMENT_LABELS,
@@ -170,7 +171,8 @@ export class DriversService {
   async createProfile(userId: string) {
     const profile = await this.prisma.driverProfile.upsert({
       where: { userId },
-      create: { userId, operatingCity: 'Kinshasa' },
+      // Pas de défaut Kinshasa : la ville vient du GPS (updateLocation) ou de l'admin.
+      create: { userId },
       update: {},
     });
     await this.ensureDefaultVehicle(profile.id);
@@ -300,15 +302,72 @@ export class DriversService {
 
   async updateLocation(userId: string, lat: number, lng: number) {
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId } });
-    const data: { currentLat: number; currentLng: number; operatingCity?: string } = {
+    const data: { currentLat: number; currentLng: number; operatingCity?: string | null } = {
       currentLat: lat,
       currentLng: lng,
     };
-    // Ne pas écraser la ville d'exploitation à chaque ping GPS (évite les faux négatifs repas).
+    // Ne pas écraser une ville déjà fixée (admin / premier GPS réel).
+    // Uniquement la zone géographique réelle — pas le « nearest » (évite faux Kinshasa).
     if (!profile?.operatingCity?.trim()) {
-      data.operatingCity = resolveCityFromCoords(lat, lng);
+      const area = findServiceAreaByCoords(lat, lng);
+      if (area) data.operatingCity = area.name;
     }
     return this.prisma.driverProfile.update({ where: { userId }, data });
+  }
+
+  /**
+   * Corrige les operatingCity « Kinshasa » hérités du défaut Prisma alors que le
+   * chauffeur n'a jamais été géolocalisé à Kinshasa (comptage admin faussé).
+   */
+  async reconcileOperatingCitiesFromGps(): Promise<{
+    cleared: number;
+    reassigned: number;
+    keptKinshasa: number;
+  }> {
+    const profiles = await this.prisma.driverProfile.findMany({
+      where: { operatingCity: { not: null } },
+      select: { id: true, operatingCity: true, currentLat: true, currentLng: true },
+    });
+    let cleared = 0;
+    let reassigned = 0;
+    let keptKinshasa = 0;
+    for (const p of profiles) {
+      const current = (p.operatingCity ?? '').trim();
+      if (!current) continue;
+      const lat = p.currentLat;
+      const lng = p.currentLng;
+      if (lat == null || lng == null) {
+        if (current.toLowerCase() === 'kinshasa') {
+          await this.prisma.driverProfile.update({
+            where: { id: p.id },
+            data: { operatingCity: null },
+          });
+          cleared += 1;
+        }
+        continue;
+      }
+      const area = findServiceAreaByCoords(lat, lng);
+      if (!area) {
+        if (current.toLowerCase() === 'kinshasa') {
+          await this.prisma.driverProfile.update({
+            where: { id: p.id },
+            data: { operatingCity: null },
+          });
+          cleared += 1;
+        }
+        continue;
+      }
+      if (area.name.toLowerCase() === current.toLowerCase()) {
+        if (current.toLowerCase() === 'kinshasa') keptKinshasa += 1;
+        continue;
+      }
+      await this.prisma.driverProfile.update({
+        where: { id: p.id },
+        data: { operatingCity: area.name },
+      });
+      reassigned += 1;
+    }
+    return { cleared, reassigned, keptKinshasa };
   }
 
   async uploadKyc(userId: string, type: string, url: string) {

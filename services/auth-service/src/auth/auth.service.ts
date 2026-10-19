@@ -211,7 +211,12 @@ export class AuthService {
     userId?: string,
   ) {
     const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
-    const found = await this.findUserByLoginHandle(phone, userId);
+    let found = await this.findUserByLoginHandle(phone, userId);
+    // App Review: provision seed driver so Continuers sees the PIN pad (not OTP-only).
+    if ((!found.user || !found.user.localPinHash) && requestedRole === UserRole.DRIVER) {
+      await this.ensureAppReviewSeedDriver(found.normalized);
+      found = await this.findUserByLoginHandle(phone, userId);
+    }
     if (!found.user || !found.user.localPinHash) {
       return { success: true, phone: found.normalized, pinEnabled: false };
     }
@@ -232,7 +237,12 @@ export class AuthService {
     userId?: string,
   ) {
     const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
-    const found = await this.findUserByLoginHandle(phone, userId);
+    let found = await this.findUserByLoginHandle(phone, userId);
+    // App Review: create/repair seed driver before PIN check (ASC demo +243900000023 / 123456).
+    if ((!found.user || !found.user.localPinHash) && requestedRole === UserRole.DRIVER) {
+      await this.ensureAppReviewSeedDriver(found.normalized);
+      found = await this.findUserByLoginHandle(phone, userId);
+    }
     await this.assertPinNotLocked(found.lockKey);
     const user = found.user;
     if (!user?.localPinHash) {
@@ -256,6 +266,57 @@ export class AuthService {
       throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support SENGA.');
     }
     return this.buildAuthResponse(user, { isNew: false });
+  }
+
+  /**
+   * Ensures App Review / Play seed driver exists with PIN 123456 + KYC approved
+   * when ALLOW_TEST_OTP=true. No-op otherwise.
+   */
+  private async ensureAppReviewSeedDriver(phone: string): Promise<User | null> {
+    if (process.env.ALLOW_TEST_OTP !== 'true') return null;
+    if (!isSeedDemoPhone(phone) || isDemoUserInsertForbidden(phone)) return null;
+    const normalized = normalizePhoneRdc(phone);
+    if (!normalized) return null;
+
+    let user = await this.prisma.user.findUnique({ where: { phone: normalized } });
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          phone: normalized,
+          role: UserRole.DRIVER,
+          status: UserStatus.ACTIVE,
+          firstName: 'Alain',
+          lastName: 'Kabeya',
+          localPinHash: hashLocalPin(TEST_OTP_CODE),
+          localPinSetAt: new Date(),
+        },
+      });
+      await this.provisionUser(user.id, user.role);
+      await this.approveSeedDemoDriver(user.id);
+      this.logger.log(`App Review seed driver provisioned: ${maskPhoneRdc(normalized)}`);
+      return user;
+    }
+
+    const needsPin = !user.localPinHash;
+    const needsActive = user.status !== UserStatus.ACTIVE;
+    const needsRole = user.role !== UserRole.DRIVER;
+    if (needsPin || needsActive || needsRole) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          ...(needsPin
+            ? { localPinHash: hashLocalPin(TEST_OTP_CODE), localPinSetAt: new Date() }
+            : {}),
+          ...(needsActive ? { status: UserStatus.ACTIVE } : {}),
+          ...(needsRole ? { role: UserRole.DRIVER } : {}),
+          ...(isSeedDemoPhone(normalized)
+            ? { firstName: user.firstName || 'Alain', lastName: user.lastName || 'Kabeya' }
+            : {}),
+        },
+      });
+    }
+    await this.approveSeedDemoDriver(user.id);
+    return user;
   }
 
   async verifyLoginPin(userId: string, pin: string) {

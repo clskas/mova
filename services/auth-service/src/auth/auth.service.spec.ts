@@ -467,7 +467,7 @@ describe('AuthService', () => {
       success: true,
       phone: '+243812345678',
     });
-    expect(sms.sendOtp).toHaveBeenCalledWith('+243812345678', expect.any(String));
+    expect(sms.sendOtp).toHaveBeenCalledWith('+243812345678', expect.any(String), undefined);
   });
 
   it('sends Google email OTP on first driver-app login (no session JWT yet)', async () => {

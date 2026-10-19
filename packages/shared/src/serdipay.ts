@@ -179,10 +179,12 @@ export function serdiPayNormalizeSmsPhone(phone: string): string {
  * Keep decimals (`50.00`) and abbreviations (`No.Jeton`).
  */
 export function serdiPaySanitizeSmsText(text: string): string {
+  // Keep newlines (Android SMS Retriever needs the app hash on its own last line).
   return text
     .replace(/\.(\s|$)/g, ' $1')
     .replace(/[:;!?]/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(/ *\n */g, '\n')
     .trim();
 }
 

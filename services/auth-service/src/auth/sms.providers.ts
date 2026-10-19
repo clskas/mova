@@ -37,16 +37,12 @@ export function sanitizeAndroidSmsHash(raw?: string | null): string | undefined 
 
 export function otpSmsText(brand: string, code: string, androidAppHash?: string): string {
   const hash = sanitizeAndroidSmsHash(androidAppHash);
-  // Android SMS Retriever: hash on its own last line (no "<#>" — SerdiPay rejects that prefix).
-  if (hash) {
-    return `Votre code ${brand} est : ${code}. Valide 10 minutes. Ne partagez pas ce code.\n${hash}`;
-  }
-  // iOS Security Code AutoFill (+ Android suggestion without Retriever).
-  const domain = (process.env.OTP_AUTOFILL_DOMAIN ?? 'senga.afri-soft.com').trim();
-  return (
-    `Votre code ${brand} est : ${code}. Valide 10 minutes. Ne partagez pas ce code.\n` +
-    `@${domain} #${code}`
-  );
+  // Keep SerdiPay-safe copy (no "<#>", no "@domain #code" — both break delivery).
+  // "code … 123456" is enough for iOS / Android system OTP suggestions.
+  const base = `Votre code ${brand} est ${code} Valide 10 minutes Ne partagez pas ce code`;
+  // Android SMS Retriever: app hash alone on the last line.
+  if (hash) return `${base}\n${hash}`;
+  return base;
 }
 
 @Injectable()

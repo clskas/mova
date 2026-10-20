@@ -176,23 +176,6 @@ describe('prod-security', () => {
     expect(matchesSeedTestOtp('+243812345678', '123456')).toBe(false);
   });
 
-  it('production emergency OTP bypass only for listed phones when flag set', async () => {
-    process.env.NODE_ENV = 'production';
-    process.env.ALLOW_TEST_OTP = 'true';
-    process.env.OTP_EMERGENCY_BYPASS = 'true';
-    process.env.OTP_EMERGENCY_PHONES = '+243893515173,+243970000001';
-    process.env.AFRISOFT_SMS_HUB_URL = 'https://sms.afri-soft.com';
-    process.env.AFRISOFT_HUB_API_KEY = 'hub-key';
-    const { isTestOtpAllowedForPhone, isEmergencyOtpPhone, matchesSeedTestOtp } =
-      await import('./prod-security');
-    expect(isEmergencyOtpPhone('+243893515173')).toBe(true);
-    expect(isTestOtpAllowedForPhone('+243893515173')).toBe(true);
-    expect(matchesSeedTestOtp('+243893515173', '123456')).toBe(true);
-    expect(isTestOtpAllowedForPhone('+243812345678')).toBe(false);
-    delete process.env.OTP_EMERGENCY_BYPASS;
-    delete process.env.OTP_EMERGENCY_PHONES;
-  });
-
   it('otpCodesToIssue stores live SMS code for seed phones in production', async () => {
     process.env.NODE_ENV = 'production';
     delete process.env.ALLOW_TEST_OTP;

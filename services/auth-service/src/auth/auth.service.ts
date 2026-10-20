@@ -18,7 +18,6 @@ import {
   maskEmail,
   userNeedsPinSetup,
   isTestOtpAllowedForPhone,
-  isEmergencyOtpPhone,
   matchesSeedTestOtp,
   otpCodesToIssue,
   TEST_OTP_CODE,
@@ -179,17 +178,12 @@ export class AuthService {
     }
 
     if (useTestOtp) {
-      const emergency = isEmergencyOtpPhone(normalized);
-      this.logger.warn(
-        `${emergency ? 'EMERGENCY' : 'TEST'} OTP ${TEST_OTP_CODE} for whitelisted phone ${maskPhoneRdc(normalized)}`,
-      );
+      this.logger.warn(`TEST OTP ${TEST_OTP_CODE} for whitelisted phone ${maskPhoneRdc(normalized)}`);
       return {
         success: true,
-        message: emergency
-          ? `SMS opérateur indisponible. Code de secours : ${TEST_OTP_CODE}`
-          : 'Code OTP envoyé (mode test)',
+        message: 'Code OTP envoyé (mode test)',
         phone: normalized,
-        ...(process.env.NODE_ENV !== 'production' || emergency ? { mockCode: TEST_OTP_CODE } : {}),
+        ...(process.env.NODE_ENV !== 'production' ? { mockCode: TEST_OTP_CODE } : {}),
       };
     }
 

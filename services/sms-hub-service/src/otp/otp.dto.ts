@@ -58,6 +58,11 @@ export class SendSmsDto {
   @MaxLength(640)
   text: string;
 
+  /** login | otp | notify — login/otp may trigger redundant carrier send. */
+  @IsOptional()
+  @IsString()
+  purpose?: string;
+
   @IsOptional()
   @IsString()
   reference?: string;

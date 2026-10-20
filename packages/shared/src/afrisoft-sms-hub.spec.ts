@@ -87,6 +87,7 @@ describe('afrisoft-sms-hub', () => {
     expect(headers['X-AfriSoft-Signature']).toBe(expected);
     expect(JSON.parse(body).phone).toBe('243970000001');
     expect(JSON.parse(body).text).toMatch(/482913/);
+    expect(JSON.parse(body).purpose).toBe('login');
   });
 
   it('surfaces nested hub error.message when SMS send fails', async () => {

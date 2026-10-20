@@ -32,6 +32,45 @@ export class ProviderService {
     return defaults[appId.toLowerCase()] || appId;
   }
 
+  private redundantOtpEnabled(): boolean {
+    const raw = (this.get('SMS_OTP_REDUNDANT_SEND') || '').trim().toLowerCase();
+    return raw === '1' || raw === 'true' || raw === 'yes';
+  }
+
+  private isOtpPurpose(purpose?: string): boolean {
+    const p = (purpose || '').trim().toLowerCase();
+    return p === 'login' || p === 'otp' || p === 'auth' || p === 'verify';
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * SerdiPay often returns SENT while CD operators drop the first SMS.
+   * For login/otp, optionally fire a second identical send ~1.5s later.
+   */
+  private async maybeRedundantSend(
+    provider: SmsBackend,
+    phone: string,
+    text: string,
+    purpose: string | undefined,
+    first: HubSmsResult,
+  ): Promise<void> {
+    if (!first.success || !this.redundantOtpEnabled() || !this.isOtpPurpose(purpose)) return;
+    await this.sleep(1500);
+    try {
+      if (provider === 'africastalking') {
+        await africasTalkingSendSms(this.get, { to: phone, message: text });
+      } else if (provider === 'serdipay') {
+        await serdiPaySendSms(this.get, { to: phone, message: text });
+      }
+      this.logger.log(`OTP redundant SMS sent → ${this.maskPhone(phone)}`);
+    } catch (e) {
+      this.logger.warn(`OTP redundant SMS failed: ${(e as Error).message}`);
+    }
+  }
+
   async sendOtpSms(appId: string, phone: string, code: string, locale = 'fr'): Promise<HubSmsResult> {
     if (isSeedDemoPhone(phone)) {
       this.logger.warn(`Skip OTP SMS for seed phone ${this.maskPhone(phone)} app=${appId}`);
@@ -40,9 +79,7 @@ export class ProviderService {
     const provider = this.activeProvider();
     const brand = this.brandName(appId);
     const message =
-      locale === 'en'
-        ? `Your ${brand} code ${code} Valid 5 minutes`
-        : `Votre code ${brand} ${code} Valide 5 minutes`;
+      locale === 'en' ? `${brand} code ${code}` : `Code ${brand} ${code}`;
 
     if (provider === 'mock') {
       // Intentional in MOCK hub bootstrap — codes appear only in server logs, not in API (unless MOCK_RETURN_CODE).
@@ -53,13 +90,17 @@ export class ProviderService {
     if (provider === 'africastalking') {
       const result = await africasTalkingSendSms(this.get, { to: phone, message });
       if (!result.success) this.logger.warn(`AT SMS failed: ${result.message}`);
-      return { success: result.success, message: result.message, provider };
+      const out = { success: result.success, message: result.message, provider };
+      await this.maybeRedundantSend(provider, phone, message, 'login', out);
+      return out;
     }
 
     if (provider === 'serdipay') {
       const result = await serdiPaySendSms(this.get, { to: phone, message });
       if (!result.success) this.logger.warn(`SerdiPay SMS failed: ${result.message}`);
-      return { success: result.success, message: result.message, provider };
+      const out = { success: result.success, message: result.message, provider };
+      await this.maybeRedundantSend(provider, phone, message, 'login', out);
+      return out;
     }
 
     throw new ServiceUnavailableException({
@@ -68,7 +109,12 @@ export class ProviderService {
     });
   }
 
-  async sendTransactional(appId: string, phone: string, text: string): Promise<HubSmsResult> {
+  async sendTransactional(
+    appId: string,
+    phone: string,
+    text: string,
+    purpose?: string,
+  ): Promise<HubSmsResult> {
     if (isSeedDemoPhone(phone)) {
       this.logger.warn(`Skip SMS for seed phone ${this.maskPhone(phone)} app=${appId}`);
       return { success: true, message: 'SMS skipped (seed phone)', provider: 'mock' };
@@ -80,11 +126,15 @@ export class ProviderService {
     }
     if (provider === 'africastalking') {
       const result = await africasTalkingSendSms(this.get, { to: phone, message: text });
-      return { success: result.success, message: result.message, provider };
+      const out = { success: result.success, message: result.message, provider };
+      await this.maybeRedundantSend(provider, phone, text, purpose, out);
+      return out;
     }
     if (provider === 'serdipay') {
       const result = await serdiPaySendSms(this.get, { to: phone, message: text });
-      return { success: result.success, message: result.message, provider };
+      const out = { success: result.success, message: result.message, provider };
+      await this.maybeRedundantSend(provider, phone, text, purpose, out);
+      return out;
     }
     throw new ServiceUnavailableException({
       message: `SMS provider '${provider}' not supported`,

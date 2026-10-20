@@ -515,10 +515,13 @@ export async function serdiPaySendSms(
   const phoneDigits = serdiPayNormalizePhone(params.to);
   const text = serdiPaySanitizeSmsText(params.message);
 
+  // Prefer default shortcode first: branded senderId (e.g. SerdiPay) is often accepted
+  // (HTTP 200 SENT) but filtered/dropped by some CD operators — especially Orange 089.
   const attempts: Array<{ phone: string; senderId?: string }> = [
-    { phone: phonePlus, senderId },
     { phone: phonePlus },
+    { phone: phonePlus, senderId },
     { phone: phoneDigits },
+    { phone: phoneDigits, senderId },
   ];
   const seen = new Set<string>();
 

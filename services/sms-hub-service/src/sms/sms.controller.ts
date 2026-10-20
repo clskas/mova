@@ -27,7 +27,7 @@ export class SmsController {
       if (cached) return JSON.parse(cached);
     }
 
-    const result = await this.provider.sendTransactional(appId, phone, dto.text);
+    const result = await this.provider.sendTransactional(appId, phone, dto.text, dto.purpose);
     if (!result.success) {
       throw new ServiceUnavailableException({
         message: result.message || 'SMS send failed',

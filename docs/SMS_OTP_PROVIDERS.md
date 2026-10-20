@@ -96,6 +96,16 @@ Numéro **hors** whitelist seed → SMS réel. Logs `mova-auth` : provider `SERD
 | SerdiPay SMS 403 | Recharger / augmenter crédit SMS chez SerdiPay. |
 | Credentials paiement vs SMS | `SERDIPAY_EMAIL` ne suffit pas pour l’OTP — il faut `SERDIPAY_SMS_API_ID` / `KEY`. |
 | Admin SMS non activé | Demander à SerdiPay d’activer l’API SMS sur le compte marchand. |
+| API « SMS envoyé » mais téléphone vide | Texte court + sans sender brandé + `SMS_OTP_REDUNDANT_SEND=1` sur le hub ; contacter SerdiPay avec heure/`sms_id` (pas de DLR exposé). |
+
+### Fiabilité livraison (SENT mais pas reçu)
+
+SerdiPay peut renvoyer HTTP 200 / `SENT` alors que l’opérateur CD (souvent Orange `089`) ne livre pas. Mitigations :
+
+- Texte OTP court (`Code SENGA 123456`) — moins de multipart
+- Essai **sans** `senderId` d’abord (shortcode), puis sender brandé
+- `SMS_OTP_REDUNDANT_SEND=1` — 2ᵉ envoi identique ~1,5 s pour `purpose=login|otp`
+- Laisser `SERDIPAY_SMS_SENDER_ID` vide si le sender `SerdiPay` est filtré
 
 ## Fichiers code
 

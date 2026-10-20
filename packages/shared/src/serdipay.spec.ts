@@ -573,11 +573,11 @@ describe('serdipay Public API', () => {
       expect.objectContaining({ method: 'POST' }),
     );
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    // Default shortcode first (no senderId) — better CD delivery when branded sender is filtered.
     expect(body).toEqual({
       apiId: 'APISMSDEMO',
       apiKey: 'test-sms-key',
       phone: '+243994972450',
-      senderId: 'SerdiPay',
       text: 'Votre code MOVA 123456 Valide 10 minutes',
     });
     // No Bearer / get-token for SMS API
@@ -663,27 +663,38 @@ describe('serdipay Public API', () => {
     const first = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     const second = JSON.parse(fetchMock.mock.calls[1][1].body as string);
     const third = JSON.parse(fetchMock.mock.calls[2][1].body as string);
-    expect(first.senderId).toBe('SENGA');
+    // Prefer no sender → branded sender → digits
+    expect(first.senderId).toBeUndefined();
     expect(first.phone).toBe('+243812345678');
     expect(first.text).toBe('Votre code SENGA 123456');
-    expect(second.senderId).toBeUndefined();
+    expect(second.senderId).toBe('SENGA');
     expect(second.phone).toBe('+243812345678');
     expect(third.senderId).toBeUndefined();
     expect(third.phone).toBe('243812345678');
   });
 
-  it('accepts SERDIPAY_SMS_SENDER alias for senderId', async () => {
+  it('accepts SERDIPAY_SMS_SENDER alias for senderId (used after default shortcode fails)', async () => {
     env.SERDIPAY_SMS_API_ID = 'APISMSDEMO';
     env.SERDIPAY_SMS_API_KEY = 'test-sms-key';
     env.SERDIPAY_SMS_SENDER = 'SerdiPay';
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ message: 'SMS sent successfully.' }),
-    });
+    const occor = {
+      ok: false,
+      status: 400,
+      json: async () => ({ message: 'An error occor while processing the sms' }),
+    };
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(occor)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ message: 'SMS sent successfully.' }),
+      });
     (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
     await serdiPaySendSms(get, { to: '+243812345678', message: 'hi' });
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
-    expect(body.senderId).toBe('SerdiPay');
+    const first = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    const second = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+    expect(first.senderId).toBeUndefined();
+    expect(second.senderId).toBe('SerdiPay');
   });
 });

@@ -38,8 +38,9 @@ export function sanitizeAndroidSmsHash(raw?: string | null): string | undefined 
 export function otpSmsText(brand: string, code: string, androidAppHash?: string): string {
   const hash = sanitizeAndroidSmsHash(androidAppHash);
   // Keep SerdiPay-safe copy (no "<#>", no "@domain #code" — both break delivery).
-  // "code … 123456" is enough for iOS / Android system OTP suggestions.
-  const base = `Votre code ${brand} est ${code} Valide 10 minutes Ne partagez pas ce code`;
+  // Short body: Orange/CD often drops long multipart SMS even when aggregator returns SENT.
+  // "Code … 123456" is enough for iOS / Android system OTP suggestions.
+  const base = `Code ${brand} ${code}`;
   // Android SMS Retriever: app hash alone on the last line.
   if (hash) return `${base}\n${hash}`;
   return base;

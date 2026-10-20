@@ -188,6 +188,7 @@ export async function afrisoftSmsHubSendSms(
     app_id: appId,
     phone: serdiPayNormalizePhone(params.phone),
     text: serdiPaySanitizeSmsText(params.text),
+    purpose,
     reference,
     ...(params.idempotencyKey ? { idempotency_key: params.idempotencyKey } : {}),
   };

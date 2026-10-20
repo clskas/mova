@@ -667,6 +667,7 @@ describe('serdipay Public API', () => {
   it('surfaces 403 credit errors from SMS API', async () => {
     env.SERDIPAY_SMS_API_ID = 'APISMSDEMO';
     env.SERDIPAY_SMS_API_KEY = 'test-sms-key';
+    env.SERDIPAY_SMS_SENDER_ID = 'SerdiPay';
     (global as unknown as { fetch: typeof fetch }).fetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 403,

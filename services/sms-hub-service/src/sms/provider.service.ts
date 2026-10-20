@@ -78,8 +78,11 @@ export class ProviderService {
     }
     const provider = this.activeProvider();
     const brand = this.brandName(appId);
+    // Same pre-autofill wording as mova-auth — SerdiPay rejects `#` / `<#>` / `@domain`.
     const message =
-      locale === 'en' ? `${brand} code ${code}` : `Code ${brand} ${code}`;
+      locale === 'en'
+        ? `Your ${brand} code is ${code}. Valid 10 minutes. Do not share this code.`
+        : `Votre code ${brand} : ${code}. Valide 10 minutes. Ne partagez pas ce code.`;
 
     if (provider === 'mock') {
       // Intentional in MOCK hub bootstrap — codes appear only in server logs, not in API (unless MOCK_RETURN_CODE).

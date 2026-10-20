@@ -35,15 +35,15 @@ export function sanitizeAndroidSmsHash(raw?: string | null): string | undefined 
   return h;
 }
 
-export function otpSmsText(brand: string, code: string, androidAppHash?: string): string {
-  const hash = sanitizeAndroidSmsHash(androidAppHash);
-  // Keep SerdiPay-safe copy (no "<#>", no "@domain #code" — both break delivery).
-  // Short body: Orange/CD often drops long multipart SMS even when aggregator returns SENT.
-  // "Code … 123456" is enough for iOS / Android system OTP suggestions.
-  const base = `Code ${brand} ${code}`;
-  // Android SMS Retriever: app hash alone on the last line.
-  if (hash) return `${base}\n${hash}`;
-  return base;
+/**
+ * Pre-autofill copy that delivered on CD via SerdiPay/DreamDigital.
+ * Do NOT append Android Retriever hash, `<#>`, or `@domain #code` — those formats
+ * broke delivery across SENGA / hub apps after the Oct 2026 autofill work.
+ * `androidAppHash` is ignored until a provider that supports Retriever is live.
+ * iOS/Android system OTP suggestion still works from « code … 123456 ».
+ */
+export function otpSmsText(brand: string, code: string, _androidAppHash?: string): string {
+  return `Votre code ${brand} : ${code}. Valide 10 minutes. Ne partagez pas ce code.`;
 }
 
 @Injectable()

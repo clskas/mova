@@ -230,11 +230,11 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> with CodeAuto
     }
     _normalizedPhone = phone;
     final api = ref.read(apiClientProvider);
-    final smsHash = await androidSmsAppHash();
+    // Do not send androidSmsHash until SMS provider accepts Retriever bodies
+    // (hash / <#> / @domain broke SerdiPay delivery for all hub apps).
     final result = await api.post('/auth/otp/request', {
       'phone': phone,
       'role': widget.appRole,
-      if (smsHash != null) 'androidSmsHash': smsHash,
     });
     if (!mounted) return;
     switch (result) {
@@ -341,6 +341,9 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> with CodeAuto
               _mockHint = kDebugMode ? data['mockCode'] as String? : null;
               _error = null;
             });
+            if (data['otpChannel']?.toString() == 'sms') {
+              await _armOtpAutofill();
+            }
             return;
           }
           final phone = _normalizedPhone ?? MarketConfig.normalizePhone(_phoneController.text);

@@ -1,7 +1,6 @@
 export * from './market-rdc.config';
 export * from './ride-contract';
 export * from './mova-error-codes';
-export * from './http-exception.filter';
 export * from './enums';
 export * from './admin-rbac';
 export * from './client-apps-config';
@@ -13,7 +12,6 @@ export * from './territory/rdc-territory';
 export * from './kinshasa-bounds';
 export * from './service-urls';
 export * from './auth-notify';
-export * from './prod-security';
 export * from './partner-connection-pin';
 export * from './play-prelaunch';
 export * from './timing-safe';
@@ -28,10 +26,14 @@ export * from './driver-documents';
 export * from './commerce-type';
 export * from './public-id';
 export * from './africas-talking';
+// serdipay BEFORE http-exception.filter — filter imports serdipay helpers; barrel
+// order otherwise leaves isSerdiPayChannelDisabledError undefined at runtime.
 export * from './serdipay';
 export * from './afrisoft-pay-hub';
 export * from './afrisoft-sms-hub';
 export * from './cinetpay';
+export * from './prod-security';
+export * from './http-exception.filter';
 export * from './supabase-storage';
 export * from './platform-wallet';
 export * from './service-cancel.util';

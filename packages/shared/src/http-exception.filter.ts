@@ -129,12 +129,19 @@ export function toPublicHttpMessage(raw: string, status: number): string {
   }
   const fieldMsg = classValidatorFieldMessage(msg);
   if (fieldMsg) return fieldMsg;
+  const serdiHelpersReady =
+    typeof isSerdiPayChannelDisabledError === 'function' &&
+    typeof isSerdiPayMerchantFloatLowError === 'function' &&
+    typeof isSerdiPayUnauthenticatedError === 'function' &&
+    typeof isAfriSoftHubHmacError === 'function' &&
+    typeof mapSerdiPayPaymentFailure === 'function';
   if (
-    isSerdiPayChannelDisabledError(msg) ||
-    isSerdiPayMerchantFloatLowError(msg) ||
-    isSerdiPayUnauthenticatedError(msg) ||
-    isAfriSoftHubHmacError(msg) ||
-    /payment failed|failed to process the payment/i.test(msg)
+    serdiHelpersReady &&
+    (isSerdiPayChannelDisabledError(msg) ||
+      isSerdiPayMerchantFloatLowError(msg) ||
+      isSerdiPayUnauthenticatedError(msg) ||
+      isAfriSoftHubHmacError(msg) ||
+      /payment failed|failed to process the payment/i.test(msg))
   ) {
     return mapSerdiPayPaymentFailure(status, msg, msg);
   }

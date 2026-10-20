@@ -22,14 +22,18 @@
 
 Téléphone test : `243893515173` (Orange).
 
-## Message à envoyer à SerdiPay
+## Message à coller à SerdiPay (WhatsApp / mail)
 
 > Bonjour,  
-> Nos OTP SMS partent via `API2N4XMR7` → DreamDigital.  
-> DreamDigital répond `Message Submitted` (ex. message_id `2026102008301054300`) pour `243893515173`, mais le SMS n’arrive sur aucun opérateur CD (Orange, Airtel, Vodacom).  
-> Avec `+243…` nous avions `Invalid Destination Address`.  
-> Merci de vérifier le routage A2P RDC + DLR, et de confirmer le sender ID approuvé pour Orange/Airtel/Vodacom.  
-> IP sortante : `178.104.82.66` (`sms.afri-soft.com`).
+> Votre API renvoie bien « SMS sent successfully » (HTTP 200). Ce n’est **pas** le point en litige.  
+>  
+> Dans le champ `data.response` de **votre** réponse, DreamDigital dit autre chose :  
+> - `phone=243893515173` + sender `Wekka` → `status: S`, `remarks: Message Submitted`, `message_id: 2026102008434487300`  
+> - `phone=+243893515173` → `status: F`, `remarks: Invalid Destination Address` (alors que vous renvoyez quand même HTTP 200)  
+>  
+> **Submitted ≠ Delivered.** Le téléphone Orange `+243893515173` (et Airtel/Vodacom testés) ne reçoit rien.  
+> Merci de nous fournir le **DLR Delivered** (pas Submitted) pour `message_id 2026102008434487300`, et le sender ID réellement approuvé RDC (Orange / Airtel / Vodacom).  
+> Compte SMS : `API2N4XMR7` · IP : `178.104.82.66` · `sms.afri-soft.com`.
 
 ## Contournement SENGA
 

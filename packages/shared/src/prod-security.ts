@@ -262,13 +262,42 @@ export function getTestOtpPhones(): Set<string> {
 }
 
 /**
+ * Temporary allowlist while SerdiPay/DreamDigital accepts SMS but CD operators
+ * never deliver. Requires explicit `OTP_EMERGENCY_BYPASS=true` + phone list.
+ * Owner superadmin phone is never eligible.
+ */
+export function getEmergencyOtpPhones(): Set<string> {
+  const raw = process.env.OTP_EMERGENCY_PHONES?.trim();
+  if (!raw) return new Set();
+  return new Set(
+    raw
+      .split(',')
+      .map((s) => normalizeTestOtpPhone(s))
+      .filter((p) => p && p !== OWNER_SUPER_ADMIN_PHONE),
+  );
+}
+
+export function isEmergencyOtpBypassEnabled(): boolean {
+  return process.env.OTP_EMERGENCY_BYPASS === 'true';
+}
+
+export function isEmergencyOtpPhone(phone: string): boolean {
+  if (!isEmergencyOtpBypassEnabled()) return false;
+  const normalized = normalizeTestOtpPhone(phone);
+  if (!normalized || normalized === OWNER_SUPER_ADMIN_PHONE) return false;
+  return getEmergencyOtpPhones().has(normalized);
+}
+
+/**
  * Fixed OTP 123456: local MOCK_OTP, seed phones, or ALLOW_TEST_OTP extras.
- * Production: only seed `+2439000000xx` when `ALLOW_TEST_OTP=true` (App Review / Play demos).
- * Owner phone is never eligible. Real +243 always use the SMS hub.
+ * Production: seed `+2439000000xx` when `ALLOW_TEST_OTP=true` (App Review),
+ * plus optional `OTP_EMERGENCY_BYPASS` allowlist when SMS delivery is down.
+ * Owner phone is never eligible.
  */
 export function isTestOtpAllowedForPhone(phone: string): boolean {
   const normalized = normalizeTestOtpPhone(phone);
   if (normalized === OWNER_SUPER_ADMIN_PHONE) return false;
+  if (isEmergencyOtpPhone(normalized)) return true;
   if (isProductionRuntime()) {
     return isTestOtpModeEnabled() && isSeedDemoPhone(normalized);
   }

@@ -100,12 +100,15 @@ Numéro **hors** whitelist seed → SMS réel. Logs `mova-auth` : provider `SERD
 
 ### Fiabilité livraison (SENT mais pas reçu)
 
-SerdiPay peut renvoyer HTTP 200 / `SENT` alors que l’opérateur CD (souvent Orange `089`) ne livre pas. Mitigations :
+SerdiPay peut renvoyer HTTP 200 « SMS sent successfully » alors que DreamDigital (transporteur) répond `status:F` / `Invalid Destination Address`. Cause fréquente : numéro en `+243…` — DreamDigital exige `243…` ou `0XXXXXXXXX`.
 
-- Texte OTP court (`Code SENGA 123456`) — moins de multipart
-- Essai **sans** `senderId` d’abord (shortcode), puis sender brandé
-- `SMS_OTP_REDUNDANT_SEND=1` — 2ᵉ envoi identique ~1,5 s pour `purpose=login|otp`
-- Laisser `SERDIPAY_SMS_SENDER_ID` vide si le sender `SerdiPay` est filtré
+Mitigations code :
+
+- Envoi avec `243…` puis `0…` (pas `+243` en premier)
+- `senderId` **obligatoire** (HTTP 422 sinon)
+- Rejet des faux succès si DreamDigital `status:F`
+- Texte OTP court (`Code SENGA 123456`)
+- `SMS_OTP_REDUNDANT_SEND=1` — 2ᵉ envoi ~1,5 s pour `purpose=login|otp`
 
 ## Fichiers code
 

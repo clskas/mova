@@ -167,10 +167,48 @@ export function serdiPayNormalizePhone(phone: string): string {
   return digits;
 }
 
-/** SMS API examples use E.164 with leading + (e.g. +243…). */
+/** E.164 with leading + — SerdiPay accepts it, but DreamDigital often rejects it. */
 export function serdiPayNormalizeSmsPhone(phone: string): string {
   const digits = serdiPayNormalizePhone(phone);
   return digits.startsWith('+') ? digits : `+${digits}`;
+}
+
+/** Local CD MSISDN `0XXXXXXXXX` (DreamDigital accepts this for Orange/Airtel/Vodacom). */
+export function serdiPayNormalizeSmsLocalCd(phone: string): string | undefined {
+  const digits = serdiPayNormalizePhone(phone);
+  if (digits.startsWith('243') && digits.length >= 12) return `0${digits.slice(3)}`;
+  return undefined;
+}
+
+/**
+ * SerdiPay HTTP 200 "SMS sent successfully" can still embed DreamDigital
+ * `status:F` / `Invalid Destination Address` when phone used a leading `+`.
+ */
+export function serdiPaySmsUpstreamFailed(data: SerdiPaySmsJson): {
+  failed: boolean;
+  status?: string;
+  remarks?: string;
+} {
+  const raw = data?.data;
+  if (!raw || typeof raw !== 'object') return { failed: false };
+  const resp = (raw as { response?: unknown }).response;
+  let parsed: Record<string, unknown> | null = null;
+  if (typeof resp === 'string') {
+    try {
+      parsed = JSON.parse(resp) as Record<string, unknown>;
+    } catch {
+      return { failed: false };
+    }
+  } else if (resp && typeof resp === 'object') {
+    parsed = resp as Record<string, unknown>;
+  }
+  if (!parsed) return { failed: false };
+  const status = String(parsed.status ?? '').toUpperCase();
+  const remarks = String(parsed.remarks ?? '');
+  if (status === 'F' || /invalid destination/i.test(remarks)) {
+    return { failed: true, status, remarks };
+  }
+  return { failed: false, status, remarks };
 }
 
 /**
@@ -489,12 +527,13 @@ function mapSerdiPaySmsFailure(status: number, data: SerdiPaySmsJson): SerdiPayS
 }
 
 /**
- * Envoi SMS — SerdiPay SMS API (sms-api.pdf).
- * POST {base}/api/sms-api/v1/send with { apiId, apiKey, phone, senderId?, text }.
+ * Envoi SMS — SerdiPay SMS API (sms-api.pdf) → DreamDigital.
+ * POST {base}/api/sms-api/v1/send with { apiId, apiKey, phone, senderId, text }.
  * Does not use payment get-token / Bearer auth.
  *
- * On HTTP 400 "An error occor…", retry without senderId then with 243… (no +).
- * An unapproved alphanumeric sender is a frequent production cause.
+ * DreamDigital rejects E.164 with leading `+` (`Invalid Destination Address`) while
+ * SerdiPay still returns HTTP 200 — always prefer `243…` / `0…` and inspect upstream.
+ * `senderId` is required (HTTP 422 without it).
  */
 export async function serdiPaySendSms(
   get: EnvGetter,
@@ -510,25 +549,32 @@ export async function serdiPaySendSms(
   const apiId = firstEnv(get, SERDIPAY_ENV_KEYS.smsApiId)!;
   const apiKey = firstEnv(get, SERDIPAY_ENV_KEYS.smsApiKey)!;
   const senderId = firstEnv(get, SERDIPAY_ENV_KEYS.smsSenderId, 'SERDIPAY_SMS_SENDER');
+  if (!senderId) {
+    return {
+      success: false,
+      message: SERDIPAY_SMS_REJECTED_FR,
+    };
+  }
   const url = `${smsBaseUrl(get)}${pathOr(get, 'smsPath', '/api/sms-api/v1/send')}`;
-  const phonePlus = serdiPayNormalizeSmsPhone(params.to);
   const phoneDigits = serdiPayNormalizePhone(params.to);
+  const phoneLocal = serdiPayNormalizeSmsLocalCd(params.to);
+  const phonePlus = serdiPayNormalizeSmsPhone(params.to);
   const text = serdiPaySanitizeSmsText(params.message);
 
-  // Prefer default shortcode first: branded senderId (e.g. SerdiPay) is often accepted
-  // (HTTP 200 SENT) but filtered/dropped by some CD operators — especially Orange 089.
-  const attempts: Array<{ phone: string; senderId?: string }> = [
-    { phone: phonePlus },
-    { phone: phonePlus, senderId },
-    { phone: phoneDigits },
-    { phone: phoneDigits, senderId },
-  ];
+  // Order matters: DreamDigital accepts 243… and 0… ; +243… returns status F.
+  const phones = [phoneDigits, phoneLocal, phonePlus].filter(
+    (p): p is string => Boolean(p),
+  );
+  const attempts: Array<{ phone: string; senderId: string }> = phones.map((phone) => ({
+    phone,
+    senderId,
+  }));
   const seen = new Set<string>();
 
   try {
     let last: { status: number; data: SerdiPaySmsJson } | undefined;
     for (const attempt of attempts) {
-      const key = `${attempt.phone}|${attempt.senderId ?? ''}`;
+      const key = `${attempt.phone}|${attempt.senderId}`;
       if (seen.has(key)) continue;
       seen.add(key);
       const { status, data } = await postSerdiPaySms(url, {
@@ -536,16 +582,34 @@ export async function serdiPaySendSms(
         apiKey,
         phone: attempt.phone,
         text,
-        ...(attempt.senderId ? { senderId: attempt.senderId } : {}),
+        senderId: attempt.senderId,
       });
       last = { status, data };
       if (status === 200 && data.success !== false) {
+        const upstream = serdiPaySmsUpstreamFailed(data);
+        if (upstream.failed) {
+          // Fake success from SerdiPay — try next MSISDN format.
+          continue;
+        }
         return { success: true, message: data.message ?? 'SMS envoyé via SerdiPay' };
       }
-      const detail = data.message ?? data.error ?? '';
-      if (!isSerdiPaySmsProcessingError(status, detail)) {
+      const detail = `${data.message ?? ''} ${data.error ?? ''}`;
+      const senderMissing =
+        status === 422 && /senderid|sender.?id/i.test(detail + JSON.stringify(data));
+      if (senderMissing || isSerdiPaySmsProcessingError(status, detail)) {
+        continue;
+      }
+      // Non-retryable (credits, auth, …) — stop.
+      if (status === 403 || /insufficient sms|crédit.*sms|not enough sms/i.test(detail)) {
         return mapSerdiPaySmsFailure(status, data);
       }
+      continue;
+    }
+    if (last && serdiPaySmsUpstreamFailed(last.data).failed) {
+      return {
+        success: false,
+        message: SERDIPAY_SMS_REJECTED_FR,
+      };
     }
     return last
       ? mapSerdiPaySmsFailure(last.status, last.data)

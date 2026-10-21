@@ -142,6 +142,53 @@ jobs:
             echo "gateway=${{ secrets.GATEWAY_RENDER_SERVICE_ID }}" >> "$GITHUB_OUTPUT"
           fi
 
+      # Wake Render Postgres + apply pending migrations before containers restart.
+      # Reduces ride crash loops (FATAL / P1017) when migrate races traffic on cold start.
+      - name: Wake Postgres and pre-migrate (rides + auth)
+        env:
+          DATABASE_URL_AUTH: ${{ secrets.DATABASE_URL_AUTH }}
+          DATABASE_URL_RIDES: ${{ secrets.DATABASE_URL_RIDES }}
+        run: |
+          set -euo pipefail
+          wake() {
+            local label="$1" url="$2"
+            if [ -z "$url" ]; then
+              echo "::warning::skip wake $label — secret unset"
+              return 0
+            fi
+            echo "=== wake $label ==="
+            for i in 1 2 3 4 5 6 7 8; do
+              if psql "$url" -v ON_ERROR_STOP=1 -c 'SELECT 1' >/dev/null 2>&1; then
+                echo "$label ready (attempt $i)"
+                return 0
+              fi
+              echo "WARN: $label not ready (attempt $i) — sleep $((i * 3))s"
+              sleep $((i * 3))
+            done
+            echo "::warning::$label still cold after wake attempts — container entrypoint will retry"
+          }
+          wake auth "${DATABASE_URL_AUTH:-}"
+          wake rides "${DATABASE_URL_RIDES:-}"
+
+          migrate_one() {
+            local label="$1" url="$2" dir="$3"
+            if [ -z "$url" ]; then
+              echo "::warning::skip pre-migrate $label — secret unset"
+              return 0
+            fi
+            echo "=== pre-migrate $label ==="
+            (
+              cd "$dir"
+              export DATABASE_URL="$url"
+              export PRISMA_MIGRATE_SKIP_SEED=1
+              export SKIP_DEMO_SEED=true
+              export RUN_SEED=false
+              npx --yes prisma@5.22.0 migrate deploy
+            ) || echo "::warning::pre-migrate $label failed — container start will retry"
+          }
+          migrate_one auth "${DATABASE_URL_AUTH:-}" services/auth-service
+          migrate_one rides "${DATABASE_URL_RIDES:-}" services/ride-service
+
       - name: Trigger Render deploy (API + web + portals)
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
@@ -152,8 +199,8 @@ jobs:
 
       - name: Note — migrations run on container start
         run: |
-          echo "Prisma migrate deploy runs inside each Prisma service container via"
-          echo "scripts/migrate-with-backup.sh (backup-then-migrate; fails if backup fails)."
+          echo "CI already woke Postgres + pre-migrated auth/rides when secrets are set."
+          echo "Containers still run scripts/migrate-with-backup.sh as a safety net (usually no-op)."
           echo "prisma db seed is FORBIDDEN on production — never create +2439000000xx demo users."
 
       - name: Wait for Render deploy (gateway)

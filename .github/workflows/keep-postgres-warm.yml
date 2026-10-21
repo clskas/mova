@@ -1,0 +1,37 @@
+name: Keep Postgres Warm
+
+# Render Postgres flaps / sleeps under low traffic; ride deploys then hit
+# FATAL "service temporarily unavailable". Ping DB-backed health every 10 minutes.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keep-postgres-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    if: github.repository != 'afri-soft-com/mova'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping ride + auth health (DB SELECT 1)
+        run: |
+          set -euo pipefail
+          ping_one() {
+            local name="$1" url="$2"
+            code=$(curl -sS -o /tmp/mova-warm.json -w "%{http_code}" --max-time 45 "$url" || echo "000")
+            body=$(head -c 200 /tmp/mova-warm.json 2>/dev/null || true)
+            echo "$name HTTP $code $body"
+            if [ "$code" != "200" ]; then
+              echo "::warning::$name health returned $code"
+            fi
+          }
+          ping_one ride "https://mova-ride.onrender.com/health"
+          ping_one auth "https://mova-auth.onrender.com/health"
+          ping_one gateway "https://mova-gateway.onrender.com/health/live"

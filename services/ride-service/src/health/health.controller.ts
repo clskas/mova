@@ -36,7 +36,7 @@ export class HealthController {
   async health() {
     let dbOk = false;
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
+      await this.prisma.withRetry(() => this.prisma.$queryRaw`SELECT 1`, 'health');
       dbOk = true;
     } catch {
       dbOk = false;

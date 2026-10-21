@@ -26,7 +26,7 @@ RUN npm config set fetch-retries 5 && npm install prisma@5.22.0 --no-save
 COPY --from=builder /app/services/ride-service/dist ./dist
 COPY --from=builder /app/services/ride-service/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/services/ride-service/prisma ./prisma
-COPY scripts/backup-db.sh scripts/migrate-with-backup.sh scripts/ride-entrypoint.sh /app/scripts/
+COPY scripts/backup-db.sh scripts/migrate-with-backup.sh scripts/wait-for-postgres.sh scripts/ride-entrypoint.sh /app/scripts/
 RUN chmod +x /app/scripts/*.sh
 ENV NODE_ENV=production APP_ENV=production MOVA_SERVICE=rides
 EXPOSE 3000

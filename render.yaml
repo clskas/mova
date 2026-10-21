@@ -103,7 +103,8 @@ services:
     runtime: docker
     dockerfilePath: ./docker/ride.Dockerfile
     dockerContext: .
-    # Start HTTP first so Render health checks pass while migrate retries against waking Postgres.
+    # Boot: wait Postgres → migrate → Nest (scripts/ride-entrypoint.sh). Avoids exit-1 when
+    # HTTP served during DB cold-start. Live probe stays DB-free so Render can pass once Nest binds.
     # Use dedicated script — do not inline $! / $pid in dockerCommand (Render/shell strip them → exit 127).
     dockerCommand: bash /app/scripts/ride-entrypoint.sh
     plan: starter

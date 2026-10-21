@@ -558,37 +558,30 @@ export async function serdiPaySendSms(
   const url = `${smsBaseUrl(get)}${pathOr(get, 'smsPath', '/api/sms-api/v1/send')}`;
   const phoneDigits = serdiPayNormalizePhone(params.to);
   const phoneLocal = serdiPayNormalizeSmsLocalCd(params.to);
-  const phonePlus = serdiPayNormalizeSmsPhone(params.to);
   const text = serdiPaySanitizeSmsText(params.message);
 
-  // Order matters: DreamDigital accepts 243… and 0… ; +243… returns status F.
-  const phones = [phoneDigits, phoneLocal, phonePlus].filter(
-    (p): p is string => Boolean(p),
-  );
-  const attempts: Array<{ phone: string; senderId: string }> = phones.map((phone) => ({
-    phone,
-    senderId,
-  }));
+  // Match working CD probes: one shot with `243…` only. Multi-format retries
+  // (+243 / 0…) caused Submitted-without-delivery on the app path while a
+  // single direct `243…` send arrived on the handset.
+  const phones = [phoneDigits, phoneLocal].filter((p): p is string => Boolean(p));
   const seen = new Set<string>();
 
   try {
     let last: { status: number; data: SerdiPaySmsJson } | undefined;
-    for (const attempt of attempts) {
-      const key = `${attempt.phone}|${attempt.senderId}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+    for (const phone of phones) {
+      if (seen.has(phone)) continue;
+      seen.add(phone);
       const { status, data } = await postSerdiPaySms(url, {
         apiId,
         apiKey,
-        phone: attempt.phone,
+        phone,
         text,
-        senderId: attempt.senderId,
+        senderId,
       });
       last = { status, data };
       if (status === 200 && data.success !== false) {
         const upstream = serdiPaySmsUpstreamFailed(data);
         if (upstream.failed) {
-          // Fake success from SerdiPay — try next MSISDN format.
           continue;
         }
         return { success: true, message: data.message ?? 'SMS envoyé via SerdiPay' };
@@ -599,7 +592,6 @@ export async function serdiPaySendSms(
       if (senderMissing || isSerdiPaySmsProcessingError(status, detail)) {
         continue;
       }
-      // Non-retryable (credits, auth, …) — stop.
       if (status === 403 || /insufficient sms|crédit.*sms|not enough sms/i.test(detail)) {
         return mapSerdiPaySmsFailure(status, data);
       }

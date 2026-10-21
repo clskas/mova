@@ -133,8 +133,12 @@ export class ProviderService {
       return out;
     }
     if (provider === 'serdipay') {
+      this.logger.log(
+        `SMS send → ${this.maskPhone(phone)} purpose=${purpose || 'n/a'} text="${text.slice(0, 48)}"`,
+      );
       const result = await serdiPaySendSms(this.get, { to: phone, message: text });
       const out = { success: result.success, message: result.message, provider };
+      if (!result.success) this.logger.warn(`SerdiPay SMS failed: ${result.message}`);
       await this.maybeRedundantSend(provider, phone, text, purpose, out);
       return out;
     }

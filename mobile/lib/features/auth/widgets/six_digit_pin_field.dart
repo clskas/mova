@@ -4,8 +4,8 @@ import '../../../core/theme/mova_colors.dart';
 
 /// Champ de saisie d'un code à 6 chiffres (PIN local ou OTP SMS/e-mail).
 ///
-/// Pour un OTP SMS, passer [forOneTimeCode] afin d’activer l’autofill système
-/// (iOS Messages / Android Gboard — suggestion au-dessus du clavier).
+/// Pour un OTP SMS, passer [forOneTimeCode] :
+/// iOS = barre Messages ; Android = User Consent + hint clavier.
 class SixDigitPinField extends StatefulWidget {
   const SixDigitPinField({
     super.key,
@@ -98,7 +98,7 @@ class _SixDigitPinFieldState extends State<SixDigitPinField> {
         ),
         counterText: '',
         helperText: forOtp
-            ? 'Touchez le code proposé au-dessus du clavier dès réception du SMS'
+            ? 'Le code se remplit après réception du SMS (autorisez si Android le demande)'
             : null,
         helperMaxLines: 2,
       ),

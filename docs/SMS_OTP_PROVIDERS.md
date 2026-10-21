@@ -107,7 +107,7 @@ Mitigations code :
 - Envoi avec `243…` puis `0…` (pas `+243` en premier)
 - `senderId` **obligatoire** (HTTP 422 sinon)
 - Rejet des faux succès si DreamDigital `status:F`
-- Texte OTP court `SENGA code 123456` (mot `code` pour autofill système) — pas de `\n`+hash Retriever, `<#>` ni `@domaine #code` (SerdiPay 503). Autofill iOS/Android = suggestion au-dessus du clavier (`AutofillHints.oneTimeCode`), sans popup.
+- Texte OTP court `SENGA code 123456` — pas de `\n`+hash Retriever, `<#>` ni `@domaine #code` (SerdiPay 503). Autofill : iOS = barre Messages ; Android = SMS User Consent (popup Autoriser) + hint clavier.
 - `SMS_OTP_REDUNDANT_SEND=1` — 2ᵉ envoi ~1,5 s pour `purpose=login|otp`
 
 ## Fichiers code

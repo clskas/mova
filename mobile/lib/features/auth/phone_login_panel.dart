@@ -1,7 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sms_autofill/sms_autofill.dart';
 import '../../core/auth/google_sign_in.dart';
 import '../../core/config/market_config.dart';
 import '../../core/api/api_client.dart';
@@ -35,7 +36,7 @@ class PhoneLoginPanel extends ConsumerStatefulWidget {
   ConsumerState<PhoneLoginPanel> createState() => _PhoneLoginPanelState();
 }
 
-class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> with CodeAutoFill {
+class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   final _phoneController = TextEditingController();
   final _codeController = TextEditingController();
   final _pinController = TextEditingController();
@@ -67,13 +68,9 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> with CodeAuto
     _codeController.addListener(_onPinOrOtpChanged);
   }
 
-  /// Android SMS Retriever → fill field as soon as the OTP SMS arrives.
-  @override
-  void codeUpdated() {
-    final digits = (code ?? '').replaceAll(RegExp(r'\D'), '');
-    if (digits.length < 6) return;
+  void _applyAutofilledOtp(String six) {
+    if (!mounted) return;
     if (_step != PhoneLoginStep.otp && _step != PhoneLoginStep.googleOtp) return;
-    final six = digits.length == 6 ? digits : digits.substring(digits.length - 6);
     if (_codeController.text == six) return;
     _codeController.value = TextEditingValue(
       text: six,
@@ -137,7 +134,6 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> with CodeAuto
 
   @override
   void dispose() {
-    cancel();
     stopOtpSmsListen();
     _pinController.removeListener(_onPinOrOtpChanged);
     _codeController.removeListener(_onPinOrOtpChanged);
@@ -147,9 +143,10 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> with CodeAuto
     super.dispose();
   }
 
-  Future<void> _armOtpAutofill() async {
-    await startOtpSmsListen();
-    listenForCode();
+  /// Start Android User Consent listen before the SMS is requested.
+  void _armOtpAutofill() {
+    stopOtpSmsListen();
+    unawaited(startOtpSmsListen(onCode: _applyAutofilledOtp));
   }
 
   Future<void> _continueFromPhone() async {
@@ -230,8 +227,8 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> with CodeAuto
     }
     _normalizedPhone = phone;
     final api = ref.read(apiClientProvider);
-    // Do not send androidSmsHash until SMS provider accepts Retriever bodies
-    // (hash / <#> / @domain broke SerdiPay delivery for all hub apps).
+    // Listen before the SMS is sent — User Consent only catches messages after start.
+    _armOtpAutofill();
     final result = await api.post('/auth/otp/request', {
       'phone': phone,
       'role': widget.appRole,
@@ -245,7 +242,6 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> with CodeAuto
           _error = null;
           _mockHint = kDebugMode ? data['mockCode'] as String? : null;
         });
-        await _armOtpAutofill();
       case Failure(:final error):
         setState(() {
           _loading = false;
@@ -342,7 +338,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> with CodeAuto
               _error = null;
             });
             if (data['otpChannel']?.toString() == 'sms') {
-              await _armOtpAutofill();
+              _armOtpAutofill();
             }
             return;
           }
@@ -515,7 +511,6 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> with CodeAuto
   }
 
   void _backToPhone() {
-    cancel();
     stopOtpSmsListen();
     setState(() {
       _step = PhoneLoginStep.phone;

@@ -1,31 +1,30 @@
 import 'package:flutter/foundation.dart';
-import 'package:sms_autofill/sms_autofill.dart';
+import 'package:smart_auth/smart_auth.dart';
 
-/// Android app signature hash for SMS Retriever (silent OTP fill).
-Future<String?> androidSmsAppHash() async {
-  if (kIsWeb) return null;
-  if (defaultTargetPlatform != TargetPlatform.android) return null;
-  try {
-    final hash = await SmsAutoFill().getAppSignature;
-    final trimmed = hash.trim();
-    return trimmed.isEmpty ? null : trimmed;
-  } catch (_) {
-    return null;
-  }
-}
+typedef OtpCodeCallback = void Function(String code);
 
-/// Starts listening for the OTP SMS (Android Retriever). No-op on iOS/web.
-Future<void> startOtpSmsListen() async {
+/// Android SMS User Consent — one-tap allow to fill OTP.
+/// Does not need an app hash in the SMS (SerdiPay rejects `\n` + Retriever hash).
+Future<void> startOtpSmsListen({OtpCodeCallback? onCode}) async {
   if (kIsWeb) return;
   if (defaultTargetPlatform != TargetPlatform.android) return;
   try {
-    await SmsAutoFill().listenForCode();
+    final res = await SmartAuth.instance.getSmsWithUserConsentApi(
+      matcher: r'(\d{6})',
+    );
+    if (!res.hasData) return;
+    final raw = res.requireData.code;
+    if (raw == null || raw.isEmpty) return;
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 6) return;
+    final six = digits.length == 6 ? digits : digits.substring(digits.length - 6);
+    onCode?.call(six);
   } catch (_) {}
 }
 
 void stopOtpSmsListen() {
   if (kIsWeb) return;
   try {
-    SmsAutoFill().unregisterListener();
+    SmartAuth.instance.removeUserConsentApiListener();
   } catch (_) {}
 }

@@ -36,10 +36,11 @@ export function sanitizeAndroidSmsHash(raw?: string | null): string | undefined 
 }
 
 /**
- * Shortest OTP copy — matches handset threads that delivered on CD
- * (e.g. `SENGA 083131` in Google Messages). Avoid `Code …` prefix when
- * SerdiPay/DreamDigital silently drops some Submitted messages.
- * Do NOT append Android Retriever hash, `<#>`, or `@domain #code`.
+ * Short OTP body that delivers on CD (`SENGA 123456`).
+ * Do NOT append Android Retriever hash with `\n` / `<#>` / `@domain #code` —
+ * SerdiPay returns processing errors (503) for those. Mobile uses SMS User
+ * Consent (no hash) for Android autofill instead.
+ * `androidAppHash` is accepted by the API but ignored in the SMS body.
  */
 export function otpSmsText(brand: string, code: string, _androidAppHash?: string): string {
   return `${brand} ${code}`;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,6 +10,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../auth/local_pin_setup_screen.dart';
+import '../auth/otp_sms_autofill.dart';
 import '../auth/pin_session.dart';
 import '../auth/widgets/six_digit_pin_field.dart';
 
@@ -37,6 +40,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
 
   @override
   void dispose() {
+    stopOtpSmsListen();
     _phoneCtrl.dispose();
     _otpCtrl.dispose();
     super.dispose();
@@ -138,6 +142,19 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
       });
       return;
     }
+    stopOtpSmsListen();
+    unawaited(
+      startOtpSmsListen(
+        onCode: (six) {
+          if (!mounted) return;
+          if (_otpCtrl.text == six) return;
+          _otpCtrl.value = TextEditingValue(
+            text: six,
+            selection: TextSelection.collapsed(offset: six.length),
+          );
+        },
+      ),
+    );
     final result = await ref.read(apiClientProvider).post('/auth/otp/request', {
       'phone': phone,
     });

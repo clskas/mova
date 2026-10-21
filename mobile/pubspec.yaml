@@ -45,6 +45,9 @@ dependencies:
   flutter_webrtc: ^1.2.1
   permission_handler: ^11.3.1
   audioplayers: ^6.6.0
+  # Android SMS User Consent (OTP fill). iOS uses system AutofillHints.oneTimeCode.
+  smart_auth: ^3.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

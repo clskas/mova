@@ -10,11 +10,15 @@ export function isTransientDbError(err: unknown): boolean {
     if (err.code === 'P1017' || err.code === 'P1001' || err.code === 'P1002') return true;
   }
   if (err instanceof Prisma.PrismaClientInitializationError) return true;
+  if (err instanceof Prisma.PrismaClientUnknownRequestError) {
+    if (lower.includes('service temporarily unavailable')) return true;
+    if (lower.includes('database system is starting up')) return true;
+  }
   return (
     lower.includes('service temporarily unavailable') ||
     lower.includes('database system is starting up') ||
     lower.includes('server has closed the connection') ||
-    lower.includes('can\'t reach database') ||
+    lower.includes("can't reach database") ||
     lower.includes('connection reset') ||
     lower.includes('econnrefused') ||
     lower.includes('econnreset') ||
@@ -34,7 +38,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleInit() {
     void this.ensureConnected().catch((err) => {
       const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Background Prisma connect still failing (app stays up): ${msg}`);
+      this.logger.error(
+        `Background Prisma connect still failing (app stays up): ${msg.slice(0, 240)}`,
+      );
     });
   }
 
@@ -58,7 +64,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (attempt === maxAttempts) {
-          this.logger.error(`Prisma connect failed after ${maxAttempts} attempts: ${msg}`);
+          this.logger.error(
+            `Prisma connect failed after ${maxAttempts} attempts: ${msg.slice(0, 240)}`,
+          );
           throw err;
         }
         const waitMs = Math.min(attempt * 1500, 10000);
@@ -70,8 +78,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   /**
    * Run a DB operation with retries on Render cold-start / connection flap.
-   * Prefer this for critical paths; most Nest handlers still use prisma.* directly
-   * and rely on entrypoint wait + reconnect.
    */
   async withRetry<T>(fn: () => Promise<T>, label = 'query'): Promise<T> {
     const maxAttempts = 5;

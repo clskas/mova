@@ -1,5 +1,12 @@
 import { HttpStatus } from '@nestjs/common';
-import { PIN_SIX_DIGITS_FR, toPublicHttpMessage, WITHDRAW_AMOUNT_INVALID_FR, WITHDRAW_OTP_REQUIRED_FR, WITHDRAW_PHONE_INVALID_FR } from './http-exception.filter';
+import {
+  PIN_SIX_DIGITS_FR,
+  toPublicHttpMessage,
+  truncateForLog,
+  WITHDRAW_AMOUNT_INVALID_FR,
+  WITHDRAW_OTP_REQUIRED_FR,
+  WITHDRAW_PHONE_INVALID_FR,
+} from './http-exception.filter';
 import { MOVA_ERROR_MESSAGES, MovaErrorCode } from './mova-error-codes';
 import {
   AFRISOFT_HUB_HMAC_FR,
@@ -108,4 +115,11 @@ describe('toPublicHttpMessage', () => {
       MOVA_ERROR_MESSAGES[MovaErrorCode.VALIDATION_ERROR],
     );
   });
+
+  it('truncates huge Prisma dumps for logs', () => {
+    const huge = `PrismaClientKnownRequestError: ${'x'.repeat(5000)}`;
+    expect(truncateForLog(huge).length).toBeLessThanOrEqual(401);
+    expect(truncateForLog(huge).endsWith('…')).toBe(true);
+  });
 });
+

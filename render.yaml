@@ -140,6 +140,9 @@ services:
         value: "false"
       - key: SEED_DEMO_CATALOG
         value: "false"
+      # Leave headroom on starter (512MB) — huge Prisma error dumps previously pushed exit-1 OOMs.
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=384"
       - fromGroup: mova-external-apis
 
   - type: web

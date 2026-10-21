@@ -170,6 +170,14 @@ export function toPublicHttpMessage(raw: string, status: number): string {
   return msg;
 }
 
+/** Prisma engine dumps can be 100KB+ — logging them under load OOMs Render starter. */
+export function truncateForLog(raw: unknown, max = 400): string {
+  const s = typeof raw === 'string' ? raw : raw instanceof Error ? raw.message : String(raw ?? '');
+  const oneLine = s.replace(/\s+/g, ' ').trim();
+  if (oneLine.length <= max) return oneLine;
+  return `${oneLine.slice(0, max)}…`;
+}
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
@@ -190,7 +198,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const status = exception.getStatus();
       const body = exception.getResponse() as { code: string; message: string };
       const message = toPublicHttpMessage(body.message, status);
-      this.logger.warn(`${tag}${body.code}: ${body.message}`);
+      this.logger.warn(`${tag}${body.code}: ${truncateForLog(body.message)}`);
       return response.status(status).json({
         success: false,
         error: { code: body.code, message },
@@ -223,8 +231,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
                   : bodyCode === 'HUB_PROVIDER_FAILED'
                     ? MovaErrorCode.PAYMENT_FAILED
                     : MovaErrorCode.VALIDATION_ERROR;
-      if (status >= 500) this.logger.error(`${tag}${code}: ${rawMessage}`, exception);
-      else this.logger.warn(`${tag}${code}: ${rawMessage}`);
+      if (status >= 500) this.logger.error(`${tag}${code}: ${truncateForLog(rawMessage)}`);
+      else this.logger.warn(`${tag}${code}: ${truncateForLog(rawMessage)}`);
       return response.status(status).json({
         success: false,
         error: { code, message },
@@ -233,7 +241,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     if (exception instanceof Error) {
-      this.logger.error(`${tag}${exception.message}`, exception.stack);
+      this.logger.error(`${tag}${truncateForLog(exception.message)}`, truncateForLog(exception.stack, 600));
       if (exception.message.includes('entity too large')) {
         const message = 'Fichier trop volumineux (max 3 Mo pour les photos colis).';
         this.logger.warn(`${tag}${MovaErrorCode.VALIDATION_ERROR}: ${message}`);

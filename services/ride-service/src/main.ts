@@ -5,6 +5,28 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter, assertProductionSecurity, resolveCorsOrigin } from '@mova/shared';
 
+function isTransientDbNoise(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err ?? '');
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes('service temporarily unavailable') ||
+    lower.includes('p1017') ||
+    lower.includes('p1001') ||
+    lower.includes('p1002') ||
+    lower.includes('database system is starting up') ||
+    lower.includes('server has closed the connection')
+  );
+}
+
+// Render starter OOMs / exit-1 when Prisma FATAL dumps are treated as fatal unhandled rejections.
+process.on('unhandledRejection', (reason) => {
+  if (isTransientDbNoise(reason)) {
+    console.warn('[ride-service] swallowed transient DB unhandledRejection');
+    return;
+  }
+  console.error('[ride-service] unhandledRejection', reason);
+});
+
 async function bootstrap() {
   assertProductionSecurity('ride-service');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });

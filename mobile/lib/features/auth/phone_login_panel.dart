@@ -227,6 +227,13 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     }
     _normalizedPhone = phone;
     final api = ref.read(apiClientProvider);
+    // Show OTP field + focus before the SMS arrives (required for iOS QuickType).
+    _codeController.clear();
+    setState(() {
+      _loading = true;
+      _error = null;
+      _step = PhoneLoginStep.otp;
+    });
     // Listen before the SMS is sent — User Consent only catches messages after start.
     _armOtpAutofill();
     final result = await api.post('/auth/otp/request', {

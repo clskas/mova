@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/mova_colors.dart';
@@ -5,8 +6,8 @@ import '../../../core/theme/mova_colors.dart';
 /// Champ de saisie d'un code à 6 chiffres (PIN local ou OTP SMS/e-mail).
 ///
 /// Pour un OTP SMS, passer [forOneTimeCode] afin d’activer l’autofill système
-/// (bannière « De Messages » / clavier Android, comme WhatsApp).
-class SixDigitPinField extends StatelessWidget {
+/// (iOS : barre « De Messages » ; Android : suggestion clavier / User Consent).
+class SixDigitPinField extends StatefulWidget {
   const SixDigitPinField({
     super.key,
     required this.controller,
@@ -29,31 +30,78 @@ class SixDigitPinField extends StatelessWidget {
   final ValueChanged<String>? onCompleted;
 
   @override
+  State<SixDigitPinField> createState() => _SixDigitPinFieldState();
+}
+
+class _SixDigitPinFieldState extends State<SixDigitPinField> {
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode(debugLabel: 'six_digit_otp');
+    if (widget.autofocus && widget.forOneTimeCode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _ensureFocused());
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant SixDigitPinField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.autofocus &&
+        widget.forOneTimeCode &&
+        widget.enabled &&
+        (!oldWidget.autofocus || !oldWidget.enabled)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _ensureFocused());
+    }
+  }
+
+  void _ensureFocused() {
+    if (!mounted || !widget.enabled) return;
+    if (!_focusNode.hasFocus) {
+      _focusNode.requestFocus();
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final forOtp = widget.forOneTimeCode;
     final field = TextField(
-      controller: controller,
-      // number + oneTimeCode: iOS Security Code AutoFill + Android SMS suggestion.
-      keyboardType: TextInputType.number,
+      controller: widget.controller,
+      focusNode: _focusNode,
+      // number + oneTimeCode → iOS UITextContentType.oneTimeCode (QuickType bar).
+      keyboardType: const TextInputType.numberWithOptions(decimal: false, signed: false),
       maxLength: 6,
-      autofocus: autofocus,
-      enabled: enabled,
+      autofocus: widget.autofocus,
+      enabled: widget.enabled,
       // obscureText bloque l’autofill OTP sur iOS/Android — uniquement pour le PIN.
-      obscureText: !forOneTimeCode,
+      obscureText: !forOtp,
       autocorrect: false,
-      enableSuggestions: forOneTimeCode,
-      autofillHints: forOneTimeCode
+      enableSuggestions: forOtp,
+      enableIMEPersonalizedLearning: false,
+      smartDashesType: SmartDashesType.disabled,
+      smartQuotesType: SmartQuotesType.disabled,
+      autofillHints: forOtp
           ? const [AutofillHints.oneTimeCode]
           : const [AutofillHints.password],
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       textInputAction: TextInputAction.done,
       decoration: InputDecoration(
-        labelText: label,
+        labelText: widget.label,
         prefixIcon: Icon(
-          forOneTimeCode ? Icons.sms_outlined : Icons.pin_outlined,
+          forOtp ? Icons.sms_outlined : Icons.pin_outlined,
         ),
         counterText: '',
-        helperText: forOneTimeCode
-            ? 'Le code se saisit automatiquement dès réception du SMS'
+        helperText: forOtp
+            ? (defaultTargetPlatform == TargetPlatform.iOS
+                ? 'Sur iPhone : touchez le code au-dessus du clavier (Messages)'
+                : 'Le code se saisit automatiquement dès réception du SMS')
             : null,
         helperMaxLines: 2,
       ),
@@ -67,12 +115,12 @@ class SixDigitPinField extends StatelessWidget {
       scrollPadding: const EdgeInsets.fromLTRB(20, 24, 20, 140),
       onChanged: (value) {
         if (value.trim().length == 6) {
-          onCompleted?.call(value.trim());
+          widget.onCompleted?.call(value.trim());
         }
       },
     );
 
-    if (!forOneTimeCode) return field;
+    if (!forOtp) return field;
     return AutofillGroup(child: field);
   }
 }

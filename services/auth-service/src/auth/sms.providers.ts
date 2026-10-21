@@ -36,14 +36,14 @@ export function sanitizeAndroidSmsHash(raw?: string | null): string | undefined 
 }
 
 /**
- * Short OTP body that delivers on CD (`SENGA 123456`).
- * Do NOT append Android Retriever hash with `\n` / `<#>` / `@domain #code` —
- * SerdiPay returns processing errors (503) for those. Mobile uses SMS User
- * Consent (no hash) for Android autofill instead.
+ * Short OTP body that delivers on CD.
+ * Include the word `code` so iOS Messages QuickType can offer system autofill
+ * (heuristics often miss bare `SENGA 123456`). No punctuation — SerdiPay
+ * rejects `.` `:` etc. No Retriever `\n`+hash / `<#>` / `@domain #code`.
  * `androidAppHash` is accepted by the API but ignored in the SMS body.
  */
 export function otpSmsText(brand: string, code: string, _androidAppHash?: string): string {
-  return `${brand} ${code}`;
+  return `${brand} code ${code}`;
 }
 
 @Injectable()

@@ -80,8 +80,8 @@ export class ProviderService {
     }
     const provider = this.activeProvider();
     const brand = this.brandName(appId);
-    // Same shortest copy as mova-auth (`SENGA 123456`) — matches delivered CD threads.
-    const message = locale === 'en' ? `${brand} ${code}` : `${brand} ${code}`;
+    // Same copy as mova-auth — word `code` helps iOS Messages QuickType autofill.
+    const message = `${brand} code ${code}`;
 
     if (provider === 'mock') {
       // Intentional in MOCK hub bootstrap — codes appear only in server logs, not in API (unless MOCK_RETURN_CODE).

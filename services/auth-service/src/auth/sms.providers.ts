@@ -36,14 +36,13 @@ export function sanitizeAndroidSmsHash(raw?: string | null): string | undefined 
 }
 
 /**
- * Short OTP body that delivers on CD.
- * Include the word `code` so iOS Messages QuickType can offer system autofill
- * (heuristics often miss bare `SENGA 123456`). No punctuation — SerdiPay
+ * Short French OTP body that delivers on CD.
+ * Keep the word `code` for iOS Messages QuickType. No punctuation — SerdiPay
  * rejects `.` `:` etc. No Retriever `\n`+hash / `<#>` / `@domain #code`.
  * `androidAppHash` is accepted by the API but ignored in the SMS body.
  */
 export function otpSmsText(brand: string, code: string, _androidAppHash?: string): string {
-  return `${brand} code ${code}`;
+  return `Votre code ${brand} ${code}`;
 }
 
 @Injectable()

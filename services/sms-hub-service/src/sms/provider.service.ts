@@ -47,8 +47,10 @@ export class ProviderService {
   }
 
   /**
-   * SerdiPay often returns SENT while CD operators drop the first SMS.
-   * For login/otp, optionally fire a second identical send ~1.5s later.
+   * Optional second identical send for login/otp (~1.5s later).
+   * Keep OFF on CD/SerdiPay: double-send correlates with non-delivery while a
+   * single direct probe with the same text arrives. Enable only if a provider
+   * needs it (`SMS_OTP_REDUNDANT_SEND=1`).
    */
   private async maybeRedundantSend(
     provider: SmsBackend,

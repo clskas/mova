@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/mova_colors.dart';
@@ -6,7 +5,7 @@ import '../../../core/theme/mova_colors.dart';
 /// Champ de saisie d'un code à 6 chiffres (PIN local ou OTP SMS/e-mail).
 ///
 /// Pour un OTP SMS, passer [forOneTimeCode] afin d’activer l’autofill système
-/// (iOS : barre « De Messages » ; Android : suggestion clavier / User Consent).
+/// (iOS Messages / Android Gboard — suggestion au-dessus du clavier).
 class SixDigitPinField extends StatefulWidget {
   const SixDigitPinField({
     super.key,
@@ -99,9 +98,7 @@ class _SixDigitPinFieldState extends State<SixDigitPinField> {
         ),
         counterText: '',
         helperText: forOtp
-            ? (defaultTargetPlatform == TargetPlatform.iOS
-                ? 'Sur iPhone : touchez le code au-dessus du clavier (Messages)'
-                : 'Le code se saisit automatiquement dès réception du SMS')
+            ? 'Touchez le code proposé au-dessus du clavier dès réception du SMS'
             : null,
         helperMaxLines: 2,
       ),

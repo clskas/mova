@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,7 +8,6 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'local_pin_setup_screen.dart';
-import 'otp_sms_autofill.dart';
 import 'pin_session.dart';
 import 'widgets/pin_digit_pad.dart';
 import 'widgets/six_digit_pin_field.dart';
@@ -66,16 +63,6 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     _restoreSavedPhone();
     _pinController.addListener(_onPinOrOtpChanged);
     _codeController.addListener(_onPinOrOtpChanged);
-  }
-
-  void _applyAutofilledOtp(String six) {
-    if (!mounted) return;
-    if (_step != PhoneLoginStep.otp && _step != PhoneLoginStep.googleOtp) return;
-    if (_codeController.text == six) return;
-    _codeController.value = TextEditingValue(
-      text: six,
-      selection: TextSelection.collapsed(offset: six.length),
-    );
   }
 
   void _onPinOrOtpChanged() {
@@ -134,19 +121,12 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
 
   @override
   void dispose() {
-    stopOtpSmsListen();
     _pinController.removeListener(_onPinOrOtpChanged);
     _codeController.removeListener(_onPinOrOtpChanged);
     _phoneController.dispose();
     _codeController.dispose();
     _pinController.dispose();
     super.dispose();
-  }
-
-  /// Start Android User Consent listen before the SMS is requested.
-  void _armOtpAutofill() {
-    stopOtpSmsListen();
-    unawaited(startOtpSmsListen(onCode: _applyAutofilledOtp));
   }
 
   Future<void> _continueFromPhone() async {
@@ -227,15 +207,13 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     }
     _normalizedPhone = phone;
     final api = ref.read(apiClientProvider);
-    // Show OTP field + focus before the SMS arrives (required for iOS QuickType).
+    // Show OTP field + focus before the SMS arrives (iOS/Android system autofill).
     _codeController.clear();
     setState(() {
       _loading = true;
       _error = null;
       _step = PhoneLoginStep.otp;
     });
-    // Listen before the SMS is sent — User Consent only catches messages after start.
-    _armOtpAutofill();
     final result = await api.post('/auth/otp/request', {
       'phone': phone,
       'role': widget.appRole,
@@ -344,9 +322,6 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
               _mockHint = kDebugMode ? data['mockCode'] as String? : null;
               _error = null;
             });
-            if (data['otpChannel']?.toString() == 'sms') {
-              _armOtpAutofill();
-            }
             return;
           }
           final phone = _normalizedPhone ?? MarketConfig.normalizePhone(_phoneController.text);
@@ -518,7 +493,6 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   void _backToPhone() {
-    stopOtpSmsListen();
     setState(() {
       _step = PhoneLoginStep.phone;
       _forgotPinRecovery = false;

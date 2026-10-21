@@ -36,14 +36,13 @@ export function sanitizeAndroidSmsHash(raw?: string | null): string | undefined 
 }
 
 /**
- * Short OTP copy that actually arrived on CD handsets (SerdiPay/DreamDigital).
- * Longer « Votre code … Valide 10 minutes » often stays Submitted without delivery;
- * probes like `Code SENGA 083131` / `Code SENGA 082756` did deliver after carrier review.
+ * Shortest OTP copy — matches handset threads that delivered on CD
+ * (e.g. `SENGA 083131` in Google Messages). Avoid `Code …` prefix when
+ * SerdiPay/DreamDigital silently drops some Submitted messages.
  * Do NOT append Android Retriever hash, `<#>`, or `@domain #code`.
- * `androidAppHash` is ignored until a provider that supports Retriever is live.
  */
 export function otpSmsText(brand: string, code: string, _androidAppHash?: string): string {
-  return `Code ${brand} ${code}`;
+  return `${brand} ${code}`;
 }
 
 @Injectable()

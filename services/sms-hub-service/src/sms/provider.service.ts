@@ -80,8 +80,8 @@ export class ProviderService {
     }
     const provider = this.activeProvider();
     const brand = this.brandName(appId);
-    // Same short copy as mova-auth — long FR sentences often stay Submitted without handset delivery.
-    const message = locale === 'en' ? `${brand} code ${code}` : `Code ${brand} ${code}`;
+    // Same shortest copy as mova-auth (`SENGA 123456`) — matches delivered CD threads.
+    const message = locale === 'en' ? `${brand} ${code}` : `${brand} ${code}`;
 
     if (provider === 'mock') {
       // Intentional in MOCK hub bootstrap — codes appear only in server logs, not in API (unless MOCK_RETURN_CODE).

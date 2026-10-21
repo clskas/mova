@@ -36,14 +36,14 @@ export function sanitizeAndroidSmsHash(raw?: string | null): string | undefined 
 }
 
 /**
- * Pre-autofill copy that delivered on CD via SerdiPay/DreamDigital.
- * Do NOT append Android Retriever hash, `<#>`, or `@domain #code` — those formats
- * broke delivery across SENGA / hub apps after the Oct 2026 autofill work.
+ * Short OTP copy that actually arrived on CD handsets (SerdiPay/DreamDigital).
+ * Longer « Votre code … Valide 10 minutes » often stays Submitted without delivery;
+ * probes like `Code SENGA 083131` / `Code SENGA 082756` did deliver after carrier review.
+ * Do NOT append Android Retriever hash, `<#>`, or `@domain #code`.
  * `androidAppHash` is ignored until a provider that supports Retriever is live.
- * iOS/Android system OTP suggestion still works from « code … 123456 ».
  */
 export function otpSmsText(brand: string, code: string, _androidAppHash?: string): string {
-  return `Votre code ${brand} : ${code}. Valide 10 minutes. Ne partagez pas ce code.`;
+  return `Code ${brand} ${code}`;
 }
 
 @Injectable()

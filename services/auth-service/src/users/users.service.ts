@@ -36,6 +36,7 @@ export class UsersService {
     id: string;
     phone: string | null;
     googleId?: string | null;
+    appleId?: string | null;
     localPinHash?: string | null;
     role: UserRole;
     firstName?: string | null;

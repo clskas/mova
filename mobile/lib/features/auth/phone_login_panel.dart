@@ -489,6 +489,11 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       _pinController.clear();
       _codeController.clear();
       _loading = false;
+      // SMS needs a +243 number — clear leftover Google e-mail from the field.
+      if (isEmailIdentity(_phoneController.text) ||
+          isEmailIdentity(_normalizedPhone ?? '')) {
+        _phoneController.clear();
+      }
     });
   }
 
@@ -502,7 +507,9 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
 
   Future<void> _sendForgotSms() async {
     final raw = _phoneController.text.trim();
-    if (isEmailIdentity(raw) || isEmailIdentity(_normalizedPhone ?? '')) {
+    // Only the SMS destination matters — do not block on a stale Google e-mail
+    // left in `_normalizedPhone` after the user typed a real +243 number.
+    if (isEmailIdentity(raw)) {
       setState(() => _error = 'Pas de SMS pour un e-mail. Utilisez Continuer avec Google.');
       return;
     }
@@ -512,7 +519,10 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       return;
     }
     _normalizedPhone = phone;
-    setState(() => _forgotPinRecovery = true);
+    setState(() {
+      _forgotPinRecovery = true;
+      _error = null;
+    });
     await _requestOtp();
   }
 

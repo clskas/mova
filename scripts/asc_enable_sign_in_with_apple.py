@@ -98,12 +98,19 @@ def enable_apple_sign_in(token: str, bundle_res_id: str, identifier: str) -> str
         if attrs.get("capabilityType") == CAPABILITY:
             print(f"OK already enabled: {identifier} ({cap.get('id')})")
             return "already"
+    # ASC requires at least one Sign in with Apple configuration (primary vs grouped).
+    # Both Senga apps are independent products → each is a primary App ID.
     body = {
         "data": {
             "type": "bundleIdCapabilities",
             "attributes": {
                 "capabilityType": CAPABILITY,
-                "settings": [],
+                "settings": [
+                    {
+                        "key": "APPLE_ID_AUTH_APP_CONSENT",
+                        "options": [{"key": "PRIMARY_APP_CONSENT"}],
+                    }
+                ],
             },
             "relationships": {
                 "bundleId": {

@@ -26,25 +26,9 @@ platform :ios do
     setup_ci if ENV["CI"]
     api_key = asc_api_key
     readonly = ENV["MATCH_READONLY"].to_s.strip == "true"
-    # Sign in with Apple entitlement requires the capability on each App ID, then
-    # a fresh App Store profile. Force regenerate when not readonly.
-    force_profiles = !readonly && ENV["MATCH_FORCE"].to_s.strip != "false"
-    [PASSENGER_ID, DRIVER_ID].each do |app_id|
-      begin
-        produce(
-          api_key: api_key,
-          app_identifier: app_id,
-          skip_itc: true,
-          skip_devcenter: false,
-          enable_services: {
-            apple_sign_in: "on"
-          }
-        )
-        UI.success("Sign in with Apple enabled for #{app_id}")
-      rescue => e
-        UI.important("produce apple_sign_in #{app_id}: #{e.message}")
-      end
-    end
+    # After enabling Sign in with Apple on App IDs (scripts/asc_enable_sign_in_with_apple.py),
+    # force-regenerate App Store profiles so they include com.apple.developer.applesignin.
+    force_profiles = !readonly
     match(
       type: "appstore",
       readonly: readonly,

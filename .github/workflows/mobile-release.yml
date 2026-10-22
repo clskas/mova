@@ -597,6 +597,10 @@ jobs:
           MATCH_READONLY: ${{ vars.MATCH_READONLY || 'false' }}
           CI: 'true'
         run: |
+          set -euo pipefail
+          # Enable Sign in with Apple on App IDs before regenerating match profiles.
+          python3 -m pip install --quiet PyJWT cryptography
+          python3 "$(git rev-parse --show-toplevel)/scripts/asc_enable_sign_in_with_apple.py"
           cd mobile/ios
           bundle install
           bundle exec fastlane sync_certificates

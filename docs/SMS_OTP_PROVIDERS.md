@@ -108,6 +108,11 @@ Mitigations code :
 - `senderId` **obligatoire** (HTTP 422 sinon)
 - Rejet des faux succès si DreamDigital `status:F`
 - Texte OTP FR court `Votre code SENGA 123456` — pas de `\n`+hash Retriever, `<#>` ni `@domaine #code` (SerdiPay 503). Autofill : iOS = barre Messages ; Android = SMS User Consent (popup système selon langue du téléphone).
+
+## Bannière de mise à jour (apps)
+
+Source de vérité : `services/ride-service/src/public/mobile-store-version.json` + miroir Render `MOBILE_*`.
+Le script `scripts/sync-mobile-app-version-env.sh` (après upload Play) **miroir Render d’abord**, puis commit sur `main` avec rebase/retry — un `git push` en échec ne doit plus laisser l’API bloquée sur un ancien `versionCode`.
 - `SMS_OTP_REDUNDANT_SEND=1` — 2ᵉ envoi ~1,5 s pour `purpose=login|otp`
 
 ## Fichiers code

@@ -37,9 +37,10 @@ const DEFAULT_DRIVER_STORE_IOS = 'https://apps.apple.com/app/id6818769267';
  * Render MOBILE_* env can raise above it, never lower it, so deploys and
  * stale blueprint values cannot hide in-app update banners again.
  */
+/** Last-resort floor if the JSON file is missing from the image. Keep ≤ store file. */
 const BUILTIN_FLOOR: MobileStoreVersionFile = {
-  version: '1.0.32',
-  versionCode: 157,
+  version: '1.0.34',
+  versionCode: 174,
 };
 
 function parseVersionCode(raw: string | undefined, fallback: number): number {

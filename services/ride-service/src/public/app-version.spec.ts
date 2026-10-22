@@ -66,7 +66,7 @@ describe('buildMobileAppVersionResponse', () => {
     const loaded = loadMobileStoreVersion(() => {
       throw new Error('missing');
     }, '/no/such/dir');
-    expect(loaded.version).toBe('1.0.32');
-    expect(loaded.versionCode).toBe(157);
+    expect(loaded.version).toBe('1.0.34');
+    expect(loaded.versionCode).toBe(174);
   });
 });

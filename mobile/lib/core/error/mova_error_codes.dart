@@ -12,7 +12,8 @@ const movaErrorMessages = <String, String>{
   'MOVA_AUTH_007': 'Trop de tentatives PIN. Réessayez dans 15 minutes ou connectez-vous par SMS.',
   'MOVA_AUTH_008': 'Aucun code PIN configuré. Connectez-vous par SMS.',
   'MOVA_AUTH_009': 'Connexion Google refusée. Réessayez ou utilisez le numéro de téléphone.',
-  'MOVA_AUTH_010': 'Ce numéro ou ce compte Google est déjà lié à un autre utilisateur SENGA.',
+  'MOVA_AUTH_010': 'Ce numéro ou ce compte Google / Apple est déjà lié à un autre utilisateur SENGA.',
+  'MOVA_AUTH_011': 'Connexion Apple refusée. Réessayez ou utilisez le numéro de téléphone.',
   'MOVA_RIDE_001': 'Course introuvable.',
   'MOVA_RIDE_002':
       'Impossible : cette course est déjà terminée, annulée, ou n’est plus à l’étape où cette action est possible. Actualisez l’écran.',

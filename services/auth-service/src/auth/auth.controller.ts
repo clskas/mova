@@ -3,8 +3,11 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import {
+  AppleLoginDto,
+  AppleVerifyDto,
   GoogleLoginDto,
   GoogleVerifyDto,
+  LinkAppleDto,
   LinkGoogleDto,
   LinkPhoneDto,
   LoginOptionsDto,
@@ -108,10 +111,61 @@ export class AuthController {
     return this.authService.unlinkGoogle(req.user.id);
   }
 
+  @Post('apple')
+  @ApiOperation({ summary: 'Connexion Apple — code e-mail (si dispo) puis JWT + PIN' })
+  async loginApple(@Body() dto: AppleLoginDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.loginWithApple(
+      dto.identityToken,
+      dto.role,
+      dto.portal,
+      dto.intendedRole,
+      { givenName: dto.givenName, familyName: dto.familyName },
+    );
+    if ('accessToken' in result) {
+      res.status(result.isNew ? HttpStatus.CREATED : HttpStatus.OK);
+      return result;
+    }
+    res.status(HttpStatus.OK);
+    return result;
+  }
+
+  @Post('apple/verify')
+  @ApiOperation({ summary: 'Connexion Apple — vérifier le code e-mail puis JWT' })
+  async verifyApple(@Body() dto: AppleVerifyDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.verifyAppleOtp(
+      dto.challengeId,
+      dto.code,
+      dto.role,
+      dto.portal,
+      dto.intendedRole,
+    );
+    res.status(result.isNew ? HttpStatus.CREATED : HttpStatus.OK);
+    return result;
+  }
+
+  @Post('link-apple')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lier Apple au compte courant (JWT + identity token)' })
+  linkApple(@Request() req: { user: { id: string } }, @Body() dto: LinkAppleDto) {
+    return this.authService.linkApple(req.user.id, dto.identityToken, dto.otpCode, {
+      givenName: dto.givenName,
+      familyName: dto.familyName,
+    });
+  }
+
+  @Post('unlink-apple')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Délier Apple (uniquement si un numéro ou Google reste)' })
+  unlinkApple(@Request() req: { user: { id: string } }) {
+    return this.authService.unlinkApple(req.user.id);
+  }
+
   @Post('unlink-phone')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Délier le numéro (uniquement si Google reste)' })
+  @ApiOperation({ summary: 'Délier le numéro (uniquement si Google ou Apple reste)' })
   unlinkPhone(@Request() req: { user: { id: string } }) {
     return this.authService.unlinkPhone(req.user.id);
   }

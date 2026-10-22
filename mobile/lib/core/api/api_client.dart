@@ -318,23 +318,28 @@ class ApiClient {
         role: body?['role']?.toString(),
       ));
     }
-    if (path.contains('/auth/google/verify')) {
+    if (path.contains('/auth/google/verify') || path.contains('/auth/apple/verify')) {
       return Success(MockData.verifyOtp(
         body?['phone']?.toString() ?? '+243812345678',
         body?['code']?.toString() ?? '',
         role: body?['role']?.toString(),
       ));
     }
-    if (path.contains('/auth/google')) {
+    if (path.contains('/auth/google') || path.contains('/auth/apple')) {
       return Success(MockData.googleOtpChallenge());
     }
     if (path.contains('/auth/link-google')) {
       return Success(MockData.linkAccount(google: true));
     }
+    if (path.contains('/auth/link-apple')) {
+      return Success(MockData.linkAccount(google: true));
+    }
     if (path.contains('/auth/link-phone')) {
       return Success(MockData.linkAccount(phone: true));
     }
-    if (path.contains('/auth/unlink-google') || path.contains('/auth/unlink-phone')) {
+    if (path.contains('/auth/unlink-google') ||
+        path.contains('/auth/unlink-apple') ||
+        path.contains('/auth/unlink-phone')) {
       return Success({
         'success': true,
         'message': 'Compte mis à jour.',

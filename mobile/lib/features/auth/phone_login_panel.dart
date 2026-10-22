@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/auth/apple_sign_in.dart';
 import '../../core/auth/google_sign_in.dart';
 import '../../core/config/market_config.dart';
 import '../../core/api/api_client.dart';
@@ -50,11 +51,18 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   String? _googleChallengeId;
   String? _googleOtpChannel;
   String? _googleDestinationMasked;
+  /// `google` | `apple` — which provider issued the email OTP challenge.
+  String _socialProvider = 'google';
   bool _pinSubmitLock = false;
 
-  /// Google Sign-In on phone / forgot steps — not on iOS (App Store 4.8).
+  /// Google Sign-In on phone / forgot. On iOS, shown only with Apple (Guideline 4.8).
   bool get _showGoogleSignIn =>
-      defaultTargetPlatform != TargetPlatform.iOS &&
+      (_step == PhoneLoginStep.phone || _step == PhoneLoginStep.forgot);
+
+  /// Sign in with Apple — iOS only (App Store Guideline 4.8).
+  bool get _showAppleSignIn =>
+      !kIsWeb &&
+      defaultTargetPlatform == TargetPlatform.iOS &&
       (_step == PhoneLoginStep.phone || _step == PhoneLoginStep.forgot);
 
   @override
@@ -312,6 +320,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       _loading = true;
       _error = null;
       _forgotPinRecovery = keepForgot;
+      _socialProvider = 'google';
     });
     try {
       final idToken = await signInWithGoogleIdToken();
@@ -330,32 +339,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         'role': widget.appRole,
       });
       if (!mounted) return;
-      switch (result) {
-        case Success(:final data):
-          if (data['otpRequired'] == true) {
-            setState(() {
-              _loading = false;
-              _googleChallengeId = data['challengeId']?.toString();
-              _googleOtpChannel = data['otpChannel']?.toString();
-              _googleDestinationMasked = data['destinationMasked']?.toString();
-              _step = PhoneLoginStep.googleOtp;
-              _codeController.clear();
-              _mockHint = kDebugMode ? data['mockCode'] as String? : null;
-              _error = null;
-            });
-            if (data['otpChannel']?.toString() == 'sms') {
-              _armOtpAutofill();
-            }
-            return;
-          }
-          final phone = _normalizedPhone ?? MarketConfig.normalizePhone(_phoneController.text);
-          await _handleAuthResult(result, phone);
-        case Failure(:final error):
-          setState(() {
-            _loading = false;
-            _error = error.message;
-          });
-      }
+      await _handleSocialAuthResult(result);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -365,10 +349,82 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     }
   }
 
+  Future<void> _loginWithApple() async {
+    final keepForgot = _forgotPinRecovery || _step == PhoneLoginStep.forgot;
+    setState(() {
+      _loading = true;
+      _error = null;
+      _forgotPinRecovery = keepForgot;
+      _socialProvider = 'apple';
+    });
+    try {
+      final apple = await signInWithAppleIdentityToken();
+      if (!mounted) return;
+      if (apple == null || apple.identityToken.isEmpty) {
+        setState(() {
+          _loading = false;
+          _error = 'Connexion Apple annulée.';
+        });
+        return;
+      }
+      final api = ref.read(apiClientProvider);
+      await api.checkHealth();
+      final body = <String, dynamic>{
+        'identityToken': apple.identityToken,
+        'role': widget.appRole,
+      };
+      if (apple.givenName != null && apple.givenName!.isNotEmpty) {
+        body['givenName'] = apple.givenName;
+      }
+      if (apple.familyName != null && apple.familyName!.isNotEmpty) {
+        body['familyName'] = apple.familyName;
+      }
+      final result = await api.post('/auth/apple', body);
+      if (!mounted) return;
+      await _handleSocialAuthResult(result);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = appleSignInErrorMessage(e);
+      });
+    }
+  }
+
+  Future<void> _handleSocialAuthResult(Result<Map<String, dynamic>> result) async {
+    switch (result) {
+      case Success(:final data):
+        if (data['otpRequired'] == true) {
+          setState(() {
+            _loading = false;
+            _googleChallengeId = data['challengeId']?.toString();
+            _googleOtpChannel = data['otpChannel']?.toString();
+            _googleDestinationMasked = data['destinationMasked']?.toString();
+            _step = PhoneLoginStep.googleOtp;
+            _codeController.clear();
+            _mockHint = kDebugMode ? data['mockCode'] as String? : null;
+            _error = null;
+          });
+          if (data['otpChannel']?.toString() == 'sms') {
+            _armOtpAutofill();
+          }
+          return;
+        }
+        final phone = _normalizedPhone ?? MarketConfig.normalizePhone(_phoneController.text);
+        await _handleAuthResult(result, phone);
+      case Failure(:final error):
+        setState(() {
+          _loading = false;
+          _error = error.message;
+        });
+    }
+  }
+
   Future<void> _verifyGoogleOtp() async {
     final challengeId = _googleChallengeId;
+    final providerLabel = _socialProvider == 'apple' ? 'Apple' : 'Google';
     if (challengeId == null || challengeId.isEmpty) {
-      setState(() => _error = 'Session Google expirée. Recommencez.');
+      setState(() => _error = 'Session $providerLabel expirée. Recommencez.');
       return;
     }
     setState(() {
@@ -376,7 +432,8 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       _error = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/auth/google/verify', {
+    final path = _socialProvider == 'apple' ? '/auth/apple/verify' : '/auth/google/verify';
+    final result = await api.post(path, {
       'challengeId': challengeId,
       'code': _codeController.text.trim(),
       'role': widget.appRole,
@@ -699,7 +756,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             child: Text(_step == PhoneLoginStep.googleOtp ? 'Retour' : 'Changer de numéro'),
           ),
         ],
-        if (_showGoogleSignIn) ...[
+        if (_showAppleSignIn || _showGoogleSignIn) ...[
           const SizedBox(height: 20),
           Row(
             children: [
@@ -714,14 +771,26 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
               const Expanded(child: Divider()),
             ],
           ),
-          const SizedBox(height: 16),
-          MovaButton(
-            label: 'Continuer avec Google',
-            isSecondary: true,
-            isLoading: _loading,
-            onPressed: _loginWithGoogle,
-            icon: Icons.g_mobiledata,
-          ),
+          if (_showAppleSignIn) ...[
+            const SizedBox(height: 16),
+            MovaButton(
+              label: 'Continuer avec Apple',
+              isSecondary: true,
+              isLoading: _loading,
+              onPressed: _loginWithApple,
+              icon: Icons.apple,
+            ),
+          ],
+          if (_showGoogleSignIn) ...[
+            const SizedBox(height: 16),
+            MovaButton(
+              label: 'Continuer avec Google',
+              isSecondary: true,
+              isLoading: _loading,
+              onPressed: _loginWithGoogle,
+              icon: Icons.g_mobiledata,
+            ),
+          ],
         ],
       ],
     );

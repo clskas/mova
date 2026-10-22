@@ -37,11 +37,16 @@ APPS = {
         "demo_password": "123456",
         "notes": """DEMO ACCESS (Guideline 2.1) — Senga passenger
 
+Login options on iOS: Sign in with Apple, Google, or phone + PIN/SMS OTP.
+
+Phone demo (recommended for review):
 1. Enter phone +243900000010 → Continue
 2. Enter SMS OTP: 123456
 3. Home → request a ride (destination in DRC / Kinshasa)
 4. Account deletion: Aide → Contacter le support
 Privacy: https://senga.afri-soft.com/privacy
+
+Guideline 4.8: Sign in with Apple is available on the login screen (Continuer avec Apple).
 
 Walkthrough: senga-passenger-app-review-walkthrough.mp4
 Production API: https://api.afri-soft.com — demo OTP 123456 enabled for App Review.
@@ -53,12 +58,17 @@ Production API: https://api.afri-soft.com — demo OTP 123456 enabled for App Re
         "demo_password": "123456",
         "notes": """DEMO ACCESS (Guideline 2.1) — Senga Driver
 
+Login options on iOS: Sign in with Apple, Google, or phone + PIN/SMS OTP.
+
+Phone demo (recommended for review):
 1. Enter phone +243900000023 → Continue
 2. On the PIN screen, tap "Code PIN oublié ?" (Forgot PIN). Do NOT enter 123456 as the local PIN.
 3. Enter SMS OTP: 123456
 4. Toggle Online to receive jobs (KYC-approved demo driver).
 5. Account deletion: Aide → Contacter le support
 Privacy: https://senga.afri-soft.com/privacy
+
+Guideline 4.8: Sign in with Apple is available on the login screen (Continuer avec Apple), equal prominence with Google.
 
 Walkthrough: senga-driver-app-review-walkthrough.mp4
 Production API: https://api.afri-soft.com — demo OTP 123456 enabled for App Review.

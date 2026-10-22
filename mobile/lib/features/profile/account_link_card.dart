@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/auth/apple_sign_in.dart';
 import '../../core/auth/google_sign_in.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
@@ -14,7 +16,7 @@ import '../auth/otp_sms_autofill.dart';
 import '../auth/pin_session.dart';
 import '../auth/widgets/six_digit_pin_field.dart';
 
-const _linkedSnack = 'Compte lié. Vous pouvez vous connecter avec le téléphone ou Google.';
+const _linkedSnack = 'Compte lié. Vous pouvez vous connecter avec le téléphone, Google ou Apple.';
 
 /// Bloc « Compte et connexion » : lier Google ou le numéro +243 au même compte.
 class AccountLinkCard extends ConsumerStatefulWidget {
@@ -47,6 +49,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
   }
 
   bool get _googleLinked => widget.profile['googleLinked'] == true;
+  bool get _appleLinked => widget.profile['appleLinked'] == true;
   bool get _hasPhone {
     if (widget.profile['hasPhone'] == true) return true;
     final phone = widget.profile['phone']?.toString() ?? '';
@@ -54,8 +57,11 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
   }
 
   bool get _canUnlinkGoogle => widget.profile['canUnlinkGoogle'] == true;
+  bool get _canUnlinkApple => widget.profile['canUnlinkApple'] == true;
   bool get _canUnlinkPhone => widget.profile['canUnlinkPhone'] == true;
   bool get _pinConfigured => widget.profile['pinConfigured'] == true;
+  bool get _showAppleLink =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   String get _phoneLabel {
     final masked = widget.profile['phoneMasked']?.toString();
@@ -125,6 +131,51 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
       setState(() {
         _busy = false;
         _error = googleSignInErrorMessage(e);
+      });
+    }
+  }
+
+  Future<void> _linkApple() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final apple = await signInWithAppleIdentityToken();
+      if (!mounted) return;
+      if (apple == null || apple.identityToken.isEmpty) {
+        setState(() {
+          _busy = false;
+          _error = 'Liaison Apple annulée.';
+        });
+        return;
+      }
+      final body = <String, dynamic>{'identityToken': apple.identityToken};
+      if (apple.givenName != null && apple.givenName!.isNotEmpty) {
+        body['givenName'] = apple.givenName;
+      }
+      if (apple.familyName != null && apple.familyName!.isNotEmpty) {
+        body['familyName'] = apple.familyName;
+      }
+      final result = await ref.read(apiClientProvider).post('/auth/link-apple', body);
+      if (!mounted) return;
+      switch (result) {
+        case Success(:final data):
+          await _applyAuth(data);
+          setState(() => _busy = false);
+          _snack(data['message']?.toString() ?? _linkedSnack);
+          await widget.onChanged();
+        case Failure(:final error):
+          setState(() {
+            _busy = false;
+            _error = error.message;
+          });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = appleSignInErrorMessage(e);
       });
     }
   }
@@ -215,14 +266,23 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
     }
   }
 
-  Future<void> _unlink({required bool google}) async {
-    final label = google ? 'Google' : 'ce numéro';
+  Future<void> _unlink({required String kind}) async {
+    final label = switch (kind) {
+      'google' => 'Google',
+      'apple' => 'Apple',
+      _ => 'ce numéro',
+    };
+    final remaining = switch (kind) {
+      'google' => 'votre numéro ou Apple',
+      'apple' => 'votre numéro ou Google',
+      _ => 'Google ou Apple',
+    };
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(google ? 'Détacher Google ?' : 'Détacher le numéro ?'),
+        title: Text('Détacher $label ?'),
         content: Text(
-          'Vous pourrez encore vous connecter avec ${google ? 'votre numéro' : 'Google'}. '
+          'Vous pourrez encore vous connecter avec $remaining. '
           'Détacher $label ?',
         ),
         actions: [
@@ -236,10 +296,12 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
       _busy = true;
       _error = null;
     });
-    final result = await ref.read(apiClientProvider).post(
-      google ? '/auth/unlink-google' : '/auth/unlink-phone',
-      {},
-    );
+    final path = switch (kind) {
+      'google' => '/auth/unlink-google',
+      'apple' => '/auth/unlink-apple',
+      _ => '/auth/unlink-phone',
+    };
+    final result = await ref.read(apiClientProvider).post(path, {});
     if (!mounted) return;
     switch (result) {
       case Success(:final data):
@@ -257,7 +319,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
 
   @override
   Widget build(BuildContext context) {
-    final linkedBoth = _googleLinked && _hasPhone;
+    final linkedSocialAndPhone = (_googleLinked || _appleLinked) && _hasPhone;
 
     return MovaCard(
       child: Column(
@@ -268,9 +330,11 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
             style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Optionnel. Vous pouvez utiliser seulement le téléphone, seulement Google, ou les deux pour le même compte.',
-            style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+          Text(
+            _showAppleLink
+                ? 'Optionnel. Téléphone, Google et/ou Apple pour le même compte.'
+                : 'Optionnel. Vous pouvez utiliser seulement le téléphone, seulement Google, ou les deux pour le même compte.',
+            style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
           ),
           const SizedBox(height: 12),
           _Row(
@@ -284,6 +348,14 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
             label: 'Google',
             value: _googleLinked ? 'lié · $_emailLabel' : 'non lié',
           ),
+          if (_showAppleLink) ...[
+            const SizedBox(height: 8),
+            _Row(
+              icon: Icons.apple,
+              label: 'Apple',
+              value: _appleLinked ? 'lié' : 'non lié',
+            ),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 12),
             MovaErrorBanner(message: _error!),
@@ -296,6 +368,16 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
               isSecondary: true,
               isLoading: _busy,
               onPressed: _busy ? null : _linkGoogle,
+            ),
+          ],
+          if (_showAppleLink && !_appleLinked) ...[
+            const SizedBox(height: 12),
+            MovaButton(
+              label: 'Lier Apple',
+              icon: Icons.apple,
+              isSecondary: true,
+              isLoading: _busy,
+              onPressed: _busy ? null : _linkApple,
             ),
           ],
           if (!_hasPhone) ...[
@@ -340,30 +422,38 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
                 child: const Text('Changer de numéro'),
               ),
           ],
-          if (linkedBoth) ...[
+          if (linkedSocialAndPhone) ...[
             const SizedBox(height: 8),
             const Text(
-              'Les deux méthodes sont liées. Un seul portefeuille.',
+              'Plusieurs méthodes liées. Un seul portefeuille.',
               style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
             ),
             if (_canUnlinkGoogle)
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton(
-                  onPressed: _busy ? null : () => _unlink(google: true),
+                  onPressed: _busy ? null : () => _unlink(kind: 'google'),
                   child: const Text('Détacher Google'),
+                ),
+              ),
+            if (_canUnlinkApple)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _busy ? null : () => _unlink(kind: 'apple'),
+                  child: const Text('Détacher Apple'),
                 ),
               ),
             if (_canUnlinkPhone)
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton(
-                  onPressed: _busy ? null : () => _unlink(google: false),
+                  onPressed: _busy ? null : () => _unlink(kind: 'phone'),
                   child: const Text('Détacher le numéro'),
                 ),
               ),
           ],
-          if (_hasPhone && !_pinConfigured && _googleLinked) ...[
+          if (_hasPhone && !_pinConfigured && (_googleLinked || _appleLinked)) ...[
             const SizedBox(height: 8),
             TextButton.icon(
               onPressed: _busy

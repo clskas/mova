@@ -49,11 +49,12 @@ export class UsersService {
     createdAt: Date;
     updatedAt: Date;
   }) {
-    const { googleId, localPinHash: _pin, adminPermissions: rawPerms, ...safe } = user;
+    const { googleId, appleId, localPinHash: _pin, adminPermissions: rawPerms, ...safe } = user;
     const stored = sanitizeAdminPermissions(rawPerms);
     const effectivePermissions = isAdminPanelRole(user.role)
       ? resolveAdminPermissions(user.role, stored)
       : [];
+    const hasSocial = Boolean(googleId || appleId);
     return {
       ...safe,
       adminPermissions: stored,
@@ -70,9 +71,13 @@ export class UsersService {
       phoneMasked: maskPhoneRdc(user.phone),
       emailMasked: maskEmail(user.email),
       googleLinked: Boolean(googleId),
+      appleLinked: Boolean(appleId),
       hasPhone: Boolean(user.phone),
-      canUnlinkGoogle: Boolean(googleId && user.phone),
-      canUnlinkPhone: Boolean(user.phone && googleId && user.phone !== OWNER_SUPER_ADMIN_PHONE),
+      canUnlinkGoogle: Boolean(googleId && (user.phone || appleId)),
+      canUnlinkApple: Boolean(appleId && (user.phone || googleId)),
+      canUnlinkPhone: Boolean(
+        user.phone && hasSocial && user.phone !== OWNER_SUPER_ADMIN_PHONE,
+      ),
       pinConfigured: Boolean(_pin),
       needsPinSetup: userNeedsPinSetup(user.phone, _pin),
       playPrelaunch: isPlayPrelaunchAccount(user),

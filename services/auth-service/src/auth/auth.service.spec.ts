@@ -30,6 +30,7 @@ function makeUser(overrides: Record<string, unknown> = {}) {
     lastName: null,
     email: null,
     googleId: null,
+    appleId: null,
     localPinHash: null,
     localPinSetAt: null,
     ...overrides,
@@ -55,6 +56,7 @@ describe('AuthService', () => {
   };
   let jwt: { sign: jest.Mock };
   let googleTokens: { verify: jest.Mock };
+  let appleTokens: { verify: jest.Mock };
   let redis: {
     publish: jest.Mock;
     client: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
@@ -92,6 +94,16 @@ describe('AuthService', () => {
         audience: 'web-client.apps.googleusercontent.com',
       }),
     };
+    appleTokens = {
+      verify: jest.fn().mockResolvedValue({
+        appleId: 'aid-new',
+        email: 'new.user@privaterelay.appleid.com',
+        emailVerified: true,
+        givenName: 'Marie',
+        familyName: 'Kabila',
+        audience: 'cd.mova.mova',
+      }),
+    };
     redis = {
       publish: jest.fn().mockResolvedValue(undefined),
       client: {
@@ -117,6 +129,7 @@ describe('AuthService', () => {
       redis as never,
       sms as never,
       googleTokens as never,
+      appleTokens as never,
       mailer as never,
     );
     global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 }) as jest.Mock;
@@ -1488,6 +1501,7 @@ describe('AuthService', () => {
       redis as never,
       sms as never,
       googleTokens as never,
+      appleTokens as never,
       mailer as never,
       users as never,
     );

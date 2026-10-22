@@ -10,12 +10,15 @@ We have addressed both issues:
 ────────────────────────────────
 1) Guideline 4.8 — Login Services
 ────────────────────────────────
-Google Sign-In has been removed from the iOS build of SENGA Driver.
-The only login methods on iOS are:
-- Phone number + local 6-digit PIN, or
+SENGA Driver on iOS now offers Sign in with Apple as a login option, shown with equal prominence next to Google Sign-In (when Google is available).
+
+Login methods on iOS:
+- Sign in with Apple
+- Google Sign-In (optional)
+- Phone number + local 6-digit PIN
 - Phone number + SMS OTP (Forgot PIN)
 
-There is no third-party login on iOS in this build, so Sign in with Apple is not required under 4.8 for this submission. We will add Sign in with Apple before re-enabling Google Sign-In on iOS in a future release.
+Sign in with Apple uses the standard ASAuthorizationAppleIDButton / system sheet and verifies the identity token on our backend against Apple's JWKS (audiences: cd.mova.mova and cd.mova.mova.driver).
 
 ────────────────────────────────
 2) Guideline 2.1 — Demo account access
@@ -31,6 +34,8 @@ How to sign in on the device under review:
 3. On the PIN pad, enter 123456 (this is the App Review demo PIN)
 4. You will land in the driver home; toggle Online to receive jobs
 
+Alternatively, use Continuer avec Apple with any Apple ID on the review device.
+
 Notes:
 - 123456 works as the local PIN for this seed demo account (App Review mode).
 - The account is provisioned automatically when you tap Continue (PIN pad appears; no SMS required).
@@ -38,8 +43,4 @@ Notes:
 - Privacy: https://senga.afri-soft.com/privacy
 
 The demo driver is KYC-approved so Online works immediately.
-Please use the new build submitted with this reply
-(Google Sign-In removed on iOS; demo PIN 123456 works on production).
-
-Thank you.
 ```

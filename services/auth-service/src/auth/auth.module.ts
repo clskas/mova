@@ -10,6 +10,7 @@ import { AuthController } from './auth.controller';
 import { SmsInternalController } from './sms-internal.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { GoogleTokenVerifier } from './google-id-token';
+import { AppleTokenVerifier } from './apple-id-token';
 import { EmailOtpMailer } from './email-otp.mailer';
 import {
   MockSmsProvider,
@@ -38,6 +39,7 @@ import {
   providers: [
     AuthService,
     GoogleTokenVerifier,
+    AppleTokenVerifier,
     EmailOtpMailer,
     JwtStrategy,
     MockSmsProvider,

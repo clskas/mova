@@ -61,6 +61,7 @@ import {
 } from './partner-auth.util';
 import { hashOtpCode } from './otp-code.util';
 import { GoogleIdentity, GoogleTokenVerifier } from './google-id-token';
+import { AppleIdentity, AppleNameHint, AppleTokenVerifier } from './apple-id-token';
 
 const PIN_FAIL_PREFIX = 'auth:pin:fail:';
 const PIN_FAIL_MAX = 5;
@@ -72,6 +73,9 @@ const OTP_FAIL_TTL_SEC = 15 * 60;
 
 const GOOGLE_CHALLENGE_PREFIX = 'auth:google:ch:';
 const GOOGLE_CHALLENGE_TTL_SEC = 10 * 60;
+
+const APPLE_CHALLENGE_PREFIX = 'auth:apple:ch:';
+const APPLE_CHALLENGE_TTL_SEC = 10 * 60;
 
 type GoogleOtpChannel = 'sms' | 'email';
 
@@ -98,15 +102,35 @@ type GoogleChallenge = {
   channel: GoogleOtpChannel;
 };
 
+type AppleChallenge = {
+  appleId: string;
+  email: string | null;
+  givenName: string | null;
+  familyName: string | null;
+  userId: string | null;
+  isNew: boolean;
+  role?: UserRole;
+  destination: string;
+  channel: GoogleOtpChannel;
+};
+
 const PASSENGER_ON_DRIVER_APP_MESSAGE =
   'Ce numéro est un compte passager. Utilisez l\'application SENGA passager, ou attendez qu\'un administrateur vous promeuve chauffeur (après KYC).';
 const PASSENGER_GOOGLE_ON_DRIVER_APP_MESSAGE =
   'Ce Google est un compte passager. Inscrivez-vous chauffeur avec votre numéro, puis liez Google dans Compte.';
+const PASSENGER_APPLE_ON_DRIVER_APP_MESSAGE =
+  'Ce compte Apple est un compte passager. Inscrivez-vous chauffeur avec votre numéro, puis liez Apple dans Compte.';
 const STAFF_ON_DRIVER_APP_MESSAGE = 'Compte staff — connexion réservée à la console admin.';
 const STAFF_GOOGLE_ON_DRIVER_APP_MESSAGE =
   'Compte administrateur. Utilisez la console admin, ou inscrivez-vous chauffeur avec votre numéro.';
+const STAFF_APPLE_ON_DRIVER_APP_MESSAGE =
+  'Compte administrateur. Utilisez la console admin, ou inscrivez-vous chauffeur avec votre numéro.';
 const NO_DRIVER_ACCOUNT_MESSAGE =
   'Aucun compte chauffeur pour ce numéro. Utilisez l\'application SENGA passager, ou attendez une promotion chauffeur après validation KYC.';
+
+function userHasSocialLogin(user: { googleId?: string | null; appleId?: string | null }): boolean {
+  return Boolean(user.googleId || user.appleId);
+}
 
 @Injectable()
 export class AuthService {
@@ -118,6 +142,7 @@ export class AuthService {
     private redis: RedisService,
     private sms: SmsService,
     private googleTokens: GoogleTokenVerifier,
+    private appleTokens: AppleTokenVerifier,
     private emailOtp: EmailOtpMailer,
     @Optional() private users?: UsersService,
   ) {}
@@ -693,11 +718,11 @@ export class AuthService {
     if (!user.googleId) {
       return this.buildLinkResponse(user, 'Google n\'est pas lié à ce compte.');
     }
-    if (!user.phone) {
+    if (!user.phone && !user.appleId) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.CONFLICT,
-        'Impossible de délier Google : ajoutez d\'abord un numéro +243.',
+        'Impossible de délier Google : ajoutez d\'abord un numéro +243 ou Apple.',
       );
     }
     const updated = await this.prisma.user.update({
@@ -705,6 +730,133 @@ export class AuthService {
       data: { googleId: null },
     });
     return this.buildLinkResponse(updated, 'Compte Google délié.');
+  }
+
+  /**
+   * Step 1: verify Apple identity token.
+   * Same email-OTP gate as Google when an e-mail is available.
+   * Returning Apple users without a relay e-mail on this login get a direct JWT
+   * (Apple already proved the identity; e-mail is only sent once by Apple).
+   */
+  async loginWithApple(
+    identityToken: string,
+    role?: UserRole,
+    portal?: string,
+    intendedRole?: string,
+    nameHint?: AppleNameHint,
+  ): Promise<GoogleOtpChallengeResult | ReturnType<AuthService['buildAuthResponse']>> {
+    const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
+    const identity = await this.appleTokens.verify(identityToken, nameHint);
+    let user = await this.resolveAppleLoginUser(identity, requestedRole);
+
+    if (!user) {
+      this.assertAppleCanAutoRegister(requestedRole, identity.email);
+    } else {
+      this.assertRoleAccess(user, requestedRole, 'apple');
+      if (user.status === UserStatus.SUSPENDED) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.FORBIDDEN,
+          'Compte suspendu. Contactez le support SENGA.',
+        );
+      }
+    }
+
+    const channel: GoogleOtpChannel = 'email';
+    const destination = (identity.email ?? user?.email ?? '').trim().toLowerCase();
+    const hasEmail = destination.includes('@');
+
+    if (!this.requiresGoogleEmailOtp(requestedRole, user) || !hasEmail) {
+      return this.finalizeAppleSession(identity, user, requestedRole);
+    }
+
+    const issued = await this.issueOtpToDestination(destination, channel, requestedRole);
+    const challengeId = await this.storeAppleChallenge({
+      appleId: identity.appleId,
+      email: identity.email,
+      givenName: identity.givenName,
+      familyName: identity.familyName,
+      userId: user?.id ?? null,
+      isNew: !user,
+      role: requestedRole,
+      destination,
+      channel,
+    });
+    return {
+      success: true,
+      otpRequired: true,
+      challengeId,
+      otpChannel: channel,
+      destinationMasked: maskEmail(destination),
+      message: 'Code envoyé par e-mail. Vérifiez votre boîte de réception.',
+      ...(issued.mock && !isProductionRuntime() ? { mockCode: TEST_OTP_CODE } : {}),
+    };
+  }
+
+  async verifyAppleOtp(
+    challengeId: string,
+    code: string,
+    role?: UserRole,
+    portal?: string,
+    intendedRole?: string,
+  ) {
+    const challenge = await this.loadAppleChallenge(challengeId);
+    const requestedRole = this.resolveRequestedAuthRole(role ?? challenge.role, portal, intendedRole);
+    await this.consumeValidOtp(challenge.destination, code, { email: challenge.channel === 'email' });
+
+    const existing = challenge.userId
+      ? await this.prisma.user.findUnique({ where: { id: challenge.userId } })
+      : null;
+
+    const destinationEmail = challenge.destination.includes('@')
+      ? challenge.destination.trim().toLowerCase()
+      : null;
+    const identity: AppleIdentity = {
+      appleId: challenge.appleId,
+      email: challenge.email?.trim().toLowerCase() || destinationEmail,
+      emailVerified: true,
+      givenName: challenge.givenName,
+      familyName: challenge.familyName,
+      audience: '',
+    };
+
+    const result = await this.finalizeAppleSession(identity, existing, requestedRole);
+    await this.clearAppleChallenge(challengeId);
+    return result;
+  }
+
+  async linkApple(
+    userId: string,
+    identityToken: string,
+    otpCode?: string,
+    nameHint?: AppleNameHint,
+  ) {
+    const identity = await this.appleTokens.verify(identityToken, nameHint);
+    const user = await this.requireActiveUser(userId);
+    if (user.phone && otpCode) {
+      await this.consumeValidOtp(user.phone, otpCode);
+    }
+    const linked = await this.attachAppleIdentity(user, identity);
+    return this.buildLinkResponse(linked);
+  }
+
+  async unlinkApple(userId: string) {
+    const user = await this.requireActiveUser(userId);
+    if (!user.appleId) {
+      return this.buildLinkResponse(user, 'Apple n\'est pas lié à ce compte.');
+    }
+    if (!user.phone && !user.googleId) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.CONFLICT,
+        'Impossible de délier Apple : ajoutez d\'abord un numéro +243 ou Google.',
+      );
+    }
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { appleId: null },
+    });
+    return this.buildLinkResponse(updated, 'Compte Apple délié.');
   }
 
   async unlinkPhone(userId: string) {
@@ -719,18 +871,18 @@ export class AuthService {
         'Le numéro du compte propriétaire SENGA ne peut pas être détaché.',
       );
     }
-    if (!user.googleId) {
+    if (!userHasSocialLogin(user)) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.CONFLICT,
-        'Impossible de délier le numéro : liez d\'abord Google.',
+        'Impossible de délier le numéro : liez d\'abord Google ou Apple.',
       );
     }
     const updated = await this.prisma.user.update({
       where: { id: user.id },
       data: { phone: null, localPinHash: null, localPinSetAt: null },
     });
-    return this.buildLinkResponse(updated, 'Numéro délié. Connectez-vous avec Google.');
+    return this.buildLinkResponse(updated, 'Numéro délié. Connectez-vous avec Google ou Apple.');
   }
 
   async validateUser(userId: string) {
@@ -795,7 +947,7 @@ export class AuthService {
   ): Promise<User | null> {
     let user = await this.prisma.user.findUnique({ where: { googleId: identity.googleId } });
     if (isStaffAuthRole(requestedRole)) {
-      const owner = await this.resolveAllowlistedSuperAdmin(identity);
+      const owner = await this.resolveAllowlistedSuperAdmin(identity.email);
       if (owner) return owner;
       if (user && isStaffAuthRole(user.role)) return user;
       if (!user && identity.email) {
@@ -816,14 +968,47 @@ export class AuthService {
       });
     }
     if (!user && isPartnerPortalRole(requestedRole)) {
-      const owner = await this.resolveAllowlistedSuperAdmin(identity);
+      const owner = await this.resolveAllowlistedSuperAdmin(identity.email);
       if (owner) return owner;
     }
     return user;
   }
 
-  private async resolveAllowlistedSuperAdmin(identity: GoogleIdentity): Promise<User | null> {
-    if (!isOwnerSuperAdminEmail(identity.email)) return null;
+  private async resolveAppleLoginUser(
+    identity: AppleIdentity,
+    requestedRole?: UserRole,
+  ): Promise<User | null> {
+    let user = await this.prisma.user.findUnique({ where: { appleId: identity.appleId } });
+    if (isStaffAuthRole(requestedRole)) {
+      const owner = await this.resolveAllowlistedSuperAdmin(identity.email);
+      if (owner) return owner;
+      if (user && isStaffAuthRole(user.role)) return user;
+      if (!user && identity.email) {
+        user = await this.prisma.user.findFirst({
+          where: { email: { equals: identity.email, mode: 'insensitive' } },
+        });
+        if (user && isStaffAuthRole(user.role)) return user;
+      }
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Aucun compte autorisé pour cet e-mail Apple. Le compte staff doit déjà exister.',
+      );
+    }
+    if (!user && identity.email) {
+      user = await this.prisma.user.findFirst({
+        where: { email: { equals: identity.email, mode: 'insensitive' } },
+      });
+    }
+    if (!user && isPartnerPortalRole(requestedRole)) {
+      const owner = await this.resolveAllowlistedSuperAdmin(identity.email);
+      if (owner) return owner;
+    }
+    return user;
+  }
+
+  private async resolveAllowlistedSuperAdmin(email?: string | null): Promise<User | null> {
+    if (!isOwnerSuperAdminEmail(email)) return null;
     const owner = await this.prisma.user.findUnique({ where: { phone: OWNER_SUPER_ADMIN_PHONE } });
     if (owner && owner.role === UserRole.SUPER_ADMIN) return owner;
     return null;
@@ -870,6 +1055,47 @@ export class AuthService {
     return this.buildAuthResponse(user, { isNew });
   }
 
+  private async finalizeAppleSession(
+    identity: AppleIdentity,
+    existing: User | null,
+    requestedRole?: UserRole,
+  ) {
+    let user = existing;
+    let isNew = false;
+    if (!user) {
+      this.assertAppleCanAutoRegister(requestedRole, identity.email);
+      user = await this.prisma.user.create({
+        data: this.appleAutoRegisterCreateData(identity, requestedRole),
+      });
+      isNew = true;
+      await this.provisionUser(user.id, user.role);
+      try {
+        const payload: UserCreatedPayload = { userId: user.id, phone: user.phone ?? undefined, role: user.role };
+        await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
+      } catch (e) {
+        this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
+      }
+    } else {
+      user = await this.attachAppleIdentity(user, identity);
+    }
+    this.assertRoleAccess(user, requestedRole, 'apple');
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Compte suspendu. Contactez le support SENGA.',
+      );
+    }
+    if (user.phone) {
+      try {
+        await this.clearPinFailures(user.phone);
+      } catch (e) {
+        this.logger.warn(`clearPinFailures failed: ${(e as Error).message}`);
+      }
+    }
+    return this.buildAuthResponse(user, { isNew });
+  }
+
   private assertGoogleCanAutoRegister(role?: UserRole, email?: string | null) {
     if (isPlayPrelaunchAccount({ email, phone: null })) {
       throw new MovaHttpException(
@@ -893,6 +1119,43 @@ export class AuthService {
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
         'Aucun compte autorisé pour cet e-mail Google. Le compte staff doit déjà exister.',
+      );
+    }
+    if (isAllowedPartnerSelfRegisterRole(role)) {
+      return;
+    }
+    if (isPartnerPortalRole(role) || shouldRefusePassengerAutoRegister('', role)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        missingInviteOnlyAccountMessage('', role),
+      );
+    }
+  }
+
+  private assertAppleCanAutoRegister(role?: UserRole, email?: string | null) {
+    if (isPlayPrelaunchAccount({ email, phone: null })) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Compte de test refusé. Utilisez un numéro +243 ou un compte Apple personnel.',
+      );
+    }
+    if (isPartnerPortalRole(role) && isOwnerSuperAdminEmail(email)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        STAFF_ON_PARTNER_PORTAL_MESSAGE,
+      );
+    }
+    if (role === UserRole.DRIVER) {
+      return;
+    }
+    if (isStaffAuthRole(role)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Aucun compte autorisé pour cet e-mail Apple. Le compte staff doit déjà exister.',
       );
     }
     if (isAllowedPartnerSelfRegisterRole(role)) {
@@ -1123,6 +1386,72 @@ export class AuthService {
     }
   }
 
+  private async storeAppleChallenge(challenge: AppleChallenge): Promise<string> {
+    const challengeId = crypto.randomUUID();
+    try {
+      await this.redis.client.set(
+        `${APPLE_CHALLENGE_PREFIX}${challengeId}`,
+        JSON.stringify(challenge),
+        'EX',
+        APPLE_CHALLENGE_TTL_SEC,
+      );
+    } catch (e) {
+      this.logger.error(`Apple challenge store failed: ${(e as Error).message}`);
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Connexion Apple temporairement indisponible. Réessayez.',
+      );
+    }
+    return challengeId;
+  }
+
+  private async loadAppleChallenge(challengeId: string): Promise<AppleChallenge> {
+    const trimmed = String(challengeId ?? '').trim();
+    if (!trimmed) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_EXPIRED_OTP,
+        HttpStatus.BAD_REQUEST,
+        'Session Apple expirée. Recommencez.',
+      );
+    }
+    let raw: string | null = null;
+    try {
+      raw = await this.redis.client.get(`${APPLE_CHALLENGE_PREFIX}${trimmed}`);
+    } catch (e) {
+      this.logger.error(`Apple challenge load failed: ${(e as Error).message}`);
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Connexion Apple temporairement indisponible. Réessayez.',
+      );
+    }
+    if (!raw) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_EXPIRED_OTP,
+        HttpStatus.BAD_REQUEST,
+        'Session Apple expirée. Recommencez avec Apple.',
+      );
+    }
+    try {
+      return JSON.parse(raw) as AppleChallenge;
+    } catch {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_EXPIRED_OTP,
+        HttpStatus.BAD_REQUEST,
+        'Session Apple invalide. Recommencez.',
+      );
+    }
+  }
+
+  private async clearAppleChallenge(challengeId: string) {
+    try {
+      await this.redis.client.del(`${APPLE_CHALLENGE_PREFIX}${challengeId}`);
+    } catch (e) {
+      this.logger.warn(`Apple challenge clear failed: ${(e as Error).message}`);
+    }
+  }
+
   private async consumeValidOtp(
     destination: string,
     code: string,
@@ -1179,6 +1508,33 @@ export class AuthService {
         firstName: user.firstName?.trim() || identity.givenName,
         lastName: user.lastName?.trim() || identity.familyName,
         avatarUrl: user.avatarUrl?.trim() || identity.picture,
+      },
+    });
+  }
+
+  private async attachAppleIdentity(user: User, identity: AppleIdentity): Promise<User> {
+    if (user.appleId && user.appleId !== identity.appleId) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.CONFLICT,
+        'Ce compte est déjà lié à un autre compte Apple.',
+      );
+    }
+    const taken = await this.prisma.user.findUnique({ where: { appleId: identity.appleId } });
+    if (taken && taken.id !== user.id) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_IDENTITY_TAKEN,
+        HttpStatus.CONFLICT,
+        'Ce compte Apple est déjà lié à un autre compte SENGA.',
+      );
+    }
+    return this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        appleId: identity.appleId,
+        email: user.email?.trim() || identity.email,
+        firstName: user.firstName?.trim() || identity.givenName,
+        lastName: user.lastName?.trim() || identity.familyName,
       },
     });
   }
@@ -1306,7 +1662,28 @@ export class AuthService {
     };
   }
 
-  private assertRoleAccess(user: User, role?: UserRole, via: 'phone' | 'google' = 'phone') {
+  private appleAutoRegisterCreateData(identity: AppleIdentity, requestedRole?: UserRole) {
+    const isDriverApplicant = requestedRole === UserRole.DRIVER;
+    const createdRole = isDriverApplicant
+      ? UserRole.DRIVER
+      : isAllowedPartnerSelfRegisterRole(requestedRole)
+        ? requestedRole!
+        : UserRole.PASSENGER;
+    return {
+      appleId: identity.appleId,
+      email: identity.email?.trim().toLowerCase() || null,
+      firstName: identity.givenName?.trim() || null,
+      lastName: identity.familyName?.trim() || null,
+      role: createdRole,
+      status: isDriverApplicant ? UserStatus.PENDING_KYC : UserStatus.ACTIVE,
+    };
+  }
+
+  private assertRoleAccess(
+    user: User,
+    role?: UserRole,
+    via: 'phone' | 'google' | 'apple' = 'phone',
+  ) {
     const staffRoles: UserRole[] = [
       UserRole.SUPER_ADMIN,
       UserRole.ADMIN,
@@ -1333,17 +1710,29 @@ export class AuthService {
       );
     }
     if (role === UserRole.DRIVER && user.role === UserRole.PASSENGER) {
+      const passengerMsg =
+        via === 'google'
+          ? PASSENGER_GOOGLE_ON_DRIVER_APP_MESSAGE
+          : via === 'apple'
+            ? PASSENGER_APPLE_ON_DRIVER_APP_MESSAGE
+            : PASSENGER_ON_DRIVER_APP_MESSAGE;
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        via === 'google' ? PASSENGER_GOOGLE_ON_DRIVER_APP_MESSAGE : PASSENGER_ON_DRIVER_APP_MESSAGE,
+        passengerMsg,
       );
     }
     if (role === UserRole.DRIVER && staffRoles.includes(user.role)) {
+      const staffMsg =
+        via === 'google'
+          ? STAFF_GOOGLE_ON_DRIVER_APP_MESSAGE
+          : via === 'apple'
+            ? STAFF_APPLE_ON_DRIVER_APP_MESSAGE
+            : STAFF_ON_DRIVER_APP_MESSAGE;
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        via === 'google' ? STAFF_GOOGLE_ON_DRIVER_APP_MESSAGE : STAFF_ON_DRIVER_APP_MESSAGE,
+        staffMsg,
       );
     }
     if (role === UserRole.PASSENGER && staffRoles.includes(user.role)) {
@@ -1451,9 +1840,13 @@ export class AuthService {
         email: user.email ?? '',
         emailMasked: maskEmail(user.email),
         googleLinked: Boolean(user.googleId),
+        appleLinked: Boolean(user.appleId),
         hasPhone: Boolean(user.phone),
-        canUnlinkGoogle: Boolean(user.googleId && user.phone),
-        canUnlinkPhone: Boolean(user.googleId && user.phone && user.phone !== OWNER_SUPER_ADMIN_PHONE),
+        canUnlinkGoogle: Boolean(user.googleId && (user.phone || user.appleId)),
+        canUnlinkApple: Boolean(user.appleId && (user.phone || user.googleId)),
+        canUnlinkPhone: Boolean(
+          userHasSocialLogin(user) && user.phone && user.phone !== OWNER_SUPER_ADMIN_PHONE,
+        ),
         publicId: formatMovaPublicId(user.id, user.role),
         role: user.role,
         status: user.status,

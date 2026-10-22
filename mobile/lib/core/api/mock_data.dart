@@ -73,6 +73,7 @@ abstract final class MockData {
     'email': '',
     'emailMasked': '',
     'googleLinked': false,
+    'appleLinked': false,
     'hasPhone': true,
     'canUnlinkGoogle': false,
     'canUnlinkPhone': false,

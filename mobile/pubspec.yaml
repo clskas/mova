@@ -38,6 +38,8 @@ dependencies:
   firebase_core: ^4.11.0
   firebase_messaging: ^16.4.1
   google_sign_in: ^6.2.2
+  sign_in_with_apple: ^6.1.4
+  crypto: ^3.0.6
   in_app_update: ^4.2.3
   package_info_plus: ^8.3.0
   # 2.5.4+: io.livekit:noise (16 KB page size). Stay <2.13 (needs Dart 3.10 / Flutter 3.38).

@@ -9,6 +9,7 @@ export enum MovaErrorCode {
   AUTH_PIN_NOT_SET = 'MOVA_AUTH_008',
   AUTH_INVALID_GOOGLE = 'MOVA_AUTH_009',
   AUTH_IDENTITY_TAKEN = 'MOVA_AUTH_010',
+  AUTH_INVALID_APPLE = 'MOVA_AUTH_011',
 
   RIDE_NOT_FOUND = 'MOVA_RIDE_001',
   RIDE_INVALID_STATUS = 'MOVA_RIDE_002',
@@ -75,7 +76,8 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.AUTH_PIN_NOT_SET]: 'Aucun code PIN configuré. Connectez-vous par SMS.',
   [MovaErrorCode.AUTH_INVALID_GOOGLE]: 'Connexion Google refusée. Réessayez ou utilisez le numéro de téléphone.',
   [MovaErrorCode.AUTH_IDENTITY_TAKEN]:
-    'Ce numéro ou ce compte Google est déjà lié à un autre utilisateur SENGA.',
+    'Ce numéro ou ce compte Google / Apple est déjà lié à un autre utilisateur SENGA.',
+  [MovaErrorCode.AUTH_INVALID_APPLE]: 'Connexion Apple refusée. Réessayez ou utilisez le numéro de téléphone.',
 
   [MovaErrorCode.RIDE_NOT_FOUND]: 'Course introuvable.',
   [MovaErrorCode.RIDE_INVALID_STATUS]:

@@ -104,6 +104,47 @@ export class LinkGoogleDto {
   otpCode?: string;
 }
 
+export class AppleLoginDto extends AuthIntentDto {
+  @ApiProperty({ description: 'Apple identity token (Sign in with Apple)' })
+  @IsString()
+  identityToken: string;
+  @ApiProperty({ required: false, description: 'Prénom (fourni une seule fois par Apple)' })
+  @IsOptional()
+  @IsString()
+  givenName?: string;
+  @ApiProperty({ required: false, description: 'Nom (fourni une seule fois par Apple)' })
+  @IsOptional()
+  @IsString()
+  familyName?: string;
+}
+
+export class AppleVerifyDto extends AuthIntentDto {
+  @ApiProperty({ description: 'challengeId renvoyé par POST /auth/apple' })
+  @IsString()
+  challengeId: string;
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  code: string;
+}
+
+export class LinkAppleDto {
+  @ApiProperty({ description: 'Apple identity token (Sign in with Apple)' })
+  @IsString()
+  identityToken: string;
+  @ApiProperty({ required: false, description: 'Prénom (fourni une seule fois par Apple)' })
+  @IsOptional()
+  @IsString()
+  givenName?: string;
+  @ApiProperty({ required: false, description: 'Nom (fourni une seule fois par Apple)' })
+  @IsOptional()
+  @IsString()
+  familyName?: string;
+  @ApiProperty({ required: false, example: '123456', description: 'OTP SMS du numéro déjà lié, si demandé' })
+  @IsOptional()
+  @IsString()
+  otpCode?: string;
+}
+
 export class LinkPhoneDto {
   @ApiProperty({ example: '+243812345678' })
   @IsString({ message: 'Numéro de téléphone requis.' })

@@ -10,6 +10,7 @@ import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../help/legal_screen.dart';
 import 'local_pin_setup_screen.dart';
 import 'otp_sms_autofill.dart';
 import 'pin_session.dart';
@@ -54,6 +55,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   /// `google` | `apple` — which provider issued the email OTP challenge.
   String _socialProvider = 'google';
   bool _pinSubmitLock = false;
+  bool _legalAccepted = false;
 
   /// Google Sign-In on phone / forgot. On iOS, shown only with Apple (Guideline 4.8).
   bool get _showGoogleSignIn =>
@@ -86,6 +88,12 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     );
   }
 
+  bool _ensureLegalAccepted() {
+    if (_legalAccepted) return true;
+    setState(() => _error = 'Acceptez les CGU et la Politique de confidentialité pour continuer.');
+    return false;
+  }
+
   void _onPinOrOtpChanged() {
     if (!mounted) return;
     setState(() {});
@@ -93,10 +101,12 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         _pinController.text.trim().length == 6 &&
         !_loading &&
         !_pinSubmitLock) {
+      if (!_legalAccepted) return;
       _loginWithPin();
     }
     // Autofill SMS / saisie : valider dès 6 chiffres (comme WhatsApp).
     if (!_loading && _codeController.text.trim().length == 6) {
+      if (!_legalAccepted) return;
       if (_step == PhoneLoginStep.otp) {
         _verifyOtp();
       } else if (_step == PhoneLoginStep.googleOtp) {
@@ -158,6 +168,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _continueFromPhone() async {
+    if (!_ensureLegalAccepted()) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -265,6 +276,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _loginWithPin() async {
+    if (!_ensureLegalAccepted()) return;
     final pin = _pinController.text.trim();
     if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
       setState(() => _error = 'Le code PIN doit contenir 6 chiffres.');
@@ -292,6 +304,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _verifyOtp() async {
+    if (!_ensureLegalAccepted()) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -314,6 +327,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _loginWithGoogle() async {
+    if (!_ensureLegalAccepted()) return;
     // Conserver le mode « PIN oublié » si on part de cet écran (nouveau PIN après Google).
     final keepForgot = _forgotPinRecovery || _step == PhoneLoginStep.forgot;
     setState(() {
@@ -350,6 +364,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _loginWithApple() async {
+    if (!_ensureLegalAccepted()) return;
     final keepForgot = _forgotPinRecovery || _step == PhoneLoginStep.forgot;
     setState(() {
       _loading = true;
@@ -421,6 +436,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _verifyGoogleOtp() async {
+    if (!_ensureLegalAccepted()) return;
     final challengeId = _googleChallengeId;
     final providerLabel = _socialProvider == 'apple' ? 'Apple' : 'Google';
     if (challengeId == null || challengeId.isEmpty) {
@@ -563,6 +579,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _sendForgotSms() async {
+    if (!_ensureLegalAccepted()) return;
     final raw = _phoneController.text.trim();
     // Only the SMS destination matters — do not block on a stale Google e-mail
     // left in `_normalizedPhone` after the user typed a real +243 number.
@@ -716,7 +733,17 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           const SizedBox(height: 16),
           MovaErrorBanner(message: _error!),
         ],
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+        _LegalAcceptRow(
+          accepted: _legalAccepted,
+          onChanged: (v) => setState(() {
+            _legalAccepted = v;
+            if (v && _error != null && _error!.contains('CGU')) {
+              _error = null;
+            }
+          }),
+        ),
+        const SizedBox(height: 16),
           MovaButton(
           label: switch (_step) {
             PhoneLoginStep.phone => 'Continuer',
@@ -725,16 +752,18 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             PhoneLoginStep.otp || PhoneLoginStep.googleOtp => 'Vérifier le code',
           },
           isLoading: _loading,
-          onPressed: switch (_step) {
-            PhoneLoginStep.phone => _continueFromPhone,
-            PhoneLoginStep.pin =>
-              _pinController.text.trim().length == 6 ? _loginWithPin : null,
-            PhoneLoginStep.forgot => _sendForgotSms,
-            PhoneLoginStep.otp =>
-              _codeController.text.trim().length == 6 ? _verifyOtp : null,
-            PhoneLoginStep.googleOtp =>
-              _codeController.text.trim().length == 6 ? _verifyGoogleOtp : null,
-          },
+          onPressed: !_legalAccepted
+              ? null
+              : switch (_step) {
+                  PhoneLoginStep.phone => _continueFromPhone,
+                  PhoneLoginStep.pin =>
+                    _pinController.text.trim().length == 6 ? _loginWithPin : null,
+                  PhoneLoginStep.forgot => _sendForgotSms,
+                  PhoneLoginStep.otp =>
+                    _codeController.text.trim().length == 6 ? _verifyOtp : null,
+                  PhoneLoginStep.googleOtp =>
+                    _codeController.text.trim().length == 6 ? _verifyGoogleOtp : null,
+                },
           icon: switch (_step) {
             PhoneLoginStep.phone => Icons.arrow_forward,
             PhoneLoginStep.pin => Icons.login,
@@ -777,7 +806,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
               label: 'Continuer avec Apple',
               isSecondary: true,
               isLoading: _loading,
-              onPressed: _loginWithApple,
+              onPressed: _legalAccepted ? _loginWithApple : null,
               icon: Icons.apple,
             ),
           ],
@@ -787,11 +816,99 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
               label: 'Continuer avec Google',
               isSecondary: true,
               isLoading: _loading,
-              onPressed: _loginWithGoogle,
+              onPressed: _legalAccepted ? _loginWithGoogle : null,
               icon: Icons.g_mobiledata,
             ),
           ],
         ],
+      ],
+    );
+  }
+}
+
+class _LegalAcceptRow extends StatelessWidget {
+  const _LegalAcceptRow({required this.accepted, required this.onChanged});
+
+  final bool accepted;
+  final ValueChanged<bool> onChanged;
+
+  void _openLegal(BuildContext context, {required String title, required String asset, String? apiPath}) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LegalScreen(title: title, asset: asset, apiPath: apiPath),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 24,
+          height: 24,
+          child: Checkbox(
+            value: accepted,
+            onChanged: (v) => onChanged(v ?? false),
+            activeColor: MovaColors.violet,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                "J'ai lu et j'accepte les ",
+                style: TextStyle(fontSize: 13, color: MovaColors.textSecondary.withValues(alpha: 0.95)),
+              ),
+              GestureDetector(
+                onTap: () => _openLegal(
+                  context,
+                  title: 'CGU',
+                  asset: 'assets/legal/cgu_fr.md',
+                  apiPath: '/public/cgu',
+                ),
+                child: const Text(
+                  'CGU',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: MovaColors.violet,
+                    decoration: TextDecoration.underline,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                ' et la ',
+                style: TextStyle(fontSize: 13, color: MovaColors.textSecondary.withValues(alpha: 0.95)),
+              ),
+              GestureDetector(
+                onTap: () => _openLegal(
+                  context,
+                  title: 'Confidentialité',
+                  asset: 'assets/legal/privacy_fr.md',
+                  apiPath: '/public/privacy',
+                ),
+                child: const Text(
+                  'Politique de confidentialité',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: MovaColors.violet,
+                    decoration: TextDecoration.underline,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                '.',
+                style: TextStyle(fontSize: 13, color: MovaColors.textSecondary.withValues(alpha: 0.95)),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

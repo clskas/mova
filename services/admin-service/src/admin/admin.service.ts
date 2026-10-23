@@ -1402,6 +1402,25 @@ export class AdminService {
     return this.proxy('ride', `/internal/cgu/${id}`, { method: 'DELETE' });
   }
 
+  listPrivacy() {
+    return this.fetchJson('ride', '/internal/privacy');
+  }
+  createPrivacy(body: Record<string, unknown>) {
+    return this.proxy('ride', '/internal/privacy', { method: 'POST', body: JSON.stringify(body) });
+  }
+  updatePrivacy(id: string, body: Record<string, unknown>) {
+    return this.proxy('ride', `/internal/privacy/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+  publishPrivacy(id: string) {
+    return this.proxy('ride', `/internal/privacy/${id}/publish`, { method: 'POST' });
+  }
+  unpublishPrivacy(id: string) {
+    return this.proxy('ride', `/internal/privacy/${id}/unpublish`, { method: 'POST' });
+  }
+  deletePrivacy(id: string) {
+    return this.proxy('ride', `/internal/privacy/${id}`, { method: 'DELETE' });
+  }
+
   listPricingRules(city?: string) {
     const q = city ? `?city=${encodeURIComponent(city)}` : '';
     return this.fetchJson('ride', `/internal/pricing-rules${q}`);

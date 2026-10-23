@@ -1,6 +1,6 @@
-name: Mobile Release
+﻿name: Mobile Release
 
-# Sérialise les runs : des uploads Play parallèles font expirer l'Edit API (« This edit has expired »).
+# SÃ©rialise les runs : des uploads Play parallÃ¨les font expirer l'Edit API (Â« This edit has expired Â»).
 concurrency:
   group: mobile-release
   cancel-in-progress: false
@@ -16,12 +16,12 @@ on:
   workflow_dispatch:
     inputs:
       upload_ios_testflight:
-        description: "iOS — publier les IPA (Senga + Senga Driver) sur TestFlight / ASC"
+        description: "iOS â€” publier les IPA (Senga + Senga Driver) sur TestFlight / ASC"
         required: false
         type: boolean
         default: false
       submit_ios_app_store:
-        description: "iOS — après TestFlight, soumettre Senga + Senga Driver pour review App Store (production). Métadonnées ASC requises."
+        description: "iOS â€” aprÃ¨s TestFlight, soumettre Senga + Senga Driver pour review App Store (production). MÃ©tadonnÃ©es ASC requises."
         required: false
         type: boolean
         default: false
@@ -31,27 +31,27 @@ on:
         type: boolean
         default: false
       build_apks:
-        description: Aussi construire les APK (install direct) — non requis pour Play
+        description: Aussi construire les APK (install direct) â€” non requis pour Play
         required: false
         type: boolean
         default: false
       promote_to_production:
-        description: "Après l'upload internal, promouvoir vers production (les chauffeurs ne verront plus « Interne »). Ne cocher que si la fiche store / questionnaire contenu est complet."
+        description: "AprÃ¨s l'upload internal, promouvoir vers production (les chauffeurs ne verront plus Â« Interne Â»). Ne cocher que si la fiche store / questionnaire contenu est complet."
         required: false
         type: boolean
         default: false
       promote_only:
-        description: "Promouvoir seulement internal→production (pas de rebuild AAB). À utiliser quand versionCode est déjà sur internal."
+        description: "Promouvoir seulement internalâ†’production (pas de rebuild AAB). Ã€ utiliser quand versionCode est dÃ©jÃ  sur internal."
         required: false
         type: boolean
         default: false
       asc_submit_only:
-        description: "iOS — soumettre pour review App Store sans rebuild (IPA déjà sur TestFlight). Utilise scripts/asc_update_review_and_submit.py."
+        description: "iOS â€” soumettre pour review App Store sans rebuild (IPA dÃ©jÃ  sur TestFlight). Utilise scripts/asc_update_review_and_submit.py."
         required: false
         type: boolean
         default: false
       asc_build_number:
-        description: "iOS — CFBundleVersion / build number à préférer (ex. 119). Vide = dernier build VALID."
+        description: "iOS â€” CFBundleVersion / build number Ã  prÃ©fÃ©rer (ex. 119). Vide = dernier build VALID."
         required: false
         type: string
         default: ""
@@ -61,9 +61,9 @@ permissions:
   actions: read
 
 env:
-  # Keep in sync with CI mobile job — livekit_client 2.5.4 (16 KB noise) on Flutter 3.32.6.
+  # Keep in sync with CI mobile job â€” livekit_client 2.5.4 (16 KB noise) on Flutter 3.32.6.
   FLUTTER_VERSION: '3.32.6'
-  # Défauts production (domaine custom). Les secrets peuvent surcharger, mais le job
+  # DÃ©fauts production (domaine custom). Les secrets peuvent surcharger, mais le job
   # "Resolve production API URLs" rejette les IP LAN / localhost.
   DEFAULT_PROD_API_URL: https://api.afri-soft.com/api
   DEFAULT_PROD_WS_URL: https://api.afri-soft.com
@@ -107,7 +107,7 @@ jobs:
               '(localhost|127\.0\.0\.1|10\.0\.2\.2|:3000|://10\.|://192\.168\.|://172\.(1[6-9]|2[0-9]|3[0-1])\.)'
           }
           if looks_dev "$API" || looks_dev "$WS" || [[ "$API" != https://* ]] || [[ "$WS" != https://* ]]; then
-            echo "::warning::PROD_API_URL/PROD_WS_URL invalides ou LAN — forçage API production"
+            echo "::warning::PROD_API_URL/PROD_WS_URL invalides ou LAN â€” forÃ§age API production"
             API="$DEFAULT_PROD_API_URL"
             WS="$DEFAULT_PROD_WS_URL"
           fi
@@ -140,9 +140,9 @@ jobs:
               echo "keyAlias=${ANDROID_KEY_ALIAS}"
               echo "storeFile=upload-keystore.jks"
             } > mobile/android/key.properties
-            echo "Keystore release configuré ($(wc -c < "$KEYSTORE_PATH") bytes)"
+            echo "Keystore release configurÃ© ($(wc -c < "$KEYSTORE_PATH") bytes)"
           else
-            echo "::notice::ANDROID_KEYSTORE_BASE64 absent — build signé avec clé debug (non publiable sur Play Store)"
+            echo "::notice::ANDROID_KEYSTORE_BASE64 absent â€” build signÃ© avec clÃ© debug (non publiable sur Play Store)"
           fi
 
       - name: Write google-services.json (FCM)
@@ -154,9 +154,9 @@ jobs:
           if [ -n "${GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
             echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > "$OUT"
             test -s "$OUT"
-            echo "google-services.json écrit ($(wc -c < "$OUT") bytes) — FCM activé"
+            echo "google-services.json Ã©crit ($(wc -c < "$OUT") bytes) â€” FCM activÃ©"
           else
-            echo "::notice::GOOGLE_SERVICES_JSON_BASE64 absent — build sans FCM (SMS secours chauffeur). Voir docs/FIREBASE_SENGA_SETUP.md"
+            echo "::notice::GOOGLE_SERVICES_JSON_BASE64 absent â€” build sans FCM (SMS secours chauffeur). Voir docs/FIREBASE_SENGA_SETUP.md"
           fi
 
       - name: Free disk space
@@ -181,7 +181,7 @@ jobs:
           set -euo pipefail
           # Floor must stay above the highest versionCode already accepted by Play
           # (123 used; bump when uploads fail with "already been used").
-          FLOOR=157
+          FLOOR=178
           PUBSPEC_LINE=$(grep -E '^version:' mobile/pubspec.yaml | head -1)
           PUBSPEC_NAME=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
@@ -304,8 +304,8 @@ jobs:
   upload-android:
     name: Upload Play Store (internal)
     needs: build-android
-    # Toujours après un build AAB réussi (smoke→main, tag v*, workflow_dispatch).
-    # Skip uniquement si aucun secret Play n'est configuré. Gate env: production-mobile.
+    # Toujours aprÃ¨s un build AAB rÃ©ussi (smokeâ†’main, tag v*, workflow_dispatch).
+    # Skip uniquement si aucun secret Play n'est configurÃ©. Gate env: production-mobile.
     if: needs.build-android.result == 'success'
     runs-on: ubuntu-latest
     environment: production-mobile
@@ -370,18 +370,18 @@ jobs:
           elif [ -n "$PLAY_STORE_JSON" ]; then
             printf '%s' "$PLAY_STORE_JSON" > /tmp/play-store-key.json
           else
-            echo "::notice::Secrets Play absents (PLAY_STORE_JSON_KEY / PLAY_SERVICE_ACCOUNT_JSON / PLAY_STORE_JSON). AAB en artefacts Actions — upload ignoré."
+            echo "::notice::Secrets Play absents (PLAY_STORE_JSON_KEY / PLAY_SERVICE_ACCOUNT_JSON / PLAY_STORE_JSON). AAB en artefacts Actions â€” upload ignorÃ©."
             exit 0
           fi
           if ! head -c 1 /tmp/play-store-key.json | grep -q '{'; then
-            echo "::error::Clé Play Store invalide (JSON attendu après décodage)."
+            echo "::error::ClÃ© Play Store invalide (JSON attendu aprÃ¨s dÃ©codage)."
             exit 1
           fi
           export PLAY_STORE_JSON_KEY_PATH=/tmp/play-store-key.json
           echo "Upload Play internal: cd.mova.mova.passenger + cd.mova.mova.driver"
           bundle exec fastlane deploy_internal
           if [ "${{ github.event_name == 'workflow_dispatch' && inputs.promote_to_production }}" = "true" ]; then
-            echo "Promote Play internal → production (opt-in)"
+            echo "Promote Play internal â†’ production (opt-in)"
             bundle exec fastlane promote_internal_to_production
           fi
 
@@ -396,7 +396,7 @@ jobs:
         run: bash scripts/sync-mobile-app-version-env.sh
 
   promote-android-production:
-    name: Promote Play internal → production
+    name: Promote Play internal â†’ production
     if: >
       github.repository != 'afri-soft-com/mova' &&
       github.event_name == 'workflow_dispatch' &&
@@ -432,15 +432,15 @@ jobs:
           elif [ -n "$PLAY_STORE_JSON" ]; then
             printf '%s' "$PLAY_STORE_JSON" > /tmp/play-store-key.json
           else
-            echo "::error::Secrets Play absents — promote impossible."
+            echo "::error::Secrets Play absents â€” promote impossible."
             exit 1
           fi
           if ! head -c 1 /tmp/play-store-key.json | grep -q '{'; then
-            echo "::error::Clé Play Store invalide (JSON attendu après décodage)."
+            echo "::error::ClÃ© Play Store invalide (JSON attendu aprÃ¨s dÃ©codage)."
             exit 1
           fi
           export PLAY_STORE_JSON_KEY_PATH=/tmp/play-store-key.json
-          echo "Promote Play internal → production (passenger + driver)"
+          echo "Promote Play internal â†’ production (passenger + driver)"
           bundle exec fastlane promote_internal_to_production
 
   build-ios:
@@ -453,7 +453,7 @@ jobs:
         (inputs.build_ios == true || inputs.upload_ios_testflight == true || inputs.submit_ios_app_store == true)))
     # App Store Connect requires iOS 26 SDK (Xcode 26+) as of Apple's 2026 cutoff.
     runs-on: macos-26
-    # Parallel passenger/driver — hang on one must not block the other forever.
+    # Parallel passenger/driver â€” hang on one must not block the other forever.
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -488,7 +488,7 @@ jobs:
               '(localhost|127\.0\.0\.1|10\.0\.2\.2|:3000|://10\.|://192\.168\.|://172\.(1[6-9]|2[0-9]|3[0-1])\.)'
           }
           if looks_dev "$API" || looks_dev "$WS" || [[ "$API" != https://* ]] || [[ "$WS" != https://* ]]; then
-            echo "::warning::PROD_API_URL/PROD_WS_URL invalides ou LAN — forçage API production"
+            echo "::warning::PROD_API_URL/PROD_WS_URL invalides ou LAN â€” forÃ§age API production"
             API="$DEFAULT_PROD_API_URL"
             WS="$DEFAULT_PROD_WS_URL"
           fi
@@ -501,9 +501,9 @@ jobs:
         id: iosver
         run: |
           set -euo pipefail
-          # Aligné Android : max(run_number, pubspec +N) pour que la bannière
-          # currentVersionCode (API) ne reste pas collée après TestFlight.
-          FLOOR=157
+          # AlignÃ© Android : max(run_number, pubspec +N) pour que la banniÃ¨re
+          # currentVersionCode (API) ne reste pas collÃ©e aprÃ¨s TestFlight.
+          FLOOR=178
           PUBSPEC_LINE=$(grep -E '^version:' mobile/pubspec.yaml | head -1)
           NAME=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
@@ -521,7 +521,7 @@ jobs:
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         run: |
           if [ -z "${MATCH_PASSWORD}" ] || [ -z "${APP_STORE_CONNECT_API_KEY}" ]; then
-            echo "::notice::Certificats iOS non configurés — voir docs/cicd.md"
+            echo "::notice::Certificats iOS non configurÃ©s â€” voir docs/cicd.md"
             echo "available=false" >> "$GITHUB_OUTPUT"
           else
             echo "available=true" >> "$GITHUB_OUTPUT"
@@ -535,7 +535,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Disable SwiftPM (CocoaPods only — avoids 60m+ SPM hangs on CI)
+      - name: Disable SwiftPM (CocoaPods only â€” avoids 60m+ SPM hangs on CI)
         if: steps.ios_creds.outputs.available == 'true'
         run: flutter config --no-enable-swift-package-manager
 
@@ -558,14 +558,14 @@ jobs:
         working-directory: mobile/ios
         run: |
           set -euo pipefail
-          test -f Podfile || { echo "::error::Podfile manquant dans mobile/ios — commit requis."; exit 1; }
+          test -f Podfile || { echo "::error::Podfile manquant dans mobile/ios â€” commit requis."; exit 1; }
           pod install --verbose
 
       - name: Select Xcode 26 + CI signing prep
         if: steps.ios_creds.outputs.available == 'true'
         run: |
           set -euo pipefail
-          # ASC rejects IPA built with iOS 18.5 SDK — need Xcode 26+ (iOS 26 SDK).
+          # ASC rejects IPA built with iOS 18.5 SDK â€” need Xcode 26+ (iOS 26 SDK).
           for cand in \
               /Applications/Xcode_26.6.app \
               /Applications/Xcode_26.5.app \
@@ -599,7 +599,7 @@ jobs:
         run: |
           set -euo pipefail
           # Enable Sign in with Apple on App IDs before regenerating match profiles.
-          # macOS runners use PEP 668 — install deps in a venv, not system pip.
+          # macOS runners use PEP 668 â€” install deps in a venv, not system pip.
           python3 -m venv /tmp/asc-siwa-venv
           # shellcheck disable=SC1091
           source /tmp/asc-siwa-venv/bin/activate
@@ -628,8 +628,8 @@ jobs:
         run: |
           set -euo pipefail
           WEB_CLIENT="58917716638-rbgibno8pdvlud8dd00pdfjdv3q1dh4k.apps.googleusercontent.com"
-          # Same public defaults as ios/ci_set_flavor.sh — never pass an empty
-          # dart-define (empty clientId + nil keyWindow → native crash on tap).
+          # Same public defaults as ios/ci_set_flavor.sh â€” never pass an empty
+          # dart-define (empty clientId + nil keyWindow â†’ native crash on tap).
           PASSENGER_IOS_DEFAULT="58917716638-9qupcijrhjr7dvd5v1efmi9elitmndnd.apps.googleusercontent.com"
           DRIVER_IOS_DEFAULT="58917716638-q5i6cr1hv085ri1k7tpot6sggvcv9qih.apps.googleusercontent.com"
           if [ "${{ matrix.flavor }}" = "driver" ]; then
@@ -736,14 +736,14 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${APP_STORE_CONNECT_API_KEY:-}" ]; then
-            echo "::notice::APP_STORE_CONNECT_API_KEY non configuré — publication iOS ignorée."
+            echo "::notice::APP_STORE_CONNECT_API_KEY non configurÃ© â€” publication iOS ignorÃ©e."
             exit 0
           fi
-          # Absolute paths — Fastlane cwd can be fastlane/; also "Senga Driver.ipa" has a space.
+          # Absolute paths â€” Fastlane cwd can be fastlane/; also "Senga Driver.ipa" has a space.
           PASSENGER_IPA="$(find "$(pwd)/../build/ios/ipa/passenger" -name '*.ipa' 2>/dev/null | head -1 || true)"
           DRIVER_IPA="$(find "$(pwd)/../build/ios/ipa/driver" -name '*.ipa' 2>/dev/null | head -1 || true)"
           if [ -z "${PASSENGER_IPA}" ] && [ -z "${DRIVER_IPA}" ]; then
-            echo "::error::Aucun IPA téléchargé — build iOS a échoué."
+            echo "::error::Aucun IPA tÃ©lÃ©chargÃ© â€” build iOS a Ã©chouÃ©."
             find ../build/ios/ipa -type f 2>/dev/null || true
             exit 1
           fi
@@ -754,14 +754,14 @@ jobs:
           export PASSENGER_IPA DRIVER_IPA
           bundle exec fastlane release_both
           if [ "${SUBMIT_APP_STORE}" = "true" ]; then
-            # macOS runners use PEP 668 — install deps in a venv, not system pip.
+            # macOS runners use PEP 668 â€” install deps in a venv, not system pip.
             python3 -m venv /tmp/asc-venv
             # shellcheck disable=SC1091
             source /tmp/asc-venv/bin/activate
             pip install --quiet PyJWT cryptography
             export ASC_VERSION=1.0.32
-            # Même logique que build-ios (max run_number / pubspec +N), pas run_number seul.
-            FLOOR=157
+            # MÃªme logique que build-ios (max run_number / pubspec +N), pas run_number seul.
+            FLOOR=178
             PUBSPEC_LINE=$(grep -E '^version:' "$(git rev-parse --show-toplevel)/mobile/pubspec.yaml" | head -1)
             PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
             ASC_CODE="${{ github.run_number }}"

@@ -54,6 +54,9 @@ export enum AdminPermission {
   CONTACTS_WRITE = 'contacts:write',
   CGU_READ = 'cgu:read',
   CGU_WRITE = 'cgu:write',
+  /** SuperAdmin-only: politique de confidentialité. */
+  PRIVACY_READ = 'privacy:read',
+  PRIVACY_WRITE = 'privacy:write',
   /** SuperAdmin-only: maintenance mode + MM operator visibility. */
   SYSTEM_READ = 'system:read',
   SYSTEM_WRITE = 'system:write',
@@ -313,6 +316,11 @@ export const ADMIN_ACCESS_LEVELS: AdminAccessLevel[] = [
     permissions: [AdminPermission.CONTACTS_READ, AdminPermission.CONTACTS_WRITE],
   },
   { id: 'cgu', label: 'CGU', permissions: [AdminPermission.CGU_READ, AdminPermission.CGU_WRITE] },
+  {
+    id: 'privacy',
+    label: 'Politique de confidentialité',
+    permissions: [AdminPermission.PRIVACY_READ, AdminPermission.PRIVACY_WRITE],
+  },
   {
     id: 'systeme',
     label: 'Système (maintenance, MM, SOS ops)',

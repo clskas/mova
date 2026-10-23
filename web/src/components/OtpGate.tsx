@@ -27,6 +27,7 @@ export function OtpGate({ children }: Props) {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const pinSubmitLock = useRef(false);
 
   const pinOnly = pinMode && !codeSent && !googleChallenge && !setupPin && !forgotPin;
@@ -102,11 +103,17 @@ export function OtpGate({ children }: Props) {
   }, []);
 
   useEffect(() => {
-    if (pinOnly && pin.length === 6 && !loading) {
+    if (pinOnly && pin.length === 6 && !loading && legalAccepted) {
       void loginWithPin();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin, pinOnly]);
+  }, [pin, pinOnly, legalAccepted]);
+
+  function ensureLegalAccepted() {
+    if (legalAccepted) return true;
+    setError("Acceptez les CGU et la Politique de confidentialité pour continuer.");
+    return false;
+  }
 
   function completeSession(data: AuthPayload & { user?: { phone?: string } }) {
     if (!data.accessToken) {
@@ -131,6 +138,7 @@ export function OtpGate({ children }: Props) {
   }
 
   async function requestOtp(opts?: { forceSms?: boolean }) {
+    if (!ensureLegalAccepted()) return;
     setLoading(true);
     setError(null);
     try {
@@ -177,6 +185,7 @@ export function OtpGate({ children }: Props) {
   }
 
   async function loginWithGoogle(idToken: string) {
+    if (!ensureLegalAccepted()) return;
     setLoading(true);
     setError(null);
     try {
@@ -209,6 +218,7 @@ export function OtpGate({ children }: Props) {
   }
 
   async function loginWithPin() {
+    if (!ensureLegalAccepted()) return;
     if (pinSubmitLock.current) return;
     pinSubmitLock.current = true;
     setLoading(true);
@@ -233,6 +243,7 @@ export function OtpGate({ children }: Props) {
   }
 
   async function verifyOtp() {
+    if (!ensureLegalAccepted()) return;
     setLoading(true);
     setError(null);
     try {
@@ -359,6 +370,28 @@ export function OtpGate({ children }: Props) {
             maxLength={6}
           />
         )}
+        <label className="flex items-start gap-2 mb-4 text-sm text-gray-600 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="mt-1 accent-[#6C63FF]"
+            checked={legalAccepted}
+            onChange={(e) => {
+              setLegalAccepted(e.target.checked);
+              if (e.target.checked && error?.includes("CGU")) setError(null);
+            }}
+          />
+          <span>
+            J&apos;ai lu et j&apos;accepte les{" "}
+            <a href="/cgu" target="_blank" rel="noopener noreferrer" className="text-[#6C63FF] underline font-medium">
+              CGU
+            </a>{" "}
+            et la{" "}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#6C63FF] underline font-medium">
+              Politique de confidentialité
+            </a>
+            .
+          </span>
+        </label>
         {!pinOnly && (
           <button
             type="button"
@@ -369,6 +402,7 @@ export function OtpGate({ children }: Props) {
             }}
             disabled={
               loading ||
+              !legalAccepted ||
               (!googleChallenge && !phone.trim()) ||
               (codeSent && !code.trim()) ||
               (pinMode && !codeSent && pin.length !== 6)
@@ -429,7 +463,7 @@ export function OtpGate({ children }: Props) {
         {(googleClientId() || forgotPin) && !codeSent && !googleChallenge && !hideIdentity && (
           <>
             <p className="text-center text-xs text-gray-400 my-4">ou</p>
-            <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />
+            <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading || !legalAccepted} />
           </>
         )}
         {codeSent && (

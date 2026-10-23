@@ -37,7 +37,13 @@ export class PublicController {
   @Get('cgu')
   @ApiOperation({ summary: 'CGU publiées (markdown / HTML / texte)' })
   getCgu() {
-    return this.legalDocuments.getPublished();
+    return this.legalDocuments.getPublished('cgu');
+  }
+
+  @Get('privacy')
+  @ApiOperation({ summary: 'Politique de confidentialité publiée (markdown / HTML / texte)' })
+  getPrivacy() {
+    return this.legalDocuments.getPublished('privacy');
   }
 
   @Get('trips/:token')

@@ -17,6 +17,7 @@ const ALLOW_PREFIXES = [
   '/api/public/app-version',
   '/api/public/client-config',
   '/api/public/cgu',
+  '/api/public/privacy',
   '/api/payments/webhooks/',
   '/api/payments/africastalking/callback',
 ];

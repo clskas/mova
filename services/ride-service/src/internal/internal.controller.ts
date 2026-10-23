@@ -440,12 +440,15 @@ export class InternalController {
 
   @Get('cgu')
   listCgu() {
-    return this.legalDocuments.listAdmin();
+    return this.legalDocuments.listAdmin('cgu');
   }
 
   @Post('cgu')
   createCgu(@Body() body: Record<string, unknown>) {
-    return this.legalDocuments.create(body as { version?: string; title?: string; body?: string; format?: string });
+    return this.legalDocuments.create(
+      body as { version?: string; title?: string; body?: string; format?: string },
+      'cgu',
+    );
   }
 
   @Patch('cgu/:id')
@@ -465,6 +468,39 @@ export class InternalController {
 
   @Delete('cgu/:id')
   deleteCgu(@Param('id') id: string) {
+    return this.legalDocuments.remove(id);
+  }
+
+  @Get('privacy')
+  listPrivacy() {
+    return this.legalDocuments.listAdmin('privacy');
+  }
+
+  @Post('privacy')
+  createPrivacy(@Body() body: Record<string, unknown>) {
+    return this.legalDocuments.create(
+      body as { version?: string; title?: string; body?: string; format?: string },
+      'privacy',
+    );
+  }
+
+  @Patch('privacy/:id')
+  updatePrivacy(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.legalDocuments.update(id, body as { version?: string; title?: string; body?: string; format?: string });
+  }
+
+  @Post('privacy/:id/publish')
+  publishPrivacy(@Param('id') id: string) {
+    return this.legalDocuments.publish(id);
+  }
+
+  @Post('privacy/:id/unpublish')
+  unpublishPrivacy(@Param('id') id: string) {
+    return this.legalDocuments.unpublish(id);
+  }
+
+  @Delete('privacy/:id')
+  deletePrivacy(@Param('id') id: string) {
     return this.legalDocuments.remove(id);
   }
 

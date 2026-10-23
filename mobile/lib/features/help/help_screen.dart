@@ -142,7 +142,11 @@ class HelpScreen extends ConsumerWidget {
             subtitle: 'Protection de vos données',
             onTap: () => _open(
               context,
-              const LegalScreen(title: 'Confidentialité', asset: 'assets/legal/privacy_fr.md'),
+              const LegalScreen(
+                title: 'Confidentialité',
+                asset: 'assets/legal/privacy_fr.md',
+                apiPath: '/public/privacy',
+              ),
             ),
           ),
           const SizedBox(height: 16),

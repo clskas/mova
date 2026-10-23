@@ -8,8 +8,15 @@ import {
   DEFAULT_CGU_TITLE,
   DEFAULT_CGU_VERSION,
 } from './legal-cgu.default';
+import {
+  DEFAULT_PRIVACY_BODY,
+  DEFAULT_PRIVACY_SLUG,
+  DEFAULT_PRIVACY_TITLE,
+  DEFAULT_PRIVACY_VERSION,
+} from './legal-privacy.default';
 
 const FORMATS = new Set(['markdown', 'html', 'plain']);
+const ALLOWED_SLUGS = new Set([DEFAULT_CGU_SLUG, DEFAULT_PRIVACY_SLUG]);
 
 function isPrismaUniqueViolation(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002';
@@ -23,6 +30,13 @@ export type LegalDocumentInput = {
   format?: string;
 };
 
+type LegalDefaults = {
+  slug: string;
+  version: string;
+  title: string;
+  body: string;
+};
+
 @Injectable()
 export class LegalDocumentsService implements OnModuleInit {
   private readonly logger = new Logger(LegalDocumentsService.name);
@@ -30,40 +44,75 @@ export class LegalDocumentsService implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    void this.ensureDefaultPublished().catch((err: unknown) => {
+    void this.ensureDefaultPublished(DEFAULT_CGU_SLUG).catch((err: unknown) => {
       this.logger.warn(`CGU bootstrap skipped: ${err instanceof Error ? err.message : String(err)}`);
+    });
+    void this.ensureDefaultPublished(DEFAULT_PRIVACY_SLUG).catch((err: unknown) => {
+      this.logger.warn(`Privacy bootstrap skipped: ${err instanceof Error ? err.message : String(err)}`);
     });
   }
 
+  private defaultsFor(slug: string): LegalDefaults {
+    if (slug === DEFAULT_PRIVACY_SLUG) {
+      return {
+        slug: DEFAULT_PRIVACY_SLUG,
+        version: DEFAULT_PRIVACY_VERSION,
+        title: DEFAULT_PRIVACY_TITLE,
+        body: DEFAULT_PRIVACY_BODY,
+      };
+    }
+    return {
+      slug: DEFAULT_CGU_SLUG,
+      version: DEFAULT_CGU_VERSION,
+      title: DEFAULT_CGU_TITLE,
+      body: DEFAULT_CGU_BODY,
+    };
+  }
+
+  private assertSlug(slug: string) {
+    if (!ALLOWED_SLUGS.has(slug)) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Document légal non supporté.',
+      );
+    }
+  }
+
+  private labelFor(slug: string) {
+    return slug === DEFAULT_PRIVACY_SLUG ? 'Politique de confidentialité' : 'CGU';
+  }
+
   /**
-   * Idempotent: inserts the in-app default CGU as published 1.0 when the table is empty.
-   * Does not duplicate or overwrite once any CGU row exists (draft or published).
+   * Idempotent: inserts the in-app default as published 1.0 when no row exists for the slug.
    */
-  async ensureDefaultPublished() {
+  async ensureDefaultPublished(slug = DEFAULT_CGU_SLUG) {
+    this.assertSlug(slug);
     const existing = await this.prisma.legalDocument.findFirst({
-      where: { slug: DEFAULT_CGU_SLUG },
+      where: { slug },
       select: { id: true },
     });
     if (existing) return;
 
+    const defaults = this.defaultsFor(slug);
     const now = new Date();
     try {
       const row = await this.prisma.legalDocument.create({
         data: {
-          slug: DEFAULT_CGU_SLUG,
-          version: DEFAULT_CGU_VERSION,
-          title: DEFAULT_CGU_TITLE,
-          body: DEFAULT_CGU_BODY,
+          slug: defaults.slug,
+          version: defaults.version,
+          title: defaults.title,
+          body: defaults.body,
           format: 'markdown',
           isPublished: true,
           publishedAt: now,
         },
       });
-      this.logger.log(`CGU ${DEFAULT_CGU_VERSION} créée et publiée (texte par défaut chauffeur / aide).`);
+      this.logger.log(`${this.labelFor(slug)} ${defaults.version} créée et publiée (texte par défaut).`);
       return this.toRecord(row);
     } catch (err) {
       if (!isPrismaUniqueViolation(err)) throw err;
-      this.logger.log(`CGU ${DEFAULT_CGU_VERSION} déjà présente — bootstrap ignoré.`);
+      this.logger.log(`${this.labelFor(slug)} ${defaults.version} déjà présente — bootstrap ignoré.`);
     }
   }
 
@@ -93,13 +142,14 @@ export class LegalDocumentsService implements OnModuleInit {
     };
   }
 
-  private fallbackPublic() {
+  private fallbackPublic(slug = DEFAULT_CGU_SLUG) {
+    const defaults = this.defaultsFor(slug);
     return {
       id: null as string | null,
-      slug: DEFAULT_CGU_SLUG,
-      version: DEFAULT_CGU_VERSION,
-      title: DEFAULT_CGU_TITLE,
-      body: DEFAULT_CGU_BODY,
+      slug: defaults.slug,
+      version: defaults.version,
+      title: defaults.title,
+      body: defaults.body,
       format: 'markdown',
       isPublished: true,
       publishedAt: null as string | null,
@@ -108,18 +158,18 @@ export class LegalDocumentsService implements OnModuleInit {
   }
 
   async getPublished(slug = DEFAULT_CGU_SLUG) {
+    this.assertSlug(slug);
     const row = await this.prisma.legalDocument.findFirst({
       where: { slug, isPublished: true },
       orderBy: { publishedAt: 'desc' },
     });
-    if (!row) return this.fallbackPublic();
+    if (!row) return this.fallbackPublic(slug);
     return { ...this.toRecord(row), source: 'database' as const };
   }
 
   async listAdmin(slug = DEFAULT_CGU_SLUG) {
-    if (slug === DEFAULT_CGU_SLUG) {
-      await this.ensureDefaultPublished();
-    }
+    this.assertSlug(slug);
+    await this.ensureDefaultPublished(slug);
     const rows = await this.prisma.legalDocument.findMany({
       where: { slug },
       orderBy: [{ isPublished: 'desc' }, { createdAt: 'desc' }],
@@ -127,19 +177,14 @@ export class LegalDocumentsService implements OnModuleInit {
     return rows.map((row) => this.toRecord(row));
   }
 
-  private normalize(body: LegalDocumentInput, partial = false) {
-    const slug = (body.slug ?? DEFAULT_CGU_SLUG).trim() || DEFAULT_CGU_SLUG;
-    if (slug !== DEFAULT_CGU_SLUG) {
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        HttpStatus.BAD_REQUEST,
-        'Seul le document CGU est géré ici.',
-      );
-    }
+  private normalize(body: LegalDocumentInput, partial = false, forcedSlug?: string) {
+    const slug = (forcedSlug ?? body.slug ?? DEFAULT_CGU_SLUG).trim() || DEFAULT_CGU_SLUG;
+    this.assertSlug(slug);
     const version = body.version !== undefined ? body.version.trim() : undefined;
     const title = body.title !== undefined ? body.title.trim() : undefined;
     const text = body.body !== undefined ? body.body : undefined;
     const format = body.format !== undefined ? body.format.trim().toLowerCase() : undefined;
+    const label = this.labelFor(slug);
 
     if (!partial) {
       if (!version) {
@@ -149,7 +194,11 @@ export class LegalDocumentsService implements OnModuleInit {
         throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Le titre est obligatoire.');
       }
       if (text === undefined || !text.trim()) {
-        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Le texte des CGU est obligatoire.');
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.BAD_REQUEST,
+          `Le texte de la ${label} est obligatoire.`,
+        );
       }
     }
     if (format !== undefined && !FORMATS.has(format)) {
@@ -174,8 +223,8 @@ export class LegalDocumentsService implements OnModuleInit {
     return data;
   }
 
-  async create(body: LegalDocumentInput) {
-    const data = this.normalize(body) as Prisma.LegalDocumentCreateInput;
+  async create(body: LegalDocumentInput, forcedSlug?: string) {
+    const data = this.normalize(body, false, forcedSlug) as Prisma.LegalDocumentCreateInput;
     const existing = await this.prisma.legalDocument.findUnique({
       where: { slug_version: { slug: data.slug, version: data.version } },
     });
@@ -193,9 +242,9 @@ export class LegalDocumentsService implements OnModuleInit {
   async update(id: string, body: LegalDocumentInput) {
     const existing = await this.prisma.legalDocument.findUnique({ where: { id } });
     if (!existing) {
-      throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'CGU introuvable.');
+      throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'Document introuvable.');
     }
-    const data = this.normalize({ ...body, slug: existing.slug }, true);
+    const data = this.normalize({ ...body, slug: existing.slug }, true, existing.slug);
     if (data.version && data.version !== existing.version) {
       const clash = await this.prisma.legalDocument.findUnique({
         where: { slug_version: { slug: existing.slug, version: String(data.version) } },
@@ -215,7 +264,7 @@ export class LegalDocumentsService implements OnModuleInit {
   async publish(id: string) {
     const existing = await this.prisma.legalDocument.findUnique({ where: { id } });
     if (!existing) {
-      throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'CGU introuvable.');
+      throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'Document introuvable.');
     }
     const now = new Date();
     await this.prisma.$transaction([
@@ -235,7 +284,7 @@ export class LegalDocumentsService implements OnModuleInit {
   async unpublish(id: string) {
     const existing = await this.prisma.legalDocument.findUnique({ where: { id } });
     if (!existing) {
-      throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'CGU introuvable.');
+      throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'Document introuvable.');
     }
     if (!existing.isPublished) {
       throw new MovaHttpException(
@@ -254,13 +303,13 @@ export class LegalDocumentsService implements OnModuleInit {
   async remove(id: string) {
     const existing = await this.prisma.legalDocument.findUnique({ where: { id } });
     if (!existing) {
-      throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'CGU introuvable.');
+      throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'Document introuvable.');
     }
     if (existing.isPublished) {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         HttpStatus.BAD_REQUEST,
-        'Publiez une autre version avant de supprimer la CGU en vigueur.',
+        `Publiez une autre version avant de supprimer la ${this.labelFor(existing.slug)} en vigueur.`,
       );
     }
     await this.prisma.legalDocument.delete({ where: { id } });

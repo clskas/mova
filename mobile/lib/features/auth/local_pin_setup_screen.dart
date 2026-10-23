@@ -13,11 +13,14 @@ class LocalPinSetupScreen extends ConsumerStatefulWidget {
   const LocalPinSetupScreen({
     super.key,
     required this.onCompleted,
+    this.onCancel,
     this.title = connectionPinHeadingFr,
     this.reset = false,
   });
 
   final Future<void> Function() onCompleted;
+  /// Called when the user dismisses without saving (X / system back) and no route to pop.
+  final VoidCallback? onCancel;
   final String title;
   final bool reset;
 
@@ -49,6 +52,16 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
     _pinController.dispose();
     _confirmController.dispose();
     super.dispose();
+  }
+
+  void _dismiss() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final nav = Navigator.of(context);
+    if (nav.canPop()) {
+      nav.pop();
+      return;
+    }
+    widget.onCancel?.call();
   }
 
   Future<void> _submit() async {
@@ -84,59 +97,96 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
-      child: MovaScreen(
-      title: widget.title,
-      centerContent: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Icon(Icons.lock_outline, size: 56, color: MovaColors.violet),
-          const SizedBox(height: 16),
-          Text(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _dismiss();
+      },
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: 'Fermer',
+            onPressed: _dismiss,
+          ),
+          title: Text(
             widget.title,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: MovaColors.midnight,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: kMovaScrollPhysics,
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Icon(Icons.lock_outline, size: 56, color: MovaColors.violet),
+                            const SizedBox(height: 16),
+                            Text(
+                              widget.title,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: MovaColors.midnight,
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              widget.reset
+                                  ? 'Obligatoire pour les prochaines connexions. 6 chiffres — évitez 123456 ou des chiffres identiques.'
+                                  : pinSetupHintFr,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: MovaColors.textSecondary),
+                            ),
+                            const SizedBox(height: 28),
+                            SixDigitPinField(
+                              controller: _pinController,
+                              label: 'Nouveau PIN',
+                              autofocus: true,
+                            ),
+                            const SizedBox(height: 16),
+                            SixDigitPinField(
+                              controller: _confirmController,
+                              label: 'Confirmer le PIN',
+                            ),
+                            if (_error != null) ...[
+                              const SizedBox(height: 16),
+                              MovaErrorBanner(message: _error!),
+                            ],
+                            const SizedBox(height: 24),
+                            MovaButton(
+                              label: 'Enregistrer le PIN',
+                              isLoading: _loading,
+                              onPressed: _pinController.text.trim().length == 6 &&
+                                      _confirmController.text.trim().length == 6
+                                  ? _submit
+                                  : null,
+                              icon: Icons.check,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
+              );
+            },
           ),
-          const SizedBox(height: 8),
-          Text(
-            widget.reset
-                ? 'Obligatoire pour les prochaines connexions. 6 chiffres — évitez 123456 ou des chiffres identiques.'
-                : pinSetupHintFr,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: MovaColors.textSecondary),
-          ),
-          const SizedBox(height: 28),
-          SixDigitPinField(
-            controller: _pinController,
-            label: 'Nouveau PIN',
-            autofocus: true,
-          ),
-          const SizedBox(height: 16),
-          SixDigitPinField(
-            controller: _confirmController,
-            label: 'Confirmer le PIN',
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 16),
-            MovaErrorBanner(message: _error!),
-          ],
-          const SizedBox(height: 24),
-          MovaButton(
-            label: 'Enregistrer le PIN',
-            isLoading: _loading,
-            onPressed: _pinController.text.trim().length == 6 &&
-                    _confirmController.text.trim().length == 6
-                ? _submit
-                : null,
-            icon: Icons.check,
-          ),
-        ],
+        ),
       ),
-    ),
     );
   }
 }

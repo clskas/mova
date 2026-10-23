@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -160,6 +162,14 @@ class _AuthSessionGateState extends ConsumerState<AuthSessionGate> {
           setState(() {
             _needsPinSetup = false;
             _authenticated = true;
+          });
+        },
+        onCancel: () {
+          unawaited(_clearRejectedSession(ref.read(apiClientProvider)));
+          if (!mounted) return;
+          setState(() {
+            _needsPinSetup = false;
+            _authenticated = false;
           });
         },
       );

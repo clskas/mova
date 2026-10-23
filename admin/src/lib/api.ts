@@ -1118,6 +1118,31 @@ function mockFor<T>(path: string, init?: RequestInit): T {
       },
     ] as T;
   }
+  if (path.includes("/privacy") && path.includes("/unpublish") && method === "POST") {
+    return { id: "privacy-1", slug: "privacy", isPublished: false, ...body } as T;
+  }
+  if (path.includes("/privacy") && path.includes("/publish") && method === "POST") {
+    return { id: "privacy-1", slug: "privacy", isPublished: true, publishedAt: new Date().toISOString(), ...body } as T;
+  }
+  if (path.includes("/privacy") && method === "POST") {
+    return { id: "privacy-new", slug: "privacy", isPublished: false, ...body } as T;
+  }
+  if (path.includes("/privacy") && (method === "PATCH" || method === "DELETE")) {
+    return { id: path.split("/").pop(), ...body, success: true } as T;
+  }
+  if (path.includes("/privacy") && !path.includes("/public")) {
+    return [
+      {
+        id: "privacy-1",
+        slug: "privacy",
+        version: "1.0",
+        title: "Politique de Confidentialité — SENGA RDC",
+        body: "Texte confidentialité",
+        format: "markdown",
+        isPublished: true,
+      },
+    ] as T;
+  }
   if (path.includes("/cgu") && path.includes("/unpublish") && method === "POST") {
     return { id: "cgu-1", slug: "cgu", isPublished: false, ...body } as T;
   }
@@ -2547,6 +2572,36 @@ export async function unpublishCgu(id: string) {
 
 export async function deleteCgu(id: string) {
   return apiFetch(`/api/admin/cgu/${id}`, { method: "DELETE" });
+}
+
+export async function fetchPrivacyVersions(): Promise<LegalDocument[]> {
+  const raw = await apiFetch<LegalDocument[]>("/api/admin/privacy");
+  return Array.isArray(raw) ? raw : [];
+}
+
+export async function savePrivacy(data: Partial<LegalDocument>, id?: string) {
+  if (id) {
+    return apiFetch<LegalDocument>(`/api/admin/privacy/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+  return apiFetch<LegalDocument>("/api/admin/privacy", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function publishPrivacy(id: string) {
+  return apiFetch<LegalDocument>(`/api/admin/privacy/${id}/publish`, { method: "POST" });
+}
+
+export async function unpublishPrivacy(id: string) {
+  return apiFetch<LegalDocument>(`/api/admin/privacy/${id}/unpublish`, { method: "POST" });
+}
+
+export async function deletePrivacy(id: string) {
+  return apiFetch(`/api/admin/privacy/${id}`, { method: "DELETE" });
 }
 
 export async function fetchCurrentUser(): Promise<AdminSessionUser> {

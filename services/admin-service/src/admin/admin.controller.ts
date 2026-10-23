@@ -798,6 +798,48 @@ export class AdminController {
     return this.adminService.deleteCgu(id);
   }
 
+  @Get('privacy')
+  @RequirePermissions(AdminPermission.PRIVACY_READ)
+  @ApiOperation({ summary: 'Liste des versions Politique de confidentialité (SuperAdmin)' })
+  listPrivacy() {
+    return this.adminService.listPrivacy();
+  }
+
+  @Post('privacy')
+  @RequirePermissions(AdminPermission.PRIVACY_WRITE)
+  @ApiOperation({ summary: 'Créer une version Politique de confidentialité' })
+  createPrivacy(@Body() body: Record<string, unknown>) {
+    return this.adminService.createPrivacy(body);
+  }
+
+  @Patch('privacy/:id')
+  @RequirePermissions(AdminPermission.PRIVACY_WRITE)
+  @ApiOperation({ summary: 'Modifier une version Politique de confidentialité' })
+  updatePrivacy(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updatePrivacy(id, body);
+  }
+
+  @Post('privacy/:id/publish')
+  @RequirePermissions(AdminPermission.PRIVACY_WRITE)
+  @ApiOperation({ summary: 'Publier une version Politique de confidentialité' })
+  publishPrivacy(@Param('id') id: string) {
+    return this.adminService.publishPrivacy(id);
+  }
+
+  @Post('privacy/:id/unpublish')
+  @RequirePermissions(AdminPermission.PRIVACY_WRITE)
+  @ApiOperation({ summary: 'Retirer une version Politique de confidentialité de la publication' })
+  unpublishPrivacy(@Param('id') id: string) {
+    return this.adminService.unpublishPrivacy(id);
+  }
+
+  @Delete('privacy/:id')
+  @RequirePermissions(AdminPermission.PRIVACY_WRITE)
+  @ApiOperation({ summary: 'Supprimer une version Politique de confidentialité non publiée' })
+  deletePrivacy(@Param('id') id: string) {
+    return this.adminService.deletePrivacy(id);
+  }
+
   @Get('pricing-rules')
   @RequirePermissions(AdminPermission.PRICING_READ)
   @ApiOperation({ summary: 'Règles tarifaires véhicules' })

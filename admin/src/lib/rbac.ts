@@ -25,6 +25,7 @@ export type AdminSection =
   | "publicites"
   | "contacts"
   | "cgu"
+  | "privacy"
   | "systeme";
 
 export const ADMIN_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN", "SUPPORT", "FINANCE", "CONTENT", "CITY_ADMIN"];
@@ -64,6 +65,7 @@ export const ACCESS_LEVEL_OPTIONS: { id: string; label: string; sections: AdminS
   { id: "publicites", label: "Publicités", sections: ["publicites"] },
   { id: "contacts", label: "Contacts", sections: ["contacts"] },
   { id: "cgu", label: "CGU", sections: ["cgu"] },
+  { id: "privacy", label: "Politique de confidentialité", sections: ["privacy"] },
   { id: "systeme", label: "Système (maintenance, MM, SOS ops)", sections: ["systeme"] },
 ];
 
@@ -91,13 +93,14 @@ const ALL_SECTIONS: AdminSection[] = [
   "publicites",
   "contacts",
   "cgu",
+  "privacy",
   "systeme",
 ];
 
 /** Sections visibles dans le menu par rôle. */
 const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
   SUPER_ADMIN: ALL_SECTIONS,
-  ADMIN: ALL_SECTIONS.filter((s) => s !== "systeme"),
+  ADMIN: ALL_SECTIONS.filter((s) => s !== "systeme" && s !== "privacy"),
   SUPPORT: [
     "utilisateurs",
     "chauffeurs",
@@ -137,7 +140,7 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
 /** Sections où l'utilisateur peut modifier des données. */
 const ROLE_WRITE: Record<AdminRole, AdminSection[]> = {
   SUPER_ADMIN: ALL_SECTIONS,
-  ADMIN: ALL_SECTIONS.filter((s) => s !== "portefeuille" && s !== "systeme"),
+  ADMIN: ALL_SECTIONS.filter((s) => s !== "portefeuille" && s !== "systeme" && s !== "privacy"),
   SUPPORT: ["kyc", "litiges", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
   FINANCE: ["tarifs", "regles", "abonnements", "promos", "portefeuille"],
   CONTENT: ["restaurants", "locations", "publicites"],
@@ -173,6 +176,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/kyc", label: "KYC", short: "KYC", section: "kyc" },
   { href: "/contacts", label: "Contacts", short: "Contacts", section: "contacts" },
   { href: "/cgu", label: "CGU", short: "CGU", section: "cgu" },
+  { href: "/privacy", label: "Confidentialité", short: "Priv.", section: "privacy" },
   { href: "/operateurs-mm", label: "Opérateurs Mobile Money", short: "MM", section: "systeme" },
   { href: "/services-senga", label: "Services SENGA", short: "Serv.", section: "systeme" },
   { href: "/abonnements-externes", label: "Hébergements & plateformes", short: "Échéances", section: "systeme" },

@@ -102,9 +102,6 @@ export function OtpGate({ children }: Props) {
     };
   }, []);
 
-  /** CGU / confidentialité : 1ʳᵉ connexion (téléphone / Google), pas PIN ni oubli. */
-  const needsLegalGate = !pinOnly && !forgotPin && !pinMode && !codeSent && !googleChallenge;
-
   useEffect(() => {
     if (pinOnly && pin.length === 6 && !loading) {
       void loginWithPin();
@@ -112,8 +109,11 @@ export function OtpGate({ children }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin, pinOnly]);
 
+  /** Première connexion (téléphone / Google) — pas PIN connu ni PIN oublié. */
+  const needsLegalAcceptance = !pinOnly && !forgotPin && !codeSent && !pinMode;
+
   function ensureLegalAccepted() {
-    if (!needsLegalGate || legalAccepted) return true;
+    if (!needsLegalAcceptance || legalAccepted) return true;
     setError("Acceptez les CGU et la Politique de confidentialité pour continuer.");
     return false;
   }
@@ -141,7 +141,8 @@ export function OtpGate({ children }: Props) {
   }
 
   async function requestOtp(opts?: { forceSms?: boolean }) {
-    if (!ensureLegalAccepted()) return;
+    // Première connexion seulement (pas « PIN oublié »).
+    if (!forgotPin && !ensureLegalAccepted()) return;
     setLoading(true);
     setError(null);
     try {
@@ -188,7 +189,7 @@ export function OtpGate({ children }: Props) {
   }
 
   async function loginWithGoogle(idToken: string) {
-    if (!ensureLegalAccepted()) return;
+    if (!forgotPin && !ensureLegalAccepted()) return;
     setLoading(true);
     setError(null);
     try {
@@ -371,7 +372,7 @@ export function OtpGate({ children }: Props) {
             maxLength={6}
           />
         )}
-        {needsLegalGate && (
+        {needsLegalAcceptance && (
           <label className="flex items-start gap-2 mb-4 text-sm text-gray-600 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -405,7 +406,7 @@ export function OtpGate({ children }: Props) {
             }}
             disabled={
               loading ||
-              (needsLegalGate && !legalAccepted) ||
+              (needsLegalAcceptance && !legalAccepted) ||
               (!googleChallenge && !phone.trim()) ||
               (codeSent && !code.trim()) ||
               (pinMode && !codeSent && pin.length !== 6)
@@ -468,7 +469,7 @@ export function OtpGate({ children }: Props) {
             <p className="text-center text-xs text-gray-400 my-4">ou</p>
             <GoogleContinueButton
               onCredential={loginWithGoogle}
-              disabled={loading || (needsLegalGate && !legalAccepted)}
+              disabled={loading || (needsLegalAcceptance && !legalAccepted)}
             />
           </>
         )}

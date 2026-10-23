@@ -1,7 +1,7 @@
 ﻿name: mova
-description: SENGA â€” Plateforme de mobilitÃ© RDC
+description: SENGA — Plateforme de mobilité RDC
 publish_to: 'none'
-version: 1.0.35+187
+version: 1.0.36+187
 
 environment:
   sdk: ^3.8.1
@@ -57,9 +57,9 @@ dev_dependencies:
   golden_toolkit: ^0.15.0
   flutter_launcher_icons: ^0.14.3
 
-# IcÃ´nes distinctes par app (modÃ¨le Uber) : la config est sÃ©parÃ©e par flavor dans
+# Icônes distinctes par app (modèle Uber) : la config est séparée par flavor dans
 # flutter_launcher_icons-passenger.yaml et flutter_launcher_icons-driver.yaml.
-# `dart run flutter_launcher_icons` dÃ©tecte ces fichiers et gÃ©nÃ¨re les icÃ´nes
+# `dart run flutter_launcher_icons` détecte ces fichiers et génère les icônes
 # dans android/app/src/<flavor>/res.
 
 flutter:

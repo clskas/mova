@@ -88,11 +88,11 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     );
   }
 
-  /// CGU / confidentialité : uniquement à la 1ʳᵉ connexion (téléphone / social), pas PIN ni oubli.
-  bool get _needsLegalGate => _step == PhoneLoginStep.phone;
+  /// CGU / confidentialité : uniquement première connexion (téléphone / social), pas PIN ni PIN oublié.
+  bool get _needsLegalAcceptance => _step == PhoneLoginStep.phone;
 
   bool _ensureLegalAccepted() {
-    if (!_needsLegalGate || _legalAccepted) return true;
+    if (!_needsLegalAcceptance || _legalAccepted) return true;
     setState(() => _error = 'Acceptez les CGU et la Politique de confidentialité pour continuer.');
     return false;
   }
@@ -326,7 +326,8 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _loginWithGoogle() async {
-    if (!_ensureLegalAccepted()) return;
+    // Première connexion seulement — pas lors d'une récupération PIN.
+    if (_step == PhoneLoginStep.phone && !_ensureLegalAccepted()) return;
     // Conserver le mode « PIN oublié » si on part de cet écran (nouveau PIN après Google).
     final keepForgot = _forgotPinRecovery || _step == PhoneLoginStep.forgot;
     setState(() {
@@ -363,7 +364,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _loginWithApple() async {
-    if (!_ensureLegalAccepted()) return;
+    if (_step == PhoneLoginStep.phone && !_ensureLegalAccepted()) return;
     final keepForgot = _forgotPinRecovery || _step == PhoneLoginStep.forgot;
     setState(() {
       _loading = true;
@@ -730,7 +731,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           const SizedBox(height: 16),
           MovaErrorBanner(message: _error!),
         ],
-        if (_needsLegalGate) ...[
+        if (_needsLegalAcceptance) ...[
           const SizedBox(height: 16),
           _LegalAcceptRow(
             accepted: _legalAccepted,
@@ -751,7 +752,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             PhoneLoginStep.otp || PhoneLoginStep.googleOtp => 'Vérifier le code',
           },
           isLoading: _loading,
-          onPressed: (_needsLegalGate && !_legalAccepted)
+          onPressed: (_needsLegalAcceptance && !_legalAccepted)
               ? null
               : switch (_step) {
                   PhoneLoginStep.phone => _continueFromPhone,
@@ -805,7 +806,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
               label: 'Continuer avec Apple',
               isSecondary: true,
               isLoading: _loading,
-              onPressed: (_needsLegalGate && !_legalAccepted) ? null : _loginWithApple,
+              onPressed: (_needsLegalAcceptance && !_legalAccepted) ? null : _loginWithApple,
               icon: Icons.apple,
             ),
           ],
@@ -815,7 +816,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
               label: 'Continuer avec Google',
               isSecondary: true,
               isLoading: _loading,
-              onPressed: (_needsLegalGate && !_legalAccepted) ? null : _loginWithGoogle,
+              onPressed: (_needsLegalAcceptance && !_legalAccepted) ? null : _loginWithGoogle,
               icon: Icons.g_mobiledata,
             ),
           ],

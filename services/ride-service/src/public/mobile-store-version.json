@@ -1,6 +1,6 @@
 {
-  "version": "1.0.34",
-  "versionCode": 177,
-  "updatedAt": "2026-10-22T07:28:48.000Z",
+  "version": "1.0.35",
+  "versionCode": 186,
+  "updatedAt": "2026-10-23T06:50:14.000Z",
   "note": "Source of truth for GET /api/public/app-version. Updated automatically by mobile-release after a successful Play upload. Do not lower these values by hand."
 }

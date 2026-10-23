@@ -102,15 +102,18 @@ export function OtpGate({ children }: Props) {
     };
   }, []);
 
+  /** CGU / confidentialité : 1ʳᵉ connexion (téléphone / Google), pas PIN ni oubli. */
+  const needsLegalGate = !pinOnly && !forgotPin && !pinMode && !codeSent && !googleChallenge;
+
   useEffect(() => {
-    if (pinOnly && pin.length === 6 && !loading && legalAccepted) {
+    if (pinOnly && pin.length === 6 && !loading) {
       void loginWithPin();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin, pinOnly, legalAccepted]);
+  }, [pin, pinOnly]);
 
   function ensureLegalAccepted() {
-    if (legalAccepted) return true;
+    if (!needsLegalGate || legalAccepted) return true;
     setError("Acceptez les CGU et la Politique de confidentialité pour continuer.");
     return false;
   }
@@ -218,7 +221,6 @@ export function OtpGate({ children }: Props) {
   }
 
   async function loginWithPin() {
-    if (!ensureLegalAccepted()) return;
     if (pinSubmitLock.current) return;
     pinSubmitLock.current = true;
     setLoading(true);
@@ -243,7 +245,6 @@ export function OtpGate({ children }: Props) {
   }
 
   async function verifyOtp() {
-    if (!ensureLegalAccepted()) return;
     setLoading(true);
     setError(null);
     try {
@@ -370,28 +371,30 @@ export function OtpGate({ children }: Props) {
             maxLength={6}
           />
         )}
-        <label className="flex items-start gap-2 mb-4 text-sm text-gray-600 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            className="mt-1 accent-[#6C63FF]"
-            checked={legalAccepted}
-            onChange={(e) => {
-              setLegalAccepted(e.target.checked);
-              if (e.target.checked && error?.includes("CGU")) setError(null);
-            }}
-          />
-          <span>
-            J&apos;ai lu et j&apos;accepte les{" "}
-            <a href="/cgu" target="_blank" rel="noopener noreferrer" className="text-[#6C63FF] underline font-medium">
-              CGU
-            </a>{" "}
-            et la{" "}
-            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#6C63FF] underline font-medium">
-              Politique de confidentialité
-            </a>
-            .
-          </span>
-        </label>
+        {needsLegalGate && (
+          <label className="flex items-start gap-2 mb-4 text-sm text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="mt-1 accent-[#6C63FF]"
+              checked={legalAccepted}
+              onChange={(e) => {
+                setLegalAccepted(e.target.checked);
+                if (e.target.checked && error?.includes("CGU")) setError(null);
+              }}
+            />
+            <span>
+              J&apos;ai lu et j&apos;accepte les{" "}
+              <a href="/cgu" target="_blank" rel="noopener noreferrer" className="text-[#6C63FF] underline font-medium">
+                CGU
+              </a>{" "}
+              et la{" "}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#6C63FF] underline font-medium">
+                Politique de confidentialité
+              </a>
+              .
+            </span>
+          </label>
+        )}
         {!pinOnly && (
           <button
             type="button"
@@ -402,7 +405,7 @@ export function OtpGate({ children }: Props) {
             }}
             disabled={
               loading ||
-              !legalAccepted ||
+              (needsLegalGate && !legalAccepted) ||
               (!googleChallenge && !phone.trim()) ||
               (codeSent && !code.trim()) ||
               (pinMode && !codeSent && pin.length !== 6)
@@ -463,7 +466,10 @@ export function OtpGate({ children }: Props) {
         {(googleClientId() || forgotPin) && !codeSent && !googleChallenge && !hideIdentity && (
           <>
             <p className="text-center text-xs text-gray-400 my-4">ou</p>
-            <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading || !legalAccepted} />
+            <GoogleContinueButton
+              onCredential={loginWithGoogle}
+              disabled={loading || (needsLegalGate && !legalAccepted)}
+            />
           </>
         )}
         {codeSent && (

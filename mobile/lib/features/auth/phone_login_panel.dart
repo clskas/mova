@@ -88,8 +88,11 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     );
   }
 
+  /// CGU / confidentialité : uniquement à la 1ʳᵉ connexion (téléphone / social), pas PIN ni oubli.
+  bool get _needsLegalGate => _step == PhoneLoginStep.phone;
+
   bool _ensureLegalAccepted() {
-    if (_legalAccepted) return true;
+    if (!_needsLegalGate || _legalAccepted) return true;
     setState(() => _error = 'Acceptez les CGU et la Politique de confidentialité pour continuer.');
     return false;
   }
@@ -101,12 +104,10 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         _pinController.text.trim().length == 6 &&
         !_loading &&
         !_pinSubmitLock) {
-      if (!_legalAccepted) return;
       _loginWithPin();
     }
     // Autofill SMS / saisie : valider dès 6 chiffres (comme WhatsApp).
     if (!_loading && _codeController.text.trim().length == 6) {
-      if (!_legalAccepted) return;
       if (_step == PhoneLoginStep.otp) {
         _verifyOtp();
       } else if (_step == PhoneLoginStep.googleOtp) {
@@ -276,7 +277,6 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _loginWithPin() async {
-    if (!_ensureLegalAccepted()) return;
     final pin = _pinController.text.trim();
     if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
       setState(() => _error = 'Le code PIN doit contenir 6 chiffres.');
@@ -304,7 +304,6 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _verifyOtp() async {
-    if (!_ensureLegalAccepted()) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -436,7 +435,6 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _verifyGoogleOtp() async {
-    if (!_ensureLegalAccepted()) return;
     final challengeId = _googleChallengeId;
     final providerLabel = _socialProvider == 'apple' ? 'Apple' : 'Google';
     if (challengeId == null || challengeId.isEmpty) {
@@ -579,7 +577,6 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   }
 
   Future<void> _sendForgotSms() async {
-    if (!_ensureLegalAccepted()) return;
     final raw = _phoneController.text.trim();
     // Only the SMS destination matters — do not block on a stale Google e-mail
     // left in `_normalizedPhone` after the user typed a real +243 number.
@@ -733,16 +730,18 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           const SizedBox(height: 16),
           MovaErrorBanner(message: _error!),
         ],
-        const SizedBox(height: 16),
-        _LegalAcceptRow(
-          accepted: _legalAccepted,
-          onChanged: (v) => setState(() {
-            _legalAccepted = v;
-            if (v && _error != null && _error!.contains('CGU')) {
-              _error = null;
-            }
-          }),
-        ),
+        if (_needsLegalGate) ...[
+          const SizedBox(height: 16),
+          _LegalAcceptRow(
+            accepted: _legalAccepted,
+            onChanged: (v) => setState(() {
+              _legalAccepted = v;
+              if (v && _error != null && _error!.contains('CGU')) {
+                _error = null;
+              }
+            }),
+          ),
+        ],
         const SizedBox(height: 16),
           MovaButton(
           label: switch (_step) {
@@ -752,7 +751,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             PhoneLoginStep.otp || PhoneLoginStep.googleOtp => 'Vérifier le code',
           },
           isLoading: _loading,
-          onPressed: !_legalAccepted
+          onPressed: (_needsLegalGate && !_legalAccepted)
               ? null
               : switch (_step) {
                   PhoneLoginStep.phone => _continueFromPhone,
@@ -806,7 +805,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
               label: 'Continuer avec Apple',
               isSecondary: true,
               isLoading: _loading,
-              onPressed: _legalAccepted ? _loginWithApple : null,
+              onPressed: (_needsLegalGate && !_legalAccepted) ? null : _loginWithApple,
               icon: Icons.apple,
             ),
           ],
@@ -816,7 +815,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
               label: 'Continuer avec Google',
               isSecondary: true,
               isLoading: _loading,
-              onPressed: _legalAccepted ? _loginWithGoogle : null,
+              onPressed: (_needsLegalGate && !_legalAccepted) ? null : _loginWithGoogle,
               icon: Icons.g_mobiledata,
             ),
           ],

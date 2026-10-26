@@ -2039,14 +2039,17 @@ export class AuthService {
     let smsError: string | undefined;
     let emailError: string | undefined;
     if (shouldNotify && hasPhone) {
-      const text =
-        `SENGA votre code PIN de connexion est ${pin} Conservez-le precieusement Ne le communiquez a personne`;
+      // SerdiPay rejects long / punctuated copy (« An error occor… »). Same short
+      // OTP-style line as phone login — email still carries the fuller notice.
+      const text = `Votre code SENGA ${pin}`;
       try {
         const sms = await this.sms.sendSms(phone, text, 'login_pin');
         smsSent = sms.success === true;
-        if (!smsSent) smsError = sms.message;
+        if (!smsSent) {
+          smsError = mapSmsDeliveryFailureToUserMessage(sms.message);
+        }
       } catch (e) {
-        smsError = (e as Error).message;
+        smsError = mapSmsDeliveryFailureToUserMessage((e as Error).message);
       }
     }
     if (shouldNotify && hasEmail) {

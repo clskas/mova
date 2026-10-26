@@ -1384,7 +1384,11 @@ describe('AuthService', () => {
     expect(result.emailSent).toBe(true);
     expect(result.hasPhone).toBe(true);
     expect(result.loginPin).toMatch(/^\d{6}$/);
-    expect(sms.sendSms).toHaveBeenCalledWith('+243811111111', expect.stringContaining(result.loginPin!), 'login_pin');
+    expect(sms.sendSms).toHaveBeenCalledWith(
+      '+243811111111',
+      `Votre code SENGA ${result.loginPin}`,
+      'login_pin',
+    );
     expect(mailer.sendLoginPin).toHaveBeenCalledWith('a@b.cd', result.loginPin, {
       portal: undefined,
     });

@@ -788,15 +788,15 @@ export class DriversService {
     if (profile.kycStatus !== KycStatus.APPROVED) {
       throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING, undefined, 'Dossier pas encore validé par SENGA.');
     }
-    if (!profile.activationPin || profile.activationPin !== pin.trim()) {
+    const trimmed = String(pin ?? '').trim();
+    if (!/^\d{6}$/.test(trimmed)) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Code PIN incorrect.');
     }
-    if (profile.activationPinExpiresAt && profile.activationPinExpiresAt.getTime() < Date.now()) {
-      throw new MovaHttpException(
-        MovaErrorCode.VALIDATION_ERROR,
-        undefined,
-        'Ce code a expiré. Demandez un nouveau PIN à l\'administration SENGA.',
-      );
+    // No time expiry: PIN stays valid until used or admin regenerates (was 72h → « invalide » if late).
+    const matchesStored = profile.activationPin != null && profile.activationPin === trimmed;
+    const ok = matchesStored || (await this.loginPinMatches(userId, trimmed));
+    if (!ok) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Code PIN incorrect.');
     }
     await this.prisma.driverProfile.update({
       where: { userId },
@@ -848,8 +848,22 @@ export class DriversService {
     return crypto.randomInt(100000, 999999).toString();
   }
 
-  private activationPinExpiry() {
-    return new Date(Date.now() + 72 * 60 * 60 * 1000);
+  /** Same 6-digit login PIN issued at KYC (auth localPinHash) — fallback if profile.activationPin drifted. */
+  private async loginPinMatches(userId: string, pin: string): Promise<boolean> {
+    try {
+      const res = await fetch(serviceUrl('auth', `/internal/users/${userId}/verify-login-pin`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-api-key': resolveInternalApiKey(),
+        },
+        body: JSON.stringify({ pin }),
+      });
+      return res.ok;
+    } catch (e) {
+      this.logger.warn(`Verify login PIN threw for ${userId}: ${(e as Error).message}`);
+      return false;
+    }
   }
 
   private sendActivationPinNotify(userId: string, pin: string): Promise<AuthUserNotifyResult> {
@@ -1005,7 +1019,6 @@ export class DriversService {
 
   private async applyKycApproval(userId: string) {
     const pin = await this.resolveOnePin(userId);
-    const expiresAt = this.activationPinExpiry();
     const defaultExpiry = new Date();
     defaultExpiry.setUTCFullYear(defaultExpiry.getUTCFullYear() + 2);
     const existing = await this.prisma.driverProfile.findUnique({ where: { userId } });
@@ -1016,7 +1029,7 @@ export class DriversService {
         kycStatus: KycStatus.APPROVED,
         activationPin: pin,
         activationPinVerifiedAt: null,
-        activationPinExpiresAt: expiresAt,
+        activationPinExpiresAt: null,
         isAvailable: false,
         licenseExpiry: defaultExpiry,
         insuranceExpiry: defaultExpiry,
@@ -1026,7 +1039,7 @@ export class DriversService {
         kycStatus: KycStatus.APPROVED,
         activationPin: pin,
         activationPinVerifiedAt: null,
-        activationPinExpiresAt: expiresAt,
+        activationPinExpiresAt: null,
         isAvailable: false,
         ...(existing?.licenseExpiry == null ? { licenseExpiry: defaultExpiry } : {}),
         ...(existing?.insuranceExpiry == null ? { insuranceExpiry: defaultExpiry } : {}),
@@ -1407,13 +1420,12 @@ export class DriversService {
       );
     }
     const pin = await this.resolveOnePin(userId);
-    const expiresAt = this.activationPinExpiry();
     await this.prisma.driverProfile.update({
       where: { userId },
       data: {
         activationPin: pin,
         activationPinVerifiedAt: null,
-        activationPinExpiresAt: expiresAt,
+        activationPinExpiresAt: null,
         isAvailable: false,
       },
     });

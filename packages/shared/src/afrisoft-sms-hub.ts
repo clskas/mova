@@ -52,8 +52,9 @@ export function isAfrisoftSmsHubClientConfigured(get: EnvGetter): boolean {
 
 export const SMS_RATE_LIMIT_USER_MESSAGE =
   'Trop de codes envoyés vers ce numéro. Réessayez dans une minute.';
-/** Same user-facing copy as generic SMS failure (do not expose SerdiPay credit details). */
-export const SMS_CREDIT_USER_MESSAGE = SMS_UNAVAILABLE_USER_MESSAGE;
+/** User-facing copy when SerdiPay / hub reports insufficient SMS credits. */
+export const SMS_CREDIT_USER_MESSAGE =
+  'Échec de l’envoi du SMS de vérification. Veuillez réessayer dans quelques minutes.';
 
 /**
  * Hub / SerdiPay errors must not leak HMAC, env names, or English Nest text.

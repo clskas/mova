@@ -31,6 +31,7 @@ describe('afrisoft-sms-hub', () => {
     expect(mapSmsDeliveryFailureToUserMessage('Crédit SMS SerdiPay insuffisant (403).')).toBe(
       SMS_CREDIT_USER_MESSAGE,
     );
+    expect(mapSmsDeliveryFailureToUserMessage('Insufficient SMS credits.')).toBe(SMS_CREDIT_USER_MESSAGE);
     expect(mapSmsDeliveryFailureToUserMessage('Invalid HMAC signature')).toBe(SMS_UNAVAILABLE_USER_MESSAGE);
     expect(mapSmsDeliveryFailureToUserMessage('An error occor while processing the sms')).toBe(
       SERDIPAY_SMS_REJECTED_FR,

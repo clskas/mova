@@ -52,9 +52,8 @@ export function isAfrisoftSmsHubClientConfigured(get: EnvGetter): boolean {
 
 export const SMS_RATE_LIMIT_USER_MESSAGE =
   'Trop de codes envoyés vers ce numéro. Réessayez dans une minute.';
-/** Hub returns EN « Insufficient SMS credits. » — show recharge, not a vague retry. */
-export const SMS_CREDIT_USER_MESSAGE =
-  'Crédit SMS épuisé. Rechargez le compte SerdiPay (hub AfriSoft) ou contactez le support SENGA.';
+/** Same user-facing copy as generic SMS failure (do not expose SerdiPay credit details). */
+export const SMS_CREDIT_USER_MESSAGE = SMS_UNAVAILABLE_USER_MESSAGE;
 
 /**
  * Hub / SerdiPay errors must not leak HMAC, env names, or English Nest text.

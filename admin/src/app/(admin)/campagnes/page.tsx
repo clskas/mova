@@ -51,8 +51,7 @@ export default function CampagnesPage() {
 
   const active = codes.filter((c) => c.isActive !== false);
 
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
+  async function create() {
     if (readOnly || !code.trim()) return;
     setSaving(true);
     try {
@@ -105,7 +104,7 @@ export default function CampagnesPage() {
       </div>
       {error && <ErrorBanner message={error} onRetry={load} />}
       {!readOnly && (
-        <form onSubmit={create} className="bg-white border rounded-xl p-4 flex flex-wrap gap-3 items-end">
+        <div className="bg-white border rounded-xl p-4 flex flex-wrap gap-3 items-end">
           <label>
             <FieldLabel>Code</FieldLabel>
             <TextInput value={code} onChange={setCode} placeholder="SENGA10" />
@@ -114,8 +113,10 @@ export default function CampagnesPage() {
             <FieldLabel>% réduction</FieldLabel>
             <TextInput value={percent} onChange={setPercent} placeholder="10" />
           </label>
-          <BtnPrimary type="submit" disabled={saving}>Créer</BtnPrimary>
-        </form>
+          <BtnPrimary disabled={saving} onClick={() => void create()}>
+            Créer
+          </BtnPrimary>
+        </div>
       )}
       {loading ? (
         <LoadingState />

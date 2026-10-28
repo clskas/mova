@@ -44,8 +44,7 @@ export default function BlacklistPage() {
     void load();
   }, [load]);
 
-  async function addEntry(e: React.FormEvent) {
-    e.preventDefault();
+  async function addEntry() {
     if (readOnly || !value.trim() || !reason.trim()) return;
     setSaving(true);
     try {
@@ -65,7 +64,7 @@ export default function BlacklistPage() {
       <PageHeader title="Liste noire" subtitle="Blocage téléphone, e-mail, compte, appareil ou plaque" />
       {error && <ErrorBanner message={error} onRetry={load} />}
       {!readOnly && (
-        <form onSubmit={addEntry} className="bg-white rounded-xl border p-4 space-y-3">
+        <div className="bg-white rounded-xl border p-4 space-y-3">
           <div className="grid sm:grid-cols-3 gap-3">
             <label>
               <FieldLabel>Type</FieldLabel>
@@ -90,8 +89,10 @@ export default function BlacklistPage() {
             <FieldLabel>Motif</FieldLabel>
             <TextInput value={reason} onChange={setReason} placeholder="Motif du blocage" />
           </label>
-          <BtnPrimary type="submit" disabled={saving}>Ajouter</BtnPrimary>
-        </form>
+          <BtnPrimary disabled={saving} onClick={() => void addEntry()}>
+            Ajouter
+          </BtnPrimary>
+        </div>
       )}
       {loading ? (
         <LoadingState />

@@ -2112,9 +2112,12 @@ export class RidesService {
     return { rides, completed, revenueCdf, todayRides, todayCompleted, todayRevenueCdf, activeRides, cancelled };
   }
 
-  /** Séries temporelles et KPIs pour rapports admin (7–90 jours). */
-  async getReportAnalytics(days = 30, cityFilter?: string | null) {
-    const periodDays = Math.min(Math.max(Number(days) || 30, 7), 90);
+  /** Séries temporelles et KPIs pour rapports admin (1–366 j, ou plage from/to). */
+  async getReportAnalytics(
+    days = 30,
+    cityFilter?: string | null,
+    range?: { from?: string; to?: string },
+  ) {
     /** Calendrier RDC (évite le décalage UTC qui fausse ville+période). */
     const tz = 'Africa/Kinshasa';
     const dayKeyInTz = (value: Date | string) => {
@@ -2126,9 +2129,48 @@ export class RidesService {
         day: '2-digit',
       }).format(d);
     };
+    const parseYmd = (raw?: string | null): string | null => {
+      const v = String(raw ?? '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+      const t = Date.parse(`${v}T12:00:00+01:00`);
+      return Number.isFinite(t) ? v : null;
+    };
     const todayKey = dayKeyInTz(new Date());
-    const since = new Date(`${todayKey}T00:00:00+01:00`);
-    since.setDate(since.getDate() - periodDays + 1);
+    let fromKey = parseYmd(range?.from);
+    let toKey = parseYmd(range?.to);
+    if (fromKey && toKey) {
+      if (fromKey > toKey) {
+        const swap = fromKey;
+        fromKey = toKey;
+        toKey = swap;
+      }
+      if (toKey > todayKey) toKey = todayKey;
+    } else {
+      toKey = todayKey;
+      const periodDaysPreset = Math.min(Math.max(Math.floor(Number(days)) || 30, 1), 366);
+      const end = new Date(`${toKey}T12:00:00+01:00`);
+      end.setDate(end.getDate() - periodDaysPreset + 1);
+      fromKey = dayKeyInTz(end);
+    }
+    // Cap inclusive range at 366 days (keep `to`, slide `from` forward).
+    {
+      const start = new Date(`${fromKey!}T12:00:00+01:00`);
+      const end = new Date(`${toKey!}T12:00:00+01:00`);
+      const span = Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
+      if (span > 366) {
+        const fromAdj = new Date(`${toKey}T12:00:00+01:00`);
+        fromAdj.setDate(fromAdj.getDate() - 365);
+        fromKey = dayKeyInTz(fromAdj);
+      }
+    }
+    const since = new Date(`${fromKey}T00:00:00+01:00`);
+    const until = new Date(`${toKey}T23:59:59.999+01:00`);
+    const periodDays =
+      Math.floor(
+        (new Date(`${toKey}T12:00:00+01:00`).getTime() - new Date(`${fromKey}T12:00:00+01:00`).getTime()) /
+          86_400_000,
+      ) + 1;
+    const createdAtFilter = { gte: since, lte: until };
     const normalizeCity = (name: string) =>
       name
         .normalize('NFD')
@@ -2140,7 +2182,7 @@ export class RidesService {
     const [rides, deliveries, errands, moving, scheduled, carpool, rideRule, deliveryRule, foodRule] =
       await Promise.all([
         this.prisma.ride.findMany({
-          where: { createdAt: { gte: since } },
+          where: { createdAt: createdAtFilter },
           select: {
             createdAt: true,
             status: true,
@@ -2153,7 +2195,7 @@ export class RidesService {
           },
         }),
         this.prisma.delivery.findMany({
-          where: { createdAt: { gte: since } },
+          where: { createdAt: createdAtFilter },
           select: {
             createdAt: true,
             status: true,
@@ -2165,12 +2207,12 @@ export class RidesService {
           },
         }),
         this.prisma.errandOrder.findMany({
-          where: { createdAt: { gte: since } },
+          where: { createdAt: createdAtFilter },
           select: { createdAt: true, status: true, finalPriceCdf: true, pickupLat: true, pickupLng: true },
         }),
-        this.prisma.movingRequest.count({ where: { createdAt: { gte: since } } }),
-        this.prisma.scheduledRide.count({ where: { createdAt: { gte: since } } }),
-        this.prisma.carpoolTrip.count({ where: { createdAt: { gte: since } } }),
+        this.prisma.movingRequest.count({ where: { createdAt: createdAtFilter } }),
+        this.prisma.scheduledRide.count({ where: { createdAt: createdAtFilter } }),
+        this.prisma.carpoolTrip.count({ where: { createdAt: createdAtFilter } }),
         this.commission.get(CommissionServiceType.RIDE),
         this.commission.get(CommissionServiceType.DELIVERY),
         this.commission.get(CommissionServiceType.FOOD),
@@ -2299,6 +2341,8 @@ export class RidesService {
 
     return {
       periodDays,
+      periodFrom: fromKey,
+      periodTo: toKey,
       generatedAt: new Date().toISOString(),
       city: cityFilter?.trim() || null,
       daily: Array.from(dailyMap.values()),

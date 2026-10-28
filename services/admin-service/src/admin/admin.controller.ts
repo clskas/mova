@@ -120,10 +120,12 @@ export class AdminController {
     @Request() req: { user: AdminJwtUser },
     @Query('city') city?: string,
     @Query('days') days?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     const scoped = resolveManagedCityScope(req.user) ?? city;
     const period = Number(days ?? 30);
-    return this.adminService.getMetrics(scoped, Number.isFinite(period) ? period : 30);
+    return this.adminService.getMetrics(scoped, Number.isFinite(period) ? period : 30, { from, to });
   }
 
   @Get('reports')
@@ -133,9 +135,11 @@ export class AdminController {
     @Request() req: { user: AdminJwtUser },
     @Query('days') days?: string,
     @Query('city') city?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     const scoped = resolveManagedCityScope(req.user) ?? city;
-    return this.adminService.getReports(Number(days ?? 30), scoped);
+    return this.adminService.getReports(Number(days ?? 30), scoped, { from, to });
   }
 
   @Get('users')

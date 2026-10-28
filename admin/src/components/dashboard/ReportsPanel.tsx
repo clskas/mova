@@ -15,13 +15,15 @@ function pct(n: number) {
 
 export function ReportsPanel({ reports, onExport }: ReportsPanelProps) {
   if (!reports) return null;
-  const { kpis, serviceBreakdown, periodDays, commissionsByCity, city } = reports;
+  const { kpis, serviceBreakdown, periodDays, periodFrom, periodTo, commissionsByCity, city } = reports;
+  const periodLabel =
+    periodFrom && periodTo ? `${periodFrom} → ${periodTo} (${periodDays} j)` : `${periodDays} jours`;
 
   const rows = [
     { label: "Taux de complétion courses", value: pct(kpis.completionRate), desc: "Courses terminées / demandées" },
     { label: "Taux d'annulation", value: pct(kpis.cancelRate), desc: "Courses annulées / demandées" },
     { label: "Panier moyen course", value: formatCdf(kpis.avgTicketCdf), desc: "Revenu moyen par course complétée" },
-    { label: "Revenus courses (période)", value: formatCdf(kpis.totalRevenueCdf), desc: `${periodDays} derniers jours` },
+    { label: "Revenus courses (période)", value: formatCdf(kpis.totalRevenueCdf), desc: periodLabel },
     { label: "Revenus livraisons (période)", value: formatCdf(kpis.deliveryRevenueCdf), desc: "Uniquement livraisons / courses terminées" },
     { label: "Commissions SENGA (période)", value: formatCdf(kpis.totalPlatformCommissionCdf ?? 0), desc: "Parts plateforme estimées" },
     { label: "Volume livraisons", value: String(kpis.totalDeliveries), desc: "Demandes créées (y compris annulées)" },
@@ -48,7 +50,7 @@ export function ReportsPanel({ reports, onExport }: ReportsPanelProps) {
         <div>
           <h2 className="text-lg font-bold text-[#0d0d1a]">Rapports avancés</h2>
           <p className="text-sm text-gray-500">
-            KPIs opérationnels et financiers — {periodDays} jours
+            KPIs opérationnels et financiers — {periodLabel}
             {city ? ` · ${city}` : " · toutes villes"}
           </p>
         </div>

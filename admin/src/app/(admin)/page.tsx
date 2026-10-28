@@ -20,14 +20,53 @@ import { ReportsPanel } from "@/components/dashboard/ReportsPanel";
 import { ConnectionCard } from "@/components/ConnectionCard";
 import { Card, ErrorBanner, LoadingState, PageHeader, SelectInput, StatusBadge } from "@/components/ui";
 
-type Period = 7 | 30 | 90;
+type PeriodPreset = 1 | 7 | 30 | 90;
+type PeriodMode = "preset" | "custom";
 type ChartMode = "rides" | "revenue" | "deliveries";
+
+function todayYmdKinshasa(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Kinshasa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function inclusiveDays(from: string, to: string): number {
+  const a = Date.parse(`${from}T12:00:00+01:00`);
+  const b = Date.parse(`${to}T12:00:00+01:00`);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return 30;
+  return Math.max(1, Math.floor((b - a) / 86_400_000) + 1);
+}
+
+const PERIOD_PRESETS: { days: PeriodPreset; label: string }[] = [
+  { days: 1, label: "Auj." },
+  { days: 7, label: "7j" },
+  { days: 30, label: "30j" },
+  { days: 90, label: "90j" },
+];
 
 export default function DashboardPage() {
   const { canAccess, role, user } = useAdmin();
   const [metrics, setMetrics] = useState<AdminMetrics>({});
   const [reports, setReports] = useState<AdminReports | null>(null);
-  const [period, setPeriod] = useState<Period>(30);
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("preset");
+  const [period, setPeriod] = useState<PeriodPreset>(30);
+  const [customFrom, setCustomFrom] = useState(() => {
+    const to = todayYmdKinshasa();
+    const d = new Date(`${to}T12:00:00+01:00`);
+    d.setDate(d.getDate() - 29);
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Kinshasa",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  });
+  const [customTo, setCustomTo] = useState(todayYmdKinshasa);
+  const [appliedFrom, setAppliedFrom] = useState<string | null>(null);
+  const [appliedTo, setAppliedTo] = useState<string | null>(null);
   const [cityFilter, setCityFilter] = useState("");
   const [chartMode, setChartMode] = useState<ChartMode>("rides");
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -39,19 +78,41 @@ export default function DashboardPage() {
 
   const scopedCity = role === "CITY_ADMIN" ? (user?.managedCity?.trim() || "") : cityFilter;
 
+  const periodLabel = useMemo(() => {
+    if (periodMode === "custom" && appliedFrom && appliedTo) {
+      return `${appliedFrom} → ${appliedTo}`;
+    }
+    if (period === 1) return "aujourd'hui";
+    return `${period}j`;
+  }, [periodMode, period, appliedFrom, appliedTo]);
+
   const load = useCallback(async () => {
     const seq = ++loadSeq.current;
     const cityAtRequest = scopedCity;
+    const modeAtRequest = periodMode;
     const periodAtRequest = period;
+    const fromAtRequest = modeAtRequest === "custom" ? appliedFrom : null;
+    const toAtRequest = modeAtRequest === "custom" ? appliedTo : null;
+    const daysAtRequest =
+      fromAtRequest && toAtRequest ? inclusiveDays(fromAtRequest, toAtRequest) : periodAtRequest;
     setError(null);
     try {
       const metricsQs = new URLSearchParams();
       if (cityAtRequest) metricsQs.set("city", cityAtRequest);
-      metricsQs.set("days", String(periodAtRequest));
+      metricsQs.set("days", String(daysAtRequest));
+      if (fromAtRequest && toAtRequest) {
+        metricsQs.set("from", fromAtRequest);
+        metricsQs.set("to", toAtRequest);
+      }
       const metricsPath = `/api/admin/metrics?${metricsQs}`;
       const [mRes, rRes] = await Promise.allSettled([
         apiFetch<AdminMetrics>(metricsPath),
-        fetchAdminReports(periodAtRequest, cityAtRequest || null),
+        fetchAdminReports({
+          days: daysAtRequest,
+          city: cityAtRequest || null,
+          from: fromAtRequest,
+          to: toAtRequest,
+        }),
       ]);
       if (seq !== loadSeq.current) return;
       if (mRes.status === "fulfilled") {
@@ -63,7 +124,11 @@ export default function DashboardPage() {
         const payloadCity = (payload.city ?? "").trim().toLowerCase();
         const wantedCity = cityAtRequest.trim().toLowerCase();
         const cityOk = !wantedCity || payloadCity === wantedCity;
-        const periodOk = !payload.periodDays || payload.periodDays === periodAtRequest;
+        const periodOk =
+          fromAtRequest && toAtRequest
+            ? (!payload.periodFrom || payload.periodFrom === fromAtRequest) &&
+              (!payload.periodTo || payload.periodTo === toAtRequest)
+            : !payload.periodDays || payload.periodDays === periodAtRequest;
         if (cityOk && periodOk) {
           setReports(payload);
         } else {
@@ -91,7 +156,7 @@ export default function DashboardPage() {
     } finally {
       if (seq === loadSeq.current) setLoading(false);
     }
-  }, [period, scopedCity]);
+  }, [period, periodMode, appliedFrom, appliedTo, scopedCity]);
 
   useEffect(() => {
     setLoading(true);
@@ -187,9 +252,9 @@ export default function DashboardPage() {
     <div className="max-w-7xl mx-auto space-y-6">
       <PageHeader
         title="Tableau de bord"
-        subtitle={`${scopedCity || "RDC"} · ${scopedCity ? `filtre ${scopedCity}` : "couverture nationale"} · ${period}j · ${lastUpdate ? `MAJ ${lastUpdate.toLocaleTimeString("fr-CD")}` : ""}`}
+        subtitle={`${scopedCity || "RDC"} · ${scopedCity ? `filtre ${scopedCity}` : "couverture nationale"} · ${periodLabel} · ${lastUpdate ? `MAJ ${lastUpdate.toLocaleTimeString("fr-CD")}` : ""}`}
         action={
-          <div className="flex flex-wrap items-center gap-2 relative z-10">
+          <div className="flex flex-wrap items-end gap-2 relative z-10">
             {role !== "CITY_ADMIN" && (
               <label className="min-w-[11rem] flex flex-col gap-0.5">
                 <span className="text-[11px] font-medium text-gray-500 px-0.5">Ville</span>
@@ -211,38 +276,108 @@ export default function DashboardPage() {
             )}
             <div className="flex flex-col gap-0.5">
               <span className="text-[11px] font-medium text-gray-500 px-0.5">Période</span>
-              <div className="flex gap-1">
-                {([7, 30, 90] as Period[]).map((d) => (
+              <div className="flex flex-wrap gap-1">
+                {PERIOD_PRESETS.map(({ days, label }) => (
                   <button
-                    key={d}
+                    key={days}
                     type="button"
                     onClick={() => {
-                      if (d === period) return;
-                      setPeriod(d);
+                      setPeriodMode("preset");
+                      setAppliedFrom(null);
+                      setAppliedTo(null);
+                      if (periodMode === "preset" && days === period) return;
+                      setPeriod(days);
                       setMetrics({});
                       setReports(null);
                       setLoading(true);
                       setError(null);
                     }}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      period === d ? "bg-[#6366f1] text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                      periodMode === "preset" && period === days
+                        ? "bg-[#6366f1] text-white"
+                        : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
                     }`}
                   >
-                    {d}j
+                    {label}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPeriodMode("custom");
+                    setError(null);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    periodMode === "custom"
+                      ? "bg-[#6366f1] text-white"
+                      : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  Perso
+                </button>
               </div>
             </div>
+            {periodMode === "custom" && (
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="flex flex-col gap-0.5">
+                  <span className="text-[11px] font-medium text-gray-500 px-0.5">Du</span>
+                  <input
+                    type="date"
+                    value={customFrom}
+                    max={customTo || todayYmdKinshasa()}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700"
+                  />
+                </label>
+                <label className="flex flex-col gap-0.5">
+                  <span className="text-[11px] font-medium text-gray-500 px-0.5">Au</span>
+                  <input
+                    type="date"
+                    value={customTo}
+                    min={customFrom || undefined}
+                    max={todayYmdKinshasa()}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!customFrom || !customTo) {
+                      setError("Choisissez une date de début et une date de fin.");
+                      return;
+                    }
+                    if (customFrom > customTo) {
+                      setError("La date de début doit être antérieure ou égale à la date de fin.");
+                      return;
+                    }
+                    if (inclusiveDays(customFrom, customTo) > 366) {
+                      setError("La période personnalisée est limitée à 366 jours.");
+                      return;
+                    }
+                    setAppliedFrom(customFrom);
+                    setAppliedTo(customTo);
+                    setMetrics({});
+                    setReports(null);
+                    setLoading(true);
+                    setError(null);
+                  }}
+                  className="mova-btn-primary text-sm"
+                >
+                  Appliquer
+                </button>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setAutoRefresh((v) => !v)}
-              className={`self-end px-3 py-1.5 rounded-lg text-sm border ${
+              className={`px-3 py-1.5 rounded-lg text-sm border ${
                 autoRefresh ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 text-gray-500"
               }`}
             >
               {autoRefresh ? "Auto 60s" : "Manuel"}
             </button>
-            <button type="button" onClick={() => { setLoading(true); void load(); }} className="self-end mova-btn-primary text-sm">
+            <button type="button" onClick={() => { setLoading(true); void load(); }} className="mova-btn-primary text-sm">
               Actualiser
             </button>
           </div>
@@ -269,7 +404,7 @@ export default function DashboardPage() {
         <>
           {scopedCity && reports && reports.kpis.totalRides === 0 && reports.kpis.totalDeliveries === 0 ? (
             <Card className="p-4 border border-amber-100 bg-amber-50/70 text-sm text-amber-950">
-              Aucune activité enregistrée à <strong>{scopedCity}</strong> sur les <strong>{period} derniers jours</strong>.
+              Aucune activité enregistrée à <strong>{scopedCity}</strong> sur la période <strong>{periodLabel}</strong>.
               Essayez une autre période ou vérifiez que les courses de cette ville ont un GPS de prise en charge.
             </Card>
           ) : null}
@@ -282,7 +417,7 @@ export default function DashboardPage() {
           <div className="grid lg:grid-cols-3 gap-4">
             <Card className="p-5 lg:col-span-2">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                <h2 className="font-bold text-[#0d0d1a]">Activité ({period} jours)</h2>
+                <h2 className="font-bold text-[#0d0d1a]">Activité ({periodLabel})</h2>
                 <div className="flex gap-1">
                   {(
                     [
@@ -341,19 +476,19 @@ export default function DashboardPage() {
               <h2 className="font-bold text-[#0d0d1a] mb-3">Synthèse globale</h2>
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <div className="p-3 rounded-xl bg-gray-50">
-                  <dt className="text-gray-500 text-xs">Courses ({period}j)</dt>
+                  <dt className="text-gray-500 text-xs">Courses ({periodLabel})</dt>
                   <dd className="font-bold text-lg tabular-nums">{m.totalRides}</dd>
                 </div>
                 <div className="p-3 rounded-xl bg-gray-50">
-                  <dt className="text-gray-500 text-xs">Complétées ({period}j)</dt>
+                  <dt className="text-gray-500 text-xs">Complétées ({periodLabel})</dt>
                   <dd className="font-bold text-lg tabular-nums text-emerald-600">{m.completedRides}</dd>
                 </div>
                 <div className="p-3 rounded-xl bg-gray-50">
-                  <dt className="text-gray-500 text-xs">Annulées ({period}j)</dt>
+                  <dt className="text-gray-500 text-xs">Annulées ({periodLabel})</dt>
                   <dd className="font-bold text-lg tabular-nums text-orange-600">{m.cancelledRides}</dd>
                 </div>
                 <div className="p-3 rounded-xl bg-gray-50">
-                  <dt className="text-gray-500 text-xs">Revenus ({period}j)</dt>
+                  <dt className="text-gray-500 text-xs">Revenus ({periodLabel})</dt>
                   <dd className="font-bold text-sm tabular-nums">{formatCdf(m.totalRevenueCdf)}</dd>
                 </div>
                 <div className="p-3 rounded-xl bg-gray-50 col-span-2">

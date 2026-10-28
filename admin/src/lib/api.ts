@@ -47,6 +47,8 @@ export type AdminMetrics = {
 
 export type AdminReports = {
   periodDays: number;
+  periodFrom?: string;
+  periodTo?: string;
   generatedAt: string;
   city?: string | null;
   daily: { date: string; rides: number; completed: number; revenueCdf: number; cancelled: number; deliveries: number }[];
@@ -1482,9 +1484,24 @@ export function normalizeMetrics(raw: AdminMetrics) {
   };
 }
 
-export async function fetchAdminReports(days = 30, city?: string | null): Promise<AdminReports> {
+export type AdminReportsQuery = {
+  days?: number;
+  city?: string | null;
+  from?: string | null;
+  to?: string | null;
+};
+
+export async function fetchAdminReports(
+  daysOrOpts: number | AdminReportsQuery = 30,
+  city?: string | null,
+): Promise<AdminReports> {
+  const opts: AdminReportsQuery =
+    typeof daysOrOpts === "number" ? { days: daysOrOpts, city } : daysOrOpts;
+  const days = Math.min(366, Math.max(1, Math.floor(Number(opts.days)) || 30));
   const params = new URLSearchParams({ days: String(days) });
-  if (city?.trim()) params.set("city", city.trim());
+  if (opts.city?.trim()) params.set("city", opts.city.trim());
+  if (opts.from?.trim()) params.set("from", opts.from.trim());
+  if (opts.to?.trim()) params.set("to", opts.to.trim());
   return apiFetch<AdminReports>(`/api/admin/reports?${params}`);
 }
 
@@ -1493,6 +1510,8 @@ export function exportReportsCsv(reports: AdminReports, metrics: ReturnType<type
     "SENGA — Rapport analytique",
     `Généré;${reports.generatedAt}`,
     `Période (jours);${reports.periodDays}`,
+    `Du;${reports.periodFrom ?? ""}`,
+    `Au;${reports.periodTo ?? ""}`,
     "",
     "Indicateur;Valeur",
     `Utilisateurs;${metrics.totalUsers}`,

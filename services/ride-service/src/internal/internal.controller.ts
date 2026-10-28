@@ -130,8 +130,13 @@ export class InternalController {
   }
 
   @Get('rides/reports')
-  reports(@Query('days') days?: string, @Query('city') city?: string) {
-    return this.rides.getReportAnalytics(Number(days ?? 30), city);
+  reports(
+    @Query('days') days?: string,
+    @Query('city') city?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.rides.getReportAnalytics(Number(days ?? 30), city, { from, to });
   }
 
   @Get('rides/passengers-by-city')

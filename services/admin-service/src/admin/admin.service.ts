@@ -87,18 +87,22 @@ export class AdminService {
     );
   }
 
-  async getMetrics(managedCity?: string | null, days = 30) {
-    const reportDays = Math.min(90, Math.max(7, Math.floor(Number(days)) || 30));
+  async getMetrics(
+    managedCity?: string | null,
+    days = 30,
+    range?: { from?: string; to?: string },
+  ) {
+    const reportDays = Math.min(366, Math.max(1, Math.floor(Number(days)) || 30));
     const city = managedCity?.trim() || '';
     if (!city) {
-      return this.getMetricsNational(reportDays);
+      return this.getMetricsNational(reportDays, range);
     }
     const [driversRes, rides, deliveries, incidents, reports, cityUsers] = await Promise.all([
       this.listDrivers(0, 500, { includeHidden: false }, city).catch(() => ({ data: [] as Array<Record<string, unknown>> })),
       this.listRides({ skip: 0, take: 200 }, city).catch(() => [] as Array<Record<string, unknown>>),
       this.listDeliveries({ skip: 0, take: 200 }, city).catch(() => [] as Array<Record<string, unknown>>),
       this.fetchJson<{ status?: string; type?: string; lat?: number; lng?: number }[]>('driver', '/internal/incidents').catch(() => []),
-      this.getReports(reportDays, city).catch(() => null),
+      this.getReports(reportDays, city, range).catch(() => null),
       // Même logique que la page Utilisateurs (admins ville, passagers, partenaires, chauffeurs).
       this.collectUsersForCities([city]).catch(() => ({ allIds: new Set<string>(), passengerIds: new Set<string>() })),
     ]);
@@ -162,8 +166,8 @@ export class AdminService {
     };
   }
 
-  private async getMetricsNational(days = 30) {
-    const reportDays = Math.min(90, Math.max(7, Math.floor(Number(days)) || 30));
+  private async getMetricsNational(days = 30, range?: { from?: string; to?: string }) {
+    const reportDays = Math.min(366, Math.max(1, Math.floor(Number(days)) || 30));
     const [users, driverStats, rideStats, incidents, deliveries, scheduled, carpool, moving, rental, wallet, reports] =
       await Promise.all([
         this.fetchJson<{ count: number }>('auth', '/internal/users/count').catch(() => ({ count: 0 })),
@@ -200,7 +204,7 @@ export class AdminService {
           'payment',
           '/internal/wallets/overview',
         ).catch(() => ({ totalBalanceCdf: 0, walletCount: 0, transactionsToday: 0 })),
-        this.getReports(reportDays, null).catch(() => null),
+        this.getReports(reportDays, null, range).catch(() => null),
       ]);
     const openIncidents = Array.isArray(incidents) ? incidents.filter((i) => i.status === 'OPEN').length : 0;
     const sosIncidents = Array.isArray(incidents)
@@ -226,7 +230,7 @@ export class AdminService {
       availableDrivers: driverStats.available ?? 0,
       pendingKyc: driverStats.pendingKyc ?? 0,
       approvedDrivers: driverStats.approved ?? 0,
-      // Période (7/30/90) : KPIs rapports ; sinon stats globales en secours.
+      // Période (1–366 j / plage custom) : KPIs rapports ; sinon stats globales en secours.
       rides: kpis?.totalRides ?? rideStats.rides ?? 0,
       completedRides: kpis?.completedRides ?? rideStats.completed ?? 0,
       revenueCdf: kpis?.totalRevenueCdf ?? rideStats.revenueCdf ?? 0,
@@ -250,9 +254,12 @@ export class AdminService {
     };
   }
 
-  getReports(days = 30, city?: string | null) {
-    const params = new URLSearchParams({ days: String(days) });
+  getReports(days = 30, city?: string | null, range?: { from?: string; to?: string }) {
+    const reportDays = Math.min(366, Math.max(1, Math.floor(Number(days)) || 30));
+    const params = new URLSearchParams({ days: String(reportDays) });
     if (city?.trim()) params.set('city', city.trim());
+    if (range?.from?.trim()) params.set('from', range.from.trim());
+    if (range?.to?.trim()) params.set('to', range.to.trim());
     return this.fetchJson('ride', `/internal/rides/reports?${params}`);
   }
 

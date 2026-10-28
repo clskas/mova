@@ -777,4 +777,22 @@ describe('RidesService', () => {
     expect(report.kpis.deliveryRevenueCdf).toBe(5000);
     expect(report.kpis.totalDeliveries).toBe(4);
   });
+
+  it('getReportAnalytics accepts a custom from/to range', async () => {
+    prisma.ride.findMany.mockResolvedValue([]);
+    prisma.delivery.findMany.mockResolvedValue([]);
+    prisma.errandOrder.findMany.mockResolvedValue([]);
+    prisma.movingRequest.count.mockResolvedValue(0);
+    prisma.scheduledRide.count.mockResolvedValue(0);
+    prisma.carpoolTrip.count.mockResolvedValue(0);
+
+    const report = await service.getReportAnalytics(30, null, {
+      from: '2026-10-01',
+      to: '2026-10-07',
+    });
+    expect(report.periodFrom).toBe('2026-10-01');
+    expect(report.periodTo).toBe('2026-10-07');
+    expect(report.periodDays).toBe(7);
+    expect(report.daily).toHaveLength(7);
+  });
 });

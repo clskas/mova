@@ -101,7 +101,7 @@ describe('UsersService owner lock', () => {
     const result = await service.listUsers(0, 50);
     expect(prisma.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { AND: [{ id: { notIn: ['bot-1'] } }] },
+        where: { id: { notIn: ['bot-1'] } },
       }),
     );
     expect(result.total).toBe(1);

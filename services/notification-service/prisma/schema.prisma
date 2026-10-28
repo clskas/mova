@@ -34,3 +34,20 @@ model PushDevice {
   @@index([userId])
   @@map("push_devices")
 }
+
+/// File d’alertes ops (admin console) — distinct des notifications utilisateur mobile.
+model StaffAlert {
+  id         String    @id @default(uuid())
+  severity   String    @default("INFO")
+  title      String
+  body       String
+  city       String?
+  href       String?
+  targetRole String?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([readAt, createdAt])
+  @@map("staff_alerts")
+}

@@ -4,6 +4,7 @@ import { UserRole, UserStatus } from '@prisma/client';
 import { IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { UsersService } from '../users/users.service';
 import { AuthService } from '../auth/auth.service';
+import { ModerationService } from '../moderation/moderation.service';
 import { InternalApiGuard } from '../common/internal-api.guard';
 
 class CreateUserAdminDto {
@@ -52,7 +53,11 @@ class IssueLoginPinDto {
 @Controller('internal')
 @UseGuards(InternalApiGuard)
 export class InternalController {
-  constructor(private users: UsersService, private auth: AuthService) {}
+  constructor(
+    private users: UsersService,
+    private auth: AuthService,
+    private moderation: ModerationService,
+  ) {}
   @Get('users/count')
   async count(
     @Query('from') from?: string,
@@ -168,5 +173,101 @@ export class InternalController {
   @Post('users/:id/notify')
   notifyUser(@Param('id') id: string, @Body() dto: NotifyUserDto) {
     return this.auth.notifyUser(id, dto);
+  }
+
+  @Post('audit')
+  writeAudit(
+    @Body()
+    body: {
+      actorUserId?: string;
+      action?: string;
+      resourceType?: string;
+      resourceId?: string;
+      meta?: Record<string, unknown>;
+      ip?: string;
+    },
+  ) {
+    return this.moderation.writeAudit({
+      actorUserId: body.actorUserId ?? 'system',
+      action: body.action ?? 'UNKNOWN',
+      resourceType: body.resourceType ?? 'unknown',
+      resourceId: body.resourceId,
+      meta: body.meta,
+      ip: body.ip,
+    });
+  }
+
+  @Get('audit')
+  listAudit(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('actorUserId') actorUserId?: string,
+    @Query('action') action?: string,
+    @Query('resourceType') resourceType?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.moderation.listAudit({
+      skip: Number(skip ?? 0),
+      take: Number(take ?? 50),
+      actorUserId,
+      action,
+      resourceType,
+      from,
+      to,
+    });
+  }
+
+  @Get('blacklist')
+  listBlacklist(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('type') type?: string,
+    @Query('q') q?: string,
+    @Query('activeOnly') activeOnly?: string,
+  ) {
+    return this.moderation.listBlacklist({
+      skip: Number(skip ?? 0),
+      take: Number(take ?? 50),
+      type,
+      q,
+      activeOnly: activeOnly !== 'false' && activeOnly !== '0',
+    });
+  }
+
+  @Post('blacklist')
+  upsertBlacklist(
+    @Body()
+    body: {
+      type?: string;
+      value?: string;
+      reason?: string;
+      expiresAt?: string | null;
+      createdBy?: string;
+      active?: boolean;
+    },
+  ) {
+    return this.moderation.upsertBlacklist({
+      type: body.type ?? 'PHONE',
+      value: body.value ?? '',
+      reason: body.reason ?? '',
+      expiresAt: body.expiresAt,
+      createdBy: body.createdBy,
+      active: body.active,
+    });
+  }
+
+  @Post('blacklist/:id/deactivate')
+  deactivateBlacklist(@Param('id') id: string) {
+    return this.moderation.deactivateBlacklist(id);
+  }
+
+  @Get('blacklist/check')
+  checkBlacklist(
+    @Query('phone') phone?: string,
+    @Query('email') email?: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.moderation.isBlocked({ phone, email, userId });
   }
 }

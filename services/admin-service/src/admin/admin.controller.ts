@@ -9,6 +9,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { resolveManagedCityScope, resolveCityFilterList, type AdminJwtUser } from '../common/city-scope.util';
 import { AdminService } from './admin.service';
 import { FraudService } from './fraud.service';
+import { OpsService } from './ops.service';
 
 class ApproveKycDto {
   @ApiProperty() @IsBoolean() approved: boolean;
@@ -103,7 +104,11 @@ class DriverOperatingCityDto {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminController {
-  constructor(private adminService: AdminService, private fraudService: FraudService) {}
+  constructor(
+    private adminService: AdminService,
+    private fraudService: FraudService,
+    private opsService: OpsService,
+  ) {}
 
   /** Assign / mark-paid reserved for platform operators (not SUPPORT / CITY_ADMIN). */
   private assertOpsAdmin(user: AdminJwtUser) {
@@ -1612,5 +1617,187 @@ export class AdminController {
     @Query('take') take?: string,
   ) {
     return this.adminService.listSubscribers({ planId, status, skip: Number(skip ?? 0), take: Number(take ?? 50) });
+  }
+
+  /* ─── Ops suite (inbox, search, map, audit, blacklist, SLA, P&L, alerts) ─── */
+
+  @Get('inbox')
+  @RequirePermissions(AdminPermission.METRICS_READ)
+  @ApiOperation({ summary: 'File ops unifiée À traiter' })
+  inbox(@Request() req: { user: AdminJwtUser }, @Query('city') city?: string) {
+    const scoped = resolveManagedCityScope(req.user) ?? city;
+    return this.opsService.getInbox(scoped);
+  }
+
+  @Get('search')
+  @RequirePermissions(AdminPermission.METRICS_READ)
+  @ApiOperation({ summary: 'Recherche globale admin' })
+  search(@Request() req: { user: AdminJwtUser }, @Query('q') q?: string, @Query('city') city?: string) {
+    const scoped = resolveManagedCityScope(req.user) ?? city;
+    return this.opsService.globalSearch(q ?? '', scoped);
+  }
+
+  @Get('fleet-map')
+  @RequirePermissions(AdminPermission.DRIVERS_READ)
+  @ApiOperation({ summary: 'Carte flotte + SOS' })
+  fleetMap(@Request() req: { user: AdminJwtUser }, @Query('city') city?: string) {
+    const scoped = resolveManagedCityScope(req.user) ?? city;
+    return this.opsService.fleetMap(scoped);
+  }
+
+  @Get('drivers/:userId/score')
+  @RequirePermissions(AdminPermission.DRIVERS_READ)
+  @ApiOperation({ summary: 'Score chauffeur enrichi' })
+  driverScore(@Param('userId') userId: string) {
+    return this.opsService.driverScore(userId);
+  }
+
+  @Get('partner-sla')
+  @RequirePermissions(AdminPermission.RESTAURANTS_READ)
+  @ApiOperation({ summary: 'SLA partenaires' })
+  partnerSla(
+    @Request() req: { user: AdminJwtUser },
+    @Query('city') city?: string,
+    @Query('days') days?: string,
+  ) {
+    const scoped = resolveManagedCityScope(req.user) ?? city;
+    return this.opsService.partnerSla(scoped, Number(days ?? 30));
+  }
+
+  @Get('pnl')
+  @RequirePermissions(AdminPermission.METRICS_READ)
+  @ApiOperation({ summary: 'P&L / commissions' })
+  pnl(
+    @Request() req: { user: AdminJwtUser },
+    @Query('days') days?: string,
+    @Query('city') city?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const scoped = resolveManagedCityScope(req.user) ?? city;
+    return this.opsService.pnl(Number(days ?? 30), scoped, { from, to });
+  }
+
+  @Get('audit')
+  @RequirePermissions(AdminPermission.USERS_READ)
+  @ApiOperation({ summary: 'Journal d’audit admin' })
+  audit(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('actorUserId') actorUserId?: string,
+    @Query('action') action?: string,
+    @Query('resourceType') resourceType?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const qs = new URLSearchParams({ skip: String(skip ?? 0), take: String(take ?? 50) });
+    if (actorUserId) qs.set('actorUserId', actorUserId);
+    if (action) qs.set('action', action);
+    if (resourceType) qs.set('resourceType', resourceType);
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+    return this.opsService.listAudit(qs);
+  }
+
+  @Get('blacklist')
+  @RequirePermissions(AdminPermission.USERS_READ)
+  @ApiOperation({ summary: 'Liste noire' })
+  blacklist(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('type') type?: string,
+    @Query('q') q?: string,
+    @Query('activeOnly') activeOnly?: string,
+  ) {
+    const qs = new URLSearchParams({ skip: String(skip ?? 0), take: String(take ?? 50) });
+    if (type) qs.set('type', type);
+    if (q) qs.set('q', q);
+    if (activeOnly) qs.set('activeOnly', activeOnly);
+    return this.opsService.listBlacklist(qs);
+  }
+
+  @Post('blacklist')
+  @RequirePermissions(AdminPermission.USERS_WRITE)
+  @ApiOperation({ summary: 'Ajouter / mettre à jour entrée liste noire' })
+  upsertBlacklist(@Request() req: { user: AdminJwtUser }, @Body() body: Record<string, unknown>) {
+    return this.opsService.upsertBlacklist(body, String(req.user.id ?? 'admin'));
+  }
+
+  @Post('blacklist/:id/deactivate')
+  @RequirePermissions(AdminPermission.USERS_WRITE)
+  @ApiOperation({ summary: 'Désactiver entrée liste noire' })
+  deactivateBlacklist(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    return this.opsService.deactivateBlacklist(id, String(req.user.id ?? 'admin'));
+  }
+
+  @Get('staff-alerts')
+  @RequirePermissions(AdminPermission.METRICS_READ)
+  @ApiOperation({ summary: 'Alertes staff' })
+  staffAlerts(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('unreadOnly') unreadOnly?: string,
+    @Query('city') city?: string,
+  ) {
+    const qs = new URLSearchParams({ skip: String(skip ?? 0), take: String(take ?? 50) });
+    if (unreadOnly) qs.set('unreadOnly', unreadOnly);
+    if (city) qs.set('city', city);
+    return this.opsService.listStaffAlerts(qs);
+  }
+
+  @Post('staff-alerts/evaluate')
+  @RequirePermissions(AdminPermission.METRICS_READ)
+  @ApiOperation({ summary: 'Évaluer règles d’alertes proactives' })
+  evaluateAlerts(@Request() req: { user: AdminJwtUser }, @Query('city') city?: string) {
+    const scoped = resolveManagedCityScope(req.user) ?? city;
+    return this.opsService.evaluateAlerts(scoped);
+  }
+
+  @Patch('staff-alerts/read-all')
+  @RequirePermissions(AdminPermission.METRICS_READ)
+  markAllStaffAlertsRead() {
+    return this.opsService.markAllStaffAlertsRead();
+  }
+
+  @Patch('staff-alerts/:id/read')
+  @RequirePermissions(AdminPermission.METRICS_READ)
+  markStaffAlertRead(@Param('id') id: string) {
+    return this.opsService.markStaffAlertRead(id);
+  }
+
+  @Post('bulk/drivers/operating-city')
+  @RequirePermissions(AdminPermission.DRIVERS_WRITE)
+  @ApiOperation({ summary: 'Bulk: ville d’opération chauffeurs' })
+  bulkDriverCity(
+    @Request() req: { user: AdminJwtUser },
+    @Body() body: { userIds?: string[]; operatingCity?: string },
+  ) {
+    return this.opsService.bulkDriverCity(
+      body.userIds ?? [],
+      body.operatingCity ?? '',
+      String(req.user.id ?? 'admin'),
+    );
+  }
+
+  @Post('bulk/kyc/review')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: 'Bulk: revue KYC chauffeurs' })
+  bulkKyc(
+    @Request() req: { user: AdminJwtUser },
+    @Body() body: { userIds?: string[]; approved?: boolean; notes?: string },
+  ) {
+    return this.opsService.bulkKycReview(
+      body.userIds ?? [],
+      body.approved === true,
+      body.notes,
+      String(req.user.id ?? 'admin'),
+    );
+  }
+
+  @Post('bulk/users/suspend')
+  @RequirePermissions(AdminPermission.USERS_WRITE)
+  @ApiOperation({ summary: 'Bulk: suspendre utilisateurs' })
+  bulkSuspend(@Request() req: { user: AdminJwtUser }, @Body() body: { userIds?: string[] }) {
+    return this.opsService.bulkSuspendUsers(body.userIds ?? [], String(req.user.id ?? 'admin'));
   }
 }

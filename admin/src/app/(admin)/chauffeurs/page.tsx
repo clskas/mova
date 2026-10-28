@@ -6,6 +6,7 @@ import {
   activationPinSmsCopy,
   apiFetch,
   fetchDriverDetail,
+  fetchDriverScore,
   fetchDrivers,
   MOVA_CITIES,
   purgeDriverProfile,
@@ -21,6 +22,7 @@ import {
   type AdminDriverDetail,
   type DriverServiceMode,
 } from "@/lib/api";
+import { downloadCsv } from "@/lib/export-csv";
 import { useAdmin } from "@/components/AdminProvider";
 import { AuthenticatedMedia, resolveMediaUrl } from "@/components/AuthenticatedMedia";
 import { PeriodFilterBar } from "@/components/PeriodFilterBar";
@@ -35,6 +37,7 @@ import {
 } from "@/lib/period-filter";
 import {
   BtnDanger,
+  BtnGhost,
   BtnSuccess,
   Card,
   ConfirmDialog,
@@ -216,6 +219,7 @@ export default function ChauffeursPage() {
   const [vehicleTypeRejectNotes, setVehicleTypeRejectNotes] = useState("");
   const [selectedVehicleType, setSelectedVehicleType] = useState("");
   const [editOperatingCity, setEditOperatingCity] = useState("");
+  const [driverScore, setDriverScore] = useState<{ score: number; band: string; cancelRate: number } | null>(null);
 
   const scopedCity =
     role === "CITY_ADMIN" ? (user?.managedCity?.trim() || "") : cityFilter.trim();
@@ -253,12 +257,16 @@ export default function ChauffeursPage() {
       setActivationPin(null);
       setSmsNotice(null);
       setEditOperatingCity("");
+      setDriverScore(null);
       return;
     }
     let cancelled = false;
     setDetailLoading(true);
-    fetchDriverDetail(selectedId)
-      .then((d) => {
+    Promise.all([
+      fetchDriverDetail(selectedId),
+      fetchDriverScore(selectedId).catch(() => null),
+    ])
+      .then(([d, score]) => {
         if (!cancelled) {
           setDetail(d);
           setEditOperatingCity(d.operatingCity?.trim() || "");
@@ -267,6 +275,7 @@ export default function ChauffeursPage() {
           setVehicleTypeRejectNotes("");
           if (d.activationPin) setActivationPin(d.activationPin);
           else setActivationPin(null);
+          setDriverScore(score ? { score: score.score, band: score.band, cancelRate: score.cancelRate } : null);
         }
       })
       .catch((e) => {
@@ -546,6 +555,28 @@ export default function ChauffeursPage() {
       <PageHeader
         title="Chauffeurs"
         subtitle={readOnly ? "Consultation profils chauffeurs" : "Profils véhicule / KYC — distincts des comptes de connexion"}
+        action={
+          <BtnGhost
+            onClick={() =>
+              downloadCsv(
+                "senga-chauffeurs.csv",
+                ["UserId", "PublicId", "Nom", "Tél", "Ville", "KYC", "Disponible"],
+                filtered.map((d) => [
+                  d.userId,
+                  d.publicId ?? "",
+                  `${d.firstName ?? ""} ${d.lastName ?? ""}`.trim(),
+                  d.phone ?? "",
+                  d.operatingCity ?? "",
+                  d.kycStatus ?? "",
+                  d.isAvailable ? "oui" : "non",
+                ]),
+              )
+            }
+            disabled={filtered.length === 0}
+          >
+            Export CSV
+          </BtnGhost>
+        }
       />
       <p className="text-sm text-gray-600 mb-4">
         <strong>Chauffeurs</strong> = dossier véhicule et KYC. <strong>Utilisateurs</strong> = comptes de connexion.
@@ -740,6 +771,13 @@ export default function ChauffeursPage() {
               <p><span className="text-gray-500">Documents:</span> {selected.kycDocumentsUploaded ?? 0}/{selected.kycDocumentsRequired ?? 6} obligatoires</p>
               <p><span className="text-gray-500">PIN activé:</span> {selected.activationPinVerified ? "Oui" : "Non"}</p>
               <p><span className="text-gray-500">Note:</span> {selected.ratingAvg?.toFixed(1)} / 5</p>
+              {driverScore && (
+                <p>
+                  <span className="text-gray-500">Score SENGA:</span>{" "}
+                  <span className="font-semibold tabular-nums">{driverScore.score}</span>
+                  <span className="text-xs text-gray-500"> / 100 · {driverScore.band} · annul. {driverScore.cancelRate}%</span>
+                </p>
+              )}
               <p><span className="text-gray-500">Courses:</span> {selected.totalRides}</p>
               <p><span className="text-gray-500">Permis:</span> {selected.licenseNumber ?? "—"}</p>
               {detail?.licenseExpiry != null && (

@@ -3,16 +3,24 @@ export type AdminRole = "SUPER_ADMIN" | "ADMIN" | "SUPPORT" | "FINANCE" | "CONTE
 
 export type AdminSection =
   | "dashboard"
+  | "inbox"
   | "utilisateurs"
   | "chauffeurs"
   | "kyc"
+  | "carte"
   | "courses"
   | "livraisons"
   | "restaurants"
+  | "sla"
+  | "campagnes"
   | "tarifs"
   | "regles"
   | "litiges"
   | "fraude"
+  | "blacklist"
+  | "audit"
+  | "alertes-staff"
+  | "pnl"
   | "planifiees"
   | "abonnements"
   | "promos"
@@ -42,18 +50,26 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
 /** Niveaux d’accès éditables (alignés @mova/shared ADMIN_ACCESS_LEVELS). */
 export const ACCESS_LEVEL_OPTIONS: { id: string; label: string; sections: AdminSection[] }[] = [
   { id: "dashboard", label: "Tableau de bord", sections: ["dashboard"] },
+  { id: "inbox", label: "À traiter", sections: ["inbox"] },
   { id: "utilisateurs", label: "Utilisateurs", sections: ["utilisateurs"] },
   { id: "chauffeurs", label: "Chauffeurs", sections: ["chauffeurs"] },
   { id: "kyc", label: "KYC", sections: ["kyc"] },
+  { id: "carte", label: "Carte flotte", sections: ["carte"] },
   { id: "courses", label: "Courses", sections: ["courses"] },
   { id: "livraisons", label: "Livraisons", sections: ["livraisons"] },
   { id: "restaurants", label: "Partenaires", sections: ["restaurants"] },
+  { id: "sla", label: "SLA partenaires", sections: ["sla"] },
+  { id: "campagnes", label: "Campagnes promo", sections: ["campagnes"] },
   { id: "tarifs", label: "Tarifs", sections: ["tarifs"] },
   { id: "regles", label: "Règles plateforme", sections: ["regles"] },
   { id: "zones", label: "Zones géographiques", sections: ["parametres"] },
   { id: "lieux", label: "Lieux et POI", sections: ["lieux"] },
   { id: "litiges", label: "Litiges / SOS", sections: ["litiges"] },
   { id: "fraude", label: "Fraude", sections: ["fraude"] },
+  { id: "blacklist", label: "Liste noire", sections: ["blacklist"] },
+  { id: "audit", label: "Journal d’audit", sections: ["audit"] },
+  { id: "alertes-staff", label: "Alertes staff", sections: ["alertes-staff"] },
+  { id: "pnl", label: "P&L / commissions", sections: ["pnl"] },
   { id: "planifiees", label: "Courses planifiées", sections: ["planifiees"] },
   { id: "locations", label: "Locations", sections: ["locations"] },
   { id: "demenagements", label: "Déménagements", sections: ["demenagements"] },
@@ -71,16 +87,24 @@ export const ACCESS_LEVEL_OPTIONS: { id: string; label: string; sections: AdminS
 
 const ALL_SECTIONS: AdminSection[] = [
   "dashboard",
+  "inbox",
   "utilisateurs",
   "chauffeurs",
   "kyc",
+  "carte",
   "courses",
   "livraisons",
   "restaurants",
+  "sla",
+  "campagnes",
   "tarifs",
   "regles",
   "litiges",
   "fraude",
+  "blacklist",
+  "audit",
+  "alertes-staff",
+  "pnl",
   "planifiees",
   "abonnements",
   "promos",
@@ -102,11 +126,14 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
   SUPER_ADMIN: ALL_SECTIONS,
   ADMIN: ALL_SECTIONS.filter((s) => s !== "systeme" && s !== "privacy"),
   SUPPORT: [
+    "inbox",
     "utilisateurs",
     "chauffeurs",
     "kyc",
+    "carte",
     "litiges",
     "fraude",
+    "alertes-staff",
     "courses",
     "livraisons",
     "planifiees",
@@ -114,23 +141,28 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
     "demenagements",
     "covoiturage",
   ],
-  FINANCE: ["dashboard", "portefeuille", "tarifs", "regles", "abonnements", "promos"],
-  CONTENT: ["restaurants", "tarifs", "parametres", "lieux", "locations", "publicites"],
+  FINANCE: ["dashboard", "pnl", "portefeuille", "tarifs", "regles", "abonnements", "promos", "campagnes"],
+  CONTENT: ["restaurants", "sla", "campagnes", "tarifs", "parametres", "lieux", "locations", "publicites"],
   CITY_ADMIN: [
     "dashboard",
+    "inbox",
     "utilisateurs",
     "chauffeurs",
     "kyc",
+    "carte",
     "courses",
     "livraisons",
     "restaurants",
+    "sla",
     "litiges",
+    "alertes-staff",
     "planifiees",
     "locations",
     "demenagements",
     "covoiturage",
     "tarifs",
     "promos",
+    "campagnes",
     "regles",
     "parametres",
     "lieux",
@@ -141,21 +173,26 @@ const ROLE_SECTIONS: Record<AdminRole, AdminSection[]> = {
 const ROLE_WRITE: Record<AdminRole, AdminSection[]> = {
   SUPER_ADMIN: ALL_SECTIONS,
   ADMIN: ALL_SECTIONS.filter((s) => s !== "portefeuille" && s !== "systeme" && s !== "privacy"),
-  SUPPORT: ["kyc", "litiges", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage"],
-  FINANCE: ["tarifs", "regles", "abonnements", "promos", "portefeuille"],
-  CONTENT: ["restaurants", "locations", "publicites"],
+  SUPPORT: ["inbox", "kyc", "litiges", "courses", "livraisons", "planifiees", "locations", "demenagements", "covoiturage", "alertes-staff"],
+  FINANCE: ["tarifs", "regles", "abonnements", "promos", "campagnes", "portefeuille", "pnl"],
+  CONTENT: ["restaurants", "sla", "campagnes", "locations", "publicites"],
   CITY_ADMIN: [
     "dashboard",
+    "inbox",
     "chauffeurs",
     "kyc",
+    "carte",
     "courses",
     "livraisons",
     "restaurants",
+    "sla",
     "litiges",
+    "alertes-staff",
     "locations",
     "demenagements",
     "tarifs",
     "promos",
+    "campagnes",
     "regles",
     "parametres",
     "lieux",
@@ -171,9 +208,11 @@ export type NavItem = {
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Tableau de bord", short: "Accueil", section: "dashboard" },
+  { href: "/a-traiter", label: "À traiter", short: "Inbox", section: "inbox" },
   { href: "/utilisateurs", label: "Utilisateurs", short: "Utilis.", section: "utilisateurs" },
   { href: "/chauffeurs", label: "Chauffeurs", short: "Chauff.", section: "chauffeurs" },
   { href: "/kyc", label: "KYC", short: "KYC", section: "kyc" },
+  { href: "/carte", label: "Carte flotte", short: "Carte", section: "carte" },
   { href: "/contacts", label: "Contacts", short: "Contacts", section: "contacts" },
   { href: "/cgu", label: "CGU", short: "CGU", section: "cgu" },
   { href: "/privacy", label: "Confidentialité", short: "Priv.", section: "privacy" },
@@ -185,13 +224,19 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/courses", label: "Courses", short: "Courses", section: "courses" },
   { href: "/livraisons", label: "Livraisons", short: "Livr.", section: "livraisons" },
   { href: "/restaurants", label: "Partenaires", short: "Parten.", section: "restaurants" },
+  { href: "/sla-partenaires", label: "SLA partenaires", short: "SLA", section: "sla" },
+  { href: "/campagnes", label: "Campagnes promo", short: "Promo", section: "campagnes" },
   { href: "/publicites", label: "Publicités", short: "Pubs", section: "publicites" },
   { href: "/tarifs", label: "Tarifs", short: "Tarifs", section: "tarifs" },
   { href: "/regles-plateforme", label: "Règles plateforme", short: "Règles", section: "regles" },
   { href: "/abonnements", label: "Abonnements", short: "Abos", section: "abonnements" },
+  { href: "/pnl", label: "P&L / commissions", short: "P&L", section: "pnl" },
   { href: "/portefeuille", label: "Portefeuille", short: "Portef.", section: "portefeuille" },
   { href: "/litiges", label: "Litiges", short: "Litiges", section: "litiges" },
   { href: "/fraude", label: "Fraude", short: "Fraude", section: "fraude" },
+  { href: "/blacklist", label: "Liste noire", short: "Blacklist", section: "blacklist" },
+  { href: "/alertes-staff", label: "Alertes staff", short: "Alertes", section: "alertes-staff" },
+  { href: "/audit", label: "Journal d’audit", short: "Audit", section: "audit" },
   { href: "/planifiees", label: "Planifiées", short: "Planif.", section: "planifiees" },
   { href: "/parametres", label: "Zones géographiques", short: "Zones", section: "parametres" },
   { href: "/lieux", label: "Lieux & POI", short: "Lieux", section: "lieux" },

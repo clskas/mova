@@ -62,6 +62,7 @@ import {
 import { hashOtpCode } from './otp-code.util';
 import { GoogleIdentity, GoogleTokenVerifier } from './google-id-token';
 import { AppleIdentity, AppleNameHint, AppleTokenVerifier } from './apple-id-token';
+import { ModerationService } from '../moderation/moderation.service';
 
 const PIN_FAIL_PREFIX = 'auth:pin:fail:';
 const PIN_FAIL_MAX = 5;
@@ -145,7 +146,24 @@ export class AuthService {
     private appleTokens: AppleTokenVerifier,
     private emailOtp: EmailOtpMailer,
     @Optional() private users?: UsersService,
+    @Optional() private moderation?: ModerationService,
   ) {}
+
+  private async assertNotBlacklisted(opts: {
+    phone?: string | null;
+    email?: string | null;
+    userId?: string | null;
+  }) {
+    if (!this.moderation) return;
+    const hit = await this.moderation.isBlocked(opts);
+    if (hit.blocked) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        `Accès refusé (liste noire) : ${hit.reason}`,
+      );
+    }
+  }
 
   /** Prefer User.email; recover Google mailbox when wiped (same as Utilisateurs list). */
   private async resolveContactEmail(userId: string, fallback?: string | null): Promise<string> {
@@ -475,11 +493,14 @@ export class AuthService {
     const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
     const parsed = parseLoginHandle(phone);
     if (parsed?.kind === 'email') {
+      await this.assertNotBlacklisted({ email: parsed.value });
       return this.verifyEmailOtp(parsed.value, code, requestedRole);
     }
     const normalized = await this.consumeValidOtp(phone, code);
+    await this.assertNotBlacklisted({ phone: normalized });
 
     let user = await this.prisma.user.findUnique({ where: { phone: normalized } });
+    if (user) await this.assertNotBlacklisted({ userId: user.id, phone: user.phone, email: user.email });
     let isNew = false;
     if (!user) {
       if (isDemoUserInsertForbidden(normalized)) {

@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { resolveJwtSecret } from '@mova/shared';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UsersModule } from '../users/users.module';
+import { ModerationModule } from '../moderation/moderation.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { SmsInternalController } from './sms-internal.controller';
@@ -25,6 +26,7 @@ import {
   imports: [
     PrismaModule,
     UsersModule,
+    ModerationModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

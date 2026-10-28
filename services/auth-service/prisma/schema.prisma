@@ -64,3 +64,45 @@ model OtpCode {
   @@index([phone])
   @@map("otp_codes")
 }
+
+enum BlacklistType {
+  PHONE
+  EMAIL
+  USER_ID
+  DEVICE
+  PLATE
+}
+
+/// Blocages identité (login / accès) — distinct du statut SUSPENDED.
+model BlacklistEntry {
+  id        String        @id @default(uuid())
+  type      BlacklistType
+  value     String
+  reason    String
+  expiresAt DateTime?
+  active    Boolean       @default(true)
+  createdBy String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([type, value])
+  @@index([active, type])
+  @@map("blacklist_entries")
+}
+
+/// Journal des actions admin (KYC, suspend, tarifs, blacklist, etc.).
+model AdminAuditLog {
+  id           String   @id @default(uuid())
+  actorUserId  String
+  action       String
+  resourceType String
+  resourceId   String?
+  meta         Json?
+  ip           String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([resourceType, resourceId])
+  @@map("admin_audit_logs")
+}

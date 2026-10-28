@@ -29,15 +29,17 @@ import {
   CguIcon,
 } from "@/components/AdminIcons";
 import { DemoBadge } from "@/components/ui";
-import { checkGatewayHealth } from "@/lib/api";
+import { checkGatewayHealth, fetchAdminSearch } from "@/lib/api";
 import { clearToken, getToken, managedCityFromToken } from "@/lib/auth";
 import { navForRole, ROLE_LABELS, roleBadgeClass, canWriteSection, type NavItem } from "@/lib/rbac";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/": MetricsIcon,
+  "/a-traiter": IncidentsIcon,
   "/utilisateurs": UsersIcon,
   "/chauffeurs": DriversIcon,
   "/kyc": KycIcon,
+  "/carte": DriversIcon,
   "/contacts": ContactsIcon,
   "/cgu": CguIcon,
   "/privacy": CguIcon,
@@ -49,13 +51,19 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/courses": RidesIcon,
   "/livraisons": DeliveriesIcon,
   "/restaurants": RestaurantsIcon,
+  "/sla-partenaires": RestaurantsIcon,
+  "/campagnes": PublicitesIcon,
   "/publicites": PublicitesIcon,
   "/tarifs": PricingIcon,
   "/regles-plateforme": PricingIcon,
   "/abonnements": SubscriptionIcon,
+  "/pnl": WalletIcon,
   "/portefeuille": WalletIcon,
   "/litiges": IncidentsIcon,
   "/fraude": FraudIcon,
+  "/blacklist": FraudIcon,
+  "/alertes-staff": IncidentsIcon,
+  "/audit": SettingsIcon,
   "/planifiees": CalendarIcon,
   "/parametres": SettingsIcon,
   "/lieux": SettingsIcon,
@@ -67,7 +75,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 /** Preferred shortcuts for the phone bottom bar (first matches in role nav). */
-const MOBILE_PRIMARY_HREFS = ["/", "/courses", "/chauffeurs", "/kyc", "/livraisons", "/restaurants"];
+const MOBILE_PRIMARY_HREFS = ["/", "/a-traiter", "/courses", "/chauffeurs", "/kyc", "/livraisons"];
 
 function MenuIcon({ className }: { className?: string }) {
   return (
@@ -81,6 +89,14 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [demo, setDemo] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchHits, setSearchHits] = useState<{
+    users: { id: string; phone?: string | null; firstName?: string | null; lastName?: string | null; role?: string }[];
+    drivers: { userId: string; publicId?: string; firstName?: string | null; lastName?: string | null; phone?: string | null }[];
+    restaurants: { id: string; name: string }[];
+  } | null>(null);
+  const [searching, setSearching] = useState(false);
   const { role, loading, user, accessLevelIds } = useAdmin();
   const managedCity = user?.managedCity?.trim() || managedCityFromToken() || null;
 
@@ -124,6 +140,29 @@ function ShellInner({ children }: { children: React.ReactNode }) {
     clearToken();
     window.location.href = "/login";
   }
+
+  useEffect(() => {
+    const q = searchQ.trim();
+    if (q.length < 2) {
+      setSearchHits(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      setSearching(true);
+      fetchAdminSearch(q, role === "CITY_ADMIN" ? managedCity : null)
+        .then((res) => {
+          setSearchHits({
+            users: res.users ?? [],
+            drivers: res.drivers ?? [],
+            restaurants: (res.restaurants ?? []).map((r) => ({ id: r.id, name: r.name })),
+          });
+          setSearchOpen(true);
+        })
+        .catch(() => setSearchHits(null))
+        .finally(() => setSearching(false));
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchQ, role, managedCity]);
 
   return (
     <div className="min-h-screen flex overflow-x-hidden">
@@ -210,8 +249,58 @@ function ShellInner({ children }: { children: React.ReactNode }) {
                 )}
               </div>
             </div>
-            <div className="hidden lg:block text-sm text-[var(--mova-muted)]">
-              {user?.firstName ? `${user.firstName} ${user.lastName ?? ""}` : "Console SENGA"}
+            <div className="hidden lg:flex flex-1 max-w-md mx-4 relative">
+              <input
+                type="search"
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                onFocus={() => searchHits && setSearchOpen(true)}
+                placeholder="Recherche (tél, nom, plaque, ID…)"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400"
+              />
+              {searchOpen && searchQ.trim().length >= 2 && (
+                <div className="absolute top-full left-0 right-0 mt-1 rounded-xl border border-gray-200 bg-white shadow-lg z-50 max-h-80 overflow-y-auto text-sm">
+                  {searching && <p className="p-3 text-gray-400">Recherche…</p>}
+                  {!searching && searchHits && (
+                    <>
+                      {searchHits.users.slice(0, 5).map((u) => (
+                        <Link
+                          key={u.id}
+                          href="/utilisateurs"
+                          className="block px-3 py-2 hover:bg-gray-50"
+                          onClick={() => setSearchOpen(false)}
+                        >
+                          Utilisateur · {[u.firstName, u.lastName].filter(Boolean).join(" ") || u.phone || u.id.slice(0, 8)}
+                          {u.role ? ` (${u.role})` : ""}
+                        </Link>
+                      ))}
+                      {searchHits.drivers.slice(0, 5).map((d) => (
+                        <Link
+                          key={d.userId}
+                          href="/chauffeurs"
+                          className="block px-3 py-2 hover:bg-gray-50"
+                          onClick={() => setSearchOpen(false)}
+                        >
+                          Chauffeur · {[d.firstName, d.lastName].filter(Boolean).join(" ") || d.publicId || d.phone || d.userId.slice(0, 8)}
+                        </Link>
+                      ))}
+                      {searchHits.restaurants.slice(0, 5).map((r) => (
+                        <Link
+                          key={r.id}
+                          href="/restaurants"
+                          className="block px-3 py-2 hover:bg-gray-50"
+                          onClick={() => setSearchOpen(false)}
+                        >
+                          Partenaire · {r.name}
+                        </Link>
+                      ))}
+                      {!searchHits.users.length && !searchHits.drivers.length && !searchHits.restaurants.length && (
+                        <p className="p-3 text-gray-400">Aucun résultat</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex items-center justify-end gap-2 sm:gap-2.5 shrink-0">
               {role && (

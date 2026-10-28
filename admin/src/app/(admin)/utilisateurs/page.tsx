@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   activationPinSmsCopy,
+  bulkSuspendUsers,
   createUser,
   deactivateUser as deactivateUserApi,
   fetchCities,
@@ -18,6 +19,7 @@ import {
   type AdminCity,
   type AdminUser,
 } from "@/lib/api";
+import { downloadCsv } from "@/lib/export-csv";
 import { userRoleDisplayLabel } from "@/lib/commerce-type";
 import { useAdmin } from "@/components/AdminProvider";
 import { PeriodFilterBar } from "@/components/PeriodFilterBar";
@@ -464,25 +466,58 @@ export default function UtilisateursPage() {
             : `Comptes de connexion (login) — ${total} au total. Les dossiers KYC chauffeur sont dans Chauffeurs.`
         }
         action={
-          !readOnly ? (
-            <div className="flex flex-wrap gap-2">
-              <BtnPrimary onClick={() => setCreateOpen(true)}>Nouveau compte</BtnPrimary>
-              {canPurge && (
-                <BtnGhost
-                  onClick={() => {
-                    setCreateRole("CITY_ADMIN");
-                    setCreateManagedCity("");
-                    setCreateIdentityMode("phone");
-                    setCreateEmail("");
-                    setCreatePhone("");
-                    setCreateOpen(true);
-                  }}
-                >
-                  + Admin ville
-                </BtnGhost>
-              )}
-            </div>
-          ) : undefined
+          <div className="flex flex-wrap gap-2">
+            <BtnGhost
+              onClick={() =>
+                downloadCsv(
+                  "senga-utilisateurs.csv",
+                  ["Id", "Nom", "Téléphone", "Rôle", "Statut", "Ville", "Créé"],
+                  users.map((u) => [
+                    u.id,
+                    formatUserName(u),
+                    u.phone ?? "",
+                    u.role ?? "",
+                    u.status ?? "",
+                    u.homeCity ?? u.managedCity ?? u.operatingCity ?? "",
+                    u.createdAt ?? "",
+                  ]),
+                )
+              }
+              disabled={users.length === 0}
+            >
+              Export CSV
+            </BtnGhost>
+            {!readOnly && (
+              <>
+                <BtnPrimary onClick={() => setCreateOpen(true)}>Nouveau compte</BtnPrimary>
+                {canPurge && (
+                  <BtnGhost
+                    onClick={() => {
+                      setCreateRole("CITY_ADMIN");
+                      setCreateManagedCity("");
+                      setCreateIdentityMode("phone");
+                      setCreateEmail("");
+                      setCreatePhone("");
+                      setCreateOpen(true);
+                    }}
+                  >
+                    + Admin ville
+                  </BtnGhost>
+                )}
+                {users.length > 0 && (
+                  <BtnGhost
+                    onClick={async () => {
+                      if (!window.confirm(`Suspendre les ${users.length} utilisateurs de cette page ?`)) return;
+                      await bulkSuspendUsers(users.map((u) => u.id));
+                      await load();
+                    }}
+                  >
+                    Suspendre page
+                  </BtnGhost>
+                )}
+              </>
+            )}
+          </div>
         }
       />
       <p className="text-sm text-gray-600 mb-4">

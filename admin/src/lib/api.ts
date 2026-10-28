@@ -3011,3 +3011,230 @@ export async function fetchUserWallet(userId: string): Promise<UserWalletDetail>
 export function assertAdminRole(role?: string | null): role is AdminRole {
   return isAdminRole(role);
 }
+
+/* ─── Ops suite ─── */
+
+export type OpsInboxItem = {
+  id: string;
+  kind: string;
+  priority: number;
+  title: string;
+  subtitle: string;
+  href: string;
+  createdAt?: string;
+};
+
+export async function fetchOpsInbox(city?: string | null) {
+  const qs = new URLSearchParams();
+  if (city?.trim()) qs.set("city", city.trim());
+  const q = qs.toString();
+  return apiFetch<{
+    items: OpsInboxItem[];
+    counts: Record<string, number>;
+    city?: string | null;
+    generatedAt?: string;
+  }>(`/api/admin/inbox${q ? `?${q}` : ""}`);
+}
+
+export async function fetchAdminSearch(q: string, city?: string | null) {
+  const params = new URLSearchParams({ q });
+  if (city?.trim()) params.set("city", city.trim());
+  return apiFetch<{
+    query: string;
+    users: AdminUser[];
+    drivers: AdminDriver[];
+    rides: Array<Record<string, unknown>>;
+    restaurants: Restaurant[];
+  }>(`/api/admin/search?${params}`);
+}
+
+export async function fetchFleetMap(city?: string | null) {
+  const qs = new URLSearchParams();
+  if (city?.trim()) qs.set("city", city.trim());
+  const q = qs.toString();
+  return apiFetch<{
+    drivers: Array<{
+      userId: string;
+      publicId?: string;
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      operatingCity?: string;
+      dutyStatus?: string;
+      isAvailable?: boolean;
+      lat: number;
+      lng: number;
+    }>;
+    sos: Array<{ id?: string; type?: string; lat: number; lng: number; description?: string }>;
+    counts: { online: number; totalWithGps: number; sos: number };
+    city?: string | null;
+  }>(`/api/admin/fleet-map${q ? `?${q}` : ""}`);
+}
+
+export async function fetchDriverScore(userId: string) {
+  return apiFetch<{
+    userId: string;
+    score: number;
+    ratingAvg: number;
+    totalRides: number;
+    cancelRate: number;
+    band: string;
+    documentsRenewalPending?: boolean;
+  }>(`/api/admin/drivers/${userId}/score`);
+}
+
+export async function fetchPartnerSla(city?: string | null, days = 30) {
+  const params = new URLSearchParams({ days: String(days) });
+  if (city?.trim()) params.set("city", city.trim());
+  return apiFetch<{
+    partners: Array<{
+      id?: string;
+      name?: string;
+      rating?: number | null;
+      orders: number;
+      cancelled: number;
+      cancelRate: number;
+      alert: boolean;
+      commerceType?: string;
+    }>;
+    counts: { total: number; alerts: number };
+  }>(`/api/admin/partner-sla?${params}`);
+}
+
+export async function fetchPnl(opts?: { days?: number; city?: string | null; from?: string | null; to?: string | null }) {
+  const params = new URLSearchParams({ days: String(opts?.days ?? 30) });
+  if (opts?.city?.trim()) params.set("city", opts.city.trim());
+  if (opts?.from?.trim()) params.set("from", opts.from.trim());
+  if (opts?.to?.trim()) params.set("to", opts.to.trim());
+  return apiFetch<{
+    revenueCdf: number;
+    platformCommissionCdf: number;
+    deliveryRevenueCdf: number;
+    rideRevenueCdf: number;
+    estimatedNetMarginCdf: number;
+    avgTicketCdf: number;
+    completedRides: number;
+    cancelledRides: number;
+    completionRate: number;
+    walletBalanceCdf: number;
+    commissionsByCity: Array<Record<string, unknown>>;
+    periodDays: number;
+  }>(`/api/admin/pnl?${params}`);
+}
+
+export async function fetchAuditLog(opts?: {
+  skip?: number;
+  take?: number;
+  action?: string;
+  from?: string;
+  to?: string;
+}) {
+  const params = new URLSearchParams({
+    skip: String(opts?.skip ?? 0),
+    take: String(opts?.take ?? 50),
+  });
+  if (opts?.action) params.set("action", opts.action);
+  if (opts?.from) params.set("from", opts.from);
+  if (opts?.to) params.set("to", opts.to);
+  return apiFetch<{
+    data: Array<{
+      id: string;
+      actorUserId: string;
+      action: string;
+      resourceType: string;
+      resourceId?: string | null;
+      createdAt: string;
+      meta?: unknown;
+    }>;
+    total: number;
+  }>(`/api/admin/audit?${params}`);
+}
+
+export async function fetchBlacklist(opts?: { skip?: number; take?: number; type?: string; q?: string }) {
+  const params = new URLSearchParams({
+    skip: String(opts?.skip ?? 0),
+    take: String(opts?.take ?? 50),
+  });
+  if (opts?.type) params.set("type", opts.type);
+  if (opts?.q) params.set("q", opts.q);
+  return apiFetch<{
+    data: Array<{
+      id: string;
+      type: string;
+      value: string;
+      reason: string;
+      active: boolean;
+      expiresAt?: string | null;
+      createdAt: string;
+    }>;
+    total: number;
+  }>(`/api/admin/blacklist?${params}`);
+}
+
+export async function upsertBlacklist(data: {
+  type: string;
+  value: string;
+  reason: string;
+  expiresAt?: string | null;
+  active?: boolean;
+}) {
+  return apiFetch("/api/admin/blacklist", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function deactivateBlacklist(id: string) {
+  return apiFetch(`/api/admin/blacklist/${id}/deactivate`, { method: "POST", body: "{}" });
+}
+
+export async function fetchStaffAlerts(opts?: { unreadOnly?: boolean; city?: string }) {
+  const params = new URLSearchParams({ take: "50" });
+  if (opts?.unreadOnly) params.set("unreadOnly", "true");
+  if (opts?.city) params.set("city", opts.city);
+  return apiFetch<{
+    data: Array<{
+      id: string;
+      severity: string;
+      title: string;
+      body: string;
+      href?: string | null;
+      city?: string | null;
+      readAt?: string | null;
+      createdAt: string;
+    }>;
+    unread: number;
+    total: number;
+  }>(`/api/admin/staff-alerts?${params}`);
+}
+
+export async function evaluateStaffAlerts(city?: string | null) {
+  const qs = city?.trim() ? `?city=${encodeURIComponent(city.trim())}` : "";
+  return apiFetch<{ created: number }>(`/api/admin/staff-alerts/evaluate${qs}`, { method: "POST", body: "{}" });
+}
+
+export async function markStaffAlertRead(id: string) {
+  return apiFetch(`/api/admin/staff-alerts/${id}/read`, { method: "PATCH", body: "{}" });
+}
+
+export async function markAllStaffAlertsRead() {
+  return apiFetch("/api/admin/staff-alerts/read-all", { method: "PATCH", body: "{}" });
+}
+
+export async function bulkSuspendUsers(userIds: string[]) {
+  return apiFetch("/api/admin/bulk/users/suspend", {
+    method: "POST",
+    body: JSON.stringify({ userIds }),
+  });
+}
+
+export async function bulkDriverOperatingCity(userIds: string[], operatingCity: string) {
+  return apiFetch("/api/admin/bulk/drivers/operating-city", {
+    method: "POST",
+    body: JSON.stringify({ userIds, operatingCity }),
+  });
+}
+
+export async function bulkKycReview(userIds: string[], approved: boolean, notes?: string) {
+  return apiFetch("/api/admin/bulk/kyc/review", {
+    method: "POST",
+    body: JSON.stringify({ userIds, approved, notes }),
+  });
+}

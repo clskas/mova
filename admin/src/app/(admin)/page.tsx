@@ -212,6 +212,14 @@ export default function DashboardPage() {
 
   const kpiCards = [
     {
+      label: "À traiter",
+      value: "→",
+      hint: scopedCity ? `file ops ${scopedCity}` : "file ops nationale",
+      href: "/a-traiter",
+      section: "inbox" as const,
+      accent: "orange" as const,
+    },
+    {
       label: "Utilisateurs",
       value: m.totalUsers,
       // Stock ville (tous comptes liés) — la période Auj./7j/… ne filtre pas ce compteur.
@@ -229,6 +237,14 @@ export default function DashboardPage() {
       href: scopedCity ? `/utilisateurs?city=${encodeURIComponent(scopedCity)}` : "/utilisateurs",
       section: "utilisateurs" as const,
       accent: "violet" as const,
+    },
+    {
+      label: "Carte flotte",
+      value: "GPS",
+      hint: "temps réel 15 s",
+      href: "/carte",
+      section: "carte" as const,
+      accent: "green" as const,
     },
     {
       label: "Chauffeurs en ligne",

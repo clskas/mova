@@ -21,6 +21,7 @@ import {
 import { userRoleDisplayLabel } from "@/lib/commerce-type";
 import { useAdmin } from "@/components/AdminProvider";
 import { PeriodFilterBar } from "@/components/PeriodFilterBar";
+import { MetricCard } from "@/components/dashboard/MetricCard";
 import {
   rangeForPresetDays,
   todayYmdKinshasa,
@@ -158,6 +159,38 @@ export default function UtilisateursPage() {
     }
     return { from: null, to: null };
   }, [periodMode, period, appliedFrom, appliedTo]);
+
+  const filterSummaryHint = useMemo(() => {
+    const parts: string[] = [];
+    if (roleFilter) {
+      parts.push(ROLE_FILTER_OPTIONS.find((o) => o.value === roleFilter)?.label ?? roleFilter);
+    }
+    if (canFilterCities && cityFilter.length > 0) {
+      parts.push(cityFilter.length <= 2 ? cityFilter.join(", ") : `${cityFilter.length} villes`);
+    } else if (role === "CITY_ADMIN" && user?.managedCity) {
+      parts.push(user.managedCity);
+    }
+    if (periodMode === "preset") {
+      parts.push(period === 1 ? "aujourd'hui" : `${period}j`);
+    } else if (periodMode === "custom" && appliedFrom && appliedTo) {
+      parts.push(`${appliedFrom} → ${appliedTo}`);
+    } else {
+      parts.push("toutes périodes");
+    }
+    if (searchQuery.trim()) parts.push(`recherche « ${searchQuery.trim()} »`);
+    return parts.join(" · ");
+  }, [
+    roleFilter,
+    canFilterCities,
+    cityFilter,
+    role,
+    user?.managedCity,
+    periodMode,
+    period,
+    appliedFrom,
+    appliedTo,
+    searchQuery,
+  ]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -548,6 +581,14 @@ export default function UtilisateursPage() {
             setPeriodMode("custom");
           }}
         />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+          <MetricCard
+            label="Utilisateurs filtrés"
+            value={loading ? "…" : total}
+            hint={filterSummaryHint}
+            accent="midnight"
+          />
+        </div>
         {canFilterCities && (
           <div className="rounded-xl border border-gray-200 bg-white p-3">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">

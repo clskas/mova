@@ -24,6 +24,7 @@ import {
 import { useAdmin } from "@/components/AdminProvider";
 import { AuthenticatedMedia, resolveMediaUrl } from "@/components/AuthenticatedMedia";
 import { PeriodFilterBar } from "@/components/PeriodFilterBar";
+import { MetricCard } from "@/components/dashboard/MetricCard";
 import { kycDocLabel, VEHICLE_TYPE_LABELS, VEHICLE_TYPE_OPTIONS } from "@/lib/kyc-labels";
 import {
   createdAtInRange,
@@ -297,6 +298,37 @@ export default function ChauffeursPage() {
       );
     });
   }, [drivers, search, roleFilter, periodBounds]);
+
+  const filterSummaryHint = useMemo(() => {
+    const parts: string[] = [];
+    if (scopedCity) parts.push(scopedCity);
+    else parts.push("toutes villes");
+    if (roleFilter === "both") parts.push("courses + livraisons");
+    else if (roleFilter === "ride_only") parts.push("courses uniquement");
+    else if (roleFilter === "delivery_only") parts.push("livraisons uniquement");
+    if (periodMode === "preset") {
+      parts.push(period === 1 ? "aujourd'hui" : `${period}j`);
+    } else if (periodMode === "custom" && appliedFrom && appliedTo) {
+      parts.push(`${appliedFrom} → ${appliedTo}`);
+    } else {
+      parts.push("toutes périodes");
+    }
+    if (search.trim()) parts.push(`recherche « ${search.trim()} »`);
+    if (drivers.length > 0 && filtered.length !== drivers.length) {
+      parts.push(`sur ${drivers.length} chargés`);
+    }
+    return parts.join(" · ");
+  }, [
+    scopedCity,
+    roleFilter,
+    periodMode,
+    period,
+    appliedFrom,
+    appliedTo,
+    search,
+    drivers.length,
+    filtered.length,
+  ]);
 
   async function saveOperatingCity() {
     if (!selectedId || !editOperatingCity.trim()) return;
@@ -591,6 +623,14 @@ export default function ChauffeursPage() {
             setPeriodMode("custom");
           }}
         />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+          <MetricCard
+            label="Chauffeurs filtrés"
+            value={loading ? "…" : filtered.length}
+            hint={filterSummaryHint}
+            accent="green"
+          />
+        </div>
         {loading ? (
           <LoadingState />
         ) : filtered.length === 0 ? (

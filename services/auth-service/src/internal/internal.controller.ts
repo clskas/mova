@@ -54,9 +54,25 @@ class IssueLoginPinDto {
 export class InternalController {
   constructor(private users: UsersService, private auth: AuthService) {}
   @Get('users/count')
-  async count() {
-    const { total } = await this.users.listUsers(0, 1);
-    return { count: total };
+  async count(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('role') role?: string,
+    @Query('ids') ids?: string,
+    @Query('includePlayPrelaunch') includePlayPrelaunch?: string,
+  ) {
+    const idList = (ids ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const count = await this.users.countUsers({
+      from,
+      to,
+      role,
+      ids: idList.length > 0 ? idList : undefined,
+      includePlayPrelaunch: includePlayPrelaunch === 'true' || includePlayPrelaunch === '1',
+    });
+    return { count };
   }
 
   @Get('users/ops-staff')
@@ -86,12 +102,16 @@ export class InternalController {
     @Query('take') take?: string,
     @Query('search') search?: string,
     @Query('includePlayPrelaunch') includePlayPrelaunch?: string,
+    @Query('role') role?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     return this.users.listUsers(
       Number(skip ?? 0),
       Number(take ?? 50),
       search,
       includePlayPrelaunch === 'true' || includePlayPrelaunch === '1',
+      { role, from, to },
     );
   }
 

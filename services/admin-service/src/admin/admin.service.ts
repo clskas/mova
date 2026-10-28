@@ -87,15 +87,74 @@ export class AdminService {
     );
   }
 
+  /** Inclusive calendar days for custom/preset period (Kinshasa WAT). */
+  private resolvePeriodYmd(days = 30, range?: { from?: string; to?: string }): { from: string; to: string; days: number } {
+    const reportDays = Math.min(366, Math.max(1, Math.floor(Number(days)) || 30));
+    const fromQ = range?.from?.trim();
+    const toQ = range?.to?.trim();
+    if (fromQ && toQ && /^\d{4}-\d{2}-\d{2}$/.test(fromQ) && /^\d{4}-\d{2}-\d{2}$/.test(toQ)) {
+      const a = Date.parse(`${fromQ}T12:00:00+01:00`);
+      const b = Date.parse(`${toQ}T12:00:00+01:00`);
+      const span =
+        Number.isFinite(a) && Number.isFinite(b)
+          ? Math.max(1, Math.floor((b - a) / 86_400_000) + 1)
+          : reportDays;
+      return { from: fromQ, to: toQ, days: Math.min(366, span) };
+    }
+    const to = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Kinshasa',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    const end = new Date(`${to}T12:00:00+01:00`);
+    end.setDate(end.getDate() - (reportDays - 1));
+    const from = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Kinshasa',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(end);
+    return { from, to, days: reportDays };
+  }
+
+  private async countNewUsersInPeriod(
+    period: { from: string; to: string },
+    cityUserIds?: Set<string> | null,
+  ): Promise<number> {
+    const params = new URLSearchParams({ from: period.from, to: period.to });
+    if (cityUserIds) {
+      const ids = [...cityUserIds];
+      if (ids.length === 0) return 0;
+      // Chunk to keep query strings manageable.
+      let total = 0;
+      const chunkSize = 80;
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        const chunk = ids.slice(i, i + chunkSize);
+        const q = new URLSearchParams({ from: period.from, to: period.to, ids: chunk.join(',') });
+        const res = await this.fetchJson<{ count: number }>('auth', `/internal/users/count?${q}`).catch(() => ({
+          count: 0,
+        }));
+        total += res.count ?? 0;
+      }
+      return total;
+    }
+    const res = await this.fetchJson<{ count: number }>('auth', `/internal/users/count?${params}`).catch(() => ({
+      count: 0,
+    }));
+    return res.count ?? 0;
+  }
+
   async getMetrics(
     managedCity?: string | null,
     days = 30,
     range?: { from?: string; to?: string },
   ) {
-    const reportDays = Math.min(366, Math.max(1, Math.floor(Number(days)) || 30));
+    const period = this.resolvePeriodYmd(days, range);
+    const reportDays = period.days;
     const city = managedCity?.trim() || '';
     if (!city) {
-      return this.getMetricsNational(reportDays, range);
+      return this.getMetricsNational(reportDays, range, period);
     }
     const [driversRes, rides, deliveries, incidents, reports, cityUsers] = await Promise.all([
       this.listDrivers(0, 500, { includeHidden: false }, city).catch(() => ({ data: [] as Array<Record<string, unknown>> })),
@@ -112,6 +171,7 @@ export class AdminService {
     const approvedDrivers = drivers.filter((d) => String(d.kycStatus ?? '').toUpperCase() === 'APPROVED').length;
     const cityUserIds = cityUsers.allIds;
     const passengerCount = cityUsers.passengerIds.size;
+    const newUsersInPeriod = await this.countNewUsersInPeriod(period, cityUserIds);
     const rideRows = Array.isArray(rides) ? rides : [];
     const deliveryRows = Array.isArray(deliveries) ? deliveries : [];
     const activeRides = rideRows.filter((r) =>
@@ -139,6 +199,7 @@ export class AdminService {
     return {
       users: cityUserIds.size,
       passengers: passengerCount,
+      newUsersInPeriod,
       drivers: drivers.length,
       availableDrivers,
       pendingKyc,
@@ -163,14 +224,22 @@ export class AdminService {
       walletTransactionsToday: 0,
       city,
       periodDays: reportDays,
+      periodFrom: period.from,
+      periodTo: period.to,
     };
   }
 
-  private async getMetricsNational(days = 30, range?: { from?: string; to?: string }) {
-    const reportDays = Math.min(366, Math.max(1, Math.floor(Number(days)) || 30));
-    const [users, driverStats, rideStats, incidents, deliveries, scheduled, carpool, moving, rental, wallet, reports] =
+  private async getMetricsNational(
+    days = 30,
+    range?: { from?: string; to?: string },
+    periodResolved?: { from: string; to: string; days: number },
+  ) {
+    const period = periodResolved ?? this.resolvePeriodYmd(days, range);
+    const reportDays = period.days;
+    const [users, newUsers, driverStats, rideStats, incidents, deliveries, scheduled, carpool, moving, rental, wallet, reports] =
       await Promise.all([
         this.fetchJson<{ count: number }>('auth', '/internal/users/count').catch(() => ({ count: 0 })),
+        this.countNewUsersInPeriod(period),
         this.fetchJson<{ total?: number; available?: number; pendingKyc?: number; approved?: number }>(
           'driver',
           '/internal/drivers/stats',
@@ -226,6 +295,7 @@ export class AdminService {
         : undefined;
     return {
       users: users.count,
+      newUsersInPeriod: newUsers,
       drivers: driverStats.total ?? 0,
       availableDrivers: driverStats.available ?? 0,
       pendingKyc: driverStats.pendingKyc ?? 0,
@@ -251,6 +321,8 @@ export class AdminService {
       walletTransactionsToday: wallet.transactionsToday ?? 0,
       city: 'RDC',
       periodDays: reportDays,
+      periodFrom: period.from,
+      periodTo: period.to,
     };
   }
 
@@ -269,22 +341,26 @@ export class AdminService {
     search?: string,
     includePlayPrelaunch = false,
     cities?: string | string[] | null,
+    filters?: { role?: string; from?: string; to?: string },
   ) {
     const commerceType = commerceTypeFromSearch(search);
     if (commerceType) {
-      return this.listUsersByCommerceType(commerceType, skip, take, includePlayPrelaunch, cities);
+      return this.listUsersByCommerceType(commerceType, skip, take, includePlayPrelaunch, cities, filters);
     }
 
     const cityList = (Array.isArray(cities) ? cities : cities ? [cities] : [])
       .map((c) => c.trim())
       .filter(Boolean);
     if (cityList.length > 0) {
-      return this.listUsersInCities(cityList, skip, take, search, includePlayPrelaunch);
+      return this.listUsersInCities(cityList, skip, take, search, includePlayPrelaunch, filters);
     }
 
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (search) params.set('search', search);
     if (includePlayPrelaunch) params.set('includePlayPrelaunch', 'true');
+    if (filters?.role?.trim()) params.set('role', filters.role.trim());
+    if (filters?.from?.trim()) params.set('from', filters.from.trim());
+    if (filters?.to?.trim()) params.set('to', filters.to.trim());
     const result = await this.fetchJson<{
       data?: Array<{ id: string; role?: string; status?: string; commerceType?: string; managedCity?: string | null; [key: string]: unknown }>;
       total?: number;
@@ -487,6 +563,7 @@ export class AdminService {
     take: number,
     search?: string,
     includePlayPrelaunch = false,
+    filters?: { role?: string; from?: string; to?: string },
   ) {
     const { allIds: allowedIds } = await this.collectUsersForCities(cityList);
     const ids = [...allowedIds];
@@ -502,6 +579,7 @@ export class AdminService {
       firstName?: string | null;
       lastName?: string | null;
       playPrelaunch?: boolean;
+      createdAt?: string | Date | null;
       [key: string]: unknown;
     };
     const loaded: Row[] = [];
@@ -518,9 +596,23 @@ export class AdminService {
       }
     }
 
+    const roleFilter = filters?.role?.trim().toUpperCase() || '';
+    const fromAt = filters?.from?.trim()
+      ? Date.parse(`${filters.from.trim()}T00:00:00+01:00`)
+      : NaN;
+    const toAt = filters?.to?.trim()
+      ? Date.parse(`${filters.to.trim()}T23:59:59.999+01:00`)
+      : NaN;
     const q = (search ?? '').trim().toLowerCase();
     let filtered = loaded.filter((u) => {
       if (!includePlayPrelaunch && u.playPrelaunch) return false;
+      if (roleFilter && String(u.role ?? '').toUpperCase() !== roleFilter) return false;
+      if (Number.isFinite(fromAt) || Number.isFinite(toAt)) {
+        const created = u.createdAt ? new Date(u.createdAt).getTime() : NaN;
+        if (!Number.isFinite(created)) return false;
+        if (Number.isFinite(fromAt) && created < fromAt) return false;
+        if (Number.isFinite(toAt) && created > toAt) return false;
+      }
       if (!q) return true;
       const hay = [
         u.firstName,
@@ -572,7 +664,12 @@ export class AdminService {
     take: number,
     includePlayPrelaunch: boolean,
     cities?: string | string[] | null,
+    filters?: { role?: string; from?: string; to?: string },
   ) {
+    const roleFilter = filters?.role?.trim().toUpperCase();
+    if (roleFilter && roleFilter !== 'RESTAURANT') {
+      return { data: [], total: 0, skip, take };
+    }
     const restaurants = await this.fetchJson<
       Array<{ ownerUserId?: string | null; commerceType?: string | null; lat?: number | null; lng?: number | null }>
     >('ride', '/internal/restaurants').catch(() => []);
@@ -592,8 +689,11 @@ export class AdminService {
       skip: '0',
       take: '500',
       search: 'restaurant',
+      role: 'RESTAURANT',
     });
     if (includePlayPrelaunch) params.set('includePlayPrelaunch', 'true');
+    if (filters?.from?.trim()) params.set('from', filters.from.trim());
+    if (filters?.to?.trim()) params.set('to', filters.to.trim());
     const authResult = await this.fetchJson<{
       data?: Array<{ id: string; role?: string; commerceType?: string; managedCity?: string | null; [key: string]: unknown }>;
     }>('auth', `/internal/users?${params}`);

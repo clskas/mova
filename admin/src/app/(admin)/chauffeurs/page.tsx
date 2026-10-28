@@ -23,7 +23,15 @@ import {
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import { AuthenticatedMedia, resolveMediaUrl } from "@/components/AuthenticatedMedia";
+import { PeriodFilterBar } from "@/components/PeriodFilterBar";
 import { kycDocLabel, VEHICLE_TYPE_LABELS, VEHICLE_TYPE_OPTIONS } from "@/lib/kyc-labels";
+import {
+  createdAtInRange,
+  rangeForPresetDays,
+  todayYmdKinshasa,
+  type PeriodMode,
+  type PeriodPresetDays,
+} from "@/lib/period-filter";
 import {
   BtnDanger,
   BtnSuccess,
@@ -178,14 +186,22 @@ function driverStageLabel(d: AdminDriver | AdminDriverDetail): string {
 }
 
 export default function ChauffeursPage() {
-  const { canWrite, role } = useAdmin();
+  const { canWrite, role, user } = useAdmin();
   const readOnly = !canWrite("chauffeurs");
   const canReviewKyc = canWrite("kyc");
   const canSetVehicleType = role === "SUPER_ADMIN" || role === "ADMIN";
   const canEditOperatingCity = role === "SUPER_ADMIN" || role === "ADMIN";
+  const canFilterCity = role === "SUPER_ADMIN" || role === "ADMIN";
   const [drivers, setDrivers] = useState<AdminDriver[]>([]);
   const [search, setSearch] = useState("");
   const [includeHidden, setIncludeHidden] = useState(false);
+  const [cityFilter, setCityFilter] = useState("");
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("all");
+  const [period, setPeriod] = useState<PeriodPresetDays>(30);
+  const [customFrom, setCustomFrom] = useState(() => rangeForPresetDays(30).from);
+  const [customTo, setCustomTo] = useState(todayYmdKinshasa);
+  const [appliedFrom, setAppliedFrom] = useState<string | null>(null);
+  const [appliedTo, setAppliedTo] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -200,18 +216,33 @@ export default function ChauffeursPage() {
   const [selectedVehicleType, setSelectedVehicleType] = useState("");
   const [editOperatingCity, setEditOperatingCity] = useState("");
 
+  const scopedCity =
+    role === "CITY_ADMIN" ? (user?.managedCity?.trim() || "") : cityFilter.trim();
+
+  const periodBounds = useMemo(() => {
+    if (periodMode === "all") return { from: null as string | null, to: null as string | null };
+    if (periodMode === "custom" && appliedFrom && appliedTo) {
+      return { from: appliedFrom, to: appliedTo };
+    }
+    if (periodMode === "preset") return rangeForPresetDays(period);
+    return { from: null, to: null };
+  }, [periodMode, period, appliedFrom, appliedTo]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchDrivers(includeHidden, { take: 500 });
+      const data = await fetchDrivers(includeHidden, {
+        take: 500,
+        city: scopedCity || null,
+      });
       setDrivers(Array.isArray(data) ? data : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
     }
-  }, [includeHidden]);
+  }, [includeHidden, scopedCity]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -253,6 +284,7 @@ export default function ChauffeursPage() {
       if (roleFilter === "both" && mode !== "BOTH") return false;
       if (roleFilter === "ride_only" && mode !== "RIDES_ONLY") return false;
       if (roleFilter === "delivery_only" && mode !== "DELIVERIES_ONLY") return false;
+      if (!createdAtInRange(d.createdAt, periodBounds.from, periodBounds.to)) return false;
       if (!q) return true;
       return (
         d.userId.toLowerCase().includes(q) ||
@@ -264,7 +296,7 @@ export default function ChauffeursPage() {
         d.vehicles?.some((v) => v.plateNumber.toLowerCase().includes(q))
       );
     });
-  }, [drivers, search, roleFilter]);
+  }, [drivers, search, roleFilter, periodBounds]);
 
   async function saveOperatingCity() {
     if (!selectedId || !editOperatingCity.trim()) return;
@@ -510,6 +542,19 @@ export default function ChauffeursPage() {
               <option value="delivery_only">Livraisons uniquement</option>
             </select>
           </label>
+          {canFilterCity && (
+            <label className="flex flex-col gap-0.5 min-w-[11rem]">
+              <span className="text-[11px] font-medium text-gray-500 px-0.5">Ville</span>
+              <SelectInput
+                value={cityFilter}
+                onChange={setCityFilter}
+                options={[
+                  { value: "", label: "Toutes les villes" },
+                  ...MOVA_CITIES.map((c) => ({ value: c, label: c })),
+                ]}
+              />
+            </label>
+          )}
           {role === "SUPER_ADMIN" && (
             <label className="flex items-center gap-2 text-sm text-gray-600 pb-1">
               <input
@@ -521,6 +566,31 @@ export default function ChauffeursPage() {
             </label>
           )}
         </div>
+        <PeriodFilterBar
+          mode={periodMode}
+          period={period}
+          customFrom={customFrom}
+          customTo={customTo}
+          appliedFrom={appliedFrom}
+          appliedTo={appliedTo}
+          label="Période (inscription profil)"
+          onModeChange={(m) => {
+            setPeriodMode(m);
+            if (m !== "custom") {
+              setAppliedFrom(null);
+              setAppliedTo(null);
+            }
+          }}
+          onPeriodChange={setPeriod}
+          onCustomFromChange={setCustomFrom}
+          onCustomToChange={setCustomTo}
+          onApplyCustom={() => {
+            if (!customFrom || !customTo || customFrom > customTo) return;
+            setAppliedFrom(customFrom);
+            setAppliedTo(customTo);
+            setPeriodMode("custom");
+          }}
+        />
         {loading ? (
           <LoadingState />
         ) : filtered.length === 0 ? (

@@ -15,6 +15,8 @@ export type AdminMetrics = {
   users?: number;
   /** Passagers rattachés à la ville filtrée (homeCity + activité). */
   passengers?: number;
+  /** Nouveaux comptes créés sur la période du tableau de bord. */
+  newUsersInPeriod?: number;
   drivers?: number;
   availableDrivers?: number;
   pendingKyc?: number;
@@ -43,6 +45,8 @@ export type AdminMetrics = {
   todayCompleted?: number;
   todayRevenueCdf?: number;
   periodDays?: number;
+  periodFrom?: string;
+  periodTo?: string;
 };
 
 export type AdminReports = {
@@ -402,6 +406,7 @@ export type Restaurant = {
   courierMode?: "PLATFORM" | "OWN" | "HYBRID";
   kycStatus?: string;
   kycNotes?: string | null;
+  createdAt?: string;
 };
 
 export type PubliciteCible = "TOUS" | "PASSENGER" | "DRIVER" | "RESTAURANT" | "RENTAL_PARTNER";
@@ -1458,6 +1463,7 @@ export function normalizeMetrics(raw: AdminMetrics) {
   return {
     totalUsers: raw.totalUsers ?? raw.users ?? 0,
     passengers: raw.passengers ?? 0,
+    newUsersInPeriod: raw.newUsersInPeriod ?? 0,
     activeDrivers: raw.activeDrivers ?? raw.drivers ?? 0,
     availableDrivers: raw.availableDrivers ?? 0,
     pendingKyc: raw.pendingKyc ?? 0,
@@ -2142,11 +2148,15 @@ export async function fetchUsers(
   search?: string,
   includePlayPrelaunch = false,
   cities?: string[],
+  opts?: { role?: string; from?: string | null; to?: string | null },
 ): Promise<{ data: AdminUser[]; total: number }> {
   const params = new URLSearchParams({ skip: String(skip), take: String(take) });
   if (search?.trim()) params.set("search", search.trim());
   if (includePlayPrelaunch) params.set("includePlayPrelaunch", "true");
   if (cities?.length) params.set("city", cities.join(","));
+  if (opts?.role?.trim()) params.set("role", opts.role.trim());
+  if (opts?.from?.trim()) params.set("from", opts.from.trim());
+  if (opts?.to?.trim()) params.set("to", opts.to.trim());
   const raw = await apiFetch<AdminUser[] | { data?: AdminUser[]; total?: number }>(`/api/admin/users?${params}`);
   if (Array.isArray(raw)) return { data: raw, total: raw.length };
   return { data: raw.data ?? [], total: raw.total ?? raw.data?.length ?? 0 };
@@ -2167,12 +2177,13 @@ export async function purgePlayPrelaunchUsers() {
 
 export async function fetchDrivers(
   includeHidden = false,
-  opts?: { take?: number; kycStatus?: string },
+  opts?: { take?: number; kycStatus?: string; city?: string | null },
 ): Promise<AdminDriver[]> {
   const params = new URLSearchParams();
   if (includeHidden) params.set("includeHidden", "true");
   if (opts?.take != null) params.set("take", String(opts.take));
   if (opts?.kycStatus) params.set("kycStatus", opts.kycStatus);
+  if (opts?.city?.trim()) params.set("city", opts.city.trim());
   const q = params.toString();
   const data = await apiFetch<AdminDriver[] | { data?: AdminDriver[] }>(
     `/api/admin/drivers${q ? `?${q}` : ""}`,

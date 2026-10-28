@@ -2,8 +2,26 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { apiFetch, deleteRestaurant, fetchUsers, formatUserName, saveRestaurant, toUserErrorMessage, type AdminUser, type Restaurant } from "@/lib/api";
+import {
+  apiFetch,
+  deleteRestaurant,
+  fetchUsers,
+  formatUserName,
+  MOVA_CITIES,
+  saveRestaurant,
+  toUserErrorMessage,
+  type AdminUser,
+  type Restaurant,
+} from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
+import { PeriodFilterBar } from "@/components/PeriodFilterBar";
+import {
+  createdAtInRange,
+  rangeForPresetDays,
+  todayYmdKinshasa,
+  type PeriodMode,
+  type PeriodPresetDays,
+} from "@/lib/period-filter";
 import {
   BtnDanger,
   BtnGhost,
@@ -71,12 +89,20 @@ function courierModeLabel(mode?: string | null) {
 }
 
 export default function RestaurantsPage() {
-  const { canWrite, role } = useAdmin();
+  const { canWrite, role, user } = useAdmin();
   const readOnly = !canWrite("restaurants");
   const canToggleFleet = role === "SUPER_ADMIN";
+  const canFilterCity = role === "SUPER_ADMIN" || role === "ADMIN";
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cityFilter, setCityFilter] = useState("");
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("all");
+  const [period, setPeriod] = useState<PeriodPresetDays>(30);
+  const [customFrom, setCustomFrom] = useState(() => rangeForPresetDays(30).from);
+  const [customTo, setCustomTo] = useState(todayYmdKinshasa);
+  const [appliedFrom, setAppliedFrom] = useState<string | null>(null);
+  const [appliedTo, setAppliedTo] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     cuisine: "Congolaise",
@@ -95,6 +121,18 @@ export default function RestaurantsPage() {
   const [menuTarget, setMenuTarget] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
+  const scopedCity =
+    role === "CITY_ADMIN" ? (user?.managedCity?.trim() || "") : cityFilter.trim();
+
+  const periodBounds = useMemo(() => {
+    if (periodMode === "all") return { from: null as string | null, to: null as string | null };
+    if (periodMode === "custom" && appliedFrom && appliedTo) {
+      return { from: appliedFrom, to: appliedTo };
+    }
+    if (periodMode === "preset") return rangeForPresetDays(period);
+    return { from: null, to: null };
+  }, [periodMode, period, appliedFrom, appliedTo]);
+
   const partnerOptions = useMemo(
     () => [
       { value: "", label: "— Aucun compte lié —" },
@@ -108,18 +146,19 @@ export default function RestaurantsPage() {
 
   function partnerLabel(ownerUserId?: string | null) {
     if (!ownerUserId) return "Non lié";
-    const user = partnerUsers.find((u) => u.id === ownerUserId);
-    if (!user) return ownerUserId.slice(0, 8) + "…";
-    return user.phone ? `${formatUserName(user)} (${user.phone})` : formatUserName(user);
+    const found = partnerUsers.find((u) => u.id === ownerUserId);
+    if (!found) return ownerUserId.slice(0, 8) + "…";
+    return found.phone ? `${formatUserName(found)} (${found.phone})` : formatUserName(found);
   }
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
+      const qs = scopedCity ? `?city=${encodeURIComponent(scopedCity)}` : "";
       const [data, usersRes] = await Promise.all([
-        apiFetch<Restaurant[]>("/api/admin/restaurants"),
-        fetchUsers(0, 200),
+        apiFetch<Restaurant[]>(`/api/admin/restaurants${qs}`),
+        fetchUsers(0, 200, undefined, false, undefined, { role: "RESTAURANT" }),
       ]);
       setRestaurants(Array.isArray(data) ? data : []);
       setPartnerUsers((usersRes.data ?? []).filter((u) => u.role === "RESTAURANT" && u.status !== "INACTIVE"));
@@ -128,9 +167,14 @@ export default function RestaurantsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [scopedCity]);
 
   useEffect(() => { load(); }, [load]);
+
+  const filteredRestaurants = useMemo(
+    () => restaurants.filter((r) => createdAtInRange(r.createdAt, periodBounds.from, periodBounds.to)),
+    [restaurants, periodBounds],
+  );
 
   function parseCoord(value: string, fallback: number) {
     const n = Number.parseFloat(value.replace(",", "."));
@@ -265,6 +309,47 @@ export default function RestaurantsPage() {
       )}
       {error && <ErrorBanner message={error} onRetry={load} />}
 
+      <div className="flex flex-wrap gap-3 items-end">
+        {canFilterCity && (
+          <label className="flex flex-col gap-0.5 min-w-[11rem]">
+            <span className="text-[11px] font-medium text-gray-500 px-0.5">Ville</span>
+            <SelectInput
+              value={cityFilter}
+              onChange={setCityFilter}
+              options={[
+                { value: "", label: "Toutes les villes" },
+                ...MOVA_CITIES.map((c) => ({ value: c, label: c })),
+              ]}
+            />
+          </label>
+        )}
+        <PeriodFilterBar
+          mode={periodMode}
+          period={period}
+          customFrom={customFrom}
+          customTo={customTo}
+          appliedFrom={appliedFrom}
+          appliedTo={appliedTo}
+          label="Période (création fiche)"
+          onModeChange={(m) => {
+            setPeriodMode(m);
+            if (m !== "custom") {
+              setAppliedFrom(null);
+              setAppliedTo(null);
+            }
+          }}
+          onPeriodChange={setPeriod}
+          onCustomFromChange={setCustomFrom}
+          onCustomToChange={setCustomTo}
+          onApplyCustom={() => {
+            if (!customFrom || !customTo || customFrom > customTo) return;
+            setAppliedFrom(customFrom);
+            setAppliedTo(customTo);
+            setPeriodMode("custom");
+          }}
+        />
+      </div>
+
       {!readOnly && (
         <form onSubmit={handleCreate} className="bg-white rounded-xl p-4 shadow-sm space-y-3">
           <h2 className="font-semibold text-sm text-gray-700">Ajouter un restaurant</h2>
@@ -323,8 +408,8 @@ export default function RestaurantsPage() {
 
       {loading ? (
         <LoadingState />
-      ) : restaurants.length === 0 ? (
-        <EmptyState message="Aucun restaurant" />
+      ) : filteredRestaurants.length === 0 ? (
+        <EmptyState message={restaurants.length === 0 ? "Aucun restaurant" : "Aucun partenaire pour ces filtres"} />
       ) : (
         <Card className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -344,7 +429,7 @@ export default function RestaurantsPage() {
               </tr>
             </thead>
             <tbody>
-              {restaurants.map((r) => (
+              {filteredRestaurants.map((r) => (
                 <tr key={r.id} className="border-b">
                   <td className="p-3 font-medium">{r.name}</td>
                   <td className="p-3 text-xs">

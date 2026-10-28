@@ -174,9 +174,67 @@ export class UsersService {
     return [...new Set([...playIds, ...demoIds])];
   }
 
-  async listUsers(skip = 0, take = 50, search?: string, includePlayPrelaunch = false) {
+  /** Kinshasa calendar day → Date bounds (WAT / UTC+1). */
+  private parseDayBound(ymd?: string, endOfDay = false): Date | undefined {
+    const s = ymd?.trim();
+    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return undefined;
+    const d = new Date(`${s}T${endOfDay ? '23:59:59.999' : '00:00:00'}+01:00`);
+    return Number.isNaN(d.getTime()) ? undefined : d;
+  }
+
+  private parseRoleFilter(role?: string): UserRole | undefined {
+    const raw = role?.trim();
+    if (!raw) return undefined;
+    const upper = raw.toUpperCase();
+    return (Object.values(UserRole) as string[]).includes(upper) ? (upper as UserRole) : undefined;
+  }
+
+  async countUsers(opts?: {
+    includePlayPrelaunch?: boolean;
+    role?: string;
+    from?: string;
+    to?: string;
+    ids?: string[];
+  }) {
+    const roleFilter = this.parseRoleFilter(opts?.role);
+    const fromAt = this.parseDayBound(opts?.from, false);
+    const toAt = this.parseDayBound(opts?.to, true);
+    const idList = (opts?.ids ?? []).map((id) => id.trim()).filter(Boolean);
+    if (idList.length === 0 && opts?.ids) {
+      return 0;
+    }
+    const hiddenIds = await this.hiddenAdminUserIds(opts?.includePlayPrelaunch === true);
+    const clauses: Record<string, unknown>[] = [];
+    if (roleFilter) clauses.push({ role: roleFilter });
+    if (fromAt || toAt) {
+      clauses.push({
+        createdAt: {
+          ...(fromAt ? { gte: fromAt } : {}),
+          ...(toAt ? { lte: toAt } : {}),
+        },
+      });
+    }
+    if (idList.length > 0) {
+      // Prisma IN lists stay reasonable when chunked by the caller; still accept up to a few k.
+      clauses.push({ id: { in: idList } });
+    }
+    if (hiddenIds.length > 0) clauses.push({ id: { notIn: hiddenIds } });
+    const where = clauses.length === 0 ? undefined : clauses.length === 1 ? clauses[0] : { AND: clauses };
+    return this.prisma.user.count({ where });
+  }
+
+  async listUsers(
+    skip = 0,
+    take = 50,
+    search?: string,
+    includePlayPrelaunch = false,
+    opts?: { role?: string; from?: string; to?: string },
+  ) {
     const q = search?.trim();
     const roleFromSearch = this.roleFromSearch(q);
+    const roleFilter = this.parseRoleFilter(opts?.role) ?? undefined;
+    const fromAt = this.parseDayBound(opts?.from, false);
+    const toAt = this.parseDayBound(opts?.to, true);
     const searchWhere = q
       ? {
           OR: [
@@ -186,15 +244,24 @@ export class UsersService {
             { email: { contains: q, mode: 'insensitive' as const } },
             { homeCity: { contains: q, mode: 'insensitive' as const } },
             { managedCity: { contains: q, mode: 'insensitive' as const } },
-            ...(roleFromSearch ? [{ role: roleFromSearch }] : []),
+            ...(roleFromSearch && !roleFilter ? [{ role: roleFromSearch }] : []),
           ],
         }
       : undefined;
     const hiddenIds = await this.hiddenAdminUserIds(includePlayPrelaunch);
-    const where =
-      hiddenIds.length > 0
-        ? { AND: [...(searchWhere ? [searchWhere] : []), { id: { notIn: hiddenIds } }] }
-        : searchWhere;
+    const clauses: Record<string, unknown>[] = [];
+    if (searchWhere) clauses.push(searchWhere);
+    if (roleFilter) clauses.push({ role: roleFilter });
+    if (fromAt || toAt) {
+      clauses.push({
+        createdAt: {
+          ...(fromAt ? { gte: fromAt } : {}),
+          ...(toAt ? { lte: toAt } : {}),
+        },
+      });
+    }
+    if (hiddenIds.length > 0) clauses.push({ id: { notIn: hiddenIds } });
+    const where = clauses.length === 0 ? undefined : clauses.length === 1 ? clauses[0] : { AND: clauses };
     const [data, total] = await Promise.all([
       this.prisma.user.findMany({ where, skip, take, orderBy: { createdAt: 'desc' } }),
       this.prisma.user.count({ where }),

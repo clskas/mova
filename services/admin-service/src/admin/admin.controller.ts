@@ -152,6 +152,9 @@ export class AdminController {
     @Query('search') search?: string,
     @Query('includePlayPrelaunch') includePlayPrelaunch?: string,
     @Query('city') city?: string,
+    @Query('role') role?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     return this.adminService.listUsers(
       Number(skip ?? 0),
@@ -159,6 +162,7 @@ export class AdminController {
       search,
       includePlayPrelaunch === 'true' || includePlayPrelaunch === '1',
       resolveCityFilterList(req.user, city),
+      { role, from, to },
     );
   }
 
@@ -226,12 +230,14 @@ export class AdminController {
     @Query('kycStatus') kycStatus?: string,
     @Query('isAvailable') isAvailable?: string,
     @Query('includeHidden') includeHidden?: string,
+    @Query('city') city?: string,
   ) {
+    const cities = resolveCityFilterList(req.user, city);
     return this.adminService.listDrivers(Number(skip ?? 0), Number(take ?? 50), {
       kycStatus,
       isAvailable,
       includeHidden: includeHidden === 'true' || includeHidden === '1',
-    }, resolveManagedCityScope(req.user));
+    }, cities[0] ?? null);
   }
 
   @Get('drivers/:userId')
@@ -604,8 +610,9 @@ export class AdminController {
   @Get('restaurants')
   @RequirePermissions(AdminPermission.RESTAURANTS_READ)
   @ApiOperation({ summary: 'Liste restaurants' })
-  restaurants(@Request() req: { user: AdminJwtUser }) {
-    return this.adminService.listRestaurants(resolveManagedCityScope(req.user));
+  restaurants(@Request() req: { user: AdminJwtUser }, @Query('city') city?: string) {
+    const cities = resolveCityFilterList(req.user, city);
+    return this.adminService.listRestaurants(cities[0] ?? null);
   }
 
   @Post('restaurants')

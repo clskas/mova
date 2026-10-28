@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   activationPinSmsCopy,
@@ -20,6 +20,13 @@ import {
 } from "@/lib/api";
 import { userRoleDisplayLabel } from "@/lib/commerce-type";
 import { useAdmin } from "@/components/AdminProvider";
+import { PeriodFilterBar } from "@/components/PeriodFilterBar";
+import {
+  rangeForPresetDays,
+  todayYmdKinshasa,
+  type PeriodMode,
+  type PeriodPresetDays,
+} from "@/lib/period-filter";
 import {
   ACCESS_LEVEL_OPTIONS,
   defaultAccessLevelIdsForRole,
@@ -42,6 +49,20 @@ import {
   StatusBadge,
   TextInput,
 } from "@/components/ui";
+
+const ROLE_FILTER_OPTIONS = [
+  { value: "", label: "Tous les rôles" },
+  { value: "PASSENGER", label: "Passager" },
+  { value: "DRIVER", label: "Chauffeur" },
+  { value: "RESTAURANT", label: "Partenaire commerce" },
+  { value: "RENTAL_PARTNER", label: "Partenaire location" },
+  { value: "CITY_ADMIN", label: "Admin ville" },
+  { value: "ADMIN", label: "Administrateur" },
+  { value: "SUPPORT", label: "Support" },
+  { value: "FINANCE", label: "Finance" },
+  { value: "CONTENT", label: "Contenu" },
+  { value: "SUPER_ADMIN", label: "Super admin" },
+];
 
 const STAFF_EDIT_ROLES = new Set([
   "SUPER_ADMIN",
@@ -118,6 +139,25 @@ export default function UtilisateursPage() {
     const fromQuery = searchParams.get("city")?.trim();
     return fromQuery ? [fromQuery] : [];
   });
+  const [roleFilter, setRoleFilter] = useState("");
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("all");
+  const [period, setPeriod] = useState<PeriodPresetDays>(30);
+  const [customFrom, setCustomFrom] = useState(() => rangeForPresetDays(30).from);
+  const [customTo, setCustomTo] = useState(todayYmdKinshasa);
+  const [appliedFrom, setAppliedFrom] = useState<string | null>(null);
+  const [appliedTo, setAppliedTo] = useState<string | null>(null);
+
+  const periodBounds = useMemo(() => {
+    if (periodMode === "all") return { from: null as string | null, to: null as string | null };
+    if (periodMode === "custom" && appliedFrom && appliedTo) {
+      return { from: appliedFrom, to: appliedTo };
+    }
+    if (periodMode === "preset") {
+      const r = rangeForPresetDays(period);
+      return { from: r.from, to: r.to };
+    }
+    return { from: null, to: null };
+  }, [periodMode, period, appliedFrom, appliedTo]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -130,6 +170,11 @@ export default function UtilisateursPage() {
           searchQuery.trim() || undefined,
           showPlayPrelaunch,
           canFilterCities && cityFilter.length > 0 ? cityFilter : undefined,
+          {
+            role: roleFilter || undefined,
+            from: periodBounds.from,
+            to: periodBounds.to,
+          },
         ),
         fetchDrivers(true).catch(() => []),
       ]);
@@ -141,7 +186,7 @@ export default function UtilisateursPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, searchQuery, showPlayPrelaunch, cityFilter, canFilterCities]);
+  }, [page, searchQuery, showPlayPrelaunch, cityFilter, canFilterCities, roleFilter, periodBounds]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -423,17 +468,34 @@ export default function UtilisateursPage() {
         <div className="flex flex-wrap gap-2 items-end">
           <SearchInput value={search} onChange={setSearch} placeholder="Rechercher par nom, téléphone, e-mail, rôle ou type (Pharmacie, Boutique…)…" />
           <BtnPrimary onClick={applySearch}>Rechercher</BtnPrimary>
+          <label className="flex flex-col gap-0.5 min-w-[10rem]">
+            <span className="text-[11px] font-medium text-gray-500 px-0.5">Rôle</span>
+            <SelectInput
+              value={roleFilter}
+              onChange={(v) => {
+                setPage(0);
+                setRoleFilter(v);
+              }}
+              options={ROLE_FILTER_OPTIONS}
+            />
+          </label>
           <BtnGhost
             disabled={
               !search.trim() &&
               !searchQuery &&
               cityFilter.length === 0 &&
-              !showPlayPrelaunch
+              !showPlayPrelaunch &&
+              !roleFilter &&
+              periodMode === "all"
             }
             onClick={() => {
               setSearch("");
               setSearchQuery("");
               setCityFilter([]);
+              setRoleFilter("");
+              setPeriodMode("all");
+              setAppliedFrom(null);
+              setAppliedTo(null);
               setShowPlayPrelaunch(false);
               setPage(0);
             }}
@@ -457,6 +519,35 @@ export default function UtilisateursPage() {
             </BtnDanger>
           )}
         </div>
+        <PeriodFilterBar
+          mode={periodMode}
+          period={period}
+          customFrom={customFrom}
+          customTo={customTo}
+          appliedFrom={appliedFrom}
+          appliedTo={appliedTo}
+          onModeChange={(m) => {
+            setPage(0);
+            setPeriodMode(m);
+            if (m !== "custom") {
+              setAppliedFrom(null);
+              setAppliedTo(null);
+            }
+          }}
+          onPeriodChange={(d) => {
+            setPage(0);
+            setPeriod(d);
+          }}
+          onCustomFromChange={setCustomFrom}
+          onCustomToChange={setCustomTo}
+          onApplyCustom={() => {
+            if (!customFrom || !customTo || customFrom > customTo) return;
+            setPage(0);
+            setAppliedFrom(customFrom);
+            setAppliedTo(customTo);
+            setPeriodMode("custom");
+          }}
+        />
         {canFilterCities && (
           <div className="rounded-xl border border-gray-200 bg-white p-3">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">

@@ -223,6 +223,14 @@ export default function DashboardPage() {
       accent: "midnight" as const,
     },
     {
+      label: "Nouveaux inscrits",
+      value: m.newUsersInPeriod,
+      hint: `créés · période ${periodLabel}`,
+      href: scopedCity ? `/utilisateurs?city=${encodeURIComponent(scopedCity)}` : "/utilisateurs",
+      section: "utilisateurs" as const,
+      accent: "violet" as const,
+    },
+    {
       label: "Chauffeurs en ligne",
       value: m.availableDrivers,
       hint: `${m.approvedDrivers} approuvés · temps réel`,
@@ -444,8 +452,11 @@ export default function DashboardPage() {
       />
       {scopedCity ? (
         <p className="text-sm text-[#6366f1] -mt-3">
-          Filtre actif : <strong>{scopedCity}</strong>
-          {typeof m.totalUsers === "number" ? ` · ${m.totalUsers} utilisateur${m.totalUsers === 1 ? "" : "s"}` : null}
+          Filtre ville : <strong>{scopedCity}</strong>
+          {typeof m.totalUsers === "number"
+            ? ` · ${m.totalUsers} utilisateur${m.totalUsers === 1 ? "" : "s"} (stock lié à la ville, pas les inscriptions ${periodLabel})`
+            : null}
+          {" · "}période activité : <strong>{periodLabel}</strong>
         </p>
       ) : null}
 

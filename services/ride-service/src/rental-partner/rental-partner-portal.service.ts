@@ -608,14 +608,17 @@ export class RentalPartnerPortalService {
     bookingId: string,
     data: { km?: number; photos?: string[]; signature?: string; pin?: string },
   ) {
-    const booking = await this.rental.ownerGetBooking(ownerUserId, bookingId);
-    if (!booking.checkInAt) {
+    const row = await this.prisma.rentalInquiry.findFirst({
+      where: { id: bookingId, vehicle: { ownerUserId } },
+    });
+    if (!row) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (!row.checkInAt) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Faites le check-in d’abord.');
     }
-    if (booking.checkOutAt) {
+    if (row.checkOutAt) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Check-out déjà effectué.');
     }
-    if (booking.completionPin && data.pin && data.pin.trim() !== booking.completionPin) {
+    if (row.completionPin && data.pin && data.pin.trim() !== row.completionPin) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'PIN de retour incorrect.');
     }
     return this.prisma.rentalInquiry.update({

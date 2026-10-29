@@ -143,7 +143,7 @@ export default function UtilisateursPage() {
     return fromQuery ? [fromQuery] : [];
   });
   const [roleFilter, setRoleFilter] = useState("");
-  const [periodMode, setPeriodMode] = useState<PeriodMode>("all");
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("preset");
   const [period, setPeriod] = useState<PeriodPresetDays>(30);
   const [customFrom, setCustomFrom] = useState(() => rangeForPresetDays(30).from);
   const [customTo, setCustomTo] = useState(todayYmdKinshasa);
@@ -554,14 +554,16 @@ export default function UtilisateursPage() {
               cityFilter.length === 0 &&
               !showPlayPrelaunch &&
               !roleFilter &&
-              periodMode === "all"
+              periodMode === "preset" &&
+              period === 30
             }
             onClick={() => {
               setSearch("");
               setSearchQuery("");
               setCityFilter([]);
               setRoleFilter("");
-              setPeriodMode("all");
+              setPeriodMode("preset");
+              setPeriod(30);
               setAppliedFrom(null);
               setAppliedTo(null);
               setShowPlayPrelaunch(false);

@@ -24,8 +24,8 @@ type Props = {
 };
 
 /**
- * Period filter for list pages. Default mode `all` = no date filter.
- * Presets (Auj./7j/30j/90j) and Perso apply createdAt bounds.
+ * Period filter matching dashboard chips: Auj. / 7j / 30j / 90j / Perso.
+ * Presets and Perso apply createdAt bounds (Kinshasa calendar).
  */
 export function PeriodFilterBar({
   mode,
@@ -39,23 +39,12 @@ export function PeriodFilterBar({
   onCustomFromChange,
   onCustomToChange,
   onApplyCustom,
-  label = "Période (inscription)",
+  label = "Période",
 }: Props) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[11px] font-medium text-gray-500 px-0.5">{label}</span>
       <div className="flex flex-wrap items-end gap-1">
-        <button
-          type="button"
-          onClick={() => onModeChange("all")}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-            mode === "all"
-              ? "bg-[#6366f1] text-white"
-              : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          Tous
-        </button>
         {LIST_PERIOD_PRESETS.map(({ days, label: presetLabel }) => (
           <button
             key={days}

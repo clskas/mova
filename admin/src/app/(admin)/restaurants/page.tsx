@@ -97,7 +97,7 @@ export default function RestaurantsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cityFilter, setCityFilter] = useState("");
-  const [periodMode, setPeriodMode] = useState<PeriodMode>("all");
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("preset");
   const [period, setPeriod] = useState<PeriodPresetDays>(30);
   const [customFrom, setCustomFrom] = useState(() => rangeForPresetDays(30).from);
   const [customTo, setCustomTo] = useState(todayYmdKinshasa);
@@ -330,7 +330,7 @@ export default function RestaurantsPage() {
           customTo={customTo}
           appliedFrom={appliedFrom}
           appliedTo={appliedTo}
-          label="Période (création fiche)"
+          label="Période"
           onModeChange={(m) => {
             setPeriodMode(m);
             if (m !== "custom") {

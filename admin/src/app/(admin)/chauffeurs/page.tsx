@@ -200,7 +200,7 @@ export default function ChauffeursPage() {
   const [search, setSearch] = useState("");
   const [includeHidden, setIncludeHidden] = useState(false);
   const [cityFilter, setCityFilter] = useState("");
-  const [periodMode, setPeriodMode] = useState<PeriodMode>("all");
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("preset");
   const [period, setPeriod] = useState<PeriodPresetDays>(30);
   const [customFrom, setCustomFrom] = useState(() => rangeForPresetDays(30).from);
   const [customTo, setCustomTo] = useState(todayYmdKinshasa);
@@ -636,7 +636,7 @@ export default function ChauffeursPage() {
           customTo={customTo}
           appliedFrom={appliedFrom}
           appliedTo={appliedTo}
-          label="Période (inscription profil)"
+          label="Période"
           onModeChange={(m) => {
             setPeriodMode(m);
             if (m !== "custom") {

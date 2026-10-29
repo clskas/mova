@@ -111,14 +111,41 @@ export default function CartePage() {
       )}
       {error && <ErrorBanner message={error} onRetry={load} />}
       <div className="grid grid-cols-3 gap-3">
-        <MetricCard label="En ligne" value={data?.counts.online ?? "…"} accent="green" />
-        <MetricCard label="Avec GPS" value={data?.counts.totalWithGps ?? "…"} accent="violet" />
-        <MetricCard label="SOS" value={data?.counts.sos ?? "…"} accent="red" />
+        <MetricCard
+          label="En ligne"
+          value={data?.counts.online ?? "…"}
+          hint="pastilles vertes"
+          accent="green"
+        />
+        <MetricCard
+          label="Avec GPS"
+          value={data?.counts.totalWithGps ?? "…"}
+          hint="verts + gris"
+          accent="midnight"
+        />
+        <MetricCard label="SOS" value={data?.counts.sos ?? "…"} hint="pastilles rouges" accent="red" />
       </div>
       {loading && !data ? (
         <LoadingState />
       ) : (
-        <div ref={mapRef} className="w-full h-[520px] rounded-xl border border-gray-200 overflow-hidden bg-gray-50" />
+        <div className="relative w-full h-[520px] rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
+          <div ref={mapRef} className="absolute inset-0" />
+          <div className="absolute bottom-3 left-3 z-[500] rounded-lg bg-white/95 border border-gray-200 shadow-sm px-3 py-2 text-xs text-gray-700 space-y-1.5 pointer-events-none">
+            <p className="font-semibold text-[11px] uppercase tracking-wide text-gray-500">Légende</p>
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-3 h-3 rounded-full bg-[#10b981] border-2 border-white shadow" />
+              Disponible (en ligne)
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-3 h-3 rounded-full bg-[#6b7280] border-2 border-white shadow" />
+              GPS · non disponible
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-4 h-4 rounded-full bg-[#dc2626] border-[3px] border-white shadow" />
+              SOS ouvert
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

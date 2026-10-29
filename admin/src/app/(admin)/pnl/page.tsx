@@ -1,32 +1,70 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchPnl, formatCdf, MOVA_CITIES } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { PeriodFilterBar } from "@/components/PeriodFilterBar";
 import { downloadCsv } from "@/lib/export-csv";
+import {
+  inclusiveDays,
+  rangeForPresetDays,
+  todayYmdKinshasa,
+  type PeriodMode,
+  type PeriodPresetDays,
+} from "@/lib/period-filter";
 import { BtnGhost, BtnPrimary, ErrorBanner, LoadingState, PageHeader, SelectInput } from "@/components/ui";
 
 export default function PnlPage() {
   const { role, user } = useAdmin();
   const lockedCity = role === "CITY_ADMIN" ? user?.managedCity?.trim() || "" : "";
   const [city, setCity] = useState(lockedCity);
-  const [days, setDays] = useState(30);
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("preset");
+  const [period, setPeriod] = useState<PeriodPresetDays>(30);
+  const [customFrom, setCustomFrom] = useState(() => rangeForPresetDays(30).from);
+  const [customTo, setCustomTo] = useState(todayYmdKinshasa);
+  const [appliedFrom, setAppliedFrom] = useState<string | null>(null);
+  const [appliedTo, setAppliedTo] = useState<string | null>(null);
   const [data, setData] = useState<Awaited<ReturnType<typeof fetchPnl>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const query = useMemo(() => {
+    if (periodMode === "custom" && appliedFrom && appliedTo) {
+      return {
+        days: inclusiveDays(appliedFrom, appliedTo),
+        from: appliedFrom,
+        to: appliedTo,
+        label: `${appliedFrom} → ${appliedTo}`,
+      };
+    }
+    const r = rangeForPresetDays(period);
+    return {
+      days: period,
+      from: r.from,
+      to: r.to,
+      label: period === 1 ? "aujourd'hui" : `${period}j`,
+    };
+  }, [periodMode, period, appliedFrom, appliedTo]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setData(await fetchPnl({ days, city: lockedCity || city || null }));
+      setData(
+        await fetchPnl({
+          days: query.days,
+          from: query.from,
+          to: query.to,
+          city: lockedCity || city || null,
+        }),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur P&L");
     } finally {
       setLoading(false);
     }
-  }, [days, city, lockedCity]);
+  }, [query, city, lockedCity]);
 
   useEffect(() => {
     void load();
@@ -35,7 +73,7 @@ export default function PnlPage() {
   function exportCsv() {
     if (!data) return;
     downloadCsv(
-      `senga-pnl-${days}j.csv`,
+      `senga-pnl-${query.days}j.csv`,
       ["Indicateur", "Valeur"],
       [
         ["Revenus CDF", data.revenueCdf],
@@ -54,7 +92,7 @@ export default function PnlPage() {
     <div className="max-w-5xl mx-auto space-y-4">
       <PageHeader
         title="P&L / commissions"
-        subtitle={`Période ${days}j${lockedCity || city ? ` · ${lockedCity || city}` : " · national"}`}
+        subtitle={`Période ${query.label}${lockedCity || city ? ` · ${lockedCity || city}` : " · national"}`}
         action={
           <div className="flex flex-wrap gap-2">
             <BtnGhost onClick={exportCsv} disabled={!data}>Export CSV</BtnGhost>
@@ -62,22 +100,40 @@ export default function PnlPage() {
           </div>
         }
       />
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 items-end">
         {!lockedCity && (
-          <SelectInput
-            value={city}
-            onChange={setCity}
-            options={[{ value: "", label: "Toutes les villes" }, ...MOVA_CITIES.map((c) => ({ value: c, label: c }))]}
-          />
+          <label className="flex flex-col gap-0.5 min-w-[11rem]">
+            <span className="text-[11px] font-medium text-gray-500 px-0.5">Ville</span>
+            <SelectInput
+              value={city}
+              onChange={setCity}
+              options={[{ value: "", label: "Toutes les villes" }, ...MOVA_CITIES.map((c) => ({ value: c, label: c }))]}
+            />
+          </label>
         )}
-        <SelectInput
-          value={String(days)}
-          onChange={(v) => setDays(Number(v))}
-          options={[
-            { value: "7", label: "7 jours" },
-            { value: "30", label: "30 jours" },
-            { value: "90", label: "90 jours" },
-          ]}
+        <PeriodFilterBar
+          mode={periodMode}
+          period={period}
+          customFrom={customFrom}
+          customTo={customTo}
+          appliedFrom={appliedFrom}
+          appliedTo={appliedTo}
+          onModeChange={(m) => {
+            setPeriodMode(m);
+            if (m !== "custom") {
+              setAppliedFrom(null);
+              setAppliedTo(null);
+            }
+          }}
+          onPeriodChange={setPeriod}
+          onCustomFromChange={setCustomFrom}
+          onCustomToChange={setCustomTo}
+          onApplyCustom={() => {
+            if (!customFrom || !customTo || customFrom > customTo) return;
+            setAppliedFrom(customFrom);
+            setAppliedTo(customTo);
+            setPeriodMode("custom");
+          }}
         />
       </div>
       {error && <ErrorBanner message={error} onRetry={load} />}

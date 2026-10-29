@@ -651,7 +651,10 @@ export class RentalPartnerPortalService {
   }
 
   async requestMovaDriver(ownerUserId: string, bookingId: string) {
-    const booking = await this.rental.ownerGetBooking(ownerUserId, bookingId);
+    const row = await this.prisma.rentalInquiry.findFirst({
+      where: { id: bookingId, vehicle: { ownerUserId } },
+    });
+    if (!row) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
     const updated = await this.prisma.rentalInquiry.update({
       where: { id: bookingId },
       data: {
@@ -660,14 +663,16 @@ export class RentalPartnerPortalService {
       },
       include: { vehicle: true },
     });
-    await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
-      serviceType: 'RENTAL',
-      referenceId: bookingId,
-      passengerId: booking.userId,
-      summary: 'Demande chauffeur MOVA (partenaire location)',
-      needsMovaDriver: true,
-      ownerUserId,
-    }).catch(() => undefined);
+    await this.redis
+      .publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
+        serviceType: 'RENTAL',
+        referenceId: bookingId,
+        passengerId: row.userId,
+        summary: 'Demande chauffeur MOVA (partenaire location)',
+        needsMovaDriver: true,
+        ownerUserId,
+      })
+      .catch(() => undefined);
     return updated;
   }
 

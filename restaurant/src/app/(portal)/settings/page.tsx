@@ -311,6 +311,45 @@ export default function SettingsPage() {
               <span className="text-sm">Accepter les commandes</span>
               <input type="checkbox" checked={accepting} disabled={!canOperate} onChange={(e) => setAccepting(e.target.checked)} className="w-5 h-5" />
             </label>
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 space-y-2">
+              <p className="text-sm font-medium text-slate-700">Pause temporaire</p>
+              <div className="flex flex-wrap gap-2">
+                {[30, 60, 120].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className="px-3 py-1.5 rounded-lg text-sm border bg-white hover:bg-orange-50"
+                    onClick={async () => {
+                      try {
+                        const { patchHours } = await import("@/lib/api");
+                        await patchHours({ pauseMinutes: m });
+                        setMessage(`Pause ${m} min activée`);
+                      } catch (e) {
+                        setError(toUserErrorMessage(e, "Pause impossible"));
+                      }
+                    }}
+                  >
+                    {m} min
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="px-3 py-1.5 rounded-lg text-sm border bg-white hover:bg-emerald-50"
+                  onClick={async () => {
+                    try {
+                      const { patchHours } = await import("@/lib/api");
+                      await patchHours({ pausedUntil: null });
+                      setMessage("Commerce réouvert");
+                    } catch (e) {
+                      setError(toUserErrorMessage(e, "Reprise impossible"));
+                    }
+                  }}
+                >
+                  Reprendre
+                </button>
+              </div>
+              <p className="text-xs text-slate-500">Les commandes sont refusées pendant la pause (hors horaires aussi).</p>
+            </div>
             <label className="block text-sm">
               <span className="text-gray-600">Temps de préparation (minutes)</span>
               <NumberField

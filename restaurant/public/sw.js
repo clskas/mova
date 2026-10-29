@@ -1,11 +1,11 @@
 /* BUILD_ID: __MOVA_BUILD_ID__ */
-const CACHE = "mova-business-v19";
+const CACHE = "mova-business-v20";
 const SHELL = [
   "/manifest.webmanifest",
-  "/icon-192.png?v=partner-v19",
-  "/icon-512.png?v=partner-v19",
-  "/icon-512-maskable.png?v=partner-v19",
-  "/apple-touch-icon.png?v=partner-v19",
+  "/icon-192.png?v=partner-v20",
+  "/icon-512.png?v=partner-v20",
+  "/icon-512-maskable.png?v=partner-v20",
+  "/apple-touch-icon.png?v=partner-v20",
   "/alert-chime.wav",
   "/senga-partner-alert.wav",
 ];

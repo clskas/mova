@@ -171,5 +171,7 @@ export function formatPromoRow(promo: PromoCode) {
     rentalOwnerUserId: promo.rentalOwnerUserId,
     /** Vide = toutes les villes SENGA ; sinon liste des villes autorisées. */
     cityNames: promo.cityNames ?? [],
+    happyHourStartMin: promo.happyHourStartMin ?? null,
+    happyHourEndMin: promo.happyHourEndMin ?? null,
   };
 }

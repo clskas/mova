@@ -36,6 +36,10 @@ import { PartnerBillingService } from '../billing/partner-billing.service';
 import { computeRestaurantPartnerDisplay } from '../billing/partner-display.util';
 import { parseOrderPlacedMetadata } from '../deliveries/food-delivery-settlement.util';
 import { normalizeMenuCatalogInput, parseMenuCatalog } from './menu-catalog.util';
+import { resolvePartnerPeriod } from '../common/partner-period.util';
+import { getPartnerEntityId } from '../common/partner-entity.context';
+import { isRestaurantOpenNow, type OpeningHoursJson } from '../common/restaurant-hours.util';
+import { flattenMenuItems } from './menu-catalog.util';
 
 @Injectable()
 export class RestaurantPortalService {
@@ -76,7 +80,12 @@ export class RestaurantPortalService {
     return { buffer, filename };
   }
 
-  async getRestaurantForOwner(ownerUserId: string) {
+  async getRestaurantForOwner(ownerUserId: string, entityId?: string | null) {
+    const id = entityId?.trim() || getPartnerEntityId();
+    if (id) {
+      const found = await this.prisma.restaurant.findFirst({ where: { id, ownerUserId } });
+      if (found) return found;
+    }
     return this.ensureRestaurantForOwner(ownerUserId);
   }
 
@@ -1045,5 +1054,350 @@ export class RestaurantPortalService {
       restaurantName: delivery.restaurant?.name,
       restaurantOwnerUserId: delivery.restaurant?.ownerUserId ?? undefined,
     });
+  }
+
+  async listEstablishments(ownerUserId: string) {
+    const rows = await this.prisma.restaurant.findMany({
+      where: { ownerUserId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        commerceType: true,
+        address: true,
+        isAcceptingOrders: true,
+        kycStatus: true,
+      },
+    });
+    return { establishments: rows };
+  }
+
+  async getAnalytics(
+    ownerUserId: string,
+    query?: { days?: number; from?: string; to?: string },
+    entityId?: string | null,
+  ) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId, entityId);
+    const period = resolvePartnerPeriod(query);
+    const deliveries = await this.prisma.delivery.findMany({
+      where: {
+        type: DeliveryType.FOOD,
+        restaurantId: restaurant.id,
+        createdAt: { gte: period.from, lte: period.to },
+      },
+      include: { events: { orderBy: { createdAt: 'asc' } }, ratings: true },
+    });
+    let accepted = 0;
+    let rejected = 0;
+    let cancelled = 0;
+    let delivered = 0;
+    let revenueCdf = 0;
+    let prepSumMin = 0;
+    let prepCount = 0;
+    const itemCounts = new Map<string, { name: string; qty: number; revenueCdf: number }>();
+    for (const d of deliveries) {
+      const st = d.status;
+      if (st === DeliveryStatus.CANCELLED) cancelled += 1;
+      if (st === DeliveryStatus.DELIVERED) {
+        delivered += 1;
+        revenueCdf += d.finalPriceCdf ?? d.estimatedPriceCdf ?? 0;
+      }
+      const confirmed = d.events.find((e) => e.event === 'RESTAURANT_CONFIRMED' || e.event === 'CONFIRMED');
+      const rejectedEv = d.events.find((e) => e.event === 'RESTAURANT_REJECTED' || e.event === 'REJECTED');
+      if (confirmed) accepted += 1;
+      if (rejectedEv) rejected += 1;
+      const ready = d.events.find((e) => e.event === 'READY_FOR_PICKUP');
+      if (confirmed && ready) {
+        const mins = (ready.createdAt.getTime() - confirmed.createdAt.getTime()) / 60_000;
+        if (mins > 0 && mins < 24 * 60) {
+          prepSumMin += mins;
+          prepCount += 1;
+        }
+      }
+      const items = Array.isArray(d.items) ? d.items : [];
+      for (const raw of items) {
+        const it = raw as { name?: string; qty?: number; unitPriceCdf?: number };
+        const name = String(it.name ?? 'Article');
+        const qty = Number(it.qty ?? 1) || 1;
+        const cur = itemCounts.get(name) ?? { name, qty: 0, revenueCdf: 0 };
+        cur.qty += qty;
+        cur.revenueCdf += qty * (Number(it.unitPriceCdf) || 0);
+        itemCounts.set(name, cur);
+      }
+    }
+    const decided = accepted + rejected;
+    const acceptanceRate = decided > 0 ? Math.round((accepted / decided) * 1000) / 10 : null;
+    const cancelRate = deliveries.length > 0 ? Math.round((cancelled / deliveries.length) * 1000) / 10 : 0;
+    const avgPrepMin = prepCount > 0 ? Math.round((prepSumMin / prepCount) * 10) / 10 : null;
+    const ratings = deliveries.flatMap((d) => d.ratings);
+    const avgRating =
+      ratings.length > 0
+        ? Math.round((ratings.reduce((s, r) => s + r.restaurantScore, 0) / ratings.length) * 10) / 10
+        : restaurant.rating;
+    const open = isRestaurantOpenNow(restaurant);
+    const alerts: string[] = [];
+    if (acceptanceRate != null && acceptanceRate < 70) alerts.push(`Taux d'acceptation bas (${acceptanceRate}%)`);
+    if (cancelRate > 25) alerts.push(`Annulations élevées (${cancelRate}%)`);
+    if (avgRating != null && avgRating < 3.5) alerts.push(`Note basse (${avgRating})`);
+    if (avgPrepMin != null && restaurant.prepTimeMin && avgPrepMin > restaurant.prepTimeMin * 1.5) {
+      alerts.push(`Préparation lente (${avgPrepMin} min vs cible ${restaurant.prepTimeMin})`);
+    }
+    if (!open.open) alerts.push(open.reason ?? 'Commerce fermé');
+    return {
+      period: { from: period.fromYmd, to: period.toYmd, days: period.days },
+      restaurant: { id: restaurant.id, name: restaurant.name, rating: restaurant.rating, prepTimeMin: restaurant.prepTimeMin },
+      open,
+      kpis: {
+        orders: deliveries.length,
+        delivered,
+        cancelled,
+        accepted,
+        rejected,
+        acceptanceRate,
+        cancelRate,
+        revenueCdf,
+        avgTicketCdf: delivered > 0 ? Math.round(revenueCdf / delivered) : 0,
+        avgPrepMin,
+        avgRating,
+        reviewsCount: ratings.length,
+      },
+      topItems: [...itemCounts.values()].sort((a, b) => b.qty - a.qty).slice(0, 8),
+      alerts,
+    };
+  }
+
+  async getInbox(ownerUserId: string) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const dossier = await this.partnerKyc.getRestaurantDossier(ownerUserId);
+    const items: Array<{ id: string; kind: string; priority: number; title: string; href: string; meta?: string }> = [];
+    if (restaurant.kycStatus === PartnerKycStatus.REJECTED) {
+      items.push({
+        id: 'kyc-rejected',
+        kind: 'KYC',
+        priority: 1,
+        title: 'Dossier rejeté — à corriger',
+        href: '/dossier',
+        meta: restaurant.kycNotes ?? undefined,
+      });
+    } else if (!dossier.canOperate) {
+      items.push({
+        id: 'kyc-pending',
+        kind: 'KYC',
+        priority: 2,
+        title: 'Dossier incomplet ou en validation',
+        href: '/dossier',
+      });
+    }
+    const pendingOrders = await this.prisma.delivery.count({
+      where: { type: DeliveryType.FOOD, restaurantId: restaurant.id, status: DeliveryStatus.PENDING },
+    });
+    if (pendingOrders > 0) {
+      items.push({
+        id: 'orders-pending',
+        kind: 'ORDERS',
+        priority: 1,
+        title: `${pendingOrders} commande(s) en attente`,
+        href: '/?status=PENDING',
+      });
+    }
+    const threshold = restaurant.stockAlertThreshold ?? 5;
+    const catalog = flattenMenuItems(restaurant.menuItems);
+    const lowStock = catalog.filter((i) => i.stockQty != null && i.stockQty <= threshold && i.isAvailable !== false);
+    if (lowStock.length > 0) {
+      items.push({
+        id: 'stock-low',
+        kind: 'STOCK',
+        priority: 2,
+        title: `${lowStock.length} article(s) en stock bas`,
+        href: '/stock',
+        meta: lowStock
+          .slice(0, 3)
+          .map((i) => i.name)
+          .join(', '),
+      });
+    }
+    const unreplied = await this.prisma.deliveryRating.count({
+      where: {
+        partnerReply: null,
+        delivery: { restaurantId: restaurant.id, type: DeliveryType.FOOD },
+      },
+    });
+    if (unreplied > 0) {
+      items.push({
+        id: 'reviews',
+        kind: 'REVIEWS',
+        priority: 3,
+        title: `${unreplied} avis sans réponse`,
+        href: '/avis',
+      });
+    }
+    items.sort((a, b) => a.priority - b.priority);
+    return { counts: { total: items.length }, items };
+  }
+
+  async getLowStock(ownerUserId: string) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const threshold = restaurant.stockAlertThreshold ?? 5;
+    const catalog = flattenMenuItems(restaurant.menuItems);
+    const items = catalog
+      .filter((i) => i.stockQty != null && i.stockQty <= threshold)
+      .map((i) => ({
+        id: i.id,
+        name: i.name,
+        stockQty: i.stockQty,
+        threshold,
+        suggestion: (i.stockQty ?? 0) <= 0 ? 'Réassort urgent' : 'Prévoir réassort',
+      }))
+      .sort((a, b) => (a.stockQty ?? 0) - (b.stockQty ?? 0));
+    return { threshold, items };
+  }
+
+  async updateHoursAndPause(
+    ownerUserId: string,
+    data: {
+      openingHours?: OpeningHoursJson | null;
+      pausedUntil?: string | null;
+      pauseMinutes?: number | null;
+      stockAlertThreshold?: number;
+      isAcceptingOrders?: boolean;
+    },
+  ) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    let pausedUntil: Date | null | undefined = undefined;
+    if (data.pauseMinutes != null && data.pauseMinutes > 0) {
+      pausedUntil = new Date(Date.now() + data.pauseMinutes * 60_000);
+    } else if (data.pausedUntil === null) {
+      pausedUntil = null;
+    } else if (typeof data.pausedUntil === 'string' && data.pausedUntil.trim()) {
+      pausedUntil = new Date(data.pausedUntil);
+    }
+    const updated = await this.prisma.restaurant.update({
+      where: { id: restaurant.id },
+      data: {
+        ...(data.openingHours !== undefined
+          ? { openingHours: data.openingHours === null ? Prisma.JsonNull : (data.openingHours as Prisma.InputJsonValue) }
+          : {}),
+        ...(pausedUntil !== undefined ? { pausedUntil } : {}),
+        ...(data.stockAlertThreshold !== undefined ? { stockAlertThreshold: Math.max(0, data.stockAlertThreshold) } : {}),
+        ...(data.isAcceptingOrders !== undefined ? { isAcceptingOrders: data.isAcceptingOrders } : {}),
+      },
+    });
+    return {
+      id: updated.id,
+      openingHours: updated.openingHours,
+      pausedUntil: updated.pausedUntil,
+      stockAlertThreshold: updated.stockAlertThreshold,
+      isAcceptingOrders: updated.isAcceptingOrders,
+      open: isRestaurantOpenNow(updated),
+    };
+  }
+
+  async listReviews(ownerUserId: string, query?: { skip?: number; take?: number }) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const take = Math.min(100, Math.max(1, query?.take ?? 30));
+    const skip = Math.max(0, query?.skip ?? 0);
+    const where = { delivery: { restaurantId: restaurant.id, type: DeliveryType.FOOD } };
+    const [total, rows] = await Promise.all([
+      this.prisma.deliveryRating.count({ where }),
+      this.prisma.deliveryRating.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+        include: { delivery: { select: { id: true, createdAt: true, finalPriceCdf: true } } },
+      }),
+    ]);
+    return {
+      total,
+      reviews: rows.map((r) => ({
+        id: r.id,
+        deliveryId: r.deliveryId,
+        restaurantScore: r.restaurantScore,
+        courierScore: r.courierScore,
+        comment: r.comment,
+        partnerReply: r.partnerReply,
+        partnerRepliedAt: r.partnerRepliedAt,
+        createdAt: r.createdAt,
+        orderAt: r.delivery.createdAt,
+      })),
+    };
+  }
+
+  async replyToReview(ownerUserId: string, reviewId: string, reply: string) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const text = reply.trim();
+    if (!text || text.length > 1000) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Réponse requise (max 1000 caractères).');
+    }
+    const rating = await this.prisma.deliveryRating.findFirst({
+      where: { id: reviewId, delivery: { restaurantId: restaurant.id } },
+    });
+    if (!rating) throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'Avis introuvable.');
+    const updated = await this.prisma.deliveryRating.update({
+      where: { id: reviewId },
+      data: { partnerReply: text, partnerRepliedAt: new Date() },
+    });
+    return { id: updated.id, partnerReply: updated.partnerReply, partnerRepliedAt: updated.partnerRepliedAt };
+  }
+
+  async getFleetMap(ownerUserId: string) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const mode = restaurant.courierMode ?? 'PLATFORM';
+    if (mode === 'PLATFORM') {
+      return { enabled: false, reason: 'Mode plateforme — flotte propre non activée', drivers: [], recent: [] };
+    }
+    const links = await this.prisma.restaurantDriver.findMany({
+      where: { restaurantId: restaurant.id, isActive: true },
+    });
+    const drivers = [];
+    for (const link of links) {
+      const brief = await fetchAuthUserBrief(link.driverUserId);
+      let lat: number | null = null;
+      let lng: number | null = null;
+      let isAvailable: boolean | null = null;
+      try {
+        const res = await fetch(serviceUrl('driver', `/internal/drivers/${link.driverUserId}/detail`), {
+          headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+        });
+        if (res.ok) {
+          const detail = (await res.json()) as { currentLat?: number; currentLng?: number; isAvailable?: boolean };
+          lat = detail.currentLat ?? null;
+          lng = detail.currentLng ?? null;
+          isAvailable = detail.isAvailable ?? null;
+        }
+      } catch {
+        /* ignore */
+      }
+      drivers.push({
+        id: link.id,
+        driverUserId: link.driverUserId,
+        name: brief?.name,
+        phone: brief?.phone,
+        lat,
+        lng,
+        isAvailable,
+      });
+    }
+    const driverIds = new Set(links.map((l) => l.driverUserId));
+    const recentRaw = await this.prisma.delivery.findMany({
+      where: {
+        restaurantId: restaurant.id,
+        type: DeliveryType.FOOD,
+        createdAt: { gte: new Date(Date.now() - 7 * 86_400_000) },
+        OR: [{ courierSource: 'RESTAURANT' }, { driverId: { in: [...driverIds] } }],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        status: true,
+        driverId: true,
+        createdAt: true,
+        deliveredAt: true,
+        finalPriceCdf: true,
+        courierSource: true,
+      },
+    });
+    return { enabled: true, courierMode: mode, drivers, recent: recentRaw };
   }
 }

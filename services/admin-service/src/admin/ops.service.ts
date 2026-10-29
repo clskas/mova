@@ -483,13 +483,56 @@ export class OpsService {
       };
     });
     partners.sort((a, b) => Number(b.alert) - Number(a.alert) || b.cancelRate - a.cancelRate);
+
+    const rentalProfiles = await this.softFetch<
+      Array<{ userId?: string; businessName?: string; city?: string; kycStatus?: string }>
+    >('ride', '/internal/rental-partners', []).catch(() => []);
+    const rentalBookings = await this.softFetch<
+      Array<{ ownerUserId?: string; status?: string; createdAt?: string; vehicleOwnerUserId?: string }>
+    >('ride', `/internal/rental-inquiries?take=400`, []).catch(() => []);
+    const rentalByOwner = new Map<string, { total: number; closed: number; pending: number }>();
+    for (const b of Array.isArray(rentalBookings) ? rentalBookings : []) {
+      const oid = String(b.ownerUserId ?? b.vehicleOwnerUserId ?? '');
+      if (!oid) continue;
+      const cur = rentalByOwner.get(oid) ?? { total: 0, closed: 0, pending: 0 };
+      cur.total += 1;
+      const st = String(b.status ?? '').toUpperCase();
+      if (st === 'CLOSED') cur.closed += 1;
+      if (st === 'PENDING') cur.pending += 1;
+      rentalByOwner.set(oid, cur);
+    }
+    let rentalPartners = (Array.isArray(rentalProfiles) ? rentalProfiles : []).map((p) => {
+      const stats = rentalByOwner.get(String(p.userId ?? '')) ?? { total: 0, closed: 0, pending: 0 };
+      const declineRate = stats.total > 0 ? stats.closed / stats.total : 0;
+      const alert = declineRate > 0.3 || stats.pending > 5;
+      return {
+        id: p.userId,
+        name: p.businessName ?? 'Loueur',
+        kind: 'RENTAL' as const,
+        city: p.city ?? null,
+        kycStatus: p.kycStatus,
+        bookings: stats.total,
+        pending: stats.pending,
+        closed: stats.closed,
+        declineRate: Math.round(declineRate * 1000) / 10,
+        alert,
+      };
+    });
+    if (cityQ) {
+      rentalPartners = rentalPartners.filter((p) => (p.city ?? '').toLowerCase() === cityQ);
+    }
+    rentalPartners.sort((a, b) => Number(b.alert) - Number(a.alert) || b.declineRate - a.declineRate);
+
     return {
       days,
       city: city?.trim() || null,
       partners,
+      rentalPartners,
       counts: {
         total: partners.length,
         alerts: partners.filter((p) => p.alert).length,
+        rentalTotal: rentalPartners.length,
+        rentalAlerts: rentalPartners.filter((p) => p.alert).length,
       },
       generatedAt: new Date().toISOString(),
     };

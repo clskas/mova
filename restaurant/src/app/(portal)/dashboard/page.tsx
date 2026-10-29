@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRestaurantLiveRegister } from "@/components/RestaurantLiveProvider";
 import { PubliciteCarousel } from "@/components/PubliciteCarousel";
-import { fetchActivePublicites, fetchDashboard, formatCdf, type Publicite, type RestaurantDashboard } from "@/lib/api";
+import { fetchActivePublicites, fetchAnalytics, fetchDashboard, formatCdf, type Publicite, type RestaurantDashboard } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { PartnerAmountLine } from "@/components/PartnerAmountLine";
 import { useCommerceCopy } from "@/components/CommerceTypeContext";
+import { PeriodFilterBar } from "@/components/PeriodFilterBar";
+import { rangeForPresetDays, todayYmdKinshasa, type PeriodMode, type PeriodPresetDays } from "@/lib/period-filter";
 
 export default function DashboardPage() {
   const copy = useCommerceCopy();
@@ -16,20 +18,36 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("preset");
+  const [period, setPeriod] = useState<PeriodPresetDays>(30);
+  const [customFrom, setCustomFrom] = useState(() => rangeForPresetDays(30).from);
+  const [customTo, setCustomTo] = useState(todayYmdKinshasa);
+  const [appliedFrom, setAppliedFrom] = useState<string | null>(null);
+  const [appliedTo, setAppliedTo] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<Awaited<ReturnType<typeof fetchAnalytics>> | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setError(null);
     try {
-      const [d, ads] = await Promise.all([fetchDashboard(), fetchActivePublicites("RESTAURANT")]);
+      const periodOpts =
+        periodMode === "custom" && appliedFrom && appliedTo
+          ? { from: appliedFrom, to: appliedTo }
+          : { days: period };
+      const [d, ads, an] = await Promise.all([
+        fetchDashboard(),
+        fetchActivePublicites("RESTAURANT"),
+        fetchAnalytics(periodOpts).catch(() => null),
+      ]);
       setData(d);
       setPublicites(ads);
+      setAnalytics(an);
     } catch (e) {
       setError(toUserErrorMessage(e, "Erreur de chargement"));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [periodMode, period, appliedFrom, appliedTo]);
 
   useEffect(() => {
     load();
@@ -107,6 +125,61 @@ export default function DashboardPage() {
       )}
 
       <PubliciteCarousel items={publicites} />
+
+      <PeriodFilterBar
+        mode={periodMode}
+        period={period}
+        customFrom={customFrom}
+        customTo={customTo}
+        appliedFrom={appliedFrom}
+        appliedTo={appliedTo}
+        onModeChange={(m) => {
+          setPeriodMode(m);
+          if (m !== "custom") {
+            setAppliedFrom(null);
+            setAppliedTo(null);
+          }
+        }}
+        onPeriodChange={setPeriod}
+        onCustomFromChange={setCustomFrom}
+        onCustomToChange={setCustomTo}
+        onApplyCustom={() => {
+          if (!customFrom || !customTo || customFrom > customTo) return;
+          setAppliedFrom(customFrom);
+          setAppliedTo(customTo);
+          setPeriodMode("custom");
+        }}
+      />
+
+      {analytics?.alerts && analytics.alerts.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 space-y-1">
+          {analytics.alerts.map((a) => (
+            <p key={a}>⚠ {a}</p>
+          ))}
+        </div>
+      )}
+
+      {analytics?.kpis && (
+        <section className="space-y-3">
+          <h3 className="text-sm font-semibold text-[#0f1222]">
+            Performance · {analytics.period.from} → {analytics.period.to}
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <KpiCard label="CA période" value={formatCdf(analytics.kpis.revenueCdf)} href="/earnings" />
+            <KpiCard label="Commandes" value={String(analytics.kpis.orders)} href="/" />
+            <KpiCard
+              label="Acceptation"
+              value={analytics.kpis.acceptanceRate != null ? `${analytics.kpis.acceptanceRate}%` : "—"}
+              href="/a-traiter"
+            />
+            <KpiCard
+              label="Note / prep."
+              value={`${analytics.kpis.avgRating ?? "—"} · ${analytics.kpis.avgPrepMin ?? "—"} min`}
+              href="/avis"
+            />
+          </div>
+        </section>
+      )}
 
       {kpis && (
         <>

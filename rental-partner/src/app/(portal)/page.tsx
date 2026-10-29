@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { usePartnerLiveRegister } from "@/components/PartnerLiveProvider";
 import { PubliciteCarousel } from "@/components/PubliciteCarousel";
-import { fetchActivePublicites, fetchDashboard, fetchProfile, formatCdf, formatDate, type Publicite, type RentalDashboard } from "@/lib/api";
+import { fetchActivePublicites, fetchAnalytics, fetchDashboard, fetchProfile, formatCdf, formatDate, type Publicite, type RentalDashboard } from "@/lib/api";
+import { PeriodFilterBar } from "@/components/PeriodFilterBar";
+import { rangeForPresetDays, todayYmdKinshasa, type PeriodMode, type PeriodPresetDays } from "@/lib/period-filter";
 
 export default function DashboardPage() {
   const [dashboard, setDashboard] = useState<RentalDashboard | null>(null);
@@ -12,18 +14,35 @@ export default function DashboardPage() {
   const [profileName, setProfileName] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("preset");
+  const [period, setPeriod] = useState<PeriodPresetDays>(30);
+  const [customFrom, setCustomFrom] = useState(() => rangeForPresetDays(30).from);
+  const [customTo, setCustomTo] = useState(todayYmdKinshasa);
+  const [appliedFrom, setAppliedFrom] = useState<string | null>(null);
+  const [appliedTo, setAppliedTo] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<Awaited<ReturnType<typeof fetchAnalytics>> | null>(null);
 
   const load = useCallback(async (silent = false) => {
     try {
-      const [d, p, ads] = await Promise.all([fetchDashboard(), fetchProfile(), fetchActivePublicites("RENTAL_PARTNER")]);
+      const periodOpts =
+        periodMode === "custom" && appliedFrom && appliedTo
+          ? { from: appliedFrom, to: appliedTo }
+          : { days: period };
+      const [d, p, ads, an] = await Promise.all([
+        fetchDashboard(),
+        fetchProfile(),
+        fetchActivePublicites("RENTAL_PARTNER"),
+        fetchAnalytics(periodOpts).catch(() => null),
+      ]);
       setDashboard(d);
       setProfileName(p.name ?? d.partnerName);
       setPublicites(ads);
+      setAnalytics(an);
     } finally {
       setLoading(false);
       if (!silent) setRefreshing(false);
     }
-  }, []);
+  }, [periodMode, period, appliedFrom, appliedTo]);
 
   useEffect(() => {
     load();
@@ -108,6 +127,54 @@ export default function DashboardPage() {
       ) : (
         <>
           <PubliciteCarousel items={publicites} />
+
+          <PeriodFilterBar
+            mode={periodMode}
+            period={period}
+            customFrom={customFrom}
+            customTo={customTo}
+            appliedFrom={appliedFrom}
+            appliedTo={appliedTo}
+            onModeChange={(m) => {
+              setPeriodMode(m);
+              if (m !== "custom") {
+                setAppliedFrom(null);
+                setAppliedTo(null);
+              }
+            }}
+            onPeriodChange={setPeriod}
+            onCustomFromChange={setCustomFrom}
+            onCustomToChange={setCustomTo}
+            onApplyCustom={() => {
+              if (!customFrom || !customTo || customFrom > customTo) return;
+              setAppliedFrom(customFrom);
+              setAppliedTo(customTo);
+              setPeriodMode("custom");
+            }}
+          />
+
+          {analytics?.alerts && analytics.alerts.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 space-y-1">
+              {analytics.alerts.map((a) => (
+                <p key={a}>⚠ {a}</p>
+              ))}
+            </div>
+          )}
+
+          {analytics?.kpis && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Kpi label="CA période" value={formatCdf(analytics.kpis.revenueCdf)} />
+              <Kpi label="Réservations" value={String(analytics.kpis.bookings)} />
+              <Kpi
+                label="Taux confirm."
+                value={analytics.kpis.confirmRate != null ? `${analytics.kpis.confirmRate}%` : "—"}
+              />
+              <Kpi
+                label="Délai confirm."
+                value={analytics.kpis.avgConfirmHours != null ? `${analytics.kpis.avgConfirmHours} h` : "—"}
+              />
+            </div>
+          )}
 
           {kpis && kpis.walletAvailable === false && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">

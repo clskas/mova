@@ -47,10 +47,17 @@ export class RentalPartnerPortalController {
   }
 
   @Patch('kyc')
-  @ApiOperation({ summary: 'Type de partenaire et informations société' })
+  @ApiOperation({ summary: 'Type de partenaire et informations société / payout' })
   kycProfile(
     @Request() req: { user: { id: string } },
-    @Body() body: { partnerType?: 'COMPANY' | 'INDIVIDUAL'; nif?: string; rccm?: string },
+    @Body()
+    body: {
+      partnerType?: 'COMPANY' | 'INDIVIDUAL';
+      nif?: string;
+      rccm?: string;
+      payoutProvider?: string;
+      payoutPhone?: string;
+    },
   ) {
     return this.partnerKyc.updateRentalProfile(req.user.id, body);
   }
@@ -80,6 +87,67 @@ export class RentalPartnerPortalController {
   @ApiOperation({ summary: 'Tableau de bord partenaire location' })
   dashboard(@Request() req: { user: { id: string } }) {
     return this.portal.getDashboard(req.user.id);
+  }
+
+  @Get('analytics')
+  @ApiOperation({ summary: 'Analytics période location' })
+  analytics(
+    @Request() req: { user: { id: string } },
+    @Query('days') days?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.portal.getAnalytics(req.user.id, {
+      days: days ? Number(days) : undefined,
+      from,
+      to,
+    });
+  }
+
+  @Get('inbox')
+  @ApiOperation({ summary: 'À traiter — inbox loueur' })
+  inbox(@Request() req: { user: { id: string } }) {
+    return this.portal.getInbox(req.user.id);
+  }
+
+  @Get('calendar')
+  @ApiOperation({ summary: 'Calendrier disponibilités' })
+  calendar(
+    @Request() req: { user: { id: string } },
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.portal.getCalendar(req.user.id, { from, to });
+  }
+
+  @Post('calendar/blocks')
+  @ApiOperation({ summary: 'Bloquer un véhicule (maintenance)' })
+  createBlock(
+    @Request() req: { user: { id: string } },
+    @Body() body: { vehicleId: string; startDate: string; endDate: string; reason?: string },
+  ) {
+    return this.portal.createVehicleBlock(req.user.id, body);
+  }
+
+  @Delete('calendar/blocks/:id')
+  @ApiOperation({ summary: 'Supprimer un blocage' })
+  deleteBlock(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.portal.deleteVehicleBlock(req.user.id, id);
+  }
+
+  @Get('quality')
+  @ApiOperation({ summary: 'SLA / qualité loueur' })
+  quality(
+    @Request() req: { user: { id: string } },
+    @Query('days') days?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.portal.getQualitySla(req.user.id, {
+      days: days ? Number(days) : undefined,
+      from,
+      to,
+    });
   }
 
   @Get('vehicles')
@@ -240,6 +308,42 @@ export class RentalPartnerPortalController {
     @Param('id') id: string,
   ) {
     return this.portal.confirmCashPayment(req.user.id, id);
+  }
+
+  @Post('bookings/:id/check-in')
+  @ApiOperation({ summary: 'Check-in location (photos, km, signature)' })
+  checkIn(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() body: { km?: number; photos?: string[]; signature?: string; holdDeposit?: boolean },
+  ) {
+    return this.portal.checkInBooking(req.user.id, id, body ?? {});
+  }
+
+  @Post('bookings/:id/check-out')
+  @ApiOperation({ summary: 'Check-out location' })
+  checkOut(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() body: { km?: number; photos?: string[]; signature?: string; pin?: string },
+  ) {
+    return this.portal.checkOutBooking(req.user.id, id, body ?? {});
+  }
+
+  @Patch('bookings/:id/deposit')
+  @ApiOperation({ summary: 'Mettre à jour le statut de caution' })
+  deposit(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() body: { status: 'NONE' | 'HELD' | 'RELEASED' | 'PARTIAL' | 'DISPUTED'; note?: string; heldCdf?: number },
+  ) {
+    return this.portal.updateDeposit(req.user.id, id, body);
+  }
+
+  @Post('bookings/:id/request-mova-driver')
+  @ApiOperation({ summary: 'Demander un chauffeur MOVA' })
+  requestMova(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.portal.requestMovaDriver(req.user.id, id);
   }
 
   @Get('promos')

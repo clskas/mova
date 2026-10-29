@@ -7,7 +7,7 @@ import { LOGIN_AFTER_LOGOUT_HREF, logoutPartnerSession } from "@/lib/auth";
 import { disableGoogleAutoSelect } from "@/components/GoogleContinueButton";
 import { PUBLIC_API_BASE } from "@/lib/public-api-base";
 import { useRestaurantLiveConnected, useRestaurantLiveRegister } from "@/components/RestaurantLiveProvider";
-import { fetchDashboard } from "@/lib/api";
+import { fetchDashboard, fetchEstablishments, getActiveEntityId, setActiveEntityId } from "@/lib/api";
 import {
   COMMERCE_TYPE_LABELS_FR,
   type CommerceType,
@@ -153,6 +153,8 @@ export function PortalShell({
   const liveConnected = useRestaurantLiveConnected();
   const [pendingCount, setPendingCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [establishments, setEstablishments] = useState<Array<{ id: string; name: string }>>([]);
+  const [activeEntity, setActiveEntity] = useState<string>("");
   const nav = useMemo(() => navItemsForCommerceType(commerceType), [commerceType]);
   const typeLabel = COMMERCE_TYPE_LABELS_FR[commerceType] ?? COMMERCE_TYPE_LABELS_FR.RESTAURANT;
 
@@ -178,6 +180,18 @@ export function PortalShell({
   useEffect(() => {
     void refreshPending();
   }, [refreshPending]);
+
+  useEffect(() => {
+    void fetchEstablishments()
+      .then((res) => {
+        const list = res.establishments ?? [];
+        setEstablishments(list);
+        const current = getActiveEntityId() || list[0]?.id || "";
+        setActiveEntity(current);
+        if (current && current !== getActiveEntityId()) setActiveEntityId(current);
+      })
+      .catch(() => undefined);
+  }, []);
 
   useRestaurantLiveRegister(refreshPending);
 
@@ -212,6 +226,24 @@ export function PortalShell({
             <h1 className="font-semibold text-lg sm:text-xl text-[#0f1222] truncate tracking-tight max-w-[min(100%,28rem)] px-2">
               {restaurantName ?? "Partenaire"}
             </h1>
+            {establishments.length > 1 && (
+              <select
+                className="mt-1 text-xs border rounded-lg px-2 py-1 max-w-[16rem]"
+                value={activeEntity}
+                onChange={(e) => {
+                  setActiveEntity(e.target.value);
+                  setActiveEntityId(e.target.value || null);
+                  window.location.reload();
+                }}
+                aria-label="Établissement actif"
+              >
+                {establishments.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
+                ))}
+              </select>
+            )}
             {(ownerPhone || ownerEmail) && (
               <p className="text-xs text-slate-500 text-center max-w-full truncate px-2">
                 {[ownerPhone, ownerEmail].filter(Boolean).join(" · ")}

@@ -1,5 +1,5 @@
 /* BUILD_ID: __MOVA_BUILD_ID__ */
-const CACHE = "mova-rental-partner-v16";
+const CACHE = "mova-rental-partner-v17";
 const ICON_V = "location-v1";
 const SHELL = [
   "/manifest.webmanifest",

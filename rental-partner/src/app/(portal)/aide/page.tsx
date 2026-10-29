@@ -98,6 +98,17 @@ export default function RentalAidePage() {
         <a href="/manuel" className="inline-block mt-2 text-indigo-700 underline font-medium text-sm">
           Ouvrir le manuel utilisateur
         </a>
+        <p className="text-sm text-gray-600 mt-4">
+          Vous vendez aussi en commerce ?{" "}
+          <a
+            href="https://sengapartner.afri-soft.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-700 underline font-medium"
+          >
+            Ouvrir SENGA Business
+          </a>
+        </p>
       </section>
 
       <section className="space-y-2">

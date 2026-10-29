@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Request, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Request, Res, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PartnerEntityInterceptor } from '../common/partner-entity.interceptor';
 import { PartnerPromoDto } from '../promo/partner-promo.dto';
 import { PartnerPromoService } from '../promo/partner-promo.service';
 import { PartnerBillingService } from '../billing/partner-billing.service';
@@ -25,6 +26,7 @@ import { PartnerKycService } from '../partner-kyc/partner-kyc.service';
 @ApiTags('restaurant')
 @Controller('restaurant')
 @UseGuards(JwtAuthGuard, RestaurantRoleGuard)
+@UseInterceptors(PartnerEntityInterceptor)
 @ApiBearerAuth()
 export class RestaurantPortalController {
   constructor(
@@ -88,6 +90,89 @@ export class RestaurantPortalController {
   @ApiOperation({ summary: 'Tableau de bord partenaire restaurant' })
   dashboard(@Request() req: { user: { id: string } }) {
     return this.portal.getDashboard(req.user.id);
+  }
+
+  @Get('establishments')
+  @ApiOperation({ summary: 'Établissements du compte (multi-sites)' })
+  establishments(@Request() req: { user: { id: string } }) {
+    return this.portal.listEstablishments(req.user.id);
+  }
+
+  @Get('analytics')
+  @ApiOperation({ summary: 'Analytics période (CA, acceptation, top articles)' })
+  analytics(
+    @Request() req: { user: { id: string } },
+    @Query('days') days?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('entityId') entityId?: string,
+  ) {
+    return this.portal.getAnalytics(
+      req.user.id,
+      {
+        days: days ? Number(days) : undefined,
+        from,
+        to,
+      },
+      entityId,
+    );
+  }
+
+  @Get('inbox')
+  @ApiOperation({ summary: 'À traiter — inbox partenaire' })
+  inbox(@Request() req: { user: { id: string } }) {
+    return this.portal.getInbox(req.user.id);
+  }
+
+  @Get('stock/alerts')
+  @ApiOperation({ summary: 'Articles en stock bas' })
+  stockAlerts(@Request() req: { user: { id: string } }) {
+    return this.portal.getLowStock(req.user.id);
+  }
+
+  @Patch('hours')
+  @ApiOperation({ summary: 'Horaires, pause et seuil stock' })
+  hours(
+    @Request() req: { user: { id: string } },
+    @Body()
+    body: {
+      openingHours?: Record<string, Array<[number, number]>> | null;
+      pausedUntil?: string | null;
+      pauseMinutes?: number | null;
+      stockAlertThreshold?: number;
+      isAcceptingOrders?: boolean;
+    },
+  ) {
+    return this.portal.updateHoursAndPause(req.user.id, body);
+  }
+
+  @Get('reviews')
+  @ApiOperation({ summary: 'Avis clients' })
+  reviews(
+    @Request() req: { user: { id: string } },
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.portal.listReviews(req.user.id, {
+      skip: skip != null ? Number(skip) : undefined,
+      take: take != null ? Number(take) : undefined,
+    });
+  }
+
+  @Post('reviews/:id/reply')
+  @ApiOperation({ summary: 'Répondre à un avis' })
+  reviewReply(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() body: { reply?: string },
+  ) {
+    return this.portal.replyToReview(req.user.id, id, body.reply ?? '');
+  }
+
+  @Get('fleet')
+  @ApiOperation({ summary: 'Flotte propre GPS + historique' })
+  fleet(@Request() req: { user: { id: string } }) {
+    return this.portal.getFleetMap(req.user.id);
   }
 
   @Get('orders')

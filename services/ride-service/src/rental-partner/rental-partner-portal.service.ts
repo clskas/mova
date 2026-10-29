@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { RentalInquiryStatus, RentalVehicleApprovalStatus } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, serviceUrl } from '@mova/shared';
+import { PartnerKycStatus, RentalDepositStatus, RentalInquiryStatus, RentalLogisticsMode, RentalVehicleApprovalStatus } from '@prisma/client';
+import { MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, MOVA_EVENTS, serviceUrl } from '@mova/shared';
+import { RedisService } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import {
   fetchPartnerWallet,
@@ -10,6 +11,7 @@ import {
   startOfMonth,
   sumTransactionAmounts,
 } from '../common/partner-wallet.util';
+import { resolvePartnerPeriod } from '../common/partner-period.util';
 import { PartnerBillingService } from '../billing/partner-billing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RentalService } from '../rental/rental.service';
@@ -29,6 +31,7 @@ export class RentalPartnerPortalService {
     private uploads: UploadsService,
     private partnerBilling: PartnerBillingService,
     private partnerKyc: PartnerKycService,
+    private redis: RedisService,
   ) {}
 
   async getDashboard(ownerUserId: string) {
@@ -339,5 +342,357 @@ export class RentalPartnerPortalService {
       throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, res.status as HttpStatus, msg);
     }
     return this.rental.ownerGetBooking(ownerUserId, bookingId);
+  }
+
+  async getAnalytics(ownerUserId: string, query?: { days?: number; from?: string; to?: string }) {
+    const period = resolvePartnerPeriod(query);
+    const bookings = await this.prisma.rentalInquiry.findMany({
+      where: {
+        vehicle: { ownerUserId },
+        createdAt: { gte: period.from, lte: period.to },
+      },
+      include: { vehicle: { select: { id: true, name: true } } },
+    });
+    let confirmed = 0;
+    let declined = 0;
+    let completed = 0;
+    let revenueCdf = 0;
+    let confirmLatencySumH = 0;
+    let confirmLatencyN = 0;
+    const byVehicle = new Map<string, { name: string; bookings: number; revenueCdf: number }>();
+    for (const b of bookings) {
+      const st = b.status;
+      if (st === RentalInquiryStatus.CONFIRMED || st === RentalInquiryStatus.IN_PROGRESS || st === RentalInquiryStatus.RETURNED || st === RentalInquiryStatus.PAID || st === RentalInquiryStatus.CLOSED) {
+        confirmed += 1;
+        const hours = (b.updatedAt.getTime() - b.createdAt.getTime()) / 3_600_000;
+        if (hours >= 0 && hours < 72) {
+          confirmLatencySumH += hours;
+          confirmLatencyN += 1;
+        }
+      }
+      if (st === RentalInquiryStatus.CLOSED && !b.checkInAt) declined += 1;
+      if (st === RentalInquiryStatus.RETURNED || st === RentalInquiryStatus.PAID || st === RentalInquiryStatus.CLOSED) {
+        completed += 1;
+        revenueCdf += b.totalCdf ?? b.estimatedPriceCdf ?? 0;
+      }
+      const vid = b.vehicleId ?? 'unknown';
+      const name = b.vehicle?.name ?? 'Véhicule';
+      const cur = byVehicle.get(vid) ?? { name, bookings: 0, revenueCdf: 0 };
+      cur.bookings += 1;
+      cur.revenueCdf += b.totalCdf ?? b.estimatedPriceCdf ?? 0;
+      byVehicle.set(vid, cur);
+    }
+    const pending = bookings.filter((b) => b.status === RentalInquiryStatus.PENDING).length;
+    const confirmRate =
+      confirmed + declined + pending > 0
+        ? Math.round((confirmed / (confirmed + declined + Math.max(pending, 0))) * 1000) / 10
+        : null;
+    const alerts: string[] = [];
+    if (pending > 3) alerts.push(`${pending} réservations en attente`);
+    if (confirmLatencyN > 0 && confirmLatencySumH / confirmLatencyN > 12) {
+      alerts.push('Délai de confirmation élevé');
+    }
+    return {
+      period: { from: period.fromYmd, to: period.toYmd, days: period.days },
+      kpis: {
+        bookings: bookings.length,
+        pending,
+        confirmed,
+        declined,
+        completed,
+        revenueCdf,
+        avgTicketCdf: completed > 0 ? Math.round(revenueCdf / completed) : 0,
+        avgConfirmHours: confirmLatencyN > 0 ? Math.round((confirmLatencySumH / confirmLatencyN) * 10) / 10 : null,
+        confirmRate,
+      },
+      topVehicles: [...byVehicle.values()].sort((a, b) => b.bookings - a.bookings).slice(0, 8),
+      alerts,
+    };
+  }
+
+  async getInbox(ownerUserId: string) {
+    const dossier = await this.partnerKyc.getRentalDossier(ownerUserId);
+    const items: Array<{ id: string; kind: string; priority: number; title: string; href: string; meta?: string }> = [];
+    if (dossier.kycStatus === PartnerKycStatus.REJECTED) {
+      items.push({
+        id: 'kyc-rejected',
+        kind: 'KYC',
+        priority: 1,
+        title: 'Dossier rejeté — à corriger',
+        href: '/dossier',
+        meta: dossier.kycNotes ?? undefined,
+      });
+    } else if (!dossier.canOperate) {
+      items.push({
+        id: 'kyc-pending',
+        kind: 'KYC',
+        priority: 2,
+        title: 'Dossier incomplet ou en validation',
+        href: '/dossier',
+      });
+    }
+    const pending = await this.prisma.rentalInquiry.count({
+      where: { vehicle: { ownerUserId }, status: RentalInquiryStatus.PENDING },
+    });
+    if (pending > 0) {
+      items.push({
+        id: 'bookings-pending',
+        kind: 'BOOKINGS',
+        priority: 1,
+        title: `${pending} réservation(s) en attente`,
+        href: '/reservations',
+      });
+    }
+    const needCheckIn = await this.prisma.rentalInquiry.count({
+      where: {
+        vehicle: { ownerUserId },
+        status: { in: [RentalInquiryStatus.CONFIRMED, RentalInquiryStatus.IN_PROGRESS] },
+        checkInAt: null,
+        startDate: { lte: new Date() },
+      },
+    });
+    if (needCheckIn > 0) {
+      items.push({
+        id: 'checkin',
+        kind: 'CHECKIN',
+        priority: 2,
+        title: `${needCheckIn} check-in à faire`,
+        href: '/reservations',
+      });
+    }
+    const needCheckOut = await this.prisma.rentalInquiry.count({
+      where: {
+        vehicle: { ownerUserId },
+        status: RentalInquiryStatus.IN_PROGRESS,
+        checkInAt: { not: null },
+        checkOutAt: null,
+        endDate: { lte: new Date() },
+      },
+    });
+    if (needCheckOut > 0) {
+      items.push({
+        id: 'checkout',
+        kind: 'CHECKOUT',
+        priority: 2,
+        title: `${needCheckOut} check-out à faire`,
+        href: '/reservations',
+      });
+    }
+    const disputed = await this.prisma.rentalInquiry.count({
+      where: { vehicle: { ownerUserId }, depositStatus: RentalDepositStatus.DISPUTED },
+    });
+    if (disputed > 0) {
+      items.push({
+        id: 'deposit',
+        kind: 'DEPOSIT',
+        priority: 2,
+        title: `${disputed} caution(s) en litige`,
+        href: '/reservations',
+      });
+    }
+    items.sort((a, b) => a.priority - b.priority);
+    return { counts: { total: items.length }, items };
+  }
+
+  async getCalendar(ownerUserId: string, query?: { from?: string; to?: string }) {
+    const period = resolvePartnerPeriod({ days: 30, ...query });
+    const vehicles = await this.prisma.rentalVehicle.findMany({
+      where: { ownerUserId, isActive: true },
+      select: { id: true, name: true, city: true },
+      orderBy: { name: 'asc' },
+    });
+    const vehicleIds = vehicles.map((v) => v.id);
+    const [bookings, blocks] = await Promise.all([
+      this.prisma.rentalInquiry.findMany({
+        where: {
+          vehicleId: { in: vehicleIds },
+          status: {
+            in: [
+              RentalInquiryStatus.PENDING,
+              RentalInquiryStatus.CONFIRMED,
+              RentalInquiryStatus.IN_PROGRESS,
+              RentalInquiryStatus.RETURNED,
+            ],
+          },
+          startDate: { lte: period.to },
+          endDate: { gte: period.from },
+        },
+        select: {
+          id: true,
+          vehicleId: true,
+          status: true,
+          startDate: true,
+          endDate: true,
+          contactPhone: true,
+        },
+      }),
+      this.prisma.vehicleBlock.findMany({
+        where: {
+          vehicleId: { in: vehicleIds },
+          startDate: { lte: period.to },
+          endDate: { gte: period.from },
+        },
+      }),
+    ]);
+    return {
+      period: { from: period.fromYmd, to: period.toYmd },
+      vehicles,
+      bookings,
+      blocks,
+    };
+  }
+
+  async createVehicleBlock(
+    ownerUserId: string,
+    data: { vehicleId: string; startDate: string; endDate: string; reason?: string },
+  ) {
+    await this.getVehicleForOwner(ownerUserId, data.vehicleId);
+    const start = new Date(data.startDate);
+    const end = new Date(data.endDate);
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end < start) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Dates de blocage invalides.');
+    }
+    return this.prisma.vehicleBlock.create({
+      data: {
+        vehicleId: data.vehicleId,
+        startDate: start,
+        endDate: end,
+        reason: data.reason?.trim() || null,
+      },
+    });
+  }
+
+  async deleteVehicleBlock(ownerUserId: string, blockId: string) {
+    const block = await this.prisma.vehicleBlock.findFirst({
+      where: { id: blockId, vehicle: { ownerUserId } },
+    });
+    if (!block) throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'Blocage introuvable.');
+    await this.prisma.vehicleBlock.delete({ where: { id: blockId } });
+    return { success: true };
+  }
+
+  async checkInBooking(
+    ownerUserId: string,
+    bookingId: string,
+    data: { km?: number; photos?: string[]; signature?: string; holdDeposit?: boolean },
+  ) {
+    const booking = await this.rental.ownerGetBooking(ownerUserId, bookingId);
+    if ((booking as { checkInAt?: Date | null }).checkInAt) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Check-in déjà effectué.');
+    }
+    const vehicleDep =
+      (booking as { vehicle?: { depositCdf?: number }; depositCdf?: number }).vehicle?.depositCdf ??
+      (booking as { depositCdf?: number }).depositCdf ??
+      null;
+    const depositCdf = vehicleDep;
+    const updated = await this.prisma.rentalInquiry.update({
+      where: { id: bookingId },
+      data: {
+        checkInAt: new Date(),
+        checkInKm: data.km ?? null,
+        checkInPhotos: data.photos ?? [],
+        checkInSignature: data.signature?.trim() || null,
+        status:
+          booking.status === RentalInquiryStatus.CONFIRMED ? RentalInquiryStatus.IN_PROGRESS : booking.status,
+        ...(data.holdDeposit !== false && depositCdf
+          ? { depositStatus: RentalDepositStatus.HELD, depositHeldCdf: depositCdf }
+          : {}),
+      },
+      include: { vehicle: true },
+    });
+    return updated;
+  }
+
+  async checkOutBooking(
+    ownerUserId: string,
+    bookingId: string,
+    data: { km?: number; photos?: string[]; signature?: string; pin?: string },
+  ) {
+    const booking = await this.rental.ownerGetBooking(ownerUserId, bookingId);
+    if (!booking.checkInAt) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Faites le check-in d’abord.');
+    }
+    if (booking.checkOutAt) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Check-out déjà effectué.');
+    }
+    if (booking.completionPin && data.pin && data.pin.trim() !== booking.completionPin) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'PIN de retour incorrect.');
+    }
+    return this.prisma.rentalInquiry.update({
+      where: { id: bookingId },
+      data: {
+        checkOutAt: new Date(),
+        checkOutKm: data.km ?? null,
+        checkOutPhotos: data.photos ?? [],
+        checkOutSignature: data.signature?.trim() || null,
+        status: RentalInquiryStatus.RETURNED,
+      },
+      include: { vehicle: true },
+    });
+  }
+
+  async updateDeposit(
+    ownerUserId: string,
+    bookingId: string,
+    data: { status: RentalDepositStatus; note?: string; heldCdf?: number },
+  ) {
+    await this.rental.ownerGetBooking(ownerUserId, bookingId);
+    return this.prisma.rentalInquiry.update({
+      where: { id: bookingId },
+      data: {
+        depositStatus: data.status,
+        ...(data.note !== undefined ? { depositNote: data.note.trim() || null } : {}),
+        ...(data.heldCdf !== undefined ? { depositHeldCdf: data.heldCdf } : {}),
+      },
+    });
+  }
+
+  async requestMovaDriver(ownerUserId: string, bookingId: string) {
+    const booking = await this.rental.ownerGetBooking(ownerUserId, bookingId);
+    const updated = await this.prisma.rentalInquiry.update({
+      where: { id: bookingId },
+      data: {
+        logisticsMode: RentalLogisticsMode.MOVA_DRIVER,
+        movaDriverRequestedAt: new Date(),
+      },
+      include: { vehicle: true },
+    });
+    await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
+      serviceType: 'RENTAL',
+      referenceId: bookingId,
+      passengerId: booking.userId,
+      summary: 'Demande chauffeur MOVA (partenaire location)',
+      needsMovaDriver: true,
+      ownerUserId,
+    }).catch(() => undefined);
+    return updated;
+  }
+
+  async getQualitySla(ownerUserId: string, query?: { days?: number; from?: string; to?: string }) {
+    const analytics = await this.getAnalytics(ownerUserId, query);
+    const noShows = await this.prisma.rentalInquiry.count({
+      where: {
+        vehicle: { ownerUserId },
+        status: RentalInquiryStatus.CLOSED,
+        checkInAt: null,
+        createdAt: {
+          gte: resolvePartnerPeriod(query).from,
+          lte: resolvePartnerPeriod(query).to,
+        },
+      },
+    });
+    return {
+      ...analytics,
+      sla: {
+        avgConfirmHours: analytics.kpis.avgConfirmHours,
+        confirmRate: analytics.kpis.confirmRate,
+        pending: analytics.kpis.pending,
+        noShows,
+        alert:
+          (analytics.kpis.avgConfirmHours != null && analytics.kpis.avgConfirmHours > 12) ||
+          (analytics.kpis.confirmRate != null && analytics.kpis.confirmRate < 70) ||
+          analytics.kpis.pending > 5,
+      },
+    };
   }
 }

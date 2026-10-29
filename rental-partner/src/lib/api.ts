@@ -70,6 +70,11 @@ export type PartnerBooking = {
   paymentReady?: boolean;
   canConfirmCash?: boolean;
   isPaid?: boolean;
+  checkInAt?: string | null;
+  checkOutAt?: string | null;
+  depositStatus?: string | null;
+  depositHeldCdf?: number | null;
+  movaDriverRequestedAt?: string | null;
 };
 
 export type PartnerVehicle = {
@@ -241,6 +246,8 @@ export type RentalKycDossier = {
   partnerType?: "COMPANY" | "INDIVIDUAL";
   nif?: string | null;
   rccm?: string | null;
+  payoutProvider?: string | null;
+  payoutPhone?: string | null;
   phone?: string | null;
   phoneVerified?: boolean;
   canOperate?: boolean;
@@ -259,6 +266,8 @@ export function updateKycProfile(data: {
   partnerType?: "COMPANY" | "INDIVIDUAL";
   nif?: string;
   rccm?: string;
+  payoutProvider?: string;
+  payoutPhone?: string;
 }) {
   return apiFetch<RentalKycDossier>("/api/rental-partner/kyc", {
     method: "PATCH",
@@ -377,6 +386,86 @@ export type RentalDashboard = {
 
 export function fetchDashboard() {
   return apiFetch<RentalDashboard>("/api/rental-partner/dashboard");
+}
+
+export function fetchAnalytics(opts?: { days?: number; from?: string; to?: string }) {
+  const params = new URLSearchParams();
+  if (opts?.days) params.set("days", String(opts.days));
+  if (opts?.from) params.set("from", opts.from);
+  if (opts?.to) params.set("to", opts.to);
+  const q = params.toString();
+  return apiFetch<{
+    period: { from: string; to: string; days: number };
+    kpis: {
+      bookings: number;
+      pending: number;
+      confirmed: number;
+      completed: number;
+      revenueCdf: number;
+      avgTicketCdf: number;
+      avgConfirmHours: number | null;
+      confirmRate: number | null;
+    };
+    topVehicles: Array<{ name: string; bookings: number; revenueCdf: number }>;
+    alerts: string[];
+  }>(`/api/rental-partner/analytics${q ? `?${q}` : ""}`);
+}
+
+export function fetchPartnerInbox() {
+  return apiFetch<{ counts: { total: number }; items: Array<{ id: string; kind: string; title: string; href: string; meta?: string }> }>(
+    "/api/rental-partner/inbox",
+  );
+}
+
+export function fetchCalendar(opts?: { from?: string; to?: string }) {
+  const params = new URLSearchParams();
+  if (opts?.from) params.set("from", opts.from);
+  if (opts?.to) params.set("to", opts.to);
+  const q = params.toString();
+  return apiFetch<{
+    period: { from: string; to: string };
+    vehicles: Array<{ id: string; name: string; city?: string }>;
+    bookings: Array<{ id: string; vehicleId?: string | null; status: string; startDate: string; endDate: string }>;
+    blocks: Array<{ id: string; vehicleId: string; startDate: string; endDate: string; reason?: string | null }>;
+  }>(`/api/rental-partner/calendar${q ? `?${q}` : ""}`);
+}
+
+export function createCalendarBlock(body: { vehicleId: string; startDate: string; endDate: string; reason?: string }) {
+  return apiFetch("/api/rental-partner/calendar/blocks", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function deleteCalendarBlock(id: string) {
+  return apiFetch(`/api/rental-partner/calendar/blocks/${id}`, { method: "DELETE" });
+}
+
+export function fetchQuality(opts?: { days?: number; from?: string; to?: string }) {
+  const params = new URLSearchParams();
+  if (opts?.days) params.set("days", String(opts.days));
+  if (opts?.from) params.set("from", opts.from);
+  if (opts?.to) params.set("to", opts.to);
+  const q = params.toString();
+  return apiFetch<{
+    kpis: Record<string, number | null>;
+    sla: { avgConfirmHours: number | null; confirmRate: number | null; pending: number; noShows: number; alert: boolean };
+    alerts: string[];
+    period: { from: string; to: string; days: number };
+  }>(`/api/rental-partner/quality${q ? `?${q}` : ""}`);
+}
+
+export function checkInBooking(id: string, body: { km?: number; photos?: string[]; signature?: string; holdDeposit?: boolean }) {
+  return apiFetch(`/api/rental-partner/bookings/${id}/check-in`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function checkOutBooking(id: string, body: { km?: number; photos?: string[]; signature?: string; pin?: string }) {
+  return apiFetch(`/api/rental-partner/bookings/${id}/check-out`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function updateDeposit(id: string, body: { status: string; note?: string; heldCdf?: number }) {
+  return apiFetch(`/api/rental-partner/bookings/${id}/deposit`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function requestMovaDriver(id: string) {
+  return apiFetch(`/api/rental-partner/bookings/${id}/request-mova-driver`, { method: "POST", body: "{}" });
 }
 
 export function fetchBooking(id: string) {

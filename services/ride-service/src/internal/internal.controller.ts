@@ -403,6 +403,11 @@ export class InternalController {
     return this.partnerKyc.ensureRentalProfile(ownerUserId);
   }
 
+  @Get('rental-partners')
+  listRentalPartners() {
+    return this.rental.listPartnerProfilesAdmin();
+  }
+
   @Get('publicites')
   listPublicites() {
     return this.publicites.listAdmin();

@@ -51,6 +51,17 @@ export default function RestaurantAidePage() {
         <a href="/manuel" className="inline-block mt-2 text-orange-700 underline font-medium text-sm">
           Ouvrir le manuel utilisateur
         </a>
+        <p className="text-sm text-gray-600 mt-4">
+          Vous louez aussi des véhicules ?{" "}
+          <a
+            href="https://rental.afri-soft.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-orange-700 underline font-medium"
+          >
+            Ouvrir SENGA Location
+          </a>
+        </p>
       </section>
 
       <section className="space-y-2">

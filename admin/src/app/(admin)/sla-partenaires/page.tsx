@@ -31,30 +31,43 @@ export default function SlaPartenairesPage() {
     void load();
   }, [load]);
 
+  const rentalPartners = data?.rentalPartners ?? [];
+
   return (
     <div className="max-w-5xl mx-auto space-y-4">
       <PageHeader
         title="SLA partenaires"
-        subtitle="Annulations, notes et volume (30 j)"
+        subtitle="Commerce + location (30 j)"
         action={
           <BtnGhost
-            onClick={() =>
-              data &&
+            onClick={() => {
+              if (!data) return;
               downloadCsv(
                 "senga-sla-partenaires.csv",
-                ["Nom", "Type", "Note", "Commandes", "Annulés", "Taux %", "Alerte"],
-                data.partners.map((p) => [
-                  p.name ?? "",
-                  p.commerceType ?? "",
-                  p.rating ?? "",
-                  p.orders,
-                  p.cancelled,
-                  p.cancelRate,
-                  p.alert ? "oui" : "",
-                ]),
-              )
-            }
-            disabled={!data?.partners.length}
+                ["Segment", "Nom", "Type", "Note", "Volume", "Annul/Clos %", "Alerte"],
+                [
+                  ...data.partners.map((p) => [
+                    "COMMERCE",
+                    p.name ?? "",
+                    p.commerceType ?? "",
+                    p.rating ?? "",
+                    p.orders,
+                    p.cancelRate,
+                    p.alert ? "oui" : "",
+                  ]),
+                  ...rentalPartners.map((p) => [
+                    "LOCATION",
+                    p.name ?? "",
+                    "RENTAL",
+                    "",
+                    p.bookings,
+                    p.declineRate,
+                    p.alert ? "oui" : "",
+                  ]),
+                ],
+              );
+            }}
+            disabled={!data?.partners.length && !rentalPartners.length}
           >
             Export CSV
           </BtnGhost>
@@ -68,39 +81,76 @@ export default function SlaPartenairesPage() {
         />
       )}
       {error && <ErrorBanner message={error} onRetry={load} />}
-      <div className="grid grid-cols-2 gap-3 max-w-md">
-        <MetricCard label="Partenaires" value={data?.counts.total ?? "…"} accent="orange" />
-        <MetricCard label="Hors SLA" value={data?.counts.alerts ?? "…"} accent="red" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <MetricCard label="Commerce" value={data?.counts.total ?? "…"} accent="orange" />
+        <MetricCard label="Hors SLA commerce" value={data?.counts.alerts ?? "…"} accent="red" />
+        <MetricCard label="Loueurs" value={data?.counts.rentalTotal ?? "…"} accent="violet" />
+        <MetricCard label="Hors SLA location" value={data?.counts.rentalAlerts ?? "…"} accent="red" />
       </div>
       {loading ? (
         <LoadingState />
-      ) : !data?.partners.length ? (
-        <EmptyState message="Aucun partenaire" />
       ) : (
-        <Card className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-gray-500">
-                <th className="p-3">Nom</th>
-                <th className="p-3">Note</th>
-                <th className="p-3">Commandes</th>
-                <th className="p-3">Annul. %</th>
-                <th className="p-3">Alerte</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.partners.map((p) => (
-                <tr key={p.id} className="border-b">
-                  <td className="p-3 font-medium">{p.name}</td>
-                  <td className="p-3">{p.rating ?? "—"}</td>
-                  <td className="p-3">{p.orders}</td>
-                  <td className="p-3">{p.cancelRate}%</td>
-                  <td className="p-3">{p.alert ? <span className="text-red-700 text-xs font-medium">Oui</span> : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <>
+          <h3 className="text-sm font-semibold text-gray-700">Commerce</h3>
+          {!data?.partners.length ? (
+            <EmptyState message="Aucun partenaire commerce" />
+          ) : (
+            <Card className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="p-3">Nom</th>
+                    <th className="p-3">Note</th>
+                    <th className="p-3">Commandes</th>
+                    <th className="p-3">Annul. %</th>
+                    <th className="p-3">Alerte</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.partners.map((p) => (
+                    <tr key={p.id} className="border-b">
+                      <td className="p-3 font-medium">{p.name}</td>
+                      <td className="p-3">{p.rating ?? "—"}</td>
+                      <td className="p-3">{p.orders}</td>
+                      <td className="p-3">{p.cancelRate}%</td>
+                      <td className="p-3">{p.alert ? <span className="text-red-700 text-xs font-medium">Oui</span> : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          )}
+
+          <h3 className="text-sm font-semibold text-gray-700 pt-2">Location</h3>
+          {!rentalPartners.length ? (
+            <EmptyState message="Aucun loueur" />
+          ) : (
+            <Card className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="p-3">Nom</th>
+                    <th className="p-3">Ville</th>
+                    <th className="p-3">Réservations</th>
+                    <th className="p-3">Clos %</th>
+                    <th className="p-3">Alerte</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rentalPartners.map((p) => (
+                    <tr key={p.id} className="border-b">
+                      <td className="p-3 font-medium">{p.name}</td>
+                      <td className="p-3">{p.city ?? "—"}</td>
+                      <td className="p-3">{p.bookings}</td>
+                      <td className="p-3">{p.declineRate}%</td>
+                      <td className="p-3">{p.alert ? <span className="text-red-700 text-xs font-medium">Oui</span> : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          )}
+        </>
       )}
     </div>
   );

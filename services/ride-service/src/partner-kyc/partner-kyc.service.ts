@@ -218,6 +218,8 @@ export class PartnerKycService {
       kycNotes: profile.kycNotes,
       nif: profile.nif,
       rccm: profile.rccm,
+      payoutProvider: profile.payoutProvider,
+      payoutPhone: profile.payoutPhone,
       phone: user?.phone ?? null,
       email: user?.email ?? null,
       phoneVerified,
@@ -264,7 +266,13 @@ export class PartnerKycService {
 
   async updateRentalProfile(
     ownerUserId: string,
-    data: { partnerType?: RentalPartnerKind; nif?: string; rccm?: string },
+    data: {
+      partnerType?: RentalPartnerKind;
+      nif?: string;
+      rccm?: string;
+      payoutProvider?: string;
+      payoutPhone?: string;
+    },
   ) {
     await this.ensureRentalProfile(ownerUserId);
     await this.prisma.rentalPartnerProfile.update({
@@ -273,6 +281,8 @@ export class PartnerKycService {
         ...(data.partnerType ? { partnerType: data.partnerType as RentalPartnerType } : {}),
         ...(data.nif !== undefined ? { nif: data.nif.trim() || null } : {}),
         ...(data.rccm !== undefined ? { rccm: data.rccm.trim() || null } : {}),
+        ...(data.payoutProvider !== undefined ? { payoutProvider: data.payoutProvider.trim() || null } : {}),
+        ...(data.payoutPhone !== undefined ? { payoutPhone: data.payoutPhone.trim() || null } : {}),
         kycStatus: PartnerKycStatus.PENDING,
         kycNotes: null,
       },

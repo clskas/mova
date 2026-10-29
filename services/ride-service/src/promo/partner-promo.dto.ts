@@ -12,4 +12,16 @@ export class PartnerPromoDto {
   @ApiPropertyOptional({ enum: PromoAbsorbedBy }) @IsOptional() @IsEnum(PromoAbsorbedBy) absorbedBy?: PromoAbsorbedBy;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) @Max(100) partnerAbsorbPercent?: number;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+  @ApiPropertyOptional({ description: 'Happy hour start (minutes from midnight)' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1439)
+  happyHourStartMin?: number;
+  @ApiPropertyOptional({ description: 'Happy hour end (minutes from midnight)' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1440)
+  happyHourEndMin?: number;
 }

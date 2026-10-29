@@ -3097,7 +3097,17 @@ export async function fetchPartnerSla(city?: string | null, days = 30) {
       alert: boolean;
       commerceType?: string;
     }>;
-    counts: { total: number; alerts: number };
+    rentalPartners?: Array<{
+      id?: string;
+      name?: string;
+      city?: string | null;
+      bookings: number;
+      pending: number;
+      closed: number;
+      declineRate: number;
+      alert: boolean;
+    }>;
+    counts: { total: number; alerts: number; rentalTotal?: number; rentalAlerts?: number };
   }>(`/api/admin/partner-sla?${params}`);
 }
 

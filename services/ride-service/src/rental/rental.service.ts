@@ -403,11 +403,24 @@ export class RentalService {
     const remaining = showRemaining
       ? formatRentalRemaining(inquiry.endDate, new Date(), { rentalPeriod: inquiry.rentalPeriod })
       : null;
+    const extra = inquiry as {
+      checkInAt?: Date | null;
+      checkOutAt?: Date | null;
+      depositStatus?: string | null;
+      depositHeldCdf?: number | null;
+      movaDriverRequestedAt?: Date | null;
+    };
     return {
       id: inquiry.id,
       status: inquiry.status,
       statusLabel: RENTAL_STATUS_LABELS[inquiry.status],
       nextStepHint: this.getNextStepHint(inquiry, 'owner', flags),
+      checkInAt: extra.checkInAt?.toISOString?.() ?? extra.checkInAt ?? null,
+      checkOutAt: extra.checkOutAt?.toISOString?.() ?? extra.checkOutAt ?? null,
+      depositStatus: extra.depositStatus ?? 'NONE',
+      depositHeldCdf: extra.depositHeldCdf ?? null,
+      movaDriverRequestedAt:
+        extra.movaDriverRequestedAt?.toISOString?.() ?? extra.movaDriverRequestedAt ?? null,
       vehicleName: inquiry.vehicle?.name ?? inquiry.vehicleType,
       vehicleId: inquiry.vehicleId,
       passengerName: passenger?.name,
@@ -1799,6 +1812,21 @@ export class RentalService {
   async listVehiclesAdmin() {
     const rows = await this.prisma.rentalVehicle.findMany({ orderBy: [{ city: 'asc' }, { name: 'asc' }] });
     return rows.map((r) => this.mapVehicleForAdmin(r));
+  }
+
+  async listPartnerProfilesAdmin() {
+    return this.prisma.rentalPartnerProfile.findMany({
+      orderBy: { updatedAt: 'desc' },
+      take: 300,
+      select: {
+        id: true,
+        userId: true,
+        businessName: true,
+        city: true,
+        kycStatus: true,
+        partnerType: true,
+      },
+    });
   }
 
   mapVehicleForAdmin(row: {

@@ -261,6 +261,9 @@ const COMMON_BEFORE: NavItem[] = [
 ];
 
 const COMMON_AFTER: NavItem[] = [
+  { href: "/a-traiter", label: "À traiter", short: "Inbox", icon: "📥", badgeKey: null },
+  { href: "/avis", label: "Avis clients", short: "Avis", icon: "⭐", badgeKey: null },
+  { href: "/flotte", label: "Flotte propre", short: "Flotte", icon: "🛵", badgeKey: null },
   { href: "/earnings", label: "Revenus", short: "Revenus", icon: "💰", badgeKey: null },
   { href: "/dossier", label: "Mon dossier", short: "Dossier", icon: "📁", badgeKey: null },
   { href: "/promos", label: "Codes promo", short: "Promos", icon: "🏷️", badgeKey: null },

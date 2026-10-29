@@ -155,14 +155,29 @@ export type RestaurantOrder = {
   canPrepare?: boolean;
 };
 
+const ENTITY_KEY = "senga_partner_entity_id";
+
+export function getActiveEntityId(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(ENTITY_KEY);
+}
+
+export function setActiveEntityId(id: string | null) {
+  if (typeof window === "undefined") return;
+  if (!id) localStorage.removeItem(ENTITY_KEY);
+  else localStorage.setItem(ENTITY_KEY, id);
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
+  const entityId = getActiveEntityId();
   try {
     res = await fetch(`${API_BASE}${path}`, {
       ...init,
       headers: {
         "Content-Type": "application/json",
         ...authHeaders(),
+        ...(entityId ? { "X-Partner-Entity-Id": entityId } : {}),
         ...(init?.headers ?? {}),
       },
     });
@@ -295,6 +310,93 @@ export type RestaurantDashboard = {
 
 export function fetchDashboard() {
   return apiFetch<RestaurantDashboard>("/api/restaurant/dashboard");
+}
+
+export function fetchAnalytics(opts?: { days?: number; from?: string; to?: string }) {
+  const params = new URLSearchParams();
+  if (opts?.days) params.set("days", String(opts.days));
+  if (opts?.from) params.set("from", opts.from);
+  if (opts?.to) params.set("to", opts.to);
+  const entityId = getActiveEntityId();
+  if (entityId) params.set("entityId", entityId);
+  const q = params.toString();
+  return apiFetch<{
+    period: { from: string; to: string; days: number };
+    open: { open: boolean; reason?: string };
+    kpis: {
+      orders: number;
+      delivered: number;
+      cancelled: number;
+      acceptanceRate: number | null;
+      cancelRate: number;
+      revenueCdf: number;
+      avgTicketCdf: number;
+      avgPrepMin: number | null;
+      avgRating: number | null;
+      reviewsCount: number;
+    };
+    topItems: Array<{ name: string; qty: number; revenueCdf: number }>;
+    alerts: string[];
+  }>(`/api/restaurant/analytics${q ? `?${q}` : ""}`);
+}
+
+export function fetchPartnerInbox() {
+  return apiFetch<{ counts: { total: number }; items: Array<{ id: string; kind: string; title: string; href: string; meta?: string }> }>(
+    "/api/restaurant/inbox",
+  );
+}
+
+export function fetchEstablishments() {
+  return apiFetch<{ establishments: Array<{ id: string; name: string; commerceType?: string; address?: string }> }>(
+    "/api/restaurant/establishments",
+  );
+}
+
+export function fetchReviews(skip = 0, take = 30) {
+  return apiFetch<{
+    total: number;
+    reviews: Array<{
+      id: string;
+      restaurantScore: number;
+      comment?: string | null;
+      partnerReply?: string | null;
+      createdAt: string;
+    }>;
+  }>(`/api/restaurant/reviews?skip=${skip}&take=${take}`);
+}
+
+export function replyToReview(id: string, reply: string) {
+  return apiFetch(`/api/restaurant/reviews/${id}/reply`, {
+    method: "POST",
+    body: JSON.stringify({ reply }),
+  });
+}
+
+export function patchHours(body: Record<string, unknown>) {
+  return apiFetch("/api/restaurant/hours", { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function fetchFleet() {
+  return apiFetch<{
+    enabled: boolean;
+    reason?: string;
+    drivers: Array<{
+      id: string;
+      driverUserId: string;
+      name?: string;
+      phone?: string;
+      lat?: number | null;
+      lng?: number | null;
+      isAvailable?: boolean | null;
+    }>;
+    recent: Array<Record<string, unknown>>;
+  }>("/api/restaurant/fleet");
+}
+
+export function fetchStockAlerts() {
+  return apiFetch<{ threshold: number; items: Array<{ name: string; stockQty: number | null; suggestion: string }> }>(
+    "/api/restaurant/stock/alerts",
+  );
 }
 
 export type RestaurantEarnings = {
@@ -521,6 +623,8 @@ export type PartnerPromo = {
   scope?: string;
   absorbedBy?: string;
   partnerAbsorbPercent?: number | null;
+  happyHourStartMin?: number | null;
+  happyHourEndMin?: number | null;
 };
 
 export function fetchPromos() {
@@ -536,6 +640,8 @@ export function createPromo(data: {
   scope?: string;
   absorbedBy?: string;
   partnerAbsorbPercent?: number;
+  happyHourStartMin?: number;
+  happyHourEndMin?: number;
 }) {
   return apiFetch<PartnerPromo>("/api/restaurant/promos", { method: "POST", body: JSON.stringify(data) });
 }

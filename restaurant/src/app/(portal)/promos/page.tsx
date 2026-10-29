@@ -18,6 +18,8 @@ const emptyForm = () => ({
   maxUses: 100,
   validUntil: "",
   scope: "FOOD_MENU_ONLY" as const,
+  happyHourStartMin: "" as string,
+  happyHourEndMin: "" as string,
 });
 
 export default function PromosPage() {
@@ -61,6 +63,8 @@ export default function PromosPage() {
         maxUses: form.maxUses,
         validUntil: form.validUntil || undefined,
         scope: form.scope,
+        happyHourStartMin: form.happyHourStartMin !== "" ? Number(form.happyHourStartMin) : undefined,
+        happyHourEndMin: form.happyHourEndMin !== "" ? Number(form.happyHourEndMin) : undefined,
       });
       setForm(emptyForm());
       setMessage("Code promo créé.");
@@ -145,6 +149,30 @@ export default function PromosPage() {
                 <option value="FOOD_ORDER">{copy.scopeFullOrder}</option>
               </select>
             </label>
+            <label className="block text-sm">
+              Happy hour début (min depuis 00h)
+              <input
+                type="number"
+                min={0}
+                max={1439}
+                placeholder="ex. 660 = 11h"
+                value={form.happyHourStartMin}
+                onChange={(e) => setForm((f) => ({ ...f, happyHourStartMin: e.target.value }))}
+                className="mt-1 w-full border rounded-lg px-3 py-2"
+              />
+            </label>
+            <label className="block text-sm">
+              Happy hour fin
+              <input
+                type="number"
+                min={0}
+                max={1440}
+                placeholder="ex. 840 = 14h"
+                value={form.happyHourEndMin}
+                onChange={(e) => setForm((f) => ({ ...f, happyHourEndMin: e.target.value }))}
+                className="mt-1 w-full border rounded-lg px-3 py-2"
+              />
+            </label>
           </div>
           <p className="text-xs text-gray-500">
             La remise sera déduite de votre part nette après commission SENGA.
@@ -175,6 +203,11 @@ export default function PromosPage() {
                       {" · "}
                       {scopeLabels[p.scope ?? ""] ?? p.scope}
                       {" · À votre charge"}
+                      {" · "}
+                      {p.usedCount ?? 0}/{p.maxUses ?? "∞"} utilisations
+                      {p.happyHourStartMin != null && p.happyHourEndMin != null
+                        ? ` · HH ${p.happyHourStartMin}–${p.happyHourEndMin} min`
+                        : ""}
                       {p.maxUses != null && ` · ${p.usedCount ?? 0}/${p.maxUses} utilisations`}
                     </p>
                   </div>

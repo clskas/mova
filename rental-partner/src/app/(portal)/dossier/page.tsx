@@ -16,6 +16,8 @@ export default function RentalDossierPage() {
   const [partnerType, setPartnerType] = useState<"COMPANY" | "INDIVIDUAL">("INDIVIDUAL");
   const [nif, setNif] = useState("");
   const [rccm, setRccm] = useState("");
+  const [payoutProvider, setPayoutProvider] = useState("");
+  const [payoutPhone, setPayoutPhone] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
@@ -29,6 +31,8 @@ export default function RentalDossierPage() {
       setPartnerType(d.partnerType ?? "INDIVIDUAL");
       setNif(d.nif ?? "");
       setRccm(d.rccm ?? "");
+      setPayoutProvider(d.payoutProvider ?? "");
+      setPayoutPhone(d.payoutPhone ?? "");
     } catch (e) {
       setError(toUserErrorMessage(e, "Impossible de charger le dossier"));
     } finally {
@@ -45,7 +49,7 @@ export default function RentalDossierPage() {
     setSaving(true);
     setError(null);
     try {
-      const d = await updateKycProfile({ partnerType, nif, rccm });
+      const d = await updateKycProfile({ partnerType, nif, rccm, payoutProvider, payoutPhone });
       setDossier(d);
       setMessage("Informations enregistrées. SENGA vérifiera votre dossier avant publication des véhicules.");
     } catch (err) {
@@ -118,6 +122,24 @@ export default function RentalDossierPage() {
             </label>
           </>
         )}
+        <label className="block text-sm">
+          Opérateur Mobile Money (retraits)
+          <input
+            className="mt-1 w-full rounded-xl border p-3"
+            placeholder="Airtel / Orange / M-Pesa…"
+            value={payoutProvider}
+            onChange={(e) => setPayoutProvider(e.target.value)}
+          />
+        </label>
+        <label className="block text-sm">
+          Téléphone payout
+          <input
+            className="mt-1 w-full rounded-xl border p-3"
+            placeholder="+243…"
+            value={payoutPhone}
+            onChange={(e) => setPayoutPhone(e.target.value)}
+          />
+        </label>
         <button
           type="submit"
           disabled={saving}

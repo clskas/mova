@@ -14,6 +14,8 @@ export type PartnerPromoInput = {
   absorbedBy?: PromoAbsorbedBy;
   partnerAbsorbPercent?: number;
   isActive?: boolean;
+  happyHourStartMin?: number | null;
+  happyHourEndMin?: number | null;
 };
 
 @Injectable()
@@ -113,6 +115,8 @@ export class PartnerPromoService {
         absorbedBy: PromoAbsorbedBy.PARTNER,
         partnerAbsorbPercent: null,
         restaurantId: restaurant.id,
+        happyHourStartMin: data.happyHourStartMin ?? null,
+        happyHourEndMin: data.happyHourEndMin ?? null,
       },
     });
     return formatPromoRow(row);
@@ -142,6 +146,8 @@ export class PartnerPromoService {
         absorbedBy: PromoAbsorbedBy.PARTNER,
         partnerAbsorbPercent: null,
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
+        ...(data.happyHourStartMin !== undefined ? { happyHourStartMin: data.happyHourStartMin } : {}),
+        ...(data.happyHourEndMin !== undefined ? { happyHourEndMin: data.happyHourEndMin } : {}),
       },
     });
     return formatPromoRow(row);

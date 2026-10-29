@@ -17,6 +17,10 @@ import {
   downloadBookingReceiptPdf,
   updateBookingLogistics,
   updateBookingStatus,
+  checkInBooking,
+  checkOutBooking,
+  requestMovaDriver,
+  updateDeposit,
   type PartnerBooking,
 } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
@@ -382,6 +386,102 @@ export default function ReservationsPage() {
                   </div>
 
                   <LogisticsEditor booking={b} busy={busyId === b.id} onSave={load} />
+
+                  {(confirmed || inProgress) && (
+                    <div className="flex flex-wrap gap-2">
+                      {!b.checkInAt && (
+                        <button
+                          type="button"
+                          disabled={busyId === b.id}
+                          className="px-3 py-1.5 rounded-lg text-sm border border-emerald-200 text-emerald-800 hover:bg-emerald-50 disabled:opacity-50"
+                          onClick={async () => {
+                            setBusyId(b.id);
+                            try {
+                              const km = window.prompt("Km au départ (optionnel)");
+                              await checkInBooking(b.id, {
+                                km: km ? Number(km) : undefined,
+                                signature: "ok",
+                                holdDeposit: true,
+                              });
+                              await load();
+                            } catch (e) {
+                              setError(toUserErrorMessage(e, "Check-in impossible"));
+                            } finally {
+                              setBusyId(null);
+                            }
+                          }}
+                        >
+                          Check-in
+                        </button>
+                      )}
+                      {b.checkInAt && !b.checkOutAt && (
+                        <button
+                          type="button"
+                          disabled={busyId === b.id}
+                          className="px-3 py-1.5 rounded-lg text-sm border border-amber-200 text-amber-900 hover:bg-amber-50 disabled:opacity-50"
+                          onClick={async () => {
+                            setBusyId(b.id);
+                            try {
+                              const km = window.prompt("Km au retour (optionnel)");
+                              const pin = window.prompt("PIN retour (si requis)") ?? undefined;
+                              await checkOutBooking(b.id, {
+                                km: km ? Number(km) : undefined,
+                                pin,
+                                signature: "ok",
+                              });
+                              await load();
+                            } catch (e) {
+                              setError(toUserErrorMessage(e, "Check-out impossible"));
+                            } finally {
+                              setBusyId(null);
+                            }
+                          }}
+                        >
+                          Check-out
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={busyId === b.id}
+                        className="px-3 py-1.5 rounded-lg text-sm border hover:bg-gray-50 disabled:opacity-50"
+                        onClick={async () => {
+                          setBusyId(b.id);
+                          try {
+                            await requestMovaDriver(b.id);
+                            await load();
+                          } catch (e) {
+                            setError(toUserErrorMessage(e, "Demande MOVA impossible"));
+                          } finally {
+                            setBusyId(null);
+                          }
+                        }}
+                      >
+                        Demander chauffeur MOVA
+                      </button>
+                      {b.depositStatus && b.depositStatus !== "NONE" && (
+                        <button
+                          type="button"
+                          disabled={busyId === b.id}
+                          className="px-3 py-1.5 rounded-lg text-sm border hover:bg-gray-50 disabled:opacity-50"
+                          onClick={async () => {
+                            const status = window.prompt("Statut caution: HELD / RELEASED / PARTIAL / DISPUTED", b.depositStatus ?? "HELD");
+                            if (!status) return;
+                            setBusyId(b.id);
+                            try {
+                              await updateDeposit(b.id, { status });
+                              await load();
+                            } catch (e) {
+                              setError(toUserErrorMessage(e, "Mise à jour caution impossible"));
+                            } finally {
+                              setBusyId(null);
+                            }
+                          }}
+                        >
+                          Caution · {b.depositStatus}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   <CashReceivedConfirm booking={b} busy={busyId === b.id} onDone={load} />
 

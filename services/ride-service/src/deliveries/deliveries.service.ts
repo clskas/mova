@@ -33,6 +33,7 @@ import {
 import { assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverAcceptsDeliveries, driverApprovedVehicleTypes, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 import { fetchDriverDebtStatus } from '../common/driver-debt.util';
 import { isCommerceType, stubRestaurantCreateData } from '../restaurant/restaurant-profile.util';
+import { isRestaurantOpenNow } from '../common/restaurant-hours.util';
 import {
   assertOrderCatalogConstraints,
   decrementMenuStock,
@@ -1885,6 +1886,8 @@ export class DeliveriesService {
   private assertRestaurantCanOperate(restaurant: {
     isAcceptingOrders: boolean;
     kycStatus?: string | null;
+    pausedUntil?: Date | null;
+    openingHours?: unknown;
   }) {
     if (restaurant.kycStatus !== PartnerKycStatus.APPROVED) {
       throw new MovaHttpException(
@@ -1893,11 +1896,12 @@ export class DeliveriesService {
         "Ce restaurant n'est pas encore validé par SENGA.",
       );
     }
-    if (!restaurant.isAcceptingOrders) {
+    const open = isRestaurantOpenNow(restaurant);
+    if (!open.open) {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,
         undefined,
-        "Ce restaurant n'accepte pas de commandes pour le moment.",
+        open.reason ?? "Ce restaurant n'accepte pas de commandes pour le moment.",
       );
     }
   }

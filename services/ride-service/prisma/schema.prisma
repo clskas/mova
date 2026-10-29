@@ -309,6 +309,11 @@ model Restaurant {
   menuItems         Json?
   isActive          Boolean  @default(true)
   isAcceptingOrders Boolean  @default(true)
+  /// Weekly opening hours JSON: { mon: [[openMin, closeMin], ...], ... } (minutes from midnight).
+  openingHours      Json?
+  /// Soft pause — reject new orders until this timestamp.
+  pausedUntil       DateTime?
+  stockAlertThreshold Int     @default(5)
   prepTimeMin       Int      @default(25)
   ownerUserId       String?
   commerceType      CommerceType @default(RESTAURANT)
@@ -418,6 +423,8 @@ model DeliveryRating {
   restaurantScore Int
   courierScore    Int?
   comment         String?
+  partnerReply    String?
+  partnerRepliedAt DateTime?
   createdAt       DateTime @default(now())
 
   @@unique([deliveryId, fromUserId])
@@ -761,6 +768,7 @@ model RentalVehicle {
   updatedAt            DateTime @updatedAt
 
   bookings RentalInquiry[]
+  blocks   VehicleBlock[]
 
   @@index([city, category, isActive])
   @@index([ownerUserId])
@@ -782,6 +790,8 @@ model RentalPartnerProfile {
   activationPinVerifiedAt DateTime?
   nif         String?
   rccm        String?
+  payoutProvider String?
+  payoutPhone    String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -838,6 +848,18 @@ model RentalInquiry {
   ownerDriverPhone        String?
   driverId                String?
   completionPin           String?
+  checkInAt               DateTime?
+  checkOutAt              DateTime?
+  checkInKm               Int?
+  checkOutKm              Int?
+  checkInPhotos           Json?
+  checkOutPhotos          Json?
+  checkInSignature        String?
+  checkOutSignature       String?
+  depositStatus           RentalDepositStatus @default(NONE)
+  depositHeldCdf          Int?
+  depositNote             String?
+  movaDriverRequestedAt   DateTime?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
@@ -845,6 +867,27 @@ model RentalInquiry {
   @@index([status])
   @@index([driverId])
   @@map("rental_inquiries")
+}
+
+enum RentalDepositStatus {
+  NONE
+  HELD
+  RELEASED
+  PARTIAL
+  DISPUTED
+}
+
+model VehicleBlock {
+  id        String        @id @default(uuid())
+  vehicleId String
+  vehicle   RentalVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  startDate DateTime
+  endDate   DateTime
+  reason    String?
+  createdAt DateTime      @default(now())
+
+  @@index([vehicleId, startDate, endDate])
+  @@map("vehicle_blocks")
 }
 
 model MovingRequest {
@@ -978,6 +1021,9 @@ model PromoCode {
   rentalOwnerUserId    String?
   /// Villes SENGA éligibles (noms service area). Vide = toutes les villes. Codes PLATFORM uniquement.
   cityNames            String[]        @default([])
+  /// Happy-hour window in minutes from midnight (Kinshasa); null = all day.
+  happyHourStartMin    Int?
+  happyHourEndMin      Int?
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 

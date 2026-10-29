@@ -11,9 +11,12 @@ import { fetchDashboard } from "@/lib/api";
 
 const NAV = [
   { href: "/", label: "Tableau de bord", short: "Accueil", icon: "📊", badgeKey: null as null | "pending" },
+  { href: "/a-traiter", label: "À traiter", short: "Inbox", icon: "📥", badgeKey: null },
   { href: "/dossier", label: "Mon dossier", short: "Dossier", icon: "📁", badgeKey: null },
   { href: "/vehicules", label: "Véhicules", short: "Véhicules", icon: "🚗", badgeKey: null },
+  { href: "/calendrier", label: "Calendrier", short: "Calendrier", icon: "🗓️", badgeKey: null },
   { href: "/reservations", label: "Réservations", short: "Réserv.", icon: "📅", badgeKey: "pending" as const },
+  { href: "/qualite", label: "Qualité / SLA", short: "Qualité", icon: "📈", badgeKey: null },
   { href: "/revenus", label: "Revenus", short: "Revenus", icon: "💰", badgeKey: null },
   { href: "/promos", label: "Codes promo", short: "Promos", icon: "🏷️", badgeKey: null },
   { href: "/parametres", label: "Paramètres", short: "Réglages", icon: "⚙️", badgeKey: null },

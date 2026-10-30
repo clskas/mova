@@ -1,10 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { BlacklistType, Prisma } from '@prisma/client';
+import { denyJwtUser, normalizePhoneRdc, RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ModerationService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Optional() private readonly redis?: RedisService,
+  ) {}
 
   async writeAudit(input: {
     actorUserId: string;
@@ -87,10 +91,11 @@ export class ModerationService {
   }) {
     const type = this.parseType(input.type);
     if (!type) throw new Error('Type blacklist invalide');
-    const value = input.value.trim().toLowerCase();
+    const value = this.normalizeBlacklistValue(type, input.value);
     if (!value) throw new Error('Valeur blacklist requise');
     const expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
-    return this.prisma.blacklistEntry.upsert({
+    const active = input.active !== false;
+    const row = await this.prisma.blacklistEntry.upsert({
       where: { type_value: { type, value } },
       create: {
         type,
@@ -98,15 +103,53 @@ export class ModerationService {
         reason: input.reason.trim() || 'Sans motif',
         expiresAt: expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : null,
         createdBy: input.createdBy ?? null,
-        active: input.active !== false,
+        active,
       },
       update: {
         reason: input.reason.trim() || 'Sans motif',
         expiresAt: expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : null,
-        active: input.active !== false,
+        active,
         createdBy: input.createdBy ?? undefined,
       },
     });
+    if (active) {
+      await this.revokeSessionsForBlacklistEntry(type, value);
+    }
+    return row;
+  }
+
+  /** Normalize PHONE to +243… so JWT/OTP checks match User.phone. */
+  normalizeBlacklistValue(type: BlacklistType, raw: string): string {
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    if (type === BlacklistType.PHONE) {
+      return normalizePhoneRdc(trimmed) || trimmed.toLowerCase();
+    }
+    return trimmed.toLowerCase();
+  }
+
+  /** Coupe immédiatement les sessions JWT des comptes touchés. */
+  async revokeSessionsForBlacklistEntry(type: BlacklistType, value: string) {
+    if (!this.redis) return;
+    const ids = new Set<string>();
+    if (type === BlacklistType.USER_ID) {
+      ids.add(value);
+    } else if (type === BlacklistType.PHONE) {
+      const users = await this.prisma.user.findMany({
+        where: { phone: value },
+        select: { id: true },
+      });
+      for (const u of users) ids.add(u.id);
+    } else if (type === BlacklistType.EMAIL) {
+      const users = await this.prisma.user.findMany({
+        where: { email: { equals: value, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      for (const u of users) ids.add(u.id);
+    }
+    for (const id of ids) {
+      await denyJwtUser(this.redis, id).catch(() => undefined);
+    }
   }
 
   async deactivateBlacklist(id: string) {
@@ -121,13 +164,25 @@ export class ModerationService {
     const now = new Date();
     const or: Prisma.BlacklistEntryWhereInput[] = [];
     if (opts.phone?.trim()) {
-      or.push({ type: BlacklistType.PHONE, value: opts.phone.trim().toLowerCase() });
+      const phone = this.normalizeBlacklistValue(BlacklistType.PHONE, opts.phone);
+      or.push({ type: BlacklistType.PHONE, value: phone });
+      // Entrées historiques saisies sans normalisation.
+      const raw = opts.phone.trim().toLowerCase();
+      if (raw && raw !== phone) {
+        or.push({ type: BlacklistType.PHONE, value: raw });
+      }
     }
     if (opts.email?.trim()) {
-      or.push({ type: BlacklistType.EMAIL, value: opts.email.trim().toLowerCase() });
+      or.push({
+        type: BlacklistType.EMAIL,
+        value: this.normalizeBlacklistValue(BlacklistType.EMAIL, opts.email),
+      });
     }
     if (opts.userId?.trim()) {
-      or.push({ type: BlacklistType.USER_ID, value: opts.userId.trim().toLowerCase() });
+      or.push({
+        type: BlacklistType.USER_ID,
+        value: this.normalizeBlacklistValue(BlacklistType.USER_ID, opts.userId),
+      });
     }
     if (or.length === 0) return { blocked: false as const };
     const hit = await this.prisma.blacklistEntry.findFirst({

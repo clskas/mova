@@ -54,4 +54,27 @@ describe('JwtStrategy', () => {
       status: UserStatus.PENDING_KYC,
     });
   });
+
+  it('rejects a blacklisted user on session restore', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      phone: '+243893515173',
+      email: null,
+      role: UserRole.PASSENGER,
+      status: UserStatus.ACTIVE,
+    });
+    const moderation = {
+      isBlocked: jest.fn().mockResolvedValue({
+        blocked: true,
+        reason: 'Trop annuler',
+        type: 'PHONE',
+        value: '+243893515173',
+      }),
+    };
+    const withMod = new JwtStrategy(config as never, prisma as never, undefined, moderation as never);
+    await expect(
+      withMod.validate({ sub: 'user-1', role: UserRole.PASSENGER, status: UserStatus.ACTIVE }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(moderation.isBlocked).toHaveBeenCalled();
+  });
 });

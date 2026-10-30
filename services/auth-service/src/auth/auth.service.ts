@@ -193,9 +193,11 @@ export class AuthService {
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PHONE, HttpStatus.BAD_REQUEST);
     }
     if (parsed.kind === 'email') {
+      await this.assertNotBlacklisted({ email: parsed.value });
       return this.requestEmailOtp(parsed.value, requestedRole);
     }
     const normalized = parsed.value;
+    await this.assertNotBlacklisted({ phone: normalized });
     await this.assertInviteOnlyAccountExists(normalized, requestedRole);
     const useTestOtp = isTestOtpAllowedForPhone(normalized);
     const liveCode = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
@@ -302,6 +304,7 @@ export class AuthService {
       );
     }
     this.assertRoleAccess(user, requestedRole);
+    await this.assertNotBlacklisted({ userId: user.id, phone: user.phone, email: user.email });
     // App Review (ASC): seed demos accept PIN 123456 when ALLOW_TEST_OTP=true,
     // same standing code as SMS OTP — reviewers type password into the PIN pad.
     const seedDemoPinOk =
@@ -594,8 +597,10 @@ export class AuthService {
 
     if (!user) {
       this.assertGoogleCanAutoRegister(requestedRole, identity.email);
+      await this.assertNotBlacklisted({ email: identity.email });
     } else {
       this.assertRoleAccess(user, requestedRole, 'google');
+      await this.assertNotBlacklisted({ userId: user.id, phone: user.phone, email: user.email ?? identity.email });
       if (user.status === UserStatus.SUSPENDED) {
         throw new MovaHttpException(
           MovaErrorCode.AUTH_FORBIDDEN,
@@ -772,8 +777,10 @@ export class AuthService {
 
     if (!user) {
       this.assertAppleCanAutoRegister(requestedRole, identity.email);
+      await this.assertNotBlacklisted({ email: identity.email });
     } else {
       this.assertRoleAccess(user, requestedRole, 'apple');
+      await this.assertNotBlacklisted({ userId: user.id, phone: user.phone, email: user.email ?? identity.email });
       if (user.status === UserStatus.SUSPENDED) {
         throw new MovaHttpException(
           MovaErrorCode.AUTH_FORBIDDEN,

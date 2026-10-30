@@ -2405,6 +2405,7 @@ export type PartnerKycDossier = {
   orphan?: boolean;
   hiddenReason?: "orphan" | "play_prelaunch" | null;
   userRole?: string | null;
+  createdAt?: string;
 };
 
 export async function regeneratePartnerLoginPin(

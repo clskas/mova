@@ -19,8 +19,16 @@ import {
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import { AuthenticatedMedia } from "@/components/AuthenticatedMedia";
+import { PeriodFilterBar } from "@/components/PeriodFilterBar";
 import { KYC_DOC_LABELS, kycDocLabel, personDisplayName } from "@/lib/kyc-labels";
 import { commerceTypeLabel } from "@/lib/commerce-type";
+import {
+  createdAtInRange,
+  rangeForPresetDays,
+  todayYmdKinshasa,
+  type PeriodMode,
+  type PeriodPresetDays,
+} from "@/lib/period-filter";
 import {
   BtnDanger,
   BtnSuccess,
@@ -328,6 +336,35 @@ export default function KycPage() {
   const [includeHidden, setIncludeHidden] = useState(false);
   const [pinBanner, setPinBanner] = useState<{ title: string; pin?: string; notice: string } | null>(null);
   const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("preset");
+  const [period, setPeriod] = useState<PeriodPresetDays>(30);
+  const [customFrom, setCustomFrom] = useState(() => rangeForPresetDays(30).from);
+  const [customTo, setCustomTo] = useState(todayYmdKinshasa);
+  const [appliedFrom, setAppliedFrom] = useState<string | null>(null);
+  const [appliedTo, setAppliedTo] = useState<string | null>(null);
+
+  const periodBounds = useMemo(() => {
+    if (periodMode === "all") return { from: null as string | null, to: null as string | null };
+    if (periodMode === "custom" && appliedFrom && appliedTo) {
+      return { from: appliedFrom, to: appliedTo };
+    }
+    if (periodMode === "preset") {
+      const r = rangeForPresetDays(period);
+      return { from: r.from, to: r.to };
+    }
+    return { from: null, to: null };
+  }, [periodMode, period, appliedFrom, appliedTo]);
+
+  const inPeriod = useCallback(
+    (...dates: Array<string | Date | null | undefined>) => {
+      const { from, to } = periodBounds;
+      if (!from && !to) return true;
+      const known = dates.filter((d) => d != null && d !== "");
+      if (!known.length) return false;
+      return known.some((d) => createdAtInRange(d, from, to));
+    },
+    [periodBounds],
+  );
 
   const load = useCallback(async (opts?: { soft?: boolean }) => {
     // Soft reload keeps cards visible after last-doc approve (no LoadingState flash).
@@ -558,9 +595,10 @@ export default function KycPage() {
         if (!dossierNeedsAdminAction(dossier.allDocs, driver, statusFilter)) return false;
         // Keep PENDING dossiers with zero open docs (all APPROVED) so « Approuver le dossier » stays reachable
         if (!dossier.allDocs.length && !(driver?.kycStatus === "PENDING" || driver?.readyForReview)) return false;
+        if (!inPeriod(driver?.createdAt, ...dossier.allDocs.map((d) => d.createdAt))) return false;
         return matchesSearch(q, dossier.displayName, dossier.phone, dossier.email, dossier.publicId);
       });
-  }, [items, allDrivers, driversByUserId, kindFilter, docTypeFilter, q, statusFilter]);
+  }, [items, allDrivers, driversByUserId, kindFilter, docTypeFilter, q, statusFilter, inPeriod]);
 
   const driverDocUserIds = useMemo(() => new Set(driverDossiers.map((d) => d.userId)), [driverDossiers]);
   const showDriversWithoutDocs =
@@ -571,6 +609,7 @@ export default function KycPage() {
     ? pendingDrivers.filter((d) => {
         if (driverDocUserIds.has(d.userId)) return false;
         if (statusFilter === "PENDING" && d.kycStatus !== "PENDING" && !d.readyForReview) return false;
+        if (!inPeriod(d.createdAt)) return false;
         return matchesSearch(
           q,
           driverNameFromProfile(d),
@@ -590,9 +629,10 @@ export default function KycPage() {
       }))
       .filter((r) => {
         if (docTypeFilter && !(r.checklist ?? []).length) return false;
+        if (!inPeriod(r.createdAt)) return false;
         return matchesSearch(q, dossierName(r), r.phone, r.email, r.name);
       });
-  }, [restaurants, kindFilter, docTypeFilter, q]);
+  }, [restaurants, kindFilter, docTypeFilter, q, inPeriod]);
 
   const filteredRentals = useMemo(() => {
     if (kindFilter && kindFilter !== "RENTAL") return [];
@@ -603,9 +643,10 @@ export default function KycPage() {
       }))
       .filter((r) => {
         if (docTypeFilter && !(r.checklist ?? []).length) return false;
+        if (!inPeriod(r.createdAt)) return false;
         return matchesSearch(q, dossierName(r), r.phone, r.email, r.name);
       });
-  }, [rentalPartners, kindFilter, docTypeFilter, q]);
+  }, [rentalPartners, kindFilter, docTypeFilter, q, inPeriod]);
 
   const empty =
     driverDossiers.length === 0 &&
@@ -654,6 +695,30 @@ export default function KycPage() {
           onChange={setSearch}
           placeholder="Rechercher par nom, téléphone ou e-mail…"
           className="max-w-none"
+        />
+        <PeriodFilterBar
+          mode={periodMode}
+          period={period}
+          customFrom={customFrom}
+          customTo={customTo}
+          appliedFrom={appliedFrom}
+          appliedTo={appliedTo}
+          onModeChange={(m) => {
+            setPeriodMode(m);
+            if (m !== "custom") {
+              setAppliedFrom(null);
+              setAppliedTo(null);
+            }
+          }}
+          onPeriodChange={setPeriod}
+          onCustomFromChange={setCustomFrom}
+          onCustomToChange={setCustomTo}
+          onApplyCustom={() => {
+            if (!customFrom || !customTo || customFrom > customTo) return;
+            setAppliedFrom(customFrom);
+            setAppliedTo(customTo);
+            setPeriodMode("custom");
+          }}
         />
         <div className="flex flex-wrap gap-2">
           <select
@@ -708,7 +773,13 @@ export default function KycPage() {
       {loading ? (
         <LoadingState />
       ) : empty ? (
-        <EmptyState message={q || kindFilter || docTypeFilter ? "Aucun dossier ne correspond aux filtres" : "Aucun KYC en attente"} />
+        <EmptyState
+          message={
+            q || kindFilter || docTypeFilter || periodBounds.from
+              ? "Aucun dossier ne correspond aux filtres"
+              : "Aucun KYC en attente"
+          }
+        />
       ) : (
         <div className="space-y-6">
           {driverDossiers.length > 0 && (

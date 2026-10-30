@@ -305,14 +305,21 @@ export default function UtilisateursPage() {
 
   async function saveNewUser() {
     const isCityAdmin = createRole === "CITY_ADMIN";
-    const useGoogle = isCityAdmin && createIdentityMode === "google";
+    const isStaffRole = STAFF_EDIT_ROLES.has(createRole);
+    const useGoogle = isStaffRole && createIdentityMode === "google";
+    const emailTrim = createEmail.trim().toLowerCase();
+    const emailValid = emailTrim.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim);
+
     if (useGoogle) {
-      if (!createEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(createEmail.trim())) {
+      if (!emailValid) {
         setError("Indiquez un e-mail Google valide.");
         return;
       }
     } else if (!createPhone.trim()) {
       setError("Le téléphone est obligatoire.");
+      return;
+    } else if (emailTrim && !emailValid) {
+      setError("E-mail invalide.");
       return;
     }
     if (isCityAdmin && !createManagedCity.trim()) {
@@ -324,8 +331,11 @@ export default function UtilisateursPage() {
     try {
       await createUser({
         ...(useGoogle
-          ? { email: createEmail.trim().toLowerCase() }
-          : { phone: createPhone.trim() }),
+          ? { email: emailTrim }
+          : {
+              phone: createPhone.trim(),
+              ...(emailValid ? { email: emailTrim } : {}),
+            }),
         role: createRole,
         firstName: createFirst.trim() || undefined,
         lastName: createLast.trim() || undefined,
@@ -776,20 +786,25 @@ export default function UtilisateursPage() {
               L’admin ville ne voit que les données de sa ville (courses, livraisons, restos, tarifs…).
               Pas d’accès trésorerie / système. Connexion par téléphone (SMS) ou Google. Réservé SUPER_ADMIN.
             </p>
+          ) : STAFF_EDIT_ROLES.has(createRole) ? (
+            <p className="text-sm text-gray-600">
+              Compte staff : connexion console admin par téléphone (SMS) ou compte Google (e-mail).
+              Réservé SUPER_ADMIN.
+            </p>
           ) : (
             <p className="text-sm text-gray-600">
-              Créez un partenaire (Restaurant / Location) ou, en SUPER_ADMIN, un staff
-              (Admin ville, Support…). Le partenaire peut aussi s’inscrire seul via OTP.
+              Créez un partenaire (Restaurant / Location) ou un passager / chauffeur. Téléphone
+              obligatoire ; e-mail optionnel. Le partenaire peut aussi s’inscrire seul via OTP.
             </p>
           )}
-          {createRole === "CITY_ADMIN" && (
+          {STAFF_EDIT_ROLES.has(createRole) && (
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium text-gray-700">Identifiant de connexion *</legend>
               <div className="flex flex-wrap gap-4 text-sm text-gray-700">
                 <label className="inline-flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
-                    name="city-admin-identity"
+                    name="create-identity"
                     checked={createIdentityMode === "phone"}
                     onChange={() => setCreateIdentityMode("phone")}
                   />
@@ -798,7 +813,7 @@ export default function UtilisateursPage() {
                 <label className="inline-flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
-                    name="city-admin-identity"
+                    name="create-identity"
                     checked={createIdentityMode === "google"}
                     onChange={() => setCreateIdentityMode("google")}
                   />
@@ -807,29 +822,51 @@ export default function UtilisateursPage() {
               </div>
             </fieldset>
           )}
-          {createRole === "CITY_ADMIN" && createIdentityMode === "google" ? (
+          {STAFF_EDIT_ROLES.has(createRole) && createIdentityMode === "google" ? (
             <label>
               <FieldLabel>E-mail Google *</FieldLabel>
               <TextInput
                 value={createEmail}
                 onChange={setCreateEmail}
-                placeholder="admin.beni@gmail.com"
+                placeholder="admin@gmail.com"
               />
               <p className="text-xs text-gray-500 mt-1">
                 La personne se connectera à la console admin avec ce compte Google (même e-mail).
               </p>
             </label>
           ) : (
-            <label>
-              <FieldLabel>Téléphone *</FieldLabel>
-              <TextInput value={createPhone} onChange={setCreatePhone} placeholder="+243900000030" />
-            </label>
+            <>
+              <label>
+                <FieldLabel>Téléphone *</FieldLabel>
+                <TextInput value={createPhone} onChange={setCreatePhone} placeholder="+243900000030" />
+              </label>
+              <label>
+                <FieldLabel>
+                  {STAFF_EDIT_ROLES.has(createRole) ? "E-mail (optionnel)" : "E-mail"}
+                </FieldLabel>
+                <TextInput
+                  value={createEmail}
+                  onChange={setCreateEmail}
+                  placeholder="contact@exemple.com"
+                />
+                {!STAFF_EDIT_ROLES.has(createRole) && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Optionnel. Utile pour notifications / connexion Google si le compte le permet.
+                  </p>
+                )}
+              </label>
+            </>
           )}
           <label>
             <FieldLabel>Rôle *</FieldLabel>
             <SelectInput
               value={createRole}
-              onChange={setCreateRole}
+              onChange={(next) => {
+                setCreateRole(next);
+                if (!STAFF_EDIT_ROLES.has(next) && createIdentityMode === "google") {
+                  setCreateIdentityMode("phone");
+                }
+              }}
               options={
                 canPurge
                   ? [

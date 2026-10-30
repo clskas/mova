@@ -34,6 +34,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
   String? _error;
   Timer? _timer;
   Timer? _statusPollTimer;
+  StreamSubscription<DriverJobStopEvent>? _jobStopSub;
   double? _pickupDistanceKm;
   int? _pickupEtaMin;
   bool _closingForCancel = false;
@@ -53,8 +54,29 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
       }
       setState(() => _countdown--);
     });
-    _statusPollTimer = Timer.periodic(const Duration(seconds: 2), (_) => _pollRideStillOpen());
+    _statusPollTimer = Timer.periodic(const Duration(seconds: 1), (_) => _pollRideStillOpen());
+    _jobStopSub = DriverJobAlertService.onJobStop.listen((ev) {
+      if (_closingForCancel || !mounted) return;
+      final matchesId = ev.referenceId == _rideId;
+      final matchesKey = ev.offerKey == DriverJobAlertService.offerKey('ride', _rideId);
+      if (!matchesId && !matchesKey) return;
+      if (ev.reason == 'taken') {
+        _timer?.cancel();
+        _statusPollTimer?.cancel();
+        Navigator.pop(context, 'taken');
+      } else {
+        _closeAsCancelled();
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _pollRideStillOpen());
+  }
+
+  @override
+  void dispose() {
+    _jobStopSub?.cancel();
+    _timer?.cancel();
+    _statusPollTimer?.cancel();
+    super.dispose();
   }
 
   /// Si le passager annule pendant l'affichage de l'offre, fermer immédiatement.
@@ -140,13 +162,6 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
     } catch (_) {
       /* GPS indisponible — on n'affiche simplement pas la proximité */
     }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _statusPollTimer?.cancel();
-    super.dispose();
   }
 
   Future<void> _accept() async {

@@ -11,6 +11,23 @@ import '../sos/notification_tap_router.dart';
 import 'driver_alert_prefs.dart';
 import 'native_job_wake.dart';
 
+/// Événement FCM / socket : offre prise ou annulée — fermer UI + sonnerie immédiatement.
+class DriverJobStopEvent {
+  const DriverJobStopEvent({
+    required this.reason,
+    this.offerKey,
+    this.referenceId,
+    this.kind,
+  });
+
+  /// `taken` | `cancelled` | autre
+  final String reason;
+  final String? offerKey;
+  final String? referenceId;
+  /// `ride` | `delivery`
+  final String? kind;
+}
+
 /// Alertes chauffeur : vibration + **son SENGA dédié** (ou son système / mute).
 ///
 /// Pour courses/livraisons : sonnerie en boucle (comme un appel) jusqu’à
@@ -30,6 +47,15 @@ class DriverJobAlertService {
   static final Set<String> _activeOfferKeys = {};
   static Timer? _ringSafetyTimer;
   static const _maxRingDuration = Duration(minutes: 3);
+
+  /// true = chauffeur déjà en course/livraison : ignorer nouvelles sonneries d’offre.
+  static bool suppressNewJobOffers = false;
+
+  static final StreamController<DriverJobStopEvent> _jobStopController =
+      StreamController<DriverJobStopEvent>.broadcast();
+
+  /// Fermer immédiatement l’écran d’offre / fenêtre type appel.
+  static Stream<DriverJobStopEvent> get onJobStop => _jobStopController.stream;
 
   /// v7 : aligné JobRing / FCM — les canaux Android sont immuables.
   static const _channelSengaId = 'mova_driver_jobs_v7';
@@ -151,11 +177,33 @@ class DriverJobAlertService {
     }
   }
 
+  /// Coupe sonnerie + notif « appel » et notifie l’UI pour pop l’offre.
+  static Future<void> handleJobStop({
+    String? offerKey,
+    String? referenceId,
+    String? kind,
+    String reason = 'cancelled',
+  }) async {
+    await stopRinging(offerKey: offerKey);
+    await NativeJobWake.stopRing();
+    if (!_jobStopController.isClosed) {
+      _jobStopController.add(
+        DriverJobStopEvent(
+          reason: reason,
+          offerKey: offerKey,
+          referenceId: referenceId,
+          kind: kind,
+        ),
+      );
+    }
+  }
+
   /// Sonnerie en boucle jusqu’à [stopRinging] (acceptation / annulation / refus).
   static Future<void> startRinging({String? offerKey}) async {
     await init();
     await DriverAlertPrefs.ensureLoaded();
     if (DriverAlertPrefs.muted) return;
+    if (suppressNewJobOffers) return;
 
     if (offerKey != null && offerKey.isNotEmpty) {
       _activeOfferKeys.add(offerKey);
@@ -240,6 +288,7 @@ class DriverJobAlertService {
   }) async {
     await init();
     await DriverAlertPrefs.ensureLoaded();
+    if (suppressNewJobOffers && ringUntilStopped) return;
     final muted = DriverAlertPrefs.muted || suppressTraySound;
     final style = DriverAlertPrefs.style;
 

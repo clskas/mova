@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
+import '../navigation/mova_navigator.dart';
+import 'mova_crop_screen.dart';
 
 /// Paramètres adaptés aux appareils à faible mémoire (évite le kill processus caméra).
 const int kMovaPickMaxSide = 1024;
@@ -41,46 +42,21 @@ Future<XFile?> pickMovaImage(
   }
 }
 
-/// Ouvre l'UI de rognage après sélection (KYC, véhicule, colis, déménagement, preuves).
+/// Ouvre l'UI Flutter de rognage (croix + Rogner + Valider haut/bas).
 Future<XFile?> cropMovaImage(XFile source) async {
   try {
     await markExternalCaptureSessionGuard();
-    const presets = <CropAspectRatioPresetData>[
-      CropAspectRatioPreset.original,
-      CropAspectRatioPreset.square,
-      CropAspectRatioPreset.ratio4x3,
-      CropAspectRatioPreset.ratio16x9,
-    ];
-    final cropped = await ImageCropper().cropImage(
-      sourcePath: source.path,
-      compressFormat: ImageCompressFormat.jpg,
-      compressQuality: kMovaPickQuality,
-      maxWidth: kMovaPickMaxSide,
-      maxHeight: kMovaPickMaxSide,
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Rogner',
-          toolbarColor: const Color(0xFF6366F1),
-          toolbarWidgetColor: Colors.white,
-          activeControlsWidgetColor: const Color(0xFF6366F1),
-          statusBarLight: false,
-          initAspectRatio: CropAspectRatioPreset.original,
-          lockAspectRatio: false,
-          aspectRatioPresets: presets,
-        ),
-        IOSUiSettings(
-          title: 'Rogner',
-          cancelButtonTitle: 'Annuler',
-          // Libellé texte (plus large / accessible que l’icône seule).
-          doneButtonTitle: 'Valider',
-          aspectRatioPresets: presets,
-        ),
-      ],
+    final nav = movaNavigatorKey.currentState;
+    if (nav == null || !nav.mounted) return source;
+    final cropped = await nav.push<XFile?>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => MovaCropScreen(sourcePath: source.path),
+      ),
     );
-    if (cropped == null) return null;
-    return XFile(cropped.path);
+    return cropped;
   } catch (_) {
-    // Si le crop échoue (plugin / activité), garder l'image d'origine.
+    // Si le crop échoue, garder l'image d'origine.
     return source;
   }
 }

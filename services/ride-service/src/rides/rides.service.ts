@@ -359,7 +359,10 @@ export class RidesService {
     }
 
     const attempts = await this.prisma.rideEvent.count({ where: { rideId: ride.id, event: 'SEARCH_ATTEMPT' } });
-    const drivers = await this.matching.findDrivers(ride.pickupLat, ride.pickupLng, ride.vehicleType, attempts);
+    const driversRaw = await this.matching.findDrivers(ride.pickupLat, ride.pickupLng, ride.vehicleType, attempts);
+    // Exclure les chauffeurs déjà en course / livraison / commission (pas de 2ᵉ sonnerie).
+    const onDuty = new Set((await this.listOnDutyDriverIds()).driverIds);
+    const drivers = driversRaw.filter((d) => !onDuty.has(d.userId));
     await this.prisma.rideEvent.create({
       data: {
         rideId: ride.id,
@@ -368,6 +371,7 @@ export class RidesService {
           attempt: attempts + 1,
           driversFound: drivers.length,
           driverUserIds: drivers.map((d) => d.userId),
+          excludedOnDuty: driversRaw.length - drivers.length,
         },
       },
     });

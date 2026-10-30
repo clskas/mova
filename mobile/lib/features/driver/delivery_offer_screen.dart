@@ -13,6 +13,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../booking/widgets/mova_ride_map.dart';
+import 'driver_job_alert_service.dart';
 
 class DeliveryOfferScreen extends ConsumerStatefulWidget {
   const DeliveryOfferScreen({super.key, required this.offer});
@@ -28,9 +29,12 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
   bool _loading = false;
   String? _error;
   Timer? _timer;
+  Timer? _statusPollTimer;
+  StreamSubscription<DriverJobStopEvent>? _jobStopSub;
   double? _pickupDistanceKm;
   int? _pickupEtaMin;
   LatLng? _driverPosition;
+  bool _closing = false;
 
   String get _deliveryId => widget.offer['id']?.toString() ?? '';
 
@@ -81,6 +85,49 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
       }
       setState(() => _countdown--);
     });
+    _statusPollTimer = Timer.periodic(const Duration(seconds: 1), (_) => _pollStillOpen());
+    _jobStopSub = DriverJobAlertService.onJobStop.listen((ev) {
+      if (_closing || !mounted) return;
+      final matchesId = ev.referenceId == _deliveryId;
+      final matchesKey =
+          ev.offerKey == DriverJobAlertService.offerKey('delivery', _deliveryId);
+      if (!matchesId && !matchesKey) return;
+      _closeOffer(ev.reason == 'taken' ? 'taken' : 'cancelled');
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _pollStillOpen());
+  }
+
+  Future<void> _pollStillOpen() async {
+    if (_closing || _loading || !mounted || _deliveryId.isEmpty) return;
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/deliveries/$_deliveryId', skipCache: true);
+    if (!mounted || _closing) return;
+    if (result case Success(:final data)) {
+      final status = (data['status']?.toString() ?? '').toUpperCase();
+      if (status == 'CANCELLED' || status == 'CANCELED') {
+        _closeOffer('cancelled');
+      } else if (status.isNotEmpty &&
+          status != 'PENDING' &&
+          status != 'SEARCHING' &&
+          status != 'MATCHING' &&
+          status != 'REQUESTED') {
+        // Déjà prise / assignée ailleurs.
+        _closeOffer('taken');
+      }
+    }
+  }
+
+  void _closeOffer(String result) {
+    if (_closing || !mounted) return;
+    _closing = true;
+    _timer?.cancel();
+    _statusPollTimer?.cancel();
+    unawaited(
+      DriverJobAlertService.stopRinging(
+        offerKey: DriverJobAlertService.offerKey('delivery', _deliveryId),
+      ),
+    );
+    Navigator.pop(context, result);
   }
 
   Future<void> _resolvePickupProximity() async {
@@ -126,7 +173,9 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
 
   @override
   void dispose() {
+    _jobStopSub?.cancel();
     _timer?.cancel();
+    _statusPollTimer?.cancel();
     super.dispose();
   }
 

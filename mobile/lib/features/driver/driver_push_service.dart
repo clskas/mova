@@ -49,8 +49,23 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   if (_isJobStopData(message.data)) {
     await DriverJobAlertService.init();
-    await DriverJobAlertService.stopRinging(offerKey: _offerKeyFromStop(message.data));
-    await NativeJobWake.stopRing();
+    final data = message.data;
+    final refId = data['referenceId']?.toString() ??
+        data['rideId']?.toString() ??
+        data['deliveryId']?.toString();
+    final offerKind = (data['offerJobKind'] ?? data['jobKind'] ?? data['type'] ?? '')
+        .toString()
+        .toUpperCase();
+    final kind = offerKind.contains('DELIVERY') ? 'delivery' : 'ride';
+    final reason = (data['reason']?.toString() ?? '').toLowerCase().contains('taken')
+        ? 'taken'
+        : 'cancelled';
+    await DriverJobAlertService.handleJobStop(
+      offerKey: _offerKeyFromStop(data),
+      referenceId: refId,
+      kind: kind,
+      reason: reason,
+    );
     return;
   }
   final title = message.notification?.title ??
@@ -141,8 +156,23 @@ class DriverPushService {
 
       FirebaseMessaging.onMessage.listen((message) async {
         if (_isJobStopData(message.data)) {
-          await DriverJobAlertService.stopRinging(offerKey: _offerKeyFromStop(message.data));
-          await NativeJobWake.stopRing();
+          final data = message.data;
+          final refId = data['referenceId']?.toString() ??
+              data['rideId']?.toString() ??
+              data['deliveryId']?.toString();
+          final offerKind = (data['offerJobKind'] ?? data['jobKind'] ?? data['type'] ?? '')
+              .toString()
+              .toUpperCase();
+          final kind = offerKind.contains('DELIVERY') ? 'delivery' : 'ride';
+          final reason = (data['reason']?.toString() ?? '').toLowerCase().contains('taken')
+              ? 'taken'
+              : 'cancelled';
+          await DriverJobAlertService.handleJobStop(
+            offerKey: _offerKeyFromStop(data),
+            referenceId: refId,
+            kind: kind,
+            reason: reason,
+          );
           return;
         }
         final title = message.notification?.title ?? message.data['title']?.toString() ?? 'SENGA Driver';

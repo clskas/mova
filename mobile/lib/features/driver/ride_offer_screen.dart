@@ -168,7 +168,9 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => ActiveRideScreen(ride: data)),
+          MaterialPageRoute(
+            builder: (_) => ActiveRideScreen(ride: data, autoOpenNavigation: true),
+          ),
         );
       case Failure(:final error):
         final msg = error.message;

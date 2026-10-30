@@ -30,11 +30,14 @@ class ActiveDeliveryScreen extends ConsumerStatefulWidget {
     super.key,
     required this.delivery,
     this.autoOpenCashPin = false,
+    /// Après acceptation : ouvre Maps (pickup / client) sans 2ᵉ tap.
+    this.autoOpenNavigation = false,
   });
 
   final Map<String, dynamic> delivery;
   /// Ouvre automatiquement la saisie du PIN espèces (ex. événement socket ou accueil chauffeur).
   final bool autoOpenCashPin;
+  final bool autoOpenNavigation;
 
   @override
   ConsumerState<ActiveDeliveryScreen> createState() => _ActiveDeliveryScreenState();
@@ -50,6 +53,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   String? _userId;
   bool _cashDialogOpen = false;
   bool _skipNextCashAutoOpen = false;
+  bool _autoNavTriggered = false;
 
   String get _deliveryId => _delivery['id']?.toString() ?? '';
   String get _status => _delivery['status']?.toString() ?? 'PENDING';
@@ -122,6 +126,23 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     if (_cashPending) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _autoOpenCashConfirm());
     }
+    if (widget.autoOpenNavigation) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_maybeAutoOpenNavigation());
+      });
+    }
+  }
+
+  Future<void> _maybeAutoOpenNavigation() async {
+    if (_autoNavTriggered || !mounted) return;
+    final status = _status.toUpperCase();
+    if (status == 'CANCELLED' || status == 'CANCELED' || status == 'DELIVERED' || status == 'COMPLETED') {
+      return;
+    }
+    _autoNavTriggered = true;
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+    if (!mounted) return;
+    await _openMaps();
   }
 
   Future<void> _connectTrackingSocket() async {

@@ -63,6 +63,7 @@ Future<XFile?> cropMovaImage(XFile source) async {
           toolbarColor: const Color(0xFF6366F1),
           toolbarWidgetColor: Colors.white,
           activeControlsWidgetColor: const Color(0xFF6366F1),
+          statusBarLight: false,
           initAspectRatio: CropAspectRatioPreset.original,
           lockAspectRatio: false,
           aspectRatioPresets: presets,
@@ -70,7 +71,8 @@ Future<XFile?> cropMovaImage(XFile source) async {
         IOSUiSettings(
           title: 'Rogner',
           cancelButtonTitle: 'Annuler',
-          doneButtonTitle: 'OK',
+          // Libellé texte (plus large / accessible que l’icône seule).
+          doneButtonTitle: 'Valider',
           aspectRatioPresets: presets,
         ),
       ],

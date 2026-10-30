@@ -25,9 +25,15 @@ import 'driver_job_alert_service.dart';
 import 'widgets/driver_cash_received_dialog.dart';
 
 class ActiveRideScreen extends ConsumerStatefulWidget {
-  const ActiveRideScreen({super.key, required this.ride});
+  const ActiveRideScreen({
+    super.key,
+    required this.ride,
+    /// Après acceptation : ouvre Google Maps vers le passager sans 2ᵉ tap.
+    this.autoOpenNavigation = false,
+  });
 
   final Map<String, dynamic> ride;
+  final bool autoOpenNavigation;
 
   @override
   ConsumerState<ActiveRideScreen> createState() => _ActiveRideScreenState();
@@ -43,6 +49,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   double? _currentLat;
   double? _currentLng;
   bool _cashDialogOpen = false;
+  bool _autoNavTriggered = false;
 
   String get _rideId => _ride['id']?.toString() ?? '';
   String get _status => _ride['status']?.toString() ?? 'DRIVER_ASSIGNED';
@@ -92,6 +99,22 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     await _connectTrackingSocket();
     _startLocationUpdates();
     _syncPaymentPolling();
+    if (widget.autoOpenNavigation) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_maybeAutoOpenNavigation());
+      });
+    }
+  }
+
+  Future<void> _maybeAutoOpenNavigation() async {
+    if (_autoNavTriggered || !mounted) return;
+    final headingToPickup = _status == 'DRIVER_ASSIGNED' || _status == 'ACCEPTED';
+    if (!headingToPickup) return;
+    _autoNavTriggered = true;
+    // Laisse peindre l’écran course avant de basculer vers Maps.
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+    if (!mounted) return;
+    await _openPickup();
   }
 
   Future<void> _connectTrackingSocket() async {

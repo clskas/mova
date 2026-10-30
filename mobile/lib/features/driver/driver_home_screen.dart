@@ -1004,7 +1004,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       setState(() => _activeDelivery = result);
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => ActiveDeliveryScreen(delivery: result)),
+        MaterialPageRoute(
+          builder: (_) => ActiveDeliveryScreen(
+            delivery: result,
+            autoOpenNavigation: true,
+          ),
+        ),
       );
       await _loadActiveDelivery();
     }

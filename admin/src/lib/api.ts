@@ -2772,6 +2772,14 @@ export type PassengerServiceId =
   | "moving"
   | "wallet";
 
+export type SosEmergencyContact = {
+  id: string;
+  label: string;
+  phone: string;
+  sortOrder: number;
+  enabled: boolean;
+};
+
 export type ClientAppsConfig = {
   mobileMoney: Record<ClientAppId, Record<MmOperatorId, MmOperatorChannels>>;
   maintenance: {
@@ -2783,6 +2791,8 @@ export type ClientAppsConfig = {
   sosAlertUserIds?: string[];
   /** PASSENGER | DRIVER | PARTNER — audiences supplémentaires (push / in-app). */
   sosAlertAudiences?: Array<"PASSENGER" | "DRIVER" | "PARTNER">;
+  /** Numéros d’urgence SOS (CRUD admin → apps). */
+  sosEmergencyContacts?: SosEmergencyContact[];
 };
 
 export async function fetchClientAppsConfig(): Promise<ClientAppsConfig> {

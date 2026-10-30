@@ -45,6 +45,25 @@ export const SOS_ALERT_AUDIENCE_LABELS_FR: Record<SosAlertAudience, string> = {
   PARTNER: 'Partenaires',
 };
 
+/** Numéros d’urgence affichés sur l’écran Alerte SOS (CRUD admin). */
+export type SosEmergencyContact = {
+  id: string;
+  label: string;
+  phone: string;
+  sortOrder: number;
+  enabled: boolean;
+};
+
+export const DEFAULT_SOS_EMERGENCY_CONTACTS: SosEmergencyContact[] = [
+  {
+    id: 'intl-112',
+    label: 'Secours internationaux (112)',
+    phone: '112',
+    sortOrder: 0,
+    enabled: true,
+  },
+];
+
 export type ClientAppsConfig = {
   mobileMoney: MmVisibilityByApp;
   maintenance: MaintenanceConfig;
@@ -61,6 +80,8 @@ export type ClientAppsConfig = {
    * PARTNER = RESTAURANT + RENTAL_PARTNER.
    */
   sosAlertAudiences: SosAlertAudience[];
+  /** Numéros à appeler depuis l’écran SOS (police, pompiers, 112, …). */
+  sosEmergencyContacts: SosEmergencyContact[];
 };
 
 export const DEFAULT_MAINTENANCE_MESSAGE_FR =
@@ -110,6 +131,7 @@ export const DEFAULT_CLIENT_APPS_CONFIG: ClientAppsConfig = {
   features: { sengaPlusVisible: true },
   sosAlertUserIds: [],
   sosAlertAudiences: [],
+  sosEmergencyContacts: structuredClone(DEFAULT_SOS_EMERGENCY_CONTACTS),
 };
 
 export const CLIENT_APP_LABELS_FR: Record<ClientAppId, string> = {
@@ -232,7 +254,54 @@ export function mergeClientAppsConfig(raw: unknown): ClientAppsConfig {
     ];
   }
 
+  const sosContacts = (src as { sosEmergencyContacts?: unknown }).sosEmergencyContacts;
+  if (Array.isArray(sosContacts)) {
+    base.sosEmergencyContacts = normalizeSosEmergencyContacts(sosContacts);
+  }
+
   return base;
+}
+
+function normalizePhoneDigits(raw: string): string {
+  return raw.replace(/[^\d+]/g, '').trim();
+}
+
+/** Parse + sanitize admin CRUD payload (max 20 contacts). */
+export function normalizeSosEmergencyContacts(raw: unknown[]): SosEmergencyContact[] {
+  const out: SosEmergencyContact[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < raw.length && out.length < 20; i++) {
+    const row = raw[i];
+    if (!row || typeof row !== 'object') continue;
+    const o = row as Record<string, unknown>;
+    const label = typeof o.label === 'string' ? o.label.trim().slice(0, 80) : '';
+    const phone = typeof o.phone === 'string' ? normalizePhoneDigits(o.phone).slice(0, 24) : '';
+    if (!label || !phone) continue;
+    let id =
+      typeof o.id === 'string' && o.id.trim()
+        ? o.id.trim().slice(0, 64)
+        : `sos-${Date.now().toString(36)}-${i}`;
+    if (seen.has(id)) id = `${id}-${i}`;
+    seen.add(id);
+    const sortOrder =
+      typeof o.sortOrder === 'number' && Number.isFinite(o.sortOrder)
+        ? Math.trunc(o.sortOrder)
+        : i;
+    const enabled = o.enabled === false ? false : true;
+    out.push({ id, label, phone, sortOrder, enabled });
+  }
+  out.sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, 'fr'));
+  return out.map((c, idx) => ({ ...c, sortOrder: idx }));
+}
+
+/** Enabled contacts for mobile SOS screen (public). */
+export function enabledSosEmergencyContacts(
+  config: ClientAppsConfig,
+): SosEmergencyContact[] {
+  return (config.sosEmergencyContacts ?? [])
+    .filter((c) => c.enabled && c.phone.trim().length > 0)
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, 'fr'));
 }
 
 /** Normalize header / query values to a known client app id. */

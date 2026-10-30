@@ -61,4 +61,27 @@ describe('client-apps-config merge', () => {
     } as unknown as Partial<ClientAppsConfig>);
     expect(cfg.sosAlertAudiences).toEqual(['PASSENGER', 'PARTNER', 'DRIVER']);
   });
+
+  it('defaults sosEmergencyContacts to 112', () => {
+    const cfg = mergeClientAppsConfig(undefined);
+    expect(cfg.sosEmergencyContacts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ phone: '112', enabled: true }),
+      ]),
+    );
+  });
+
+  it('merges sosEmergencyContacts and drops invalid rows', () => {
+    const cfg = mergeClientAppsConfig({
+      sosEmergencyContacts: [
+        { id: 'p1', label: 'Police', phone: '+243 81 000 0000', sortOrder: 2, enabled: true },
+        { id: 'bad', label: '', phone: '999', enabled: true },
+        { label: 'Pompiers', phone: '118', sortOrder: 1, enabled: false },
+      ],
+    } as unknown as Partial<ClientAppsConfig>);
+    expect(cfg.sosEmergencyContacts).toHaveLength(2);
+    expect(cfg.sosEmergencyContacts[0].label).toBe('Pompiers');
+    expect(cfg.sosEmergencyContacts[0].enabled).toBe(false);
+    expect(cfg.sosEmergencyContacts[1].phone).toMatch(/^\+243/);
+  });
 });

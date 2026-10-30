@@ -8,6 +8,7 @@ import {
   MmOperatorId,
   MovaErrorCode,
   MovaHttpException,
+  enabledSosEmergencyContacts,
   isMmOperatorEnabled,
   mergeClientAppsConfig,
 } from '@mova/shared';
@@ -54,15 +55,18 @@ export class ClientAppsConfigService implements OnModuleInit {
       maintenance: this.config.maintenance,
       passengerServices: this.config.passengerServices,
       features: this.config.features,
+      sosEmergencyContacts: enabledSosEmergencyContacts(this.config),
     };
   }
 
-  /** Full config for admin (includes SOS recipient IDs / audiences). */
+  /** Full config for admin (includes SOS recipient IDs / audiences / contacts). */
   getAdmin() {
     return {
       ...this.getPublic(),
       sosAlertUserIds: this.config.sosAlertUserIds,
       sosAlertAudiences: this.config.sosAlertAudiences,
+      // Admin needs disabled rows too (CRUD).
+      sosEmergencyContacts: this.config.sosEmergencyContacts,
     };
   }
 
@@ -90,6 +94,10 @@ export class ClientAppsConfigService implements OnModuleInit {
         patch.sosAlertAudiences !== undefined
           ? patch.sosAlertAudiences
           : this.config.sosAlertAudiences,
+      sosEmergencyContacts:
+        patch.sosEmergencyContacts !== undefined
+          ? patch.sosEmergencyContacts
+          : this.config.sosEmergencyContacts,
     });
 
     this.validate(next);
@@ -127,6 +135,13 @@ export class ClientAppsConfigService implements OnModuleInit {
           `Au moins un opérateur Mobile Money doit rester visible pour ${app}.`,
         );
       }
+    }
+    if ((cfg.sosEmergencyContacts?.length ?? 0) > 20) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Maximum 20 numéros d’urgence SOS.',
+      );
     }
   }
 

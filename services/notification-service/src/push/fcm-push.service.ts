@@ -8,18 +8,14 @@ export interface FcmPushMessage {
   data?: Record<string, string>;
 }
 
-export type FcmPushProfile = 'job' | 'chat';
+export type FcmPushProfile = 'job' | 'chat' | 'jobStop';
 
 /** Canal + son SENGA (doit matcher JobRing / DriverJobAlertService — v7). */
 export const SENGA_DRIVER_JOB_CHANNEL = 'mova_driver_jobs_v7';
 /** Android raw `senga_job`. */
 export const SENGA_DRIVER_JOB_SOUND_ANDROID = 'senga_job';
-/**
- * iOS APNs : `default` est le seul son garanti app tuée.
- * Un fichier custom illisible = silence total (pas de repli). Le son SENGA
- * (senga_job.caf) est joué via JobRingIOS / notifs locales quand iOS réveille l’app.
- */
-export const SENGA_DRIVER_JOB_SOUND_IOS = 'default';
+/** Son custom SENGA (bundle iOS `senga_job.caf`). */
+export const SENGA_DRIVER_JOB_SOUND_IOS = 'senga_job.caf';
 export const SENGA_DRIVER_JOB_SOUND_IOS_CUSTOM = 'senga_job.caf';
 
 export type FcmPushPlatform = 'android' | 'ios' | 'all';
@@ -61,10 +57,11 @@ export class FcmPushService {
     );
     const profile = opts?.profile ?? 'job';
     const isChat = profile === 'chat';
+    const isJobStop = profile === 'jobStop';
     const platform = opts?.platform ?? 'all';
     const channelId = isChat ? SENGA_CHAT_CHANNEL : SENGA_DRIVER_JOB_CHANNEL;
-    const soundAndroid = isChat ? 'default' : SENGA_DRIVER_JOB_SOUND_ANDROID;
-    const soundIos = isChat
+    const soundAndroid = isChat || isJobStop ? 'default' : SENGA_DRIVER_JOB_SOUND_ANDROID;
+    const soundIos = isChat || isJobStop
       ? 'default'
       : (opts?.iosSound?.trim() || SENGA_DRIVER_JOB_SOUND_IOS);
 
@@ -72,6 +69,7 @@ export class FcmPushService {
     if (sa) {
       await this.sendViaHttpV1(unique, message, data, {
         isChat,
+        isJobStop,
         platform,
         channelId,
         soundAndroid,
@@ -92,6 +90,7 @@ export class FcmPushService {
 
     await this.sendViaLegacy(unique, message, data, serverKey, {
       isChat,
+      isJobStop,
       channelId,
       soundAndroid,
       soundIos,
@@ -152,6 +151,7 @@ export class FcmPushService {
     data: Record<string, string>,
     opts: {
       isChat: boolean;
+      isJobStop?: boolean;
       platform: FcmPushPlatform;
       channelId: string;
       soundAndroid: string;
@@ -174,7 +174,9 @@ export class FcmPushService {
         try {
           const messageBody = opts.isChat
             ? this.buildChatMessage(token, message, data, opts)
-            : this.buildJobMessage(token, message, data, opts);
+            : opts.isJobStop
+              ? this.buildJobStopMessage(token, message, data, opts)
+              : this.buildJobMessage(token, message, data, opts);
           const res = await fetch(url, {
             method: 'POST',
             headers: {
@@ -326,6 +328,85 @@ export class FcmPushService {
     };
   }
 
+  /**
+   * Arrêt sonnerie : data-only Android (JobRing.stop) + iOS content-available
+   * (JobRingIOS.stop / cancel pending locals) sans nouveau bip.
+   */
+  private buildJobStopMessage(
+    token: string,
+    message: FcmPushMessage,
+    data: Record<string, string>,
+    opts: {
+      platform: FcmPushPlatform;
+      channelId: string;
+    },
+  ) {
+    const baseData = {
+      ...data,
+      type: data.type || 'JOB_STOP',
+      jobKind: data.jobKind || 'JOB_STOP',
+      stopRing: '1',
+      title: message.title,
+      body: message.body,
+      click_action: 'FLUTTER_NOTIFICATION_CLICK',
+      android_channel_id: opts.channelId,
+    };
+
+    if (opts.platform === 'android') {
+      return {
+        token,
+        data: baseData,
+        android: {
+          priority: 'high' as const,
+          direct_boot_ok: true,
+        },
+      };
+    }
+
+    // iOS : alert silencieuse + content-available pour réveiller JobRingIOS.stop
+    // même app tuée (les silent-only sont trop souvent droppés).
+    if (opts.platform === 'ios') {
+      return {
+        token,
+        data: baseData,
+        apns: {
+          headers: {
+            'apns-priority': '10',
+            'apns-push-type': 'alert',
+          },
+          payload: {
+            aps: {
+              alert: { title: message.title, body: message.body },
+              'content-available': 1,
+              'mutable-content': 1,
+            },
+          },
+        },
+      };
+    }
+
+    return {
+      token,
+      data: baseData,
+      android: {
+        priority: 'high' as const,
+        direct_boot_ok: true,
+      },
+      apns: {
+        headers: {
+          'apns-priority': '10',
+          'apns-push-type': 'alert',
+        },
+        payload: {
+          aps: {
+            alert: { title: message.title, body: message.body },
+            'content-available': 1,
+          },
+        },
+      },
+    };
+  }
+
   private async sendViaLegacy(
     tokens: string[],
     message: FcmPushMessage,
@@ -333,6 +414,7 @@ export class FcmPushService {
     serverKey: string,
     opts: {
       isChat: boolean;
+      isJobStop?: boolean;
       channelId: string;
       soundAndroid: string;
       soundIos: string;
@@ -341,52 +423,66 @@ export class FcmPushService {
     await Promise.all(
       tokens.map(async (token) => {
         try {
+          const payload = opts.isChat
+            ? {
+                to: token,
+                priority: 'high',
+                content_available: true,
+                notification: {
+                  title: message.title,
+                  body: message.body,
+                  sound: opts.soundIos,
+                  android_channel_id: opts.channelId,
+                },
+                data: {
+                  ...data,
+                  title: message.title,
+                  body: message.body,
+                  click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                  android_channel_id: opts.channelId,
+                },
+              }
+            : opts.isJobStop
+              ? {
+                  to: token,
+                  priority: 'high',
+                  content_available: true,
+                  data: {
+                    ...data,
+                    type: data.type || 'JOB_STOP',
+                    jobKind: data.jobKind || 'JOB_STOP',
+                    stopRing: '1',
+                    title: message.title,
+                    body: message.body,
+                    click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                    android_channel_id: opts.channelId,
+                  },
+                }
+              : {
+                  to: token,
+                  priority: 'high',
+                  content_available: true,
+                  data: {
+                    ...data,
+                    title: message.title,
+                    body: message.body,
+                    click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                    android_channel_id: opts.channelId,
+                  },
+                  notification: {
+                    title: message.title,
+                    body: message.body,
+                    sound: opts.soundIos,
+                    android_channel_id: opts.channelId,
+                  },
+                };
           const res = await fetch('https://fcm.googleapis.com/fcm/send', {
             method: 'POST',
             headers: {
               Authorization: `key=${serverKey}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(
-              opts.isChat
-                ? {
-                    to: token,
-                    priority: 'high',
-                    content_available: true,
-                    notification: {
-                      title: message.title,
-                      body: message.body,
-                      sound: opts.soundIos,
-                      android_channel_id: opts.channelId,
-                    },
-                    data: {
-                      ...data,
-                      title: message.title,
-                      body: message.body,
-                      click_action: 'FLUTTER_NOTIFICATION_CLICK',
-                      android_channel_id: opts.channelId,
-                    },
-                  }
-                : {
-                    to: token,
-                    priority: 'high',
-                    content_available: true,
-                    // Jobs : tray FCM sonne app tuée ; data pour deep-link / FSI.
-                    data: {
-                      ...data,
-                      title: message.title,
-                      body: message.body,
-                      click_action: 'FLUTTER_NOTIFICATION_CLICK',
-                      android_channel_id: opts.channelId,
-                    },
-                    notification: {
-                      title: message.title,
-                      body: message.body,
-                      sound: opts.soundIos,
-                      android_channel_id: opts.channelId,
-                    },
-                  },
-            ),
+            body: JSON.stringify(payload),
           });
           if (!res.ok) {
             const text = await res.text();

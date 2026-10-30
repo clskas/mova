@@ -100,10 +100,20 @@ class _DriverJobTaskHandler extends TaskHandler {
     await checkEndpoint('/api/rides/offers', 'offer', 'ride', DriverJobAlertService.rideOfferMessage);
     await checkEndpoint('/api/deliveries/offers', 'offer', 'delivery', DriverJobAlertService.deliveryOfferMessage);
 
-    if (discovered.isNotEmpty) {
-      final merged = {...known, ...discovered}.toList();
-      await prefs.setStringList(_prefsKnownJobs, merged);
-    }
+    // Coupe la sonnerie si une offre a disparu (prise / annulée) pendant le poll FGS.
+    final openOffers = discovered
+        .where((k) => k.startsWith('ride:') || k.startsWith('delivery:'))
+        .toSet();
+    await DriverJobAlertService.syncActiveOffers(openOffers);
+
+    final vanishedOffers = known
+        .where(
+          (k) =>
+              (k.startsWith('ride:') || k.startsWith('delivery:')) && !discovered.contains(k),
+        )
+        .toSet();
+    final merged = {...known.difference(vanishedOffers), ...discovered}.toList();
+    await prefs.setStringList(_prefsKnownJobs, merged);
   }
 }
 

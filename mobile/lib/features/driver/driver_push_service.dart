@@ -24,9 +24,35 @@ String? _sosPayloadFromFcm(Map<String, dynamic> data, {String? title, String? bo
   );
 }
 
+bool _isJobStopData(Map<String, dynamic> data) {
+  if (data['stopRing']?.toString() == '1' || data['stopRing']?.toString() == 'true') {
+    return true;
+  }
+  final kind = (data['jobKind'] ?? data['type'] ?? '').toString().toUpperCase();
+  return kind == 'JOB_STOP' || kind.contains('TAKEN') || kind.contains('CANCEL');
+}
+
+String? _offerKeyFromStop(Map<String, dynamic> data) {
+  final refId = data['referenceId']?.toString() ??
+      data['rideId']?.toString() ??
+      data['deliveryId']?.toString();
+  if (refId == null || refId.isEmpty) return null;
+  final offerKind = (data['offerJobKind'] ?? data['jobKind'] ?? data['type'] ?? '')
+      .toString()
+      .toUpperCase();
+  final kind = offerKind.contains('DELIVERY') ? 'delivery' : 'ride';
+  return DriverJobAlertService.offerKey(kind, refId);
+}
+
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
+  if (_isJobStopData(message.data)) {
+    await DriverJobAlertService.init();
+    await DriverJobAlertService.stopRinging(offerKey: _offerKeyFromStop(message.data));
+    await NativeJobWake.stopRing();
+    return;
+  }
   final title = message.notification?.title ??
       message.data['title']?.toString() ??
       'SENGA Driver';
@@ -40,10 +66,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       message.data['deliveryId']?.toString();
   // CALL = appel LiveKit (CallRingService) — ne pas démarrer la sonnerie « offre ».
   final isOffer = sosPayload == null &&
+      !jobKind.toUpperCase().contains('CALL') &&
       (jobKind.contains('RIDE') ||
           jobKind.contains('DELIVERY') ||
           jobKind.contains('OFFER') ||
-          jobKind.contains('JOB'));
+          (jobKind.contains('JOB') && !jobKind.contains('STOP')));
   // Chat/SOS : tray FCM déjà affiché → pas de 2ᵉ bip.
   if (message.notification != null && !isOffer && sosPayload == null) return;
 
@@ -113,6 +140,11 @@ class DriverPushService {
       await messaging.setForegroundNotificationPresentationOptions(alert: true, badge: true, sound: true);
 
       FirebaseMessaging.onMessage.listen((message) async {
+        if (_isJobStopData(message.data)) {
+          await DriverJobAlertService.stopRinging(offerKey: _offerKeyFromStop(message.data));
+          await NativeJobWake.stopRing();
+          return;
+        }
         final title = message.notification?.title ?? message.data['title']?.toString() ?? 'SENGA Driver';
         final body = message.notification?.body ?? message.data['body']?.toString() ?? 'Nouvelle alerte';
         final jobKind = message.data['jobKind']?.toString() ?? message.data['type']?.toString() ?? '';
@@ -121,10 +153,11 @@ class DriverPushService {
             message.data['rideId']?.toString() ??
             message.data['deliveryId']?.toString();
         final isOffer = sosPayload == null &&
+            !jobKind.toUpperCase().contains('CALL') &&
             (jobKind.contains('RIDE') ||
                 jobKind.contains('DELIVERY') ||
                 jobKind.contains('OFFER') ||
-                jobKind.contains('JOB'));
+                (jobKind.contains('JOB') && !jobKind.contains('STOP')));
         // Évite un 2ᵉ bip « système » pendant que la sonnerie SENGA tourne déjà via le poll.
         if (isOffer && DriverJobAlertService.isRinging) return;
         String? offerKey;

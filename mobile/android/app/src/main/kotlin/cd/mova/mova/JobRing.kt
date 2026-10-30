@@ -19,15 +19,27 @@ object JobRing {
     private const val NOTIF_ID = 7701
     private var mediaPlayer: MediaPlayer? = null
 
+    fun isStop(data: Map<String, String>): Boolean {
+        if (data["stopRing"] == "1" || data["stopRing"] == "true") return true
+        val kind = (data["jobKind"] ?: data["type"] ?: "").uppercase()
+        if (kind.isEmpty()) return false
+        return kind == "JOB_STOP" ||
+            kind.contains("TAKEN") ||
+            kind.contains("CANCEL")
+    }
+
     fun isJob(data: Map<String, String>): Boolean {
+        if (isStop(data)) return false
         val kind = data["jobKind"] ?: data["type"] ?: return false
         if (kind == "INCIDENT_CREATED" || kind == "SOS" || kind == "CHAT_MESSAGE") return false
-        return kind.contains("RIDE") ||
-            kind.contains("DELIVERY") ||
-            kind.contains("OFFER") ||
-            kind.contains("JOB") ||
-            kind.contains("CALL") ||
-            kind.contains("MISSION")
+        val upper = kind.uppercase()
+        // CALL = LiveKit (CallRing) — pas la sonnerie offre.
+        if (upper.contains("CALL")) return false
+        return upper.contains("RIDE") ||
+            upper.contains("DELIVERY") ||
+            upper.contains("OFFER") ||
+            upper.contains("JOB") ||
+            upper.contains("MISSION")
     }
 
     fun show(context: Context, data: Map<String, String>) {

@@ -5,6 +5,7 @@ import {
   DeliveryCreatedPayload,
   DeliveryStatusUpdatedPayload,
   DriverJobAlertPayload,
+  DriverJobStopPayload,
   ErrandCreatedPayload,
   IncidentCreatedPayload,
   PaymentCompletedPayload,
@@ -47,6 +48,7 @@ export class NotificationsService implements OnModuleInit {
       MOVA_EVENTS.INCIDENT_CREATED,
       MOVA_EVENTS.RIDE_STATUS_SMS,
       MOVA_EVENTS.DRIVER_JOB_ALERT,
+      MOVA_EVENTS.DRIVER_JOB_STOP,
       MOVA_EVENTS.SCHEDULED_REMINDER,
       MOVA_EVENTS.ERRAND_CREATED,
       MOVA_EVENTS.CHAT_MESSAGE,
@@ -71,6 +73,7 @@ export class NotificationsService implements OnModuleInit {
         if (channel === MOVA_EVENTS.INCIDENT_CREATED) await this.onIncidentCreated(data as IncidentCreatedPayload);
         if (channel === MOVA_EVENTS.RIDE_STATUS_SMS) await this.onRideStatusSms(data as RideStatusSmsPayload);
         if (channel === MOVA_EVENTS.DRIVER_JOB_ALERT) await this.onDriverJobAlert(data as DriverJobAlertPayload);
+        if (channel === MOVA_EVENTS.DRIVER_JOB_STOP) await this.onDriverJobStop(data as DriverJobStopPayload);
         if (channel === MOVA_EVENTS.SCHEDULED_REMINDER) await this.onScheduledReminder(data as ScheduledReminderPayload);
         if (channel === MOVA_EVENTS.ERRAND_CREATED) await this.onErrandCreated(data as ErrandCreatedPayload);
         if (channel === MOVA_EVENTS.CHAT_MESSAGE) await this.onChatMessage(data as ChatMessagePayload);
@@ -448,18 +451,18 @@ export class NotificationsService implements OnModuleInit {
         });
       }
       if (iosTokens.length > 0) {
-        // Un seul push iOS : les re-alertes continuaient après annulation passager.
+        // Un seul push iOS : JobRingIOS enchaîne les notifs locales pour la boucle.
         await this.fcm.sendToTokens(iosTokens, pushBody, {
           profile: 'job',
           platform: 'ios',
-          iosSound: 'default',
+          iosSound: 'senga_job.caf',
         });
       }
       if (unknownTokens.length > 0) {
         await this.fcm.sendToTokens(unknownTokens, pushBody, {
           profile: 'job',
           platform: 'all',
-          iosSound: 'default',
+          iosSound: 'senga_job.caf',
         });
       }
       this.logger.log(
@@ -493,6 +496,58 @@ export class NotificationsService implements OnModuleInit {
     if (smsSent > 0) {
       this.logger.log(`driver.job.alert SMS ${payload.jobKind} → ${smsSent} chauffeur(s)`);
     }
+  }
+
+  /** Coupe la sonnerie native (app fermée) — acceptation concurrente / annulation. */
+  async onDriverJobStop(payload: DriverJobStopPayload) {
+    const userIds = [...new Set(payload.driverUserIds ?? [])];
+    if (userIds.length === 0) return;
+    if (!this.fcm.isConfigured()) return;
+
+    const reasonLabel =
+      payload.reason === 'taken' ? 'Offre déjà prise' : 'Offre annulée';
+    const pushBody = {
+      title: 'SENGA Driver',
+      body: reasonLabel,
+      data: {
+        type: 'JOB_STOP',
+        jobKind: 'JOB_STOP',
+        stopRing: '1',
+        reason: payload.reason,
+        referenceId: payload.referenceId,
+        offerJobKind: payload.jobKind,
+        title: 'SENGA Driver',
+        body: reasonLabel,
+      },
+    };
+
+    const androidTokens = await this.pushTokens.tokensForUsers(userIds, 'driver', 'android');
+    const iosTokens = await this.pushTokens.tokensForUsers(userIds, 'driver', 'ios');
+    const allTokens = await this.pushTokens.tokensForUsers(userIds, 'driver');
+    const known = new Set([...androidTokens, ...iosTokens]);
+    const unknownTokens = allTokens.filter((t) => !known.has(t));
+
+    if (androidTokens.length > 0) {
+      await this.fcm.sendToTokens(androidTokens, pushBody, {
+        profile: 'jobStop',
+        platform: 'android',
+      });
+    }
+    if (iosTokens.length > 0) {
+      await this.fcm.sendToTokens(iosTokens, pushBody, {
+        profile: 'jobStop',
+        platform: 'ios',
+      });
+    }
+    if (unknownTokens.length > 0) {
+      await this.fcm.sendToTokens(unknownTokens, pushBody, {
+        profile: 'jobStop',
+        platform: 'all',
+      });
+    }
+    this.logger.log(
+      `driver.job.stop ${payload.reason} ${payload.jobKind}/${payload.referenceId} → users=${userIds.length} android=${androidTokens.length} ios=${iosTokens.length}`,
+    );
   }
 
   async onScheduledReminder(payload: ScheduledReminderPayload) {

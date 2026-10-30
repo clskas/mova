@@ -59,7 +59,12 @@ import {
   releaseEscrowPayout,
   settleEscrowPartial,
 } from '../common/escrow.util';
-import { notifyNearbyDrivers, publishDriverJobAlert, DELIVERY_ALERT_VEHICLE_TYPES } from '../common/driver-job-alert.util';
+import {
+  notifyNearbyDrivers,
+  publishDriverJobAlert,
+  publishDriverJobStop,
+  DELIVERY_ALERT_VEHICLE_TYPES,
+} from '../common/driver-job-alert.util';
 import { deliveryPinSms, sendPlatformSms } from '../common/sms-notify.util';
 import { RoutingService } from '../geo/routing.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
@@ -1607,6 +1612,12 @@ export class DeliveriesService {
       driverId: driverUserId,
       type: delivery.type,
     });
+    await publishDriverJobStop(this.redis, {
+      jobKind: 'DELIVERY_OFFER',
+      referenceId: deliveryId,
+      reason: 'taken',
+      excludeUserIds: [driverUserId],
+    }).catch(() => undefined);
     await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
       serviceType: 'DELIVERY',
       referenceId: deliveryId,
@@ -1790,6 +1801,13 @@ export class DeliveriesService {
       restaurantName: updated.restaurant?.name,
       restaurantOwnerUserId: updated.restaurant?.ownerUserId ?? undefined,
     });
+    if (status === DeliveryStatus.CANCELLED && !delivery.driverId) {
+      await publishDriverJobStop(this.redis, {
+        jobKind: 'DELIVERY_OFFER',
+        referenceId: id,
+        reason: 'cancelled',
+      }).catch(() => undefined);
+    }
     if (status === DeliveryStatus.READY_FOR_PICKUP && !updated.driverId) {
       await this.alertDeliveryOffer(updated);
     }

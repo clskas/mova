@@ -9,6 +9,7 @@ import '../../core/billing/driver_earnings_display.dart';
 import '../../core/geo/geo_utils.dart';
 import '../sos/notification_tap_router.dart';
 import 'driver_alert_prefs.dart';
+import 'native_job_wake.dart';
 
 /// Alertes chauffeur : vibration + **son SENGA dédié** (ou son système / mute).
 ///
@@ -216,6 +217,8 @@ class DriverJobAlertService {
     } catch (_) {
       /* ignore */
     }
+    // Android MediaPlayer / iOS notifs locales planifiées (app fermée).
+    unawaited(NativeJobWake.stopRing());
   }
 
   static void _armRingSafety() {

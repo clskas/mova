@@ -13,7 +13,11 @@ import {
 import { fetchDriverDebtStatus } from '../common/driver-debt.util';
 import { tripDistanceKm } from '../common/geo.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
-import { notifyNearbyDrivers, DELIVERY_ALERT_VEHICLE_TYPES } from '../common/driver-job-alert.util';
+import {
+  notifyNearbyDrivers,
+  publishDriverJobStop,
+  DELIVERY_ALERT_VEHICLE_TYPES,
+} from '../common/driver-job-alert.util';
 import { holdWalletFunds, releaseWalletHold } from '../common/wallet-hold.util';
 import { recordWalletEscrow, refundEscrow, releaseEscrowPayout, settleEscrowPartial, freezeEscrow } from '../common/escrow.util';
 import { assertEscrowAllowsDispatch, assertPinMatches, cancelPhase, isPinTimeoutDue, settleGuaranteedCancel } from '../deliveries/delivery-guarantee.util';
@@ -724,6 +728,12 @@ export class ErrandsService {
       driverId: driverUserId,
       type: 'ERRAND',
     });
+    await publishDriverJobStop(this.redis, {
+      jobKind: 'DELIVERY_OFFER',
+      referenceId: errandId,
+      reason: 'taken',
+      excludeUserIds: [driverUserId],
+    }).catch(() => undefined);
     return { errand: formatted, delivery: formatted, success: true };
   }
 
@@ -1044,6 +1054,13 @@ export class ErrandsService {
       }
     } else if (updated.walletHoldCdf) {
       await releaseWalletHold('ERRAND', updated.id).catch(() => undefined);
+    }
+    if (!order.driverId) {
+      await publishDriverJobStop(this.redis, {
+        jobKind: 'DELIVERY_OFFER',
+        referenceId: id,
+        reason: 'cancelled',
+      }).catch(() => undefined);
     }
     return { success: true, errand: this.formatErrand(updated) };
   }

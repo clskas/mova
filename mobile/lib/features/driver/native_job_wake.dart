@@ -12,13 +12,16 @@ class NativeJobWake {
   static bool _handlerReady = false;
 
   static void install() {
-    if (!Platform.isAndroid || _handlerReady) return;
+    if (_handlerReady) return;
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     _handlerReady = true;
-    _channel.setMethodCallHandler((call) async {
-      if (call.method == 'arrived') {
-        _open(call.arguments);
-      }
-    });
+    if (Platform.isAndroid) {
+      _channel.setMethodCallHandler((call) async {
+        if (call.method == 'arrived') {
+          _open(call.arguments);
+        }
+      });
+    }
   }
 
   static Future<void> consumePending() async {
@@ -39,8 +42,10 @@ class NativeJobWake {
     } catch (_) {}
   }
 
+  /// Coupe MediaPlayer Android / notifs locales iOS même app en fond.
   static Future<void> stopRing() async {
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+    install();
     try {
       await _channel.invokeMethod<void>('stopRing');
     } catch (_) {}

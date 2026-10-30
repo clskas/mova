@@ -39,7 +39,7 @@ import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, driverAcceptsR
 import { fetchDriverDebtStatus, filterDriversNotDebtBlocked } from '../common/driver-debt.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
-import { publishDriverJobAlert } from '../common/driver-job-alert.util';
+import { publishDriverJobAlert, publishDriverJobStop } from '../common/driver-job-alert.util';
 import {
   fetchRidePaymentStatus,
   fetchRidePaymentStatuses,
@@ -504,6 +504,14 @@ export class RidesService {
     await this.prisma.rideEvent.create({ data: { rideId, event: RideStatus.ACCEPTED } });
     this.emitStatusChange(rideId, RideStatus.ACCEPTED);
     this.trackingGateway.broadcastOfferTaken('ride:taken', { rideId, driverId: driverUserId });
+    const notified = await this.driverIdsNotifiedForRide(rideId);
+    await publishDriverJobStop(this.redis, {
+      jobKind: 'RIDE_OFFER',
+      referenceId: rideId,
+      reason: 'taken',
+      driverUserIds: notified,
+      excludeUserIds: [driverUserId],
+    }).catch(() => undefined);
     await this.notifyRideStatusSms(rideId, ride.passengerId, RideStatus.ACCEPTED);
     return this.formatRideDetail(updated);
   }
@@ -777,6 +785,12 @@ export class RidesService {
     const uniqueCancelNotify = [...new Set(cancelNotifyIds.filter(Boolean))];
     if (uniqueCancelNotify.length > 0) {
       this.trackingGateway.broadcastDriverJob(uniqueCancelNotify, 'ride:cancelled', { rideId });
+      await publishDriverJobStop(this.redis, {
+        jobKind: 'RIDE_OFFER',
+        referenceId: rideId,
+        reason: 'cancelled',
+        driverUserIds: uniqueCancelNotify,
+      }).catch(() => undefined);
     }
 
     return {
@@ -2483,6 +2497,14 @@ export class RidesService {
     this.emitStatusChange(rideId, updated.status);
     if (nextStatus === RideStatus.ACCEPTED) {
       this.trackingGateway.broadcastOfferTaken('ride:taken', { rideId, driverId: driverId.trim() });
+      const notified = await this.driverIdsNotifiedForRide(rideId);
+      await publishDriverJobStop(this.redis, {
+        jobKind: 'RIDE_OFFER',
+        referenceId: rideId,
+        reason: 'taken',
+        driverUserIds: notified,
+        excludeUserIds: [driverId.trim()],
+      }).catch(() => undefined);
       await this.notifyRideStatusSms(rideId, ride.passengerId, RideStatus.ACCEPTED);
     }
     await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {

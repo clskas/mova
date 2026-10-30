@@ -15,6 +15,8 @@ export const MOVA_EVENTS = {
   RENTAL_PARTNER_VEHICLE: 'rental.partner.vehicle',
   INCIDENT_CREATED: 'incident.created',
   DRIVER_JOB_ALERT: 'driver.job.alert',
+  /** Coupe la sonnerie offre (app fermée) quand un autre chauffeur accepte ou le passager annule. */
+  DRIVER_JOB_STOP: 'driver.job.stop',
   SCHEDULED_REMINDER: 'scheduled.reminder',
   ERRAND_CREATED: 'errand.created',
   CHAT_MESSAGE: 'chat.message',
@@ -134,6 +136,16 @@ export interface DriverJobAlertPayload {
   pickupLat?: number;
   pickupLng?: number;
   data?: Record<string, unknown>;
+}
+
+export type DriverJobStopReason = 'taken' | 'cancelled';
+
+/** Push data-only pour arrêter JobRing / notifs locales iOS sans bip. */
+export interface DriverJobStopPayload {
+  jobKind: DriverJobKind;
+  referenceId: string;
+  reason: DriverJobStopReason;
+  driverUserIds: string[];
 }
 
 export interface RentalBookingPayload {

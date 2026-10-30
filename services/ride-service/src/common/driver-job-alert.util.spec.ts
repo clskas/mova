@@ -12,7 +12,10 @@ jest.mock('./driver-eligibility.util', () => ({
 }));
 
 describe('notifyNearbyDrivers', () => {
-  const redis = { publish: jest.fn() };
+  const redis = {
+    publish: jest.fn(),
+    client: { setex: jest.fn(), get: jest.fn(), del: jest.fn() },
+  };
   const matching = {
     findDrivers: jest.fn(async () => [
       { userId: 'livreur', driverId: 'd1', lat: 0, lng: 0, rating: 5, distanceKm: 1, score: 1 },

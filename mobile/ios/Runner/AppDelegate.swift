@@ -4,6 +4,8 @@ import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  private var jobWakeChannelReady = false
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -29,6 +31,8 @@ import UserNotifications
     // Same guard as google_sign_in_ios (SIGPIPE after OAuth on some devices).
     signal(SIGPIPE, SIG_IGN)
 
+    registerJobWakeChannel()
+
     return ok
   }
 
@@ -48,7 +52,28 @@ import UserNotifications
   /// Évite les badges « fantômes » (chiffre sur l’icône sans entrée dans le Centre de notifications).
   override func applicationDidBecomeActive(_ application: UIApplication) {
     super.applicationDidBecomeActive(application)
+    // Arrêt sonnerie continue dès que le chauffeur ouvre l’app.
+    JobRingIOS.stop()
+    registerJobWakeChannel()
     syncIconBadgeWithDeliveredNotifications(application)
+  }
+
+  private func registerJobWakeChannel() {
+    guard !jobWakeChannelReady else { return }
+    guard let controller = window?.rootViewController as? FlutterViewController else { return }
+    let channel = FlutterMethodChannel(
+      name: "senga/job_wake",
+      binaryMessenger: controller.binaryMessenger
+    )
+    channel.setMethodCallHandler { call, result in
+      if call.method == "stopRing" {
+        JobRingIOS.stop()
+        result(true)
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    jobWakeChannelReady = true
   }
 
   private func syncIconBadgeWithDeliveredNotifications(_ application: UIApplication) {

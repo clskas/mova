@@ -1,6 +1,8 @@
 import {
   DriverJobAlertPayload,
   DriverJobKind,
+  DriverJobStopPayload,
+  DriverJobStopReason,
   MOVA_EVENTS,
   RedisService,
   VehicleType,
@@ -19,12 +21,53 @@ export const DELIVERY_ALERT_VEHICLE_TYPES: VehicleType[] = [
   VehicleType.CAMION,
 ];
 
+const ALERT_TTL_SEC = 15 * 60;
+
+function alertCacheKey(jobKind: DriverJobKind | string, referenceId: string): string {
+  return `driver-job-alert:${jobKind}:${referenceId}`;
+}
+
+async function cacheAlertedDrivers(
+  redis: RedisService,
+  jobKind: DriverJobKind,
+  referenceId: string,
+  driverUserIds: string[],
+): Promise<void> {
+  if (driverUserIds.length === 0) return;
+  try {
+    await redis.client.setex(
+      alertCacheKey(jobKind, referenceId),
+      ALERT_TTL_SEC,
+      JSON.stringify(driverUserIds),
+    );
+  } catch {
+    /* Redis down — le stop pourra encore utiliser SEARCH_ATTEMPT (courses). */
+  }
+}
+
+export async function loadAlertedDrivers(
+  redis: RedisService,
+  jobKind: DriverJobKind,
+  referenceId: string,
+): Promise<string[]> {
+  try {
+    const raw = await redis.client.get(alertCacheKey(jobKind, referenceId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === 'string' && id.length > 0);
+  } catch {
+    return [];
+  }
+}
+
 export async function publishDriverJobAlert(
   redis: RedisService,
   payload: DriverJobAlertPayload,
 ): Promise<void> {
   if (!payload.driverUserIds?.length) return;
   await redis.publish(MOVA_EVENTS.DRIVER_JOB_ALERT, payload);
+  await cacheAlertedDrivers(redis, payload.jobKind, payload.referenceId, payload.driverUserIds);
 }
 
 /**
@@ -73,4 +116,44 @@ export async function notifyNearbyDrivers(
     pickupLng: opts.pickupLng,
     data: opts.data,
   });
+}
+
+/**
+ * Coupe la sonnerie côté apps fermées (FCM JOB_STOP) + invalide le cache d’alerte.
+ */
+export async function publishDriverJobStop(
+  redis: RedisService,
+  opts: {
+    jobKind: DriverJobKind;
+    referenceId: string;
+    reason: DriverJobStopReason;
+    driverUserIds?: string[];
+    excludeUserIds?: string[];
+  },
+): Promise<void> {
+  const cached = await loadAlertedDrivers(redis, opts.jobKind, opts.referenceId);
+  const exclude = new Set((opts.excludeUserIds ?? []).filter(Boolean));
+  const merged = [...new Set([...(opts.driverUserIds ?? []), ...cached])].filter(
+    (id) => id && !exclude.has(id),
+  );
+  if (merged.length === 0) {
+    try {
+      await redis.client.del(alertCacheKey(opts.jobKind, opts.referenceId));
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+  const payload: DriverJobStopPayload = {
+    jobKind: opts.jobKind,
+    referenceId: opts.referenceId,
+    reason: opts.reason,
+    driverUserIds: merged,
+  };
+  await redis.publish(MOVA_EVENTS.DRIVER_JOB_STOP, payload);
+  try {
+    await redis.client.del(alertCacheKey(opts.jobKind, opts.referenceId));
+  } catch {
+    /* ignore */
+  }
 }

@@ -144,11 +144,25 @@ pg_dump_is_transient() {
     "$err_file"
 }
 
+# Extra pg_dump flags per logical DB (bytea blobs blow SSL mid-COPY on Render).
+# Schema for uploaded_media is kept; row data lives in Supabase Storage after migrate.
+pg_dump_extra_args() {
+  local key="$1"
+  case "$key" in
+    rides)
+      # Exclude data only — table definition still dumped.
+      printf '%s\n' '--exclude-table-data=public.uploaded_media'
+      ;;
+  esac
+}
+
 # Returns 0 on success, 2 on server/client version mismatch (caller should skip), 1 otherwise.
 # Must be invoked from `if`/`||` so a non-zero return does not trip `set -e`.
+# Extra args after $2 are forwarded to pg_dump (e.g. --exclude-table-data=...).
 backup_via_pg_dump() {
   local url="$1"
   local out="$2"
+  shift 2
   local err attempt=1 max_attempts="${BACKUP_PG_DUMP_RETRIES:-8}" delay=5
   if [ -z "${PG_DUMP_BIN:-}" ]; then
     echo "ERROR: pg_dump not found" >&2
@@ -156,7 +170,7 @@ backup_via_pg_dump() {
   fi
   while [ "$attempt" -le "$max_attempts" ]; do
     err="$(mktemp)"
-    if "$PG_DUMP_BIN" "$url" --no-owner --no-acl -f "$out" 2>"$err"; then
+    if "$PG_DUMP_BIN" "$url" --no-owner --no-acl "$@" -f "$out" 2>"$err"; then
       rm -f "$err"
       return 0
     fi
@@ -195,8 +209,12 @@ if [ -n "${BACKUP_ONLY:-}" ] && [ -n "${DATABASE_URL:-}" ]; then
     exit 0
   fi
   echo "Backing up $BACKUP_ONLY ($db_name) via DATABASE_URL -> $out"
+  mapfile -t _extra < <(pg_dump_extra_args "$BACKUP_ONLY")
+  if [ "${#_extra[@]}" -gt 0 ]; then
+    echo "  pg_dump extras: ${_extra[*]}"
+  fi
   dump_rc=0
-  if backup_via_pg_dump "$DATABASE_URL" "$out"; then
+  if backup_via_pg_dump "$DATABASE_URL" "$out" "${_extra[@]+"${_extra[@]}"}"; then
     dump_rc=0
   else
     dump_rc=$?
@@ -228,11 +246,15 @@ for key in "${keys[@]}"; do
     continue
   fi
   echo "Backing up $key ($db_name) -> $out"
+  mapfile -t _extra < <(pg_dump_extra_args "$key")
+  if [ "${#_extra[@]}" -gt 0 ]; then
+    echo "  pg_dump extras: ${_extra[*]}"
+  fi
   if [ -n "${POSTGRES_CONTAINER:-}" ]; then
     backup_via_docker "$db_name" "$out"
   else
     dump_rc=0
-    if backup_via_pg_dump "$url" "$out"; then
+    if backup_via_pg_dump "$url" "$out" "${_extra[@]+"${_extra[@]}"}"; then
       dump_rc=0
     else
       dump_rc=$?

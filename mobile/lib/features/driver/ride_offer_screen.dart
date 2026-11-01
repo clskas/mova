@@ -181,12 +181,9 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
           offerKey: DriverJobAlertService.offerKey('ride', _rideId),
         );
         if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ActiveRideScreen(ride: data, autoOpenNavigation: true),
-          ),
-        );
+        // Remonter l’accueil avec la course acceptée pour renseigner _activeRide,
+        // puis ouvrir ActiveRideScreen (évite un écran fantôme si annulation).
+        Navigator.pop(context, data);
       case Failure(:final error):
         final msg = error.message;
         final looksInvalidStatus = msg.contains('Statut de course invalide') ||

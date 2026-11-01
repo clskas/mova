@@ -45,16 +45,24 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   String? _error;
   Timer? _locationTimer;
   Timer? _paymentPollTimer;
+  Timer? _statusPollTimer;
+  StreamSubscription<DriverJobStopEvent>? _jobStopSub;
   String? _userId;
   double? _currentLat;
   double? _currentLng;
   bool _cashDialogOpen = false;
   bool _autoNavTriggered = false;
+  bool _passengerCancelled = false;
+  bool _closingCancelled = false;
 
   String get _rideId => _ride['id']?.toString() ?? '';
   String get _status => _ride['status']?.toString() ?? 'DRIVER_ASSIGNED';
   bool get _isPaid => _ride['isPaid'] == true;
   bool get _canDriverCancel => CancelEligibility.rideDriver(_ride);
+  bool get _isCancelledStatus {
+    final s = _status.toUpperCase();
+    return s == 'CANCELLED' || s == 'CANCELED';
+  }
 
   int? get _passengerCashTotalCdf {
     final v = _ride['finalFareCdf'] ?? _ride['estimatedFareCdf'] ?? _ride['amountCdf'];
@@ -78,15 +86,45 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   void initState() {
     super.initState();
     _ride = Map<String, dynamic>.from(widget.ride);
+    _jobStopSub = DriverJobAlertService.onJobStop.listen(_onJobStopEvent);
     _bootstrap();
   }
 
   @override
   void dispose() {
+    _jobStopSub?.cancel();
     _locationTimer?.cancel();
     _paymentPollTimer?.cancel();
+    _statusPollTimer?.cancel();
     ref.read(rideSocketProvider).clearHandlers();
     super.dispose();
+  }
+
+  void _onJobStopEvent(DriverJobStopEvent ev) {
+    if (!mounted || _closingCancelled) return;
+    final matchesId = ev.referenceId == _rideId;
+    final matchesKey = ev.offerKey == DriverJobAlertService.offerKey('ride', _rideId);
+    if (!matchesId && !matchesKey) return;
+    if (ev.reason == 'cancelled' || ev.reason == 'cancel') {
+      _handlePassengerCancelled();
+    }
+  }
+
+  void _handlePassengerCancelled() {
+    if (!mounted || _closingCancelled) return;
+    _closingCancelled = true;
+    _locationTimer?.cancel();
+    _paymentPollTimer?.cancel();
+    _statusPollTimer?.cancel();
+    unawaited(DriverJobAlertService.stopRinging(
+      offerKey: DriverJobAlertService.offerKey('ride', _rideId),
+    ));
+    unawaited(CallRingService.forceStop());
+    setState(() {
+      _passengerCancelled = true;
+      _ride = {..._ride, 'status': 'CANCELLED'};
+      _loading = false;
+    });
   }
 
   Future<void> _bootstrap() async {
@@ -96,8 +134,10 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       _userId = data['userId']?.toString();
     }
     await _refreshRide();
+    if (_passengerCancelled || _isCancelledStatus) return;
     await _connectTrackingSocket();
     _startLocationUpdates();
+    _startStatusPolling();
     _syncPaymentPolling();
     if (widget.autoOpenNavigation) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -106,14 +146,22 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     }
   }
 
+  void _startStatusPolling() {
+    _statusPollTimer?.cancel();
+    _statusPollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || _passengerCancelled || _closingCancelled) return;
+      unawaited(_refreshRide());
+    });
+  }
+
   Future<void> _maybeAutoOpenNavigation() async {
-    if (_autoNavTriggered || !mounted) return;
+    if (_autoNavTriggered || !mounted || _passengerCancelled || _isCancelledStatus) return;
     final headingToPickup = _status == 'DRIVER_ASSIGNED' || _status == 'ACCEPTED';
     if (!headingToPickup) return;
     _autoNavTriggered = true;
     // Laisse peindre l’écran course avant de basculer vers Maps.
     await Future<void>.delayed(const Duration(milliseconds: 450));
-    if (!mounted) return;
+    if (!mounted || _passengerCancelled || _isCancelledStatus) return;
     await _openPickup();
   }
 
@@ -131,15 +179,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         if (id != null && id.isNotEmpty && id != _rideId) return;
         final status = payload['status']?.toString().toUpperCase() ?? '';
         if (!mounted) return;
-        if (status == 'CANCELLED') {
-          unawaited(DriverJobAlertService.stopRinging());
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-            const SnackBar(
-              content: Text('Course annulée par le passager'),
-              duration: Duration(seconds: 3),
-            ),
-          );
-          Navigator.of(context).popUntil((r) => r.isFirst);
+        if (status == 'CANCELLED' || status == 'CANCELED') {
+          _handlePassengerCancelled();
           return;
         }
         setState(() {
@@ -211,10 +252,17 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   }
 
   Future<void> _refreshRide() async {
+    if (_rideId.isEmpty) return;
     final api = ref.read(apiClientProvider);
     final result = await api.getRide(_rideId);
     if (!mounted) return;
     if (result case Success(:final data)) {
+      final status = data['status']?.toString().toUpperCase() ?? '';
+      if (status == 'CANCELLED' || status == 'CANCELED') {
+        setState(() => _ride = data);
+        _handlePassengerCancelled();
+        return;
+      }
       setState(() => _ride = data);
       _syncPaymentPolling();
       // Fallback fiable si l'événement socket a été manqué : dès que le
@@ -511,6 +559,42 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     final nextLabel = _nextActionLabel();
     final nextStatus = _nextStatus();
     final headingToPickup = _status == 'DRIVER_ASSIGNED' || _status == 'ACCEPTED';
+
+    if (_passengerCancelled || _isCancelledStatus) {
+      return MovaScreen(
+        title: 'Course annulée',
+        scrollable: false,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Spacer(),
+              Icon(Icons.cancel_outlined, size: 72, color: MovaColors.red.withValues(alpha: 0.9)),
+              const SizedBox(height: 20),
+              const Text(
+                'Le passager a annulé la course',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Cette course n’est plus active. Vous pouvez reprendre les nouvelles demandes.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 15, color: MovaColors.textSecondary, height: 1.35),
+              ),
+              const Spacer(),
+              MovaButton(
+                label: 'Retour à l’accueil',
+                icon: Icons.home_outlined,
+                onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      );
+    }
 
     return MovaScreen(
       title: _status == 'COMPLETED'

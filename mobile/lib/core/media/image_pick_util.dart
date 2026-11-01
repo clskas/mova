@@ -21,8 +21,8 @@ Future<void> markExternalCaptureSessionGuard() async {
   await prefs.setInt(ApiClient.cameraCaptureGuardKey, now);
 }
 
-/// Chemin fichier local (uCrop / Image.file / XFile content://).
-Future<String> localPathForImage(XFile source) async {
+/// Fichier local (évite content:// et chemins caméra volatils).
+Future<String> _localPathForCrop(XFile source) async {
   final path = source.path;
   if (!path.startsWith('content:') && !path.startsWith('content://')) {
     final f = File(path);
@@ -60,23 +60,25 @@ Future<XFile?> pickMovaImage(
   }
 }
 
-/// Rogne via écran Flutter (un seul Valider) — pas de uCrop natif (évite crash Android).
+/// Rogne via écran Flutter uniquement (1 bouton Valider).
+/// uCrop natif a crashé SENGA Driver en release — ne plus l'utiliser.
 Future<XFile?> cropMovaImage(XFile source) async {
   try {
     await markExternalCaptureSessionGuard();
     final nav = movaNavigatorKey.currentState;
     if (nav == null || !nav.mounted) return source;
-    final localPath = await localPathForImage(source);
+    final localPath = await _localPathForCrop(source);
     final cropped = await nav.push<XFile?>(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => MovaCropScreen(sourcePath: localPath),
       ),
     );
-    // Croix = annuler toute la prise. Valider = fichier (ou image entière en fallback).
+    // Croix = annuler toute la prise. Valider = fichier.
     if (cropped == null) return null;
     return cropped;
   } catch (_) {
+    // Codec / nav : garder l'image pour ne pas bloquer le KYC.
     return source;
   }
 }

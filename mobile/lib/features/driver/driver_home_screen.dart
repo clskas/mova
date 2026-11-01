@@ -662,16 +662,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           if (wasActive) _activeRide = null;
           _syncOfferSuppression();
         });
-        // L'écran d'offre se ferme via onJobStop (handleJobStop ci-dessus).
-        if (!onThisOffer && wasActive) {
-          Navigator.of(context).popUntil((r) => r.isFirst);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Course annulée par le passager'),
-              duration: Duration(seconds: 3),
-            ),
-          );
-        } else if (!onThisOffer && mounted) {
+        // ActiveRideScreen affiche l’écran « passager a annulé » (poll + socket + JOB_STOP).
+        // On ne force plus un popUntil ici : après accept via offre, _activeRide
+        // n’était parfois pas renseigné et l’écran course restait bloqué / disparaissait
+        // sans message. Snackbar seulement si aucun écran course/offre ouvert.
+        if (!onThisOffer && !wasActive && mounted && !Navigator.of(context).canPop()) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Course annulée par le passager'),
@@ -752,8 +747,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       final rides = (data['data'] as List? ?? data['rides'] as List? ?? [])
           .cast<Map<String, dynamic>>();
       final active = rides.where((r) {
-        final s = r['status']?.toString() ?? '';
-        return s == 'DRIVER_ASSIGNED' || s == 'ARRIVING' || s == 'IN_PROGRESS';
+        final s = r['status']?.toString().toUpperCase() ?? '';
+        return s == 'DRIVER_ASSIGNED' ||
+            s == 'ACCEPTED' ||
+            s == 'ARRIVING' ||
+            s == 'DRIVER_ARRIVED' ||
+            s == 'IN_PROGRESS';
       }).toList();
       if (active.isNotEmpty) {
         setState(() {
@@ -1112,7 +1111,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     _openOfferKind = 'ride';
     _openOfferId = id;
     unawaited(DriverJobAlertService.startRinging(offerKey: offerKey));
-    final result = await Navigator.push<String?>(
+    final result = await Navigator.push<dynamic>(
       context,
       MaterialPageRoute(
         builder: (_) => RideOfferScreen(
@@ -1125,6 +1124,25 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     _openOfferKind = null;
     _openOfferId = null;
     await DriverJobAlertService.stopRinging(offerKey: offerKey);
+    if (result is Map<String, dynamic>) {
+      // Acceptation : renseigner _activeRide puis ouvrir l’écran course.
+      _dismissedOffers.add('ride:$id');
+      if (!mounted) return;
+      setState(() {
+        _activeRide = result;
+        _syncOfferSuppression();
+      });
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ActiveRideScreen(ride: result, autoOpenNavigation: true),
+        ),
+      );
+      if (mounted) {
+        await Future.wait([_loadActiveRide(), _refreshRideOffers()]);
+      }
+      return;
+    }
     if (result == 'taken') {
       _dismissedOffers.add('ride:$id');
     } else if (result == 'cancelled') {
@@ -1141,7 +1159,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       // Pas de réponse : ne pas masquer définitivement, re-proposer plus tard.
       _snoozedOffers['ride:$id'] = DateTime.now();
     } else {
-      // Refus explicite ou acceptation : masquer définitivement pour cette session.
+      // Refus explicite : masquer définitivement pour cette session.
       _dismissedOffers.add('ride:$id');
     }
     await _loadActiveRide();

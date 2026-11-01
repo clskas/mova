@@ -8,12 +8,12 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.widget.FrameLayout
 import android.widget.ImageButton
-import androidx.appcompat.widget.Toolbar
 
 /**
  * Garde l'UI native uCrop (grille + barre Rogner) et place uniquement le ✓
@@ -101,10 +101,17 @@ object UCropDoneButtonInjector : Application.ActivityLifecycleCallbacks {
     private fun hideToolbarCrop(activity: Activity) {
         val toolbarId = activity.resources.getIdentifier("toolbar", "id", activity.packageName)
         if (toolbarId == 0) return
-        val toolbar = activity.findViewById<Toolbar?>(toolbarId) ?: return
+        val toolbar = activity.findViewById<View>(toolbarId) ?: return
         val cropId = activity.resources.getIdentifier("menu_crop", "id", activity.packageName)
-        if (cropId != 0) {
-            toolbar.menu.findItem(cropId)?.isVisible = false
+        if (cropId == 0) return
+        try {
+            val getMenu = toolbar.javaClass.methods.firstOrNull {
+                it.name == "getMenu" && it.parameterTypes.isEmpty()
+            } ?: return
+            val menu = getMenu.invoke(toolbar) as? Menu ?: return
+            menu.findItem(cropId)?.isVisible = false
+        } catch (_: Throwable) {
+            // Ignore — le ✓ bas-centre reste utilisable.
         }
     }
 

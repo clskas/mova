@@ -17,6 +17,13 @@ export async function denyJwtUser(redis: RedisService, userId?: string | null): 
   await redis.client.set(`${JWT_DENY_USER_PREFIX}${id}`, '1', 'EX', JWT_DENY_TTL_SEC);
 }
 
+/** Clear user-level JWT revoke (ex. after blacklist deactivate). */
+export async function allowJwtUser(redis: RedisService, userId?: string | null): Promise<void> {
+  const id = userId?.trim();
+  if (!id) return;
+  await redis.client.del(`${JWT_DENY_USER_PREFIX}${id}`);
+}
+
 /**
  * Returns true if this token or user is revoked.
  * Redis down → false (fail-open). Callers that move money still revalidate the user.

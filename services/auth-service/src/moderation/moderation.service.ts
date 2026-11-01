@@ -1,6 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { BlacklistType, Prisma } from '@prisma/client';
-import { denyJwtUser, normalizePhoneRdc, RedisService } from '@mova/shared';
+import { allowJwtUser, denyJwtUser, normalizePhoneRdc, RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -114,6 +114,8 @@ export class ModerationService {
     });
     if (active) {
       await this.revokeSessionsForBlacklistEntry(type, value);
+    } else {
+      await this.restoreSessionsForBlacklistEntry(type, value);
     }
     return row;
   }
@@ -131,6 +133,20 @@ export class ModerationService {
   /** Coupe immédiatement les sessions JWT des comptes touchés. */
   async revokeSessionsForBlacklistEntry(type: BlacklistType, value: string) {
     if (!this.redis) return;
+    for (const id of await this.userIdsForBlacklistEntry(type, value)) {
+      await denyJwtUser(this.redis, id).catch(() => undefined);
+    }
+  }
+
+  /** Après retrait liste noire : lever le deny Redis (sinon 401 pendant jusqu'à 7 j). */
+  async restoreSessionsForBlacklistEntry(type: BlacklistType, value: string) {
+    if (!this.redis) return;
+    for (const id of await this.userIdsForBlacklistEntry(type, value)) {
+      await allowJwtUser(this.redis, id).catch(() => undefined);
+    }
+  }
+
+  private async userIdsForBlacklistEntry(type: BlacklistType, value: string): Promise<string[]> {
     const ids = new Set<string>();
     if (type === BlacklistType.USER_ID) {
       ids.add(value);
@@ -147,16 +163,16 @@ export class ModerationService {
       });
       for (const u of users) ids.add(u.id);
     }
-    for (const id of ids) {
-      await denyJwtUser(this.redis, id).catch(() => undefined);
-    }
+    return [...ids];
   }
 
   async deactivateBlacklist(id: string) {
-    return this.prisma.blacklistEntry.update({
+    const row = await this.prisma.blacklistEntry.update({
       where: { id },
       data: { active: false },
     });
+    await this.restoreSessionsForBlacklistEntry(row.type, row.value);
+    return row;
   }
 
   /** True if phone/email/userId is actively blacklisted (and not expired). */

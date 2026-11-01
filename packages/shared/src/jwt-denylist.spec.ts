@@ -1,10 +1,18 @@
-import { denyJwtJti, denyJwtUser, isJwtDenied, JWT_DENY_JTI_PREFIX, JWT_DENY_USER_PREFIX } from './jwt-denylist';
+import {
+  allowJwtUser,
+  denyJwtJti,
+  denyJwtUser,
+  isJwtDenied,
+  JWT_DENY_JTI_PREFIX,
+  JWT_DENY_USER_PREFIX,
+} from './jwt-denylist';
 
 function mockRedis() {
   return {
     client: {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockResolvedValue('OK'),
+      del: jest.fn().mockResolvedValue(1),
     },
   };
 }
@@ -32,5 +40,11 @@ describe('jwt denylist', () => {
     const redis = mockRedis();
     redis.client.get.mockRejectedValue(new Error('redis down'));
     await expect(isJwtDenied(redis as never, { jti: 'jti-1', sub: 'u' })).resolves.toBe(false);
+  });
+
+  it('clears user denylist on allowJwtUser', async () => {
+    const redis = mockRedis();
+    await allowJwtUser(redis as never, 'user-1');
+    expect(redis.client.del).toHaveBeenCalledWith(`${JWT_DENY_USER_PREFIX}user-1`);
   });
 });

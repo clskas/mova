@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -20,6 +21,9 @@ class MovaCropScreen extends StatefulWidget {
 class _MovaCropScreenState extends State<MovaCropScreen> {
   final TransformationController _transform = TransformationController();
   ui.Image? _decoded;
+  Uint8List? _bytes;
+  /// Taille réelle de la zone InteractiveViewer (pas une estimation chrome).
+  Size? _viewportSize;
   bool _busy = false;
   String? _error;
 
@@ -35,16 +39,27 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
   @override
   void dispose() {
     _transform.dispose();
+    _decoded?.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
     try {
-      final bytes = await File(widget.sourcePath).readAsBytes();
+      // XFile lit file:// et content:// (Android galerie) — File() échoue souvent.
+      final bytes = await XFile(widget.sourcePath).readAsBytes();
       final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
-      if (!mounted) return;
-      setState(() => _decoded = frame.image);
+      if (!mounted) {
+        frame.image.dispose();
+        return;
+      }
+      final previous = _decoded;
+      setState(() {
+        _bytes = bytes;
+        _decoded = frame.image;
+        _error = null;
+      });
+      previous?.dispose();
     } catch (_) {
       if (!mounted) return;
       setState(() => _error = 'Impossible de charger l\'image.');
@@ -53,7 +68,10 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
 
   Future<void> _validate() async {
     if (_busy || _decoded == null) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
       final cropped = await _exportCrop();
       if (!mounted) return;
@@ -77,15 +95,11 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
   /// Zone visible dans le cadre central → pixels source.
   Future<XFile?> _exportCrop() async {
     final image = _decoded;
-    if (image == null) return null;
+    final viewport = _viewportSize;
+    if (image == null || viewport == null) return null;
 
-    final media = MediaQuery.sizeOf(context);
-    final safeTop = MediaQuery.paddingOf(context).top;
-    // Hauteurs approximatives des barres (titre+valider haut / hint+valider bas).
-    const topChrome = 56.0 + 58.0;
-    const bottomChrome = 90.0;
-    final viewW = media.width;
-    final viewH = media.height - safeTop - MediaQuery.paddingOf(context).bottom - topChrome - bottomChrome;
+    final viewW = viewport.width;
+    final viewH = viewport.height;
     if (viewW <= 0 || viewH <= 0) return null;
 
     final frameSide = math.min(viewW, viewH) * _frameFraction;
@@ -100,7 +114,12 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
     final baseTop = (viewH - display.height) / 2;
 
     final matrix = _transform.value;
-    final inv = Matrix4.inverted(matrix);
+    Matrix4 inv;
+    try {
+      inv = Matrix4.inverted(matrix);
+    } catch (_) {
+      inv = Matrix4.identity();
+    }
 
     Offset toImage(Offset viewPoint) {
       final local = MatrixUtils.transformPoint(inv, viewPoint);
@@ -111,14 +130,30 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
 
     final a = toImage(Offset(frameLeft, frameTop));
     final b = toImage(Offset(frameLeft + frameSide, frameTop + frameSide));
-    var left = math.min(a.dx, b.dx).clamp(0.0, imgW);
-    var top = math.min(a.dy, b.dy).clamp(0.0, imgH);
-    var right = math.max(a.dx, b.dx).clamp(0.0, imgW);
-    var bottom = math.max(a.dy, b.dy).clamp(0.0, imgH);
-    if (right - left < 8 || bottom - top < 8) return null;
+    var left = math.min(a.dx, b.dx);
+    var top = math.min(a.dy, b.dy);
+    var right = math.max(a.dx, b.dx);
+    var bottom = math.max(a.dy, b.dy);
+
+    // Si le cadre sort trop hors image (zoom/pan), clamp puis fallback centre.
+    left = left.clamp(0.0, imgW);
+    top = top.clamp(0.0, imgH);
+    right = right.clamp(0.0, imgW);
+    bottom = bottom.clamp(0.0, imgH);
+
+    if (right - left < 8 || bottom - top < 8) {
+      // Fallback : carré centré sur l'image (évite un Valider mort sur Android).
+      final side = math.min(imgW, imgH);
+      left = (imgW - side) / 2;
+      top = (imgH - side) / 2;
+      right = left + side;
+      bottom = top + side;
+    }
 
     final cropW = right - left;
     final cropH = bottom - top;
+    if (cropW < 1 || cropH < 1) return null;
+
     const maxSide = 1024.0;
     final scale = math.min(1.0, maxSide / math.max(cropW, cropH));
     final outW = math.max(1, (cropW * scale).round());
@@ -146,7 +181,7 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
 
   Widget _validateButton({required bool compact}) {
     return FilledButton(
-      onPressed: _busy ? null : _validate,
+      onPressed: _busy || _decoded == null ? null : _validate,
       style: FilledButton.styleFrom(
         backgroundColor: _accent,
         foregroundColor: Colors.white,
@@ -207,22 +242,35 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
               child: Center(child: _validateButton(compact: true)),
             ),
             Expanded(
-              child: _error != null
+              child: _error != null && _decoded == null
                   ? Center(
                       child: Padding(
                         padding: const EdgeInsets.all(24),
-                        child: Text(
-                          _error!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.white70),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _error!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                            const SizedBox(height: 16),
+                            TextButton(
+                              onPressed: _load,
+                              child: const Text('Réessayer', style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
                         ),
                       ),
                     )
-                  : _decoded == null
+                  : _decoded == null || _bytes == null
                       ? const Center(child: CircularProgressIndicator(color: _accent))
                       : LayoutBuilder(
                           builder: (context, constraints) {
-                            final side = math.min(constraints.maxWidth, constraints.maxHeight) * _frameFraction;
+                            // Sync — utilisé au Valider ; pas de setState pendant le build.
+                            _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+                            final side =
+                                math.min(constraints.maxWidth, constraints.maxHeight) * _frameFraction;
                             return Stack(
                               fit: StackFit.expand,
                               children: [
@@ -234,9 +282,10 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
                                   child: SizedBox(
                                     width: constraints.maxWidth,
                                     height: constraints.maxHeight,
-                                    child: Image.file(
-                                      File(widget.sourcePath),
+                                    child: Image.memory(
+                                      _bytes!,
                                       fit: BoxFit.contain,
+                                      gaplessPlayback: true,
                                     ),
                                   ),
                                 ),
@@ -245,6 +294,17 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
                                     painter: _CropFramePainter(frameSide: side, color: _accent),
                                   ),
                                 ),
+                                if (_error != null)
+                                  Positioned(
+                                    left: 16,
+                                    right: 16,
+                                    bottom: 8,
+                                    child: Text(
+                                      _error!,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(color: Colors.orangeAccent, fontSize: 13),
+                                    ),
+                                  ),
                               ],
                             );
                           },

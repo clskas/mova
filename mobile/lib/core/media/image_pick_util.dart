@@ -54,9 +54,11 @@ Future<XFile?> cropMovaImage(XFile source) async {
         builder: (_) => MovaCropScreen(sourcePath: source.path),
       ),
     );
+    // Annuler (croix) → null. Valider → fichier. Échec technique → image d'origine.
+    if (cropped == null) return null;
     return cropped;
   } catch (_) {
-    // Si le crop échoue, garder l'image d'origine.
+    // Si le crop plante (nav / codec), garder l'image d'origine.
     return source;
   }
 }

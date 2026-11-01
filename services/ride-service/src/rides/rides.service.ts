@@ -45,6 +45,7 @@ import {
   fetchRidePaymentStatuses,
   fetchServicePaymentStatus,
   fetchServicePaymentStatuses,
+  isHardUnpaidBlock,
   type RidePaymentStatus,
 } from '../common/payment-status.util';
 import { applyPromoCode } from '../common/promo-apply.util';
@@ -1288,8 +1289,9 @@ export class RidesService {
       select: { id: true, isShared: true },
     });
     for (const ride of completed) {
-      const { isPaid } = await this.resolvePassengerCompletedPayment(ride, passengerId);
-      if (!isPaid) {
+      const pay = await this.resolvePassengerCompletedPayment(ride, passengerId);
+      // Soft cash: PENDING espèces sans litige → passager libre ; litige ou autre méthode → bloque.
+      if (isHardUnpaidBlock(pay)) {
         throw new MovaHttpException(MovaErrorCode.RIDE_UNPAID_PENDING, HttpStatus.CONFLICT);
       }
     }
@@ -1306,7 +1308,7 @@ export class RidesService {
     });
     for (const booking of joinerBookings) {
       const pay = await fetchServicePaymentStatus('RIDE_SHARE', booking.id);
-      if (!pay.isPaid) {
+      if (isHardUnpaidBlock(pay)) {
         throw new MovaHttpException(MovaErrorCode.RIDE_UNPAID_PENDING, HttpStatus.CONFLICT);
       }
     }
@@ -1323,12 +1325,14 @@ export class RidesService {
         { id: ride.id, isShared: ride.isShared },
         passengerId,
       );
-      if (!payment.isPaid) {
+      // Dialog booking : uniquement les blocages durs (litige cash / non-cash unpaid).
+      if (isHardUnpaidBlock(payment)) {
         return {
           ride: {
             ...this.formatRideDetail(ride),
             isPaid: false,
             paymentStatus: payment.paymentStatus,
+            cashDisputed: payment.cashDisputed === true,
             ...(ride.isShared
               ? { type: 'RIDE_SHARE', paymentReferenceId: payment.paymentReferenceId }
               : {}),
@@ -1348,12 +1352,13 @@ export class RidesService {
     });
     for (const booking of joinerBookings) {
       const pay = await fetchServicePaymentStatus('RIDE_SHARE', booking.id);
-      if (!pay.isPaid) {
+      if (isHardUnpaidBlock(pay)) {
         return {
           ride: {
             ...this.formatRideDetail(booking.ride),
             isPaid: false,
             paymentStatus: pay.paymentStatus,
+            cashDisputed: pay.cashDisputed === true,
             type: 'RIDE_SHARE',
             paymentReferenceId: booking.id,
           },

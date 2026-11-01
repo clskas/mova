@@ -9,7 +9,7 @@ import { CreateFoodDeliveryDto, CreateFoodMultiDeliveryDto, CreateParcelDelivery
 import { assertServiceAreaPair } from '../common/address.util';
 import { tripDistanceKm } from '../common/geo.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
-import { fetchServicePaymentStatus } from '../common/payment-status.util';
+import { fetchServicePaymentStatus, isHardUnpaidBlock } from '../common/payment-status.util';
 import {
   assertEscrowAllowsDispatch,
   assertPinMatches,
@@ -995,7 +995,7 @@ export class DeliveriesService {
     DeliveryStatus.IN_TRANSIT,
   ];
 
-  /** Bloque une nouvelle commande si une livraison terminée n'est pas encore payée (comme les courses). */
+  /** Bloque si litige cash ou paiement non-espèces encore dû — soft cash PENDING sans litige autorisé. */
   private async assertNoUnpaidCompletedDelivery(userId: string) {
     const delivered = (await this.prisma.delivery.findMany({
       where: { userId, status: DeliveryStatus.DELIVERED },
@@ -1005,7 +1005,7 @@ export class DeliveriesService {
     })) as Array<{ id: string }> | null;
     for (const row of delivered ?? []) {
       const payment = await fetchServicePaymentStatus('DELIVERY', row.id);
-      if (!payment.isPaid) {
+      if (isHardUnpaidBlock(payment)) {
         throw new MovaHttpException(MovaErrorCode.DELIVERY_UNPAID_PENDING, HttpStatus.CONFLICT);
       }
     }

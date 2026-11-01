@@ -156,7 +156,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         builder: (ctx) => AlertDialog(
           title: const Text('Paiement en attente'),
           content: const Text(
-            'Vous avez une course terminée non payée. Réglez le paiement avant d\'en commander une nouvelle.',
+            'Un paiement est en litige (espèces non reçues ou autre). '
+            'Réglez-le ou contactez le support avant de commander.',
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),

@@ -41,6 +41,11 @@ const MOBILE_MONEY_METHODS = new Set<PaymentMethod>([
 const PAY_LOCK_PREFIX = 'pay:intent:';
 const PAY_LOCK_TTL_SEC = 60;
 
+/** Délai avant auto-clôture espèces (considéré payé) si pas de litige. */
+const CASH_AUTO_CONFIRM_HOURS = 24;
+/** Plafond CDF : au-delà, pas d’auto-confirm (support / confirmation manuelle). */
+const CASH_AUTO_CONFIRM_MAX_CDF = 150_000;
+
 /**
  * Only forward hosted checkout URLs (CinetPay). SerdiPay/AfriMomo already push
  * STK — returning their payment_url makes old clients open it and re-trigger
@@ -960,7 +965,12 @@ export class PaymentsService {
     }
     const payment = await this.prisma.servicePayment.update({
       where: { referenceType_referenceId: { referenceType: type, referenceId } },
-      data: { status: PaymentStatus.COMPLETED, providerRef: `cash_confirmed_${type}:${referenceId}` },
+      data: {
+        status: PaymentStatus.COMPLETED,
+        providerRef: `cash_confirmed_${type}:${referenceId}`,
+        cashDisputedAt: null,
+        cashDisputeReason: null,
+      },
     });
     await this.publishPaymentCompleted({
       referenceType: type,
@@ -1049,7 +1059,12 @@ export class PaymentsService {
     }
     const payment = await this.prisma.payment.update({
       where: { rideId },
-      data: { status: PaymentStatus.COMPLETED, providerRef: `cash_confirmed_${rideId}` },
+      data: {
+        status: PaymentStatus.COMPLETED,
+        providerRef: `cash_confirmed_${rideId}`,
+        cashDisputedAt: null,
+        cashDisputeReason: null,
+      },
     });
     await this.publishPaymentCompleted({
       rideId,
@@ -1059,6 +1074,289 @@ export class PaymentsService {
     });
     await this.creditDriverAfterRidePayment(rideId);
     return { success: true, payment, message: 'Paiement espèces confirmé' };
+  }
+
+  /** Chauffeur : espèces non reçues — ouvre un litige et rebloque le passager. */
+  async disputeCashRide(rideId: string, driverUserId: string, reason?: string) {
+    const ride = await this.fetchRide(rideId);
+    if (ride.isShared === true || ride.shared === true || ride.type === 'RIDE_SHARE') {
+      return this.disputeCashRideSharePool(ride, driverUserId, reason);
+    }
+    if (ride.driverId !== driverUserId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const existing = await this.prisma.payment.findUnique({ where: { rideId } });
+    if (!existing || existing.method !== PaymentMethod.CASH) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Aucun paiement espèces en attente.');
+    }
+    if (existing.status === PaymentStatus.COMPLETED) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Ce paiement est déjà confirmé.');
+    }
+    const payment = await this.prisma.payment.update({
+      where: { rideId },
+      data: {
+        cashDisputedAt: new Date(),
+        cashDisputeReason: (reason ?? 'CASH_NOT_RECEIVED').slice(0, 200),
+        autoConfirmedAt: null,
+      },
+    });
+    this.logger.warn(`Cash dispute ride=${rideId} by driver=${driverUserId}`);
+    return {
+      success: true,
+      payment,
+      cashDisputed: true,
+      message: 'Litige enregistré — le passager est bloqué jusqu’à résolution.',
+    };
+  }
+
+  private async disputeCashRideSharePool(
+    ride: Record<string, unknown>,
+    driverUserId: string,
+    reason?: string,
+  ) {
+    if (ride.driverId !== driverUserId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const rawPassengers =
+      (ride.sharePassengers as Array<{ id?: string; bookingId?: string; status?: string }> | undefined) ??
+      (ride.passengers as Array<{ id?: string; bookingId?: string; status?: string }> | undefined) ??
+      [];
+    const bookingIds = [
+      ...new Set(
+        rawPassengers
+          .filter((p) => (p.status ?? '').toUpperCase() !== 'CANCELLED')
+          .map((p) => p.bookingId ?? p.id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    let disputed = 0;
+    for (const bookingId of bookingIds) {
+      try {
+        await this.disputeCashService('RIDE_SHARE', bookingId, driverUserId, reason);
+        disputed += 1;
+      } catch {
+        /* skip bookings without pending cash */
+      }
+    }
+    if (disputed === 0) {
+      throw new MovaHttpException(
+        MovaErrorCode.PAYMENT_FAILED,
+        undefined,
+        'Aucun paiement espèces Pool à contester.',
+      );
+    }
+    return {
+      success: true,
+      disputedCount: disputed,
+      cashDisputed: true,
+      message: `Litige espèces enregistré (${disputed} passager${disputed > 1 ? 's' : ''}).`,
+    };
+  }
+
+  async disputeCashService(
+    referenceType: string,
+    referenceId: string,
+    driverUserId: string,
+    reason?: string,
+  ) {
+    const type = referenceType.toUpperCase();
+    if (type === 'RIDE') return this.disputeCashRide(referenceId, driverUserId, reason);
+    const info = await this.fetchServicePaymentInfo(type, referenceId);
+    if (info.driverId !== driverUserId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const existing = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (!existing || existing.method !== PaymentMethod.CASH) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Aucun paiement espèces en attente.');
+    }
+    if (existing.status === PaymentStatus.COMPLETED) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Ce paiement est déjà confirmé.');
+    }
+    const payment = await this.prisma.servicePayment.update({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+      data: {
+        cashDisputedAt: new Date(),
+        cashDisputeReason: (reason ?? 'CASH_NOT_RECEIVED').slice(0, 200),
+        autoConfirmedAt: null,
+      },
+    });
+    this.logger.warn(`Cash dispute ${type}/${referenceId} by driver=${driverUserId}`);
+    return {
+      success: true,
+      payment,
+      cashDisputed: true,
+      message: 'Litige enregistré — le client est bloqué jusqu’à résolution.',
+    };
+  }
+
+  /** Passager : « J’ai payé » — horodatage + traçabilité (n’auto-valide pas). */
+  async claimCashPaidRide(rideId: string, passengerId: string) {
+    const ride = await this.fetchRide(rideId);
+    if (ride.isShared === true || ride.shared === true || ride.type === 'RIDE_SHARE') {
+      const bookingId = await this.resolveShareBookingIdForPassenger(ride, passengerId);
+      if (!bookingId) {
+        throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+      }
+      return this.claimCashPaidService('RIDE_SHARE', bookingId, passengerId);
+    }
+    if (ride.passengerId !== passengerId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const existing = await this.prisma.payment.findUnique({ where: { rideId } });
+    if (!existing || existing.method !== PaymentMethod.CASH) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Aucun paiement espèces en attente.');
+    }
+    if (existing.status === PaymentStatus.COMPLETED) {
+      return { success: true, payment: existing, message: 'Paiement déjà confirmé' };
+    }
+    if (existing.userId !== passengerId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    const payment = await this.prisma.payment.update({
+      where: { rideId },
+      data: { passengerClaimedPaidAt: existing.passengerClaimedPaidAt ?? new Date() },
+    });
+    return {
+      success: true,
+      payment,
+      passengerClaimedPaid: true,
+      message: 'Déclaration enregistrée — le chauffeur confirmera « Cash reçu ».',
+    };
+  }
+
+  async claimCashPaidService(referenceType: string, referenceId: string, passengerId: string) {
+    const type = referenceType.toUpperCase();
+    if (type === 'RIDE') return this.claimCashPaidRide(referenceId, passengerId);
+    const existing = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+    });
+    if (!existing || existing.method !== PaymentMethod.CASH) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Aucun paiement espèces en attente.');
+    }
+    if (existing.userId !== passengerId) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+    if (existing.status === PaymentStatus.COMPLETED) {
+      return { success: true, payment: existing, message: 'Paiement déjà confirmé' };
+    }
+    const payment = await this.prisma.servicePayment.update({
+      where: { referenceType_referenceId: { referenceType: type, referenceId } },
+      data: { passengerClaimedPaidAt: existing.passengerClaimedPaidAt ?? new Date() },
+    });
+    return {
+      success: true,
+      payment,
+      passengerClaimedPaid: true,
+      message: 'Déclaration enregistrée — le chauffeur confirmera « Cash reçu ».',
+    };
+  }
+
+  private async resolveShareBookingIdForPassenger(
+    ride: Record<string, unknown>,
+    passengerId: string,
+  ): Promise<string | null> {
+    const rawPassengers =
+      (ride.sharePassengers as Array<{ id?: string; bookingId?: string; userId?: string; status?: string }> | undefined) ??
+      (ride.passengers as Array<{ id?: string; bookingId?: string; userId?: string; status?: string }> | undefined) ??
+      [];
+    const mine = rawPassengers.find(
+      (p) =>
+        p.userId === passengerId && (p.status ?? '').toUpperCase() !== 'CANCELLED',
+    );
+    return (mine?.bookingId ?? mine?.id) ?? null;
+  }
+
+  /**
+   * Auto-clôture espèces après 24 h sans litige (considéré payé).
+   * Plafond montant ; litige chauffeur → skip.
+   */
+  async autoConfirmStaleCashPayments(): Promise<number> {
+    const cutoff = new Date(Date.now() - CASH_AUTO_CONFIRM_HOURS * 60 * 60 * 1000);
+    let confirmed = 0;
+
+    const ridePending = await this.prisma.payment.findMany({
+      where: {
+        method: PaymentMethod.CASH,
+        status: PaymentStatus.PENDING,
+        cashDisputedAt: null,
+        createdAt: { lte: cutoff },
+        amountCdf: { lte: CASH_AUTO_CONFIRM_MAX_CDF },
+      },
+      take: 40,
+      orderBy: { createdAt: 'asc' },
+    });
+    for (const row of ridePending) {
+      try {
+        const payment = await this.prisma.payment.update({
+          where: { id: row.id },
+          data: {
+            status: PaymentStatus.COMPLETED,
+            providerRef: `cash_auto_${row.rideId}`,
+            autoConfirmedAt: new Date(),
+          },
+        });
+        await this.publishPaymentCompleted({
+          rideId: row.rideId,
+          userId: row.userId,
+          amountCdf: row.amountCdf,
+          method: 'CASH',
+        });
+        await this.creditDriverAfterRidePayment(row.rideId);
+        confirmed += 1;
+        this.logger.log(`Cash auto-confirmed ride=${row.rideId} amount=${row.amountCdf}`);
+        void payment;
+      } catch (err) {
+        this.logger.warn(`Cash auto-confirm ride=${row.rideId}: ${(err as Error).message}`);
+      }
+    }
+
+    const servicePending = await this.prisma.servicePayment.findMany({
+      where: {
+        method: PaymentMethod.CASH,
+        status: PaymentStatus.PENDING,
+        cashDisputedAt: null,
+        createdAt: { lte: cutoff },
+        amountCdf: { lte: CASH_AUTO_CONFIRM_MAX_CDF },
+      },
+      take: 40,
+      orderBy: { createdAt: 'asc' },
+    });
+    for (const row of servicePending) {
+      try {
+        const payment = await this.prisma.servicePayment.update({
+          where: { id: row.id },
+          data: {
+            status: PaymentStatus.COMPLETED,
+            providerRef: `cash_auto_${row.referenceType}_${row.referenceId}`,
+            autoConfirmedAt: new Date(),
+          },
+        });
+        await this.publishPaymentCompleted({
+          referenceType: row.referenceType,
+          referenceId: row.referenceId,
+          userId: row.userId,
+          amountCdf: row.amountCdf,
+          method: 'CASH',
+        });
+        await this.creditDriverAfterServicePayment(row.referenceType, row.referenceId);
+        if (row.referenceType.toUpperCase() === 'RENTAL') {
+          await this.syncRentalPaidStatus(row.referenceId);
+        }
+        confirmed += 1;
+        this.logger.log(
+          `Cash auto-confirmed ${row.referenceType}/${row.referenceId} amount=${row.amountCdf}`,
+        );
+        void payment;
+      } catch (err) {
+        this.logger.warn(
+          `Cash auto-confirm ${row.referenceType}/${row.referenceId}: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    return confirmed;
   }
 
   /** Pool : confirmer les ServicePayment CASH PENDING des bookings de la course. */
@@ -1210,6 +1508,10 @@ export class PaymentsService {
       rideId,
       isPaid,
       paymentStatus: payment?.status ?? null,
+      paymentMethod: payment?.method ?? null,
+      amountCdf: payment?.amountCdf ?? null,
+      cashDisputed: Boolean(payment?.cashDisputedAt),
+      passengerClaimedPaid: Boolean(payment?.passengerClaimedPaidAt),
     };
   }
 
@@ -1219,13 +1521,28 @@ export class PaymentsService {
       where: { rideId: { in: unique } },
     });
     const byRide = new Map(payments.map((p) => [p.rideId, p]));
-    const result: Record<string, { rideId: string; isPaid: boolean; paymentStatus: string | null }> = {};
+    const result: Record<
+      string,
+      {
+        rideId: string;
+        isPaid: boolean;
+        paymentStatus: string | null;
+        paymentMethod: string | null;
+        amountCdf: number | null;
+        cashDisputed: boolean;
+        passengerClaimedPaid: boolean;
+      }
+    > = {};
     for (const rideId of unique) {
       const payment = byRide.get(rideId);
       result[rideId] = {
         rideId,
         isPaid: payment?.status === PaymentStatus.COMPLETED,
         paymentStatus: payment?.status ?? null,
+        paymentMethod: payment?.method ?? null,
+        amountCdf: payment?.amountCdf ?? null,
+        cashDisputed: Boolean(payment?.cashDisputedAt),
+        passengerClaimedPaid: Boolean(payment?.passengerClaimedPaidAt),
       };
     }
     return result;
@@ -1247,6 +1564,8 @@ export class PaymentsService {
       escrowHeld: payment?.escrowHeld ?? false,
       payoutReleased: payment?.payoutReleased ?? false,
       fundsFrozen: payment?.fundsFrozen ?? false,
+      cashDisputed: Boolean(payment?.cashDisputedAt),
+      passengerClaimedPaid: Boolean(payment?.passengerClaimedPaidAt),
     };
   }
 
@@ -1269,6 +1588,8 @@ export class PaymentsService {
         escrowHeld: boolean;
         payoutReleased: boolean;
         fundsFrozen: boolean;
+        cashDisputed: boolean;
+        passengerClaimedPaid: boolean;
       }
     > = {};
     for (const referenceId of unique) {
@@ -1283,6 +1604,8 @@ export class PaymentsService {
         escrowHeld: payment?.escrowHeld ?? false,
         payoutReleased: payment?.payoutReleased ?? false,
         fundsFrozen: payment?.fundsFrozen ?? false,
+        cashDisputed: Boolean(payment?.cashDisputedAt),
+        passengerClaimedPaid: Boolean(payment?.passengerClaimedPaidAt),
       };
     }
     return result;
@@ -1748,6 +2071,10 @@ export class PaymentsService {
       isPaid: payment?.status === PaymentStatus.COMPLETED,
       pendingMobileMoney:
         payment?.status === PaymentStatus.PENDING && MOBILE_MONEY_METHODS.has(payment.method),
+      pendingCash:
+        payment?.status === PaymentStatus.PENDING && payment.method === PaymentMethod.CASH,
+      cashDisputed: Boolean(payment?.cashDisputedAt),
+      passengerClaimedPaid: Boolean(payment?.passengerClaimedPaidAt),
       failureReason: payment?.failureReason ?? null,
       amountCdf: payment?.amountCdf ?? null,
     };
@@ -1772,6 +2099,12 @@ export class PaymentsService {
         !!payment &&
         payment.status === PaymentStatus.PENDING &&
         MOBILE_MONEY_METHODS.has(payment.method),
+      pendingCash:
+        !!payment &&
+        payment.status === PaymentStatus.PENDING &&
+        payment.method === PaymentMethod.CASH,
+      cashDisputed: Boolean(payment?.cashDisputedAt),
+      passengerClaimedPaid: Boolean(payment?.passengerClaimedPaidAt),
       failureReason: payment?.failureReason ?? null,
       amountCdf: payment?.amountCdf ?? null,
       escrowHeld: payment?.escrowHeld ?? false,

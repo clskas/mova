@@ -89,7 +89,7 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.RIDE_ALREADY_RATED]: 'Vous avez déjà noté cette course.',
   [MovaErrorCode.RIDE_INVALID_TRANSITION]: 'Transition de statut non autorisée pour cette course.',
   [MovaErrorCode.RIDE_UNPAID_PENDING]:
-    'Vous avez une course terminée non payée. Réglez le paiement avant d\'en commander une nouvelle.',
+    'Un paiement est encore en litige (espèces non reçues ou autre). Réglez-le ou contactez le support avant de commander.',
   [MovaErrorCode.SCHEDULED_RIDE_NOT_FOUND]: 'Réservation planifiée introuvable.',
   [MovaErrorCode.SCHEDULED_RIDE_TOO_FAR]: 'La réservation ne peut pas dépasser 7 jours.',
   [MovaErrorCode.SCHEDULED_RIDE_PAST]: 'La date de réservation doit être dans le futur.',
@@ -105,7 +105,7 @@ export const MOVA_ERROR_MESSAGES: Record<MovaErrorCode, string> = {
   [MovaErrorCode.DELIVERY_FUNDS_FROZEN]:
     'Les fonds sont bloqués (litige ou délai dépassé). Le support SENGA interviendra — aucun versement automatique.',
   [MovaErrorCode.DELIVERY_UNPAID_PENDING]:
-    'Vous avez une livraison terminée non payée. Réglez le paiement avant d\'en commander une nouvelle.',
+    'Un paiement de livraison est en litige (espèces non reçues ou autre). Réglez-le ou contactez le support avant de commander.',
 
   [MovaErrorCode.CARPOOL_NOT_FOUND]: 'Trajet covoiturage introuvable.',
   [MovaErrorCode.CARPOOL_NO_SEATS]: 'Plus de places disponibles sur ce trajet.',

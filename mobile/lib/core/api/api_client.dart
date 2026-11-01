@@ -2011,11 +2011,41 @@ class ApiClient {
     return post('/payments/rides/$rideId/cash/confirm', <String, dynamic>{});
   }
 
+  Future<Result<Map<String, dynamic>>> disputeCashRide(String rideId, {String? reason}) async {
+    return post('/payments/rides/$rideId/cash/dispute', <String, dynamic>{
+      if (reason != null) 'reason': reason,
+    });
+  }
+
+  Future<Result<Map<String, dynamic>>> claimCashPaidRide(String rideId) async {
+    return post('/payments/rides/$rideId/cash/claim-paid', <String, dynamic>{});
+  }
+
   Future<Result<Map<String, dynamic>>> confirmCashService(
     String referenceType,
     String referenceId,
   ) async {
     return post('/payments/services/$referenceType/$referenceId/cash/confirm', <String, dynamic>{});
+  }
+
+  Future<Result<Map<String, dynamic>>> disputeCashService(
+    String referenceType,
+    String referenceId, {
+    String? reason,
+  }) async {
+    return post('/payments/services/$referenceType/$referenceId/cash/dispute', <String, dynamic>{
+      if (reason != null) 'reason': reason,
+    });
+  }
+
+  Future<Result<Map<String, dynamic>>> claimCashPaidService(
+    String referenceType,
+    String referenceId,
+  ) async {
+    return post(
+      '/payments/services/$referenceType/$referenceId/cash/claim-paid',
+      <String, dynamic>{},
+    );
   }
 
   Future<Result<Map<String, dynamic>>> createRideShareLink(String rideId) async {

@@ -60,6 +60,25 @@ export class PaymentsController {
     return this.paymentsService.confirmCashRide(rideId, req.user.id);
   }
 
+  @Post('rides/:rideId/cash/dispute')
+  @ApiOperation({ summary: 'Signaler espèces non reçues (chauffeur — litige)' })
+  disputeCashRide(
+    @Request() req: { user: { id: string } },
+    @Param('rideId') rideId: string,
+    @Body() body: { reason?: string },
+  ) {
+    return this.paymentsService.disputeCashRide(rideId, req.user.id, body?.reason);
+  }
+
+  @Post('rides/:rideId/cash/claim-paid')
+  @ApiOperation({ summary: 'Passager déclare avoir remis les espèces' })
+  claimCashPaidRide(
+    @Request() req: { user: { id: string } },
+    @Param('rideId') rideId: string,
+  ) {
+    return this.paymentsService.claimCashPaidRide(rideId, req.user.id);
+  }
+
   @Post('services/:referenceType/:referenceId/cash/confirm')
   @ApiOperation({ summary: 'Confirmer paiement espèces service (chauffeur — Cash reçu)' })
   confirmCashService(
@@ -68,6 +87,32 @@ export class PaymentsController {
     @Param('referenceId') referenceId: string,
   ) {
     return this.paymentsService.confirmCashService(referenceType, referenceId, req.user.id);
+  }
+
+  @Post('services/:referenceType/:referenceId/cash/dispute')
+  @ApiOperation({ summary: 'Signaler espèces non reçues (service — litige)' })
+  disputeCashService(
+    @Request() req: { user: { id: string } },
+    @Param('referenceType') referenceType: string,
+    @Param('referenceId') referenceId: string,
+    @Body() body: { reason?: string },
+  ) {
+    return this.paymentsService.disputeCashService(
+      referenceType,
+      referenceId,
+      req.user.id,
+      body?.reason,
+    );
+  }
+
+  @Post('services/:referenceType/:referenceId/cash/claim-paid')
+  @ApiOperation({ summary: 'Client déclare avoir remis les espèces (service)' })
+  claimCashPaidService(
+    @Request() req: { user: { id: string } },
+    @Param('referenceType') referenceType: string,
+    @Param('referenceId') referenceId: string,
+  ) {
+    return this.paymentsService.claimCashPaidService(referenceType, referenceId, req.user.id);
   }
 
   @Get('services/:referenceType/:referenceId/status')

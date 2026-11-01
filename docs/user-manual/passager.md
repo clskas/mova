@@ -130,6 +130,8 @@ Carte en **dernière ligne** de l'accueil (ou icône portefeuille dans la barre 
 - **Recharge** : minimum **2 300 FC** ; confirmez le push opérateur sur le téléphone de la SIM.
 - **Retrait** vers Mobile Money : même plancher **2 300 FC**, code OTP SMS obligatoire. Seul le **solde retirable** (portefeuille − fonds bloqués) peut être retiré.
 - Les paiements **espèces** sur une course ne créditent **pas** votre wallet (ni celui du chauffeur en tant que montant retirable). Remettez l’argent au chauffeur ; il confirme **Cash reçu** (aucun code PIN à communiquer pour le paiement).
+- **Après une course en espèces**, vous pouvez **commander une nouvelle course** même si le chauffeur n’a pas encore confirmé. Le paiement reste en attente jusqu’à **Cash reçu**, votre déclaration **« J’ai payé »**, ou une **clôture automatique sous 24 h**.
+- Si le chauffeur signale **Cash non reçu**, un **litige** s’ouvre : vous ne pourrez plus commander tant que le litige n’est pas résolu (confirmation chauffeur, paiement alternatif, ou support SENGA).
 
 ## 12. Historique
 

@@ -24,17 +24,25 @@ enum PaymentStatus {
 }
 
 model Payment {
-  id            String        @id @default(uuid())
-  rideId        String        @unique
-  userId        String
-  amountCdf     Int
-  method        PaymentMethod
-  status        PaymentStatus @default(PENDING)
-  providerRef   String?
-  failureReason String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                     String        @id @default(uuid())
+  rideId                 String        @unique
+  userId                 String
+  amountCdf              Int
+  method                 PaymentMethod
+  status                 PaymentStatus @default(PENDING)
+  providerRef            String?
+  failureReason          String?
+  /// Chauffeur a signalé « Cash non reçu » — bloque à nouveau le passager.
+  cashDisputedAt         DateTime?
+  cashDisputeReason      String?
+  /// Passager affirme avoir remis les espèces (horodatage + traçabilité).
+  passengerClaimedPaidAt DateTime?
+  /// Clôture auto après délai sans litige (considéré payé).
+  autoConfirmedAt        DateTime?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
 
+  @@index([method, status, createdAt])
   @@map("payments")
 }
 
@@ -67,22 +75,27 @@ model HubPayment {
 }
 
 model ServicePayment {
-  id            String        @id @default(uuid())
-  referenceType String
-  referenceId   String
-  userId        String
-  amountCdf     Int
-  method        PaymentMethod
-  status        PaymentStatus @default(PENDING)
-  providerRef    String?
-  failureReason  String?
-  escrowHeld     Boolean       @default(false)
-  payoutReleased Boolean       @default(false)
-  fundsFrozen    Boolean       @default(false)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                     String        @id @default(uuid())
+  referenceType          String
+  referenceId            String
+  userId                 String
+  amountCdf              Int
+  method                 PaymentMethod
+  status                 PaymentStatus @default(PENDING)
+  providerRef            String?
+  failureReason          String?
+  escrowHeld             Boolean       @default(false)
+  payoutReleased         Boolean       @default(false)
+  fundsFrozen            Boolean       @default(false)
+  cashDisputedAt         DateTime?
+  cashDisputeReason      String?
+  passengerClaimedPaidAt DateTime?
+  autoConfirmedAt        DateTime?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
 
   @@unique([referenceType, referenceId])
+  @@index([method, status, createdAt])
   @@map("service_payments")
 }
 

@@ -4,6 +4,11 @@ export type RidePaymentStatus = {
   rideId: string;
   isPaid: boolean;
   paymentStatus: string | null;
+  paymentMethod?: string | null;
+  amountCdf?: number | null;
+  /** Espèces signalées non reçues — seul cas qui rebloque le passager. */
+  cashDisputed?: boolean;
+  passengerClaimedPaid?: boolean;
 };
 
 export type ServicePaymentStatus = {
@@ -16,7 +21,21 @@ export type ServicePaymentStatus = {
   escrowHeld?: boolean;
   payoutReleased?: boolean;
   fundsFrozen?: boolean;
+  cashDisputed?: boolean;
+  passengerClaimedPaid?: boolean;
 };
+
+/** Soft cash: PENDING espèces sans litige → passager libre de commander. */
+export function isHardUnpaidBlock(pay: {
+  isPaid: boolean;
+  paymentMethod?: string | null;
+  cashDisputed?: boolean;
+}): boolean {
+  if (pay.isPaid) return false;
+  const method = (pay.paymentMethod ?? '').toUpperCase();
+  if (method === 'CASH' && !pay.cashDisputed) return false;
+  return true;
+}
 
 export async function fetchServicePaymentStatuses(
   referenceType: string,

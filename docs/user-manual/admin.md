@@ -93,6 +93,7 @@ Dans **Règles plateforme** (SUPER_ADMIN, ADMIN, **CITY_ADMIN** — section docu
 - **Retrait** = uniquement le **solde retirable** (wallet − holds). Les montants encaissés **cash** chez le client **ne** sont **pas** retirables via l’app.
 - Commission sur course **espèces** → **dette** plateforme (le wallet peut rester à 0).
 - Dette au-delà du seuil / règle solde positif → offres bloquées jusqu’à recharge ou règlement guichet.
+- **Timeout cash** : le passager n’est plus bloqué tant que le paiement espèces est PENDING sans litige. Après **24 h** sans signal « Cash non reçu » (montant ≤ **150 000 FC**), le paiement est auto-confirmé (`autoConfirmedAt`). Un litige chauffeur (`cashDisputedAt`) rebloque le passager.
 - Les courses **Pool** apparaissent dans **Courses** (badge / type partagé) ; le covoiturage planifié reste dans **Covoiturage**.
 
 ### Validation du type d'engin

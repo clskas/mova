@@ -299,6 +299,32 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     }
   }
 
+  Future<void> _claimCashPaid() async {
+    if (_actionLoading) return;
+    setState(() => _actionLoading = true);
+    final api = ref.read(apiClientProvider);
+    final result = widget.rideId != null
+        ? await api.claimCashPaidRide(widget.rideId!)
+        : await api.claimCashPaidService(widget.referenceType, widget.referenceId);
+    if (!mounted) return;
+    setState(() => _actionLoading = false);
+    switch (result) {
+      case Success(:final data):
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              data['message']?.toString() ??
+                  'Déclaration enregistrée — le chauffeur confirmera « Cash reçu ».',
+            ),
+          ),
+        );
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(sanitizeUserMessage(error.message))),
+        );
+    }
+  }
+
   void _continue() {
     // Pendant le cash pending, ne pas ouvrir la notation (sinon elle se rouvre en boucle).
     if (_cashStillPending) {
@@ -356,7 +382,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                           const SizedBox(height: 8),
                           const Text(
                             'Remettez l\'argent au chauffeur. Il confirmera « Cash reçu » dans son application. '
-                            'Le reçu sera disponible après confirmation.',
+                            'Vous pouvez déjà commander une nouvelle course : le paiement reste en attente '
+                            'jusqu\'à confirmation (ou clôture automatique sous 24 h si le chauffeur ne signale rien).',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                           ),
@@ -364,6 +391,12 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    MovaButton(
+                      label: 'J\'ai payé en espèces',
+                      isSecondary: true,
+                      onPressed: _claimCashPaid,
+                    ),
+                    const SizedBox(height: 8),
                     MovaButton(label: 'Retour à l\'accueil', onPressed: _continue),
                     if (!_cashStillPending && widget.showRatingAfter && widget.rideId != null) ...[
                       const SizedBox(height: 8),

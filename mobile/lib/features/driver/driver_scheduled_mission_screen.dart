@@ -125,6 +125,20 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
           Failure(:final error) => (ok: false, message: error.message),
         };
       },
+      dispute: () async {
+        final result = await api.disputeCashService(
+          'SCHEDULED',
+          widget.rideId,
+          reason: 'CASH_NOT_RECEIVED',
+        );
+        return switch (result) {
+          Success(:final data) => (
+              ok: true,
+              message: data['message']?.toString() ?? 'Litige enregistré',
+            ),
+          Failure(:final error) => (ok: false, message: error.message),
+        };
+      },
     );
     if (!ok || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

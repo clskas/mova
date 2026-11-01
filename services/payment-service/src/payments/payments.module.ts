@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PaymentsController } from './payments.controller';
 import { PaymentsWebhookController } from './payments-webhook.controller';
 import { PaymentsService } from './payments.service';
+import { CashAutoConfirmScheduler } from './cash-auto-confirm.scheduler';
 import { HubModule } from '../hub/hub.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { DriverPayoutModule } from '../payouts/driver-payout.module';
@@ -19,7 +20,14 @@ import { AirtelMoneyProvider, MockPaymentProvider, MpesaProvider, OrangeMoneyPro
     DriverDebtLedgerModule,
   ],
   controllers: [PaymentsController, PaymentsWebhookController],
-  providers: [PaymentsService, MockPaymentProvider, OrangeMoneyProvider, MpesaProvider, AirtelMoneyProvider],
+  providers: [
+    PaymentsService,
+    CashAutoConfirmScheduler,
+    MockPaymentProvider,
+    OrangeMoneyProvider,
+    MpesaProvider,
+    AirtelMoneyProvider,
+  ],
   exports: [PaymentsService],
 })
 export class PaymentsModule {}

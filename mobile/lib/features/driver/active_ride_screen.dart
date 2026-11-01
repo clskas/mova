@@ -1028,6 +1028,26 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
           Failure(:final error) => (ok: false, message: error.message),
         };
       },
+      dispute: () async {
+        if (_isSharedPool) {
+          final result = await api.disputeCashRide(_rideId, reason: 'CASH_NOT_RECEIVED');
+          return switch (result) {
+            Success(:final data) => (
+                ok: true,
+                message: data['message']?.toString() ?? 'Litige enregistré',
+              ),
+            Failure(:final error) => (ok: false, message: error.message),
+          };
+        }
+        final result = await api.disputeCashRide(_rideId, reason: 'CASH_NOT_RECEIVED');
+        return switch (result) {
+          Success(:final data) => (
+              ok: true,
+              message: data['message']?.toString() ?? 'Litige enregistré',
+            ),
+          Failure(:final error) => (ok: false, message: error.message),
+        };
+      },
     );
     _cashDialogOpen = false;
     if (!ok || !mounted) return;

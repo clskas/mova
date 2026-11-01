@@ -475,6 +475,20 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           Failure(:final error) => (ok: false, message: error.message),
         };
       },
+      dispute: () async {
+        final result = await api.disputeCashService(
+          refType,
+          _deliveryId,
+          reason: 'CASH_NOT_RECEIVED',
+        );
+        return switch (result) {
+          Success(:final data) => (
+              ok: true,
+              message: data['message']?.toString() ?? 'Litige enregistré',
+            ),
+          Failure(:final error) => (ok: false, message: error.message),
+        };
+      },
     );
     _cashDialogOpen = false;
     if (!ok || !mounted) return;

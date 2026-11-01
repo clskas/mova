@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
-/// Écran de rognage Flutter (remplace uCrop) :
-/// croix + titre « Rogner » centrés ; Valider en haut et en bas au centre.
+/// Fallback Flutter si uCrop est indisponible.
+/// Un seul bouton **Valider** (en haut à droite).
 class MovaCropScreen extends StatefulWidget {
   const MovaCropScreen({super.key, required this.sourcePath});
 
@@ -20,10 +20,9 @@ class MovaCropScreen extends StatefulWidget {
 
 class _MovaCropScreenState extends State<MovaCropScreen> {
   final TransformationController _transform = TransformationController();
+  final GlobalKey _viewportKey = GlobalKey();
   ui.Image? _decoded;
   Uint8List? _bytes;
-  /// Taille réelle de la zone InteractiveViewer (pas une estimation chrome).
-  Size? _viewportSize;
   bool _busy = false;
   String? _error;
 
@@ -45,7 +44,6 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
 
   Future<void> _load() async {
     try {
-      // XFile lit file:// et content:// (Android galerie) — File() échoue souvent.
       final bytes = await XFile(widget.sourcePath).readAsBytes();
       final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
@@ -67,13 +65,13 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
   }
 
   Future<void> _validate() async {
-    if (_busy || _decoded == null) return;
+    if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final cropped = await _exportCrop();
+      final cropped = await _exportCrop() ?? await _exportFullImage();
       if (!mounted) return;
       if (cropped == null) {
         setState(() {
@@ -92,14 +90,22 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
     }
   }
 
-  /// Zone visible dans le cadre central → pixels source.
+  Future<XFile?> _exportFullImage() async {
+    final bytes = _bytes;
+    if (bytes == null || bytes.isEmpty) return null;
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/mova_crop_full_${DateTime.now().millisecondsSinceEpoch}.jpg');
+    await file.writeAsBytes(bytes, flush: true);
+    return XFile(file.path, mimeType: 'image/jpeg');
+  }
+
   Future<XFile?> _exportCrop() async {
     final image = _decoded;
-    final viewport = _viewportSize;
-    if (image == null || viewport == null) return null;
+    final box = _viewportKey.currentContext?.findRenderObject() as RenderBox?;
+    if (image == null || box == null || !box.hasSize) return null;
 
-    final viewW = viewport.width;
-    final viewH = viewport.height;
+    final viewW = box.size.width;
+    final viewH = box.size.height;
     if (viewW <= 0 || viewH <= 0) return null;
 
     final frameSide = math.min(viewW, viewH) * _frameFraction;
@@ -113,10 +119,9 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
     final baseLeft = (viewW - display.width) / 2;
     final baseTop = (viewH - display.height) / 2;
 
-    final matrix = _transform.value;
     Matrix4 inv;
     try {
-      inv = Matrix4.inverted(matrix);
+      inv = Matrix4.inverted(_transform.value);
     } catch (_) {
       inv = Matrix4.identity();
     }
@@ -130,19 +135,12 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
 
     final a = toImage(Offset(frameLeft, frameTop));
     final b = toImage(Offset(frameLeft + frameSide, frameTop + frameSide));
-    var left = math.min(a.dx, b.dx);
-    var top = math.min(a.dy, b.dy);
-    var right = math.max(a.dx, b.dx);
-    var bottom = math.max(a.dy, b.dy);
-
-    // Si le cadre sort trop hors image (zoom/pan), clamp puis fallback centre.
-    left = left.clamp(0.0, imgW);
-    top = top.clamp(0.0, imgH);
-    right = right.clamp(0.0, imgW);
-    bottom = bottom.clamp(0.0, imgH);
+    var left = math.min(a.dx, b.dx).clamp(0.0, imgW);
+    var top = math.min(a.dy, b.dy).clamp(0.0, imgH);
+    var right = math.max(a.dx, b.dx).clamp(0.0, imgW);
+    var bottom = math.max(a.dy, b.dy).clamp(0.0, imgH);
 
     if (right - left < 8 || bottom - top < 8) {
-      // Fallback : carré centré sur l'image (évite un Valider mort sur Android).
       final side = math.min(imgW, imgH);
       left = (imgW - side) / 2;
       top = (imgH - side) / 2;
@@ -179,33 +177,6 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
     return XFile(file.path, mimeType: 'image/png');
   }
 
-  Widget _validateButton({required bool compact}) {
-    return FilledButton(
-      onPressed: _busy || _decoded == null ? null : _validate,
-      style: FilledButton.styleFrom(
-        backgroundColor: _accent,
-        foregroundColor: Colors.white,
-        minimumSize: Size(compact ? 140 : 180, compact ? 48 : 54),
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        elevation: 3,
-      ),
-      child: _busy
-          ? const SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-            )
-          : Text(
-              'Valider',
-              style: TextStyle(
-                fontSize: compact ? 16 : 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -215,31 +186,46 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
           children: [
             SizedBox(
               height: 56,
-              child: Stack(
-                alignment: Alignment.center,
+              child: Row(
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      onPressed: _busy ? null : () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                      tooltip: 'Annuler',
+                  IconButton(
+                    onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                    tooltip: 'Annuler',
+                  ),
+                  const Expanded(
+                    child: Text(
+                      'Rogner',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                  const Text(
-                    'Rogner',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilledButton(
+                      onPressed: _busy || _decoded == null ? null : _validate,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _accent,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(108, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: _busy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Valider', style: TextStyle(fontWeight: FontWeight.w700)),
                     ),
                   ),
                 ],
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Center(child: _validateButton(compact: true)),
             ),
             Expanded(
               child: _error != null && _decoded == null
@@ -267,11 +253,10 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
                       ? const Center(child: CircularProgressIndicator(color: _accent))
                       : LayoutBuilder(
                           builder: (context, constraints) {
-                            // Sync — utilisé au Valider ; pas de setState pendant le build.
-                            _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
                             final side =
                                 math.min(constraints.maxWidth, constraints.maxHeight) * _frameFraction;
                             return Stack(
+                              key: _viewportKey,
                               fit: StackFit.expand,
                               children: [
                                 InteractiveViewer(
@@ -298,7 +283,7 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
                                   Positioned(
                                     left: 16,
                                     right: 16,
-                                    bottom: 8,
+                                    bottom: 12,
                                     child: Text(
                                       _error!,
                                       textAlign: TextAlign.center,
@@ -311,16 +296,16 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
                         ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-              child: Column(
-                children: [
-                  Text(
-                    'Pincez pour zoomer, glissez pour cadrer',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
-                  ),
-                  const SizedBox(height: 12),
-                  Center(child: _validateButton(compact: false)),
-                ],
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                12 + MediaQuery.paddingOf(context).bottom,
+              ),
+              child: Text(
+                'Pincez pour zoomer, glissez pour cadrer',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
               ),
             ),
           ],
@@ -359,13 +344,4 @@ class _CropFramePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CropFramePainter oldDelegate) =>
       oldDelegate.frameSide != frameSide || oldDelegate.color != color;
-}
-
-Future<XFile?> showMovaCropScreen(BuildContext context, String sourcePath) {
-  return Navigator.of(context).push<XFile?>(
-    MaterialPageRoute(
-      fullscreenDialog: true,
-      builder: (_) => MovaCropScreen(sourcePath: sourcePath),
-    ),
-  );
 }

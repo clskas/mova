@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
@@ -16,6 +20,21 @@ Future<void> markExternalCaptureSessionGuard() async {
   final now = DateTime.now().millisecondsSinceEpoch;
   await prefs.setInt(ApiClient.sessionUnlockedAtKey, now);
   await prefs.setInt(ApiClient.cameraCaptureGuardKey, now);
+}
+
+/// uCrop / TOCropView exigent un vrai chemin fichier (pas content://).
+Future<String> _localPathForCrop(XFile source) async {
+  final path = source.path;
+  if (!path.startsWith('content:') && !path.startsWith('content://')) {
+    final f = File(path);
+    if (await f.exists()) return path;
+  }
+  final bytes = await source.readAsBytes();
+  final dir = await getTemporaryDirectory();
+  final ext = source.mimeType?.contains('png') == true ? 'png' : 'jpg';
+  final file = File('${dir.path}/mova_pick_${DateTime.now().millisecondsSinceEpoch}.$ext');
+  await file.writeAsBytes(bytes, flush: true);
+  return file.path;
 }
 
 Future<XFile?> pickMovaImage(
@@ -42,23 +61,71 @@ Future<XFile?> pickMovaImage(
   }
 }
 
-/// Ouvre l'UI Flutter de rognage (croix + Rogner + Valider haut/bas).
+/// Rogne via uCrop (Android) / TOCrop (iOS) — un seul bouton Valider / ✓.
+/// Fallback Flutter (1 Valider) si le plugin échoue.
 Future<XFile?> cropMovaImage(XFile source) async {
+  try {
+    await markExternalCaptureSessionGuard();
+    final localPath = await _localPathForCrop(source);
+    const presets = <CropAspectRatioPresetData>[
+      CropAspectRatioPreset.original,
+      CropAspectRatioPreset.square,
+      CropAspectRatioPreset.ratio4x3,
+      CropAspectRatioPreset.ratio16x9,
+    ];
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: localPath,
+      compressFormat: ImageCompressFormat.jpg,
+      compressQuality: kMovaPickQuality,
+      maxWidth: kMovaPickMaxSide,
+      maxHeight: kMovaPickMaxSide,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Rogner',
+          toolbarColor: const Color(0xFF6366F1),
+          toolbarWidgetColor: Colors.white,
+          activeControlsWidgetColor: const Color(0xFF6366F1),
+          statusBarLight: false,
+          initAspectRatio: CropAspectRatioPreset.original,
+          lockAspectRatio: false,
+          aspectRatioPresets: presets,
+          // Barre du bas plus haute : le geste Android ne masque pas ✓ / Valider.
+          dimmedLayerColor: const Color(0x99000000),
+          cropFrameColor: const Color(0xFF6366F1),
+          cropGridColor: const Color(0x66FFFFFF),
+        ),
+        IOSUiSettings(
+          title: 'Rogner',
+          cancelButtonTitle: 'Annuler',
+          doneButtonTitle: 'Valider',
+          aspectRatioPresets: presets,
+        ),
+      ],
+    );
+    if (cropped != null) return XFile(cropped.path, mimeType: 'image/jpeg');
+    // Annulation utilisateur.
+    return null;
+  } catch (_) {
+    // Plugin / Activity indisponible → écran Flutter (un seul Valider).
+    return _cropWithFlutterFallback(source);
+  }
+}
+
+Future<XFile?> _cropWithFlutterFallback(XFile source) async {
   try {
     await markExternalCaptureSessionGuard();
     final nav = movaNavigatorKey.currentState;
     if (nav == null || !nav.mounted) return source;
+    final localPath = await _localPathForCrop(source);
     final cropped = await nav.push<XFile?>(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => MovaCropScreen(sourcePath: source.path),
+        builder: (_) => MovaCropScreen(sourcePath: localPath),
       ),
     );
-    // Annuler (croix) → null. Valider → fichier. Échec technique → image d'origine.
     if (cropped == null) return null;
     return cropped;
   } catch (_) {
-    // Si le crop plante (nav / codec), garder l'image d'origine.
     return source;
   }
 }

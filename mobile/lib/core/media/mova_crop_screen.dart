@@ -7,8 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
-/// Fallback Flutter si uCrop / TOCrop est indisponible.
-/// Un seul bouton **Valider** (en haut à droite), aligné sur iOS.
+/// Rogner Flutter (Android) : croix + titre en haut, **Valider** en bas au centre.
 class MovaCropScreen extends StatefulWidget {
   const MovaCropScreen({super.key, required this.sourcePath});
 
@@ -177,6 +176,26 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
     return XFile(file.path, mimeType: 'image/png');
   }
 
+  Widget _validateButton() {
+    return FilledButton(
+      onPressed: _busy || _decoded == null ? null : _validate,
+      style: FilledButton.styleFrom(
+        backgroundColor: _accent,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(160, 52),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      child: _busy
+          ? const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+            )
+          : const Text('Valider', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -204,26 +223,8 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilledButton(
-                      onPressed: _busy || _decoded == null ? null : _validate,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _accent,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(108, 44),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: _busy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Valider', style: TextStyle(fontWeight: FontWeight.w700)),
-                    ),
-                  ),
+                  // Symétrie visuelle avec la croix (Valider est en bas au centre).
+                  const SizedBox(width: 48),
                 ],
               ),
             ),
@@ -296,16 +297,18 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
                         ),
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                8,
-                16,
-                12 + MediaQuery.paddingOf(context).bottom,
-              ),
-              child: Text(
-                'Pincez pour zoomer, glissez pour cadrer',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(child: _validateButton()),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Pincez pour zoomer, glissez pour cadrer',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                  ),
+                ],
               ),
             ),
           ],

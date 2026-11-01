@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
-/// Fallback Flutter si uCrop est indisponible.
-/// Un seul bouton **Valider** (en haut à droite).
+/// Fallback Flutter si uCrop / TOCrop est indisponible.
+/// Un seul bouton **Valider** (en haut à droite), aligné sur iOS.
 class MovaCropScreen extends StatefulWidget {
   const MovaCropScreen({super.key, required this.sourcePath});
 

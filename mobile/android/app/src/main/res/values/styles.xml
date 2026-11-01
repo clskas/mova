@@ -16,4 +16,30 @@
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
 
+    <!--
+      uCrop : élargir le ✓ (Valider) pour la gesture nav Pixel, comme le bouton
+      Valider iOS (TOCrop) qui reste facilement tappable.
+    -->
+    <style name="UCropTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">#FF6366F1</item>
+        <item name="colorPrimaryDark">#FF4F46E5</item>
+        <item name="android:statusBarColor">#FF6366F1</item>
+        <item name="actionButtonStyle">@style/UCropActionButton</item>
+        <item name="toolbarStyle">@style/UCropToolbar</item>
+        <item name="actionOverflowButtonStyle">@style/UCropActionButton</item>
+    </style>
+
+    <style name="UCropToolbar" parent="Widget.AppCompat.Toolbar">
+        <item name="contentInsetEnd">28dp</item>
+        <item name="contentInsetEndWithActions">28dp</item>
+        <item name="android:paddingEnd">20dp</item>
+        <item name="android:minHeight">56dp</item>
+    </style>
+
+    <style name="UCropActionButton" parent="Widget.AppCompat.ActionButton">
+        <item name="android:minWidth">56dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">18dp</item>
+    </style>
 </resources>

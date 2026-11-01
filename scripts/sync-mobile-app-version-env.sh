@@ -117,8 +117,13 @@ git config user.name "senga-mobile-release"
 git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
 # Detached HEAD (workflow_run SHA) cannot push to main — sync onto origin/main.
+# Stash dirty store file first: we already wrote it above; checkout would otherwise fail
+# with "local changes would be overwritten".
 git fetch origin main
+git stash push -u -m "mobile-store-version-pre-checkout" -- \
+  "services/ride-service/src/public/mobile-store-version.json" 2>/dev/null || true
 git checkout -B mobile-store-version-sync origin/main
+git stash drop 2>/dev/null || true
 # Re-apply the store file on top of latest main (checkout may have reset the working tree).
 python - "$STORE_FILE" "$NAME" "$CODE" "$NOW" <<'PY'
 import json, sys

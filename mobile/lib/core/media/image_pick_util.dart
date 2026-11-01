@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
@@ -23,7 +22,7 @@ Future<void> markExternalCaptureSessionGuard() async {
   await prefs.setInt(ApiClient.cameraCaptureGuardKey, now);
 }
 
-/// uCrop / TOCrop / Image.file exigent un vrai chemin fichier (pas content://).
+/// uCrop / TOCrop exigent un vrai chemin fichier (pas content://).
 Future<String> _localPathForCrop(XFile source) async {
   final path = source.path;
   if (!path.startsWith('content:') && !path.startsWith('content://')) {
@@ -62,13 +61,9 @@ Future<XFile?> pickMovaImage(
   }
 }
 
-/// Android : écran Flutter (Valider en bas au centre).
-/// iOS : TOCrop natif (Annuler / Valider).
+/// Rogne via uCrop (Android) / TOCrop (iOS).
+/// Sur Android le ✓ toolbar est masqué et réaffiché en bas au centre (natif).
 Future<XFile?> cropMovaImage(XFile source) async {
-  final useFlutterCrop = !kIsWeb && Platform.isAndroid;
-  if (useFlutterCrop) {
-    return _cropWithFlutter(source);
-  }
   try {
     await markExternalCaptureSessionGuard();
     final localPath = await _localPathForCrop(source);
@@ -94,6 +89,7 @@ Future<XFile?> cropMovaImage(XFile source) async {
           initAspectRatio: CropAspectRatioPreset.original,
           lockAspectRatio: false,
           aspectRatioPresets: presets,
+          // Pas de barre bas uCrop (rotate/scale) — seul le ✓ bas-centre injecté.
           hideBottomControls: true,
           dimmedLayerColor: const Color(0x99000000),
           cropFrameColor: const Color(0xFF6366F1),
@@ -110,11 +106,11 @@ Future<XFile?> cropMovaImage(XFile source) async {
     if (cropped != null) return XFile(cropped.path, mimeType: 'image/jpeg');
     return null;
   } catch (_) {
-    return _cropWithFlutter(source);
+    return _cropWithFlutterFallback(source);
   }
 }
 
-Future<XFile?> _cropWithFlutter(XFile source) async {
+Future<XFile?> _cropWithFlutterFallback(XFile source) async {
   try {
     await markExternalCaptureSessionGuard();
     final nav = movaNavigatorKey.currentState;
@@ -129,7 +125,6 @@ Future<XFile?> _cropWithFlutter(XFile source) async {
     if (cropped == null) return null;
     return cropped;
   } catch (_) {
-    // Codec / nav : garder l'image pour ne pas bloquer le KYC.
     return source;
   }
 }

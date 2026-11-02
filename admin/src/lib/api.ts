@@ -1598,8 +1598,9 @@ export type PoiSuggestion = {
   updatedAt: string;
 };
 
-export async function fetchPoiSuggestions(status = "PENDING", skip = 0, take = 50) {
+export async function fetchPoiSuggestions(status = "PENDING", skip = 0, take = 50, city?: string) {
   const params = new URLSearchParams({ status, skip: String(skip), take: String(take) });
+  if (city?.trim()) params.set("city", city.trim());
   return apiFetch<{ items: PoiSuggestion[]; total: number }>(`/api/admin/poi-suggestions?${params}`);
 }
 

@@ -5,6 +5,7 @@ import {
   approvePoiSuggestion,
   fetchPoiCatalog,
   fetchPoiSuggestions,
+  MOVA_CITIES,
   rejectPoiSuggestion,
   seedPoiCatalog,
   updatePoiCatalog,
@@ -110,7 +111,10 @@ function OsmLinksPanel({ item }: { item: PoiSuggestion }) {
 export default function LieuxPage() {
   const { canWrite, role, user } = useAdmin();
   const readOnly = !canWrite("lieux");
+  const canFilterCity = role === "SUPER_ADMIN" || role === "ADMIN";
   const managedCity = role === "CITY_ADMIN" ? user?.managedCity?.trim() || null : null;
+  const [cityFilter, setCityFilter] = useState("");
+  const scopeCity = managedCity || (canFilterCity ? cityFilter.trim() : "") || null;
   const [tab, setTab] = useState<"PENDING" | "APPROVED" | "REJECTED" | "CATALOG">("PENDING");
   const [items, setItems] = useState<PoiSuggestion[]>([]);
   const [catalog, setCatalog] = useState<CatalogPoi[]>([]);
@@ -142,7 +146,7 @@ export default function LieuxPage() {
 
   useEffect(() => {
     setCatalogSkip(0);
-  }, [catalogQDebounced, managedCity, tab]);
+  }, [catalogQDebounced, scopeCity, tab]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -150,7 +154,7 @@ export default function LieuxPage() {
     try {
       if (tab === "CATALOG") {
         const data = await fetchPoiCatalog({
-          city: managedCity ?? undefined,
+          city: scopeCity ?? undefined,
           q: catalogQDebounced,
           skip: 0,
           take: CATALOG_PAGE,
@@ -160,7 +164,7 @@ export default function LieuxPage() {
         setCatalogSkip(data.items?.length ?? 0);
         setItems([]);
       } else {
-        const data = await fetchPoiSuggestions(tab);
+        const data = await fetchPoiSuggestions(tab, 0, 50, scopeCity ?? undefined);
         setItems(data.items ?? []);
         setCatalog([]);
       }
@@ -169,7 +173,7 @@ export default function LieuxPage() {
     } finally {
       setLoading(false);
     }
-  }, [tab, catalogQDebounced, managedCity]);
+  }, [tab, catalogQDebounced, scopeCity]);
 
   const loadMoreCatalog = useCallback(async () => {
     if (loadingMore || catalog.length >= catalogTotal) return;
@@ -177,7 +181,7 @@ export default function LieuxPage() {
     setError(null);
     try {
       const data = await fetchPoiCatalog({
-        city: managedCity ?? undefined,
+        city: scopeCity ?? undefined,
         q: catalogQDebounced,
         skip: catalogSkip,
         take: CATALOG_PAGE,
@@ -194,7 +198,7 @@ export default function LieuxPage() {
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, catalog.length, catalogTotal, catalogSkip, managedCity, catalogQDebounced]);
+  }, [loadingMore, catalog.length, catalogTotal, catalogSkip, scopeCity, catalogQDebounced]);
 
   useEffect(() => {
     void load();
@@ -334,7 +338,7 @@ export default function LieuxPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         {(["PENDING", "APPROVED", "REJECTED", "CATALOG"] as const).map((s) => (
           <button
             key={s}
@@ -347,6 +351,19 @@ export default function LieuxPage() {
             {STATUS_LABELS[s]}
           </button>
         ))}
+        {canFilterCity && (
+          <select
+            value={cityFilter}
+            onChange={(e) => setCityFilter(e.target.value)}
+            aria-label="Ville"
+            className="ml-1 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-800"
+          >
+            <option value="">Toutes les villes</option>
+            {MOVA_CITIES.map((city) => (
+              <option key={city} value={city}>{city}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {tab === "CATALOG" && (
@@ -358,6 +375,7 @@ export default function LieuxPage() {
           />
           <p className="text-xs text-gray-500 mt-1">
             {catalogTotal} lieu{catalogTotal > 1 ? "x" : ""} dans le catalogue
+            {scopeCity ? ` · ${scopeCity}` : ""}
             {catalogTotal > 0
               ? ` — affichage ${catalog.length} / ${catalogTotal} (plus récents d’abord)`
               : ""}
@@ -369,7 +387,13 @@ export default function LieuxPage() {
         <LoadingState />
       ) : tab === "CATALOG" ? (
         catalog.length === 0 ? (
-          <EmptyState message="Aucun lieu dans le catalogue. Utilisez « Synchroniser catalogue POI »." />
+          <EmptyState
+            message={
+              scopeCity
+                ? `Aucun lieu dans le catalogue pour ${scopeCity}.`
+                : "Aucun lieu dans le catalogue. Utilisez « Synchroniser catalogue POI »."
+            }
+          />
         ) : (
           <div className="space-y-3">
             {catalog.map((poi) => (
@@ -404,7 +428,13 @@ export default function LieuxPage() {
           </div>
         )
       ) : items.length === 0 ? (
-        <EmptyState message={`Aucune suggestion ${STATUS_LABELS[tab]?.toLowerCase() ?? ""}.`} />
+        <EmptyState
+          message={
+            scopeCity
+              ? `Aucune suggestion ${(STATUS_LABELS[tab] ?? "").toLowerCase()} pour ${scopeCity}.`
+              : `Aucune suggestion ${STATUS_LABELS[tab]?.toLowerCase() ?? ""}.`
+          }
+        />
       ) : (
         <div className="space-y-3">
           {items.map((item) => (

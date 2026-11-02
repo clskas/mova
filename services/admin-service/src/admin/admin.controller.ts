@@ -1148,12 +1148,13 @@ export class AdminController {
     @Query('status') status?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
+    @Query('city') city?: string,
   ) {
     return this.adminService.listPoiSuggestions(
       status,
       Number(skip ?? 0),
       Number(take ?? 50),
-      resolveManagedCityScope(req.user),
+      resolveManagedCityScope(req.user) ?? city,
     );
   }
 

@@ -95,6 +95,7 @@ Dans **Règles plateforme** (SUPER_ADMIN, ADMIN, **CITY_ADMIN** — section docu
 - Dette au-delà du seuil / règle solde positif → offres bloquées jusqu’à recharge ou règlement guichet.
 - **Timeout cash** : le passager n’est plus bloqué tant que le paiement espèces est PENDING sans litige. Après le délai configuré sans signal « Cash non reçu » (montant sous le plafond), le paiement est auto-confirmé (`autoConfirmedAt`). Un litige chauffeur (`cashDisputedAt`) rebloque le passager et lui envoie une **notification push**.
 - Paramétrage : **Règles plateforme → Paiements espèces (timeout)** — activer/désactiver, délai (heures), plafond FC.
+- **Litiges** : filtres par type (SOS, espèces non reçues, fraude, accident, harcèlement) et par statut. Un signal « Cash non reçu » crée un litige **espèces non reçues**, distinct d’une alerte SOS.
 - Les courses **Pool** apparaissent dans **Courses** (badge / type partagé) ; le covoiturage planifié reste dans **Covoiturage**.
 
 ### Validation du type d'engin

@@ -191,6 +191,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     return _ride?['paymentStatus']?.toString().toUpperCase() == 'PENDING';
   }
 
+  bool get _cashDisputed => _ride?['cashDisputed'] == true;
+
   bool get _needsPayment {
     final s = _status.toUpperCase();
     if (s != 'COMPLETED') return _mock;
@@ -586,6 +588,23 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     if (_autoPaymentLaunched || !_needsPayment) return;
     _autoPaymentLaunched = true;
     _goToPayment();
+  }
+
+  Future<void> _claimCashPaid() async {
+    final api = ref.read(apiClientProvider);
+    final share = _ride?['type']?.toString() == 'RIDE_SHARE';
+    final bookingId = _ride?['paymentReferenceId']?.toString();
+    final result = share && bookingId != null && bookingId.isNotEmpty
+        ? await api.claimCashPaidService('RIDE_SHARE', bookingId)
+        : await api.claimCashPaidRide(widget.rideId);
+    if (!mounted) return;
+    final message = switch (result) {
+      Success(:final data) =>
+        data['message']?.toString() ??
+            'Déclaration enregistrée. Le chauffeur doit confirmer avoir reçu les espèces.',
+      Failure(:final error) => error.message,
+    };
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _goToPayment() async {
@@ -1118,7 +1137,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
-                                        'Paiement espèces en attente — remettez l\'argent au chauffeur ; il confirmera « Cash reçu ».',
+                                        _cashDisputed
+                                            ? 'Litige : le chauffeur signale ne pas avoir reçu les espèces. Si vous avez payé, déclarez-le ci-dessous.'
+                                            : 'Paiement espèces en attente — remettez l\'argent au chauffeur ; il confirmera « Cash reçu ».',
                                         style: const TextStyle(
                                           color: MovaColors.orange,
                                           fontWeight: FontWeight.w600,
@@ -1128,6 +1149,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                     ),
                                   ],
                                 ),
+                              ),
+                              const SizedBox(height: 8),
+                              MovaButton(
+                                label: 'J\'ai payé en espèces',
+                                isSecondary: true,
+                                onPressed: _claimCashPaid,
                               ),
                             ],
                           ],

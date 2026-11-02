@@ -266,7 +266,10 @@ export type KycItem = {
 export type Incident = {
   id: string;
   userId?: string;
+  counterpartyUserId?: string | null;
   rideId?: string | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
   type?: string;
   description?: string;
   status?: string;

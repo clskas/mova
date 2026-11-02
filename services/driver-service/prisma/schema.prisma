@@ -130,6 +130,8 @@ model Incident {
   lng           Float?
   referenceType String?
   referenceId   String?
+  /// Autre partie du litige (chauffeur / livreur qui signale, si userId est le passager).
+  counterpartyUserId String?
   isEmergency   Boolean      @default(false)
   createdAt     DateTime     @default(now())
 

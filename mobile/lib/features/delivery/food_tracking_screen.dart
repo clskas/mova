@@ -118,6 +118,18 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
     unawaited(_liveTracking.syncWithDelivery(_delivery));
   }
 
+  Future<void> _claimCashPaid() async {
+    final result = await ref.read(apiClientProvider).claimCashPaidService('DELIVERY', widget.orderId);
+    if (!mounted) return;
+    final message = switch (result) {
+      Success(:final data) =>
+        data['message']?.toString() ??
+            'Déclaration enregistrée. Le livreur doit confirmer avoir reçu les espèces.',
+      Failure(:final error) => error.message,
+    };
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _load({bool silent = false}) async {
     if (!mounted || widget.orderId.isEmpty) return;
     if (!silent) {
@@ -456,6 +468,19 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                                     letterSpacing: 6,
                                     color: MovaColors.green,
                                   ),
+                                ),
+                                if (_delivery?['cashDisputed'] == true) ...[
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Le livreur signale ne pas avoir reçu les espèces. Si vous avez payé, déclarez-le.',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ],
+                                const SizedBox(height: 8),
+                                MovaButton(
+                                  label: 'J\'ai payé en espèces',
+                                  isSecondary: true,
+                                  onPressed: _claimCashPaid,
                                 ),
                               ],
                             ),

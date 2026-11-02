@@ -164,6 +164,26 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
+            if (cashDispute)
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  final share = data['type']?.toString() == 'RIDE_SHARE';
+                  final bookingId = data['paymentReferenceId']?.toString();
+                  final claim = share && bookingId != null && bookingId.isNotEmpty
+                      ? await api.claimCashPaidService('RIDE_SHARE', bookingId)
+                      : await api.claimCashPaidRide(rideId);
+                  if (!mounted) return;
+                  final message = switch (claim) {
+                    Success(:final data) =>
+                      data['message']?.toString() ??
+                          'Déclaration enregistrée. Le chauffeur doit confirmer « Cash reçu ».',
+                    Failure(:final error) => error.message,
+                  };
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+                },
+                child: const Text('J\'ai payé en espèces'),
+              ),
             FilledButton(
               onPressed: () {
                 Navigator.pop(ctx);

@@ -69,7 +69,7 @@ Sur **Taxi** (voiture uniquement, pas moto), activez le bascule **Partagé (Pool
 3. Choisissez date et heure (jusqu'à J+7).
 4. Indiquez la destination et le véhicule souhaité.
 5. Confirmez la réservation.
-6. Vous recevrez des **rappels** la veille et une heure avant le départ (notification et SMS).
+6. Vous recevrez des **rappels** la veille et une heure avant le départ (notification dans l'application, sans SMS opérateur).
 7. Un chauffeur est assigné automatiquement environ **2 heures** avant l'heure prévue (ou manuellement par l'équipe SENGA).
 8. **Annulation tardive** (moins de 24 h avant le départ, chauffeur déjà confirmé) : des frais de **50 %** du tarif estimé peuvent être retenus sur votre portefeuille.
 
@@ -132,6 +132,10 @@ Carte en **dernière ligne** de l'accueil (ou icône portefeuille dans la barre 
 - **Recharge** : minimum **2 300 FC** ; confirmez le push opérateur sur le téléphone de la SIM.
 - **Retrait** vers Mobile Money : même plancher **2 300 FC**, code OTP SMS obligatoire. Seul le **solde retirable** (portefeuille − fonds bloqués) peut être retiré.
 - Les paiements **espèces** sur une course ne créditent **pas** votre wallet (ni celui du chauffeur en tant que montant retirable). Remettez l’argent au chauffeur ; il confirme **Cash reçu** (aucun code PIN à communiquer pour le paiement).
+- **Après une course en espèces**, vous pouvez **commander une nouvelle course** même si le chauffeur n’a pas encore confirmé. Le paiement reste en attente jusqu’à **Cash reçu**, votre déclaration **« J’ai payé en espèces »**, ou une **clôture automatique sous 24 h**.
+- Le bouton **J’ai payé en espèces** est sur l’écran de paiement espèces, sur le **suivi** tant que le paiement est en attente, et dans la fenêtre de **litige** si le chauffeur ou le livreur a cliqué **Cash non reçu**. Cette déclaration n’efface pas le litige : le chauffeur doit encore confirmer **J’ai reçu les espèces**, ou vous payez autrement, ou le support clôture le dossier.
+- Si le chauffeur signale **Cash non reçu**, un **litige** s’ouvre : vous ne pourrez plus commander tant que le litige n’est pas résolu (confirmation chauffeur, paiement alternatif, ou support SENGA).
+- Les changements de statut de course (acceptée, chauffeur arrivé, en cours, terminée) et les rappels de course planifiée arrivent par **notification de l’application**. Aucun SMS opérateur n’est envoyé pour ces messages.
 
 ## 12. Historique
 

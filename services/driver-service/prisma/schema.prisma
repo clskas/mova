@@ -120,18 +120,20 @@ model KycDocument {
 }
 
 model Incident {
-  id            String       @id @default(uuid())
-  userId        String
-  rideId        String?
-  type          IncidentType
-  description   String
-  status        String       @default("OPEN")
-  lat           Float?
-  lng           Float?
-  referenceType String?
-  referenceId   String?
-  isEmergency   Boolean      @default(false)
-  createdAt     DateTime     @default(now())
+  id                 String       @id @default(uuid())
+  userId             String
+  rideId             String?
+  type               IncidentType
+  description        String
+  status             String       @default("OPEN")
+  lat                Float?
+  lng                Float?
+  referenceType      String?
+  referenceId        String?
+  /// Autre partie (chauffeur / livreur) quand le litige oppose deux comptes.
+  counterpartyUserId String?
+  isEmergency        Boolean      @default(false)
+  createdAt          DateTime     @default(now())
 
   @@map("incidents")
 }

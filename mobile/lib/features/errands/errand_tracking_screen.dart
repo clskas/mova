@@ -13,6 +13,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../booking/payment_screen.dart';
+import '../billing/cash_paid_claim_button.dart';
 import '../chat/errand_chat_screen.dart';
 import '../delivery/delivery_live_tracking.dart';
 import '../delivery/delivery_payment_state.dart';
@@ -277,6 +278,21 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
 
   bool get _cashPaymentPending => deliveryCashPaymentPending(_order);
 
+  Future<void> _claimCashPaid() async {
+    final api = ref.read(apiClientProvider);
+    final claim = await api.claimCashPaidService('ERRAND', widget.errandId);
+    if (!mounted) return;
+    await showCashClaimResult(
+      context: context,
+      claim: claim,
+      onClaimed: () {
+        final current = _order;
+        if (current == null) return;
+        setState(() => _order = {...current, 'passengerClaimedPaid': true});
+      },
+    );
+  }
+
   Future<void> _openPayment() async {
     if (!mounted) return;
     await Navigator.push(
@@ -514,14 +530,18 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
-                                    const Text(
-                                      'Paiement espèces en attente',
-                                      style: TextStyle(fontWeight: FontWeight.w600),
+                                    Text(
+                                      _order?['cashDisputed'] == true
+                                          ? 'Litige : espèces non reçues'
+                                          : 'Paiement espèces en attente',
+                                      style: const TextStyle(fontWeight: FontWeight.w600),
                                     ),
                                     const SizedBox(height: 4),
-                                    const Text(
-                                      'Remettez le montant au livreur et communiquez-lui ce code PIN :',
-                                      style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+                                    Text(
+                                      _order?['cashDisputed'] == true
+                                          ? 'Le livreur signale ne pas avoir reçu les espèces. Déclarez le paiement ci-dessous, ou réglez autrement.'
+                                          : 'Remettez le montant au livreur et communiquez-lui ce code PIN :',
+                                      style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
@@ -536,6 +556,13 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                     ),
                                   ],
                                 ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (_cashPaymentPending) ...[
+                              CashPaidClaimButton(
+                                claimed: _order?['passengerClaimedPaid'] == true,
+                                onPressed: _claimCashPaid,
                               ),
                               const SizedBox(height: 12),
                             ],

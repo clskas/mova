@@ -134,7 +134,18 @@ export default function LitigesPage() {
                     {label}
                   </p>
                   <p className="text-sm text-gray-600 mt-1">{i.description}</p>
+                  {i.userId && (
+                    <p className="text-xs text-gray-700 mt-1">Passager / signalé par : {i.userId}</p>
+                  )}
+                  {i.counterpartyUserId && (
+                    <p className="text-xs text-gray-700 mt-1">Chauffeur / livreur : {i.counterpartyUserId}</p>
+                  )}
                   {i.rideId && <p className="text-xs text-gray-500 mt-1">Course : {i.rideId}</p>}
+                  {i.referenceType && i.referenceId && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Référence : {i.referenceType} {i.referenceId}
+                    </p>
+                  )}
                   {hasGps && (
                     <p className="text-xs text-gray-500 mt-1">
                       GPS : {i.lat?.toFixed(5)}, {i.lng?.toFixed(5)}

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import '../billing/cash_paid_claim_button.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/test_runtime_config.dart';
 import '../../core/location/destination_coords.dart';
@@ -164,6 +165,25 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
+            if (cashDispute)
+              TextButton(
+                onPressed: () async {
+                  final type = data['type']?.toString().toUpperCase();
+                  final paymentRef = data['paymentReferenceId']?.toString();
+                  final claim = type == 'RIDE_SHARE' && paymentRef != null && paymentRef.isNotEmpty
+                      ? await api.claimCashPaidService('RIDE_SHARE', paymentRef)
+                      : await api.claimCashPaidRide(rideId);
+                  if (!ctx.mounted) return;
+                  Navigator.pop(ctx);
+                  if (!context.mounted) return;
+                  await showCashClaimResult(
+                    context: context,
+                    claim: claim,
+                    onClaimed: () {},
+                  );
+                },
+                child: const Text('J\'ai payé en espèces'),
+              ),
             FilledButton(
               onPressed: () {
                 Navigator.pop(ctx);

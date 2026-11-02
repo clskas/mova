@@ -84,6 +84,7 @@ class CreateIncidentDto {
   @IsOptional() @IsString() rideId?: string;
   @IsOptional() @IsString() referenceType?: string;
   @IsOptional() @IsString() referenceId?: string;
+  @IsOptional() @IsString() counterpartyUserId?: string;
 }
 
 @ApiTags('internal')
@@ -169,6 +170,7 @@ export class InternalController {
       rideId: dto.rideId,
       referenceType: dto.referenceType,
       referenceId: dto.referenceId,
+      counterpartyUserId: dto.counterpartyUserId,
     });
   }
   @Post('incidents/:id/resolve') resolve(@Param('id') id: string, @Body('status') status: string) { return this.incidents.resolve(id, status ?? 'RESOLVED'); }

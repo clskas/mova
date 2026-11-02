@@ -361,7 +361,14 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async onRideStatusSms(payload: RideStatusSmsPayload) {
-    await this.sms.sendMessage(payload.phone, payload.message);
+    const title = 'Course SENGA';
+    await this.create(payload.userId, title, payload.message, 'RIDE_STATUS', payload);
+    await this.pushToUsersAnyFlavor([payload.userId], title, payload.message, {
+      type: 'RIDE_STATUS',
+      rideId: payload.rideId,
+      status: payload.status,
+    });
+    this.logger.log(`ride.status FCM (sans SMS) ${payload.rideId} ${payload.status}`);
   }
 
   async onDeliveryCreated(payload: DeliveryCreatedPayload) {
@@ -578,22 +585,16 @@ export class NotificationsService implements OnModuleInit {
     const title = `Rappel course planifiée`;
     const body = `Votre course ${when} : ${payload.summary}`;
     await this.create(payload.passengerId, title, body, 'SCHEDULED_REMINDER', payload);
-    await this.pushToDrivers([payload.passengerId], title, body, {
+    await this.pushToUsersAnyFlavor([payload.passengerId], title, body, {
       type: 'SCHEDULED_REMINDER',
       referenceId: payload.scheduledRideId,
     });
-    if (payload.passengerPhone) {
-      await this.sms.sendMessage(payload.passengerPhone, `SENGA — ${body}`);
-    }
     if (payload.driverId) {
       await this.create(payload.driverId, title, body, 'SCHEDULED_REMINDER_DRIVER', payload);
-      await this.pushToDrivers([payload.driverId], title, body, {
+      await this.pushToUsersAnyFlavor([payload.driverId], title, body, {
         type: 'SCHEDULED_REMINDER',
         referenceId: payload.scheduledRideId,
       });
-      if (payload.driverPhone) {
-        await this.sms.sendMessage(payload.driverPhone, `SENGA chauffeur — ${body}`);
-      }
     }
     this.logger.log(`scheduled.reminder ${payload.reminderKind} for ${payload.scheduledRideId}`);
   }

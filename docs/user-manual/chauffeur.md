@@ -30,7 +30,7 @@ La **ville SENGA** sur l'accueil est détectée via GPS à l'ouverture (modifiab
 - Après une **livraison COD**, le client paie en espèces à la remise ; vous confirmez **Cash reçu** dans l’app (sans code PIN).
 - **Cash reçu** : confirmez dès que vous avez encaissé. Sans action de votre part, un paiement espèces **sous 150 000 FC** peut être **clôturé automatiquement après 24 h** (considéré payé).
 - **Cash non reçu** : utilisez ce bouton si le client n’a pas remis l’argent. Cela ouvre un **litige**, bloque le passager pour de nouvelles courses, et **annule** l’auto-clôture.
-- Si le passager a déclaré **« J’ai payé »**, vérifiez et confirmez ou ouvrez un litige rapidement.
+- Si le passager a déclaré **« J’ai payé en espèces »** (écran de suivi, reçu, ou fenêtre de litige), vérifiez et confirmez **J’ai reçu les espèces** ou maintenez le litige.
 
 ## Position GPS pendant les missions
 

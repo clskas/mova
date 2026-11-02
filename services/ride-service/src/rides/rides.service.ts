@@ -920,6 +920,9 @@ export class RidesService {
         type: 'RIDE_SHARE',
         driver,
         isPaid: myBooking ? myPay?.isPaid === true : allPaid,
+        paymentMethod: myPay?.paymentMethod ?? null,
+        cashDisputed: myPay?.cashDisputed === true,
+        passengerClaimedPaid: myPay?.passengerClaimedPaid === true,
         paymentStatus: myBooking
           ? (myPay?.paymentStatus ?? null)
           : anyCashPending

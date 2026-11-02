@@ -14,6 +14,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../passenger/passenger_alert_service.dart';
 import '../booking/payment_screen.dart';
+import '../billing/cash_paid_claim_button.dart';
 import '../chat/chat_alert_service.dart';
 import '../chat/delivery_chat_screen.dart';
 import 'delivery_live_tracking.dart';
@@ -197,6 +198,21 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
 
   bool get _cashPaymentPending => deliveryCashPaymentPending(_delivery);
 
+  Future<void> _claimCashPaid() async {
+    final api = ref.read(apiClientProvider);
+    final claim = await api.claimCashPaidService('DELIVERY', widget.parcelId);
+    if (!mounted) return;
+    await showCashClaimResult(
+      context: context,
+      claim: claim,
+      onClaimed: () {
+        final current = _delivery;
+        if (current == null) return;
+        setState(() => _delivery = {...current, 'passengerClaimedPaid': true});
+      },
+    );
+  }
+
   Future<void> _openPayment() async {
     if (!mounted || _totalCdf <= 0) return;
     final api = ref.read(apiClientProvider);
@@ -326,14 +342,18 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
-                                    const Text(
-                                      'Paiement espèces en attente',
-                                      style: TextStyle(fontWeight: FontWeight.w600),
+                                    Text(
+                                      _delivery?['cashDisputed'] == true
+                                          ? 'Litige : espèces non reçues'
+                                          : 'Paiement espèces en attente',
+                                      style: const TextStyle(fontWeight: FontWeight.w600),
                                     ),
                                     const SizedBox(height: 4),
-                                    const Text(
-                                      'Remettez le montant au livreur et communiquez-lui ce code PIN :',
-                                      style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
+                                    Text(
+                                      _delivery?['cashDisputed'] == true
+                                          ? 'Le livreur signale ne pas avoir reçu les espèces. Déclarez le paiement ci-dessous, ou réglez autrement.'
+                                          : 'Remettez le montant au livreur et communiquez-lui ce code PIN :',
+                                      style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
@@ -348,6 +368,13 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                                     ),
                                   ],
                                 ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (_cashPaymentPending) ...[
+                              CashPaidClaimButton(
+                                claimed: _delivery?['passengerClaimedPaid'] == true,
+                                onPressed: _claimCashPaid,
                               ),
                               const SizedBox(height: 12),
                             ],

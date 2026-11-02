@@ -235,6 +235,7 @@ export class PaymentsService {
     rideId?: string;
     referenceType: string;
     referenceId: string;
+    counterpartyUserId?: string;
   }) {
     try {
       const res = await fetch(serviceUrl('driver', '/internal/incidents'), {
@@ -248,11 +249,12 @@ export class PaymentsService {
           type: 'CASH_NOT_RECEIVED',
           description:
             `Litige espèces non reçues — ${input.amountCdf} FC. ` +
-            `Le chauffeur/livreur signale ne pas avoir encaissé (${input.referenceType} ${input.referenceId}). ` +
+            `Passager ${input.userId}. Chauffeur/livreur ${input.counterpartyUserId ?? 'inconnu'}. ` +
             `Ce n’est pas une alerte SOS.`,
           rideId: input.rideId,
           referenceType: input.referenceType,
           referenceId: input.referenceId,
+          counterpartyUserId: input.counterpartyUserId,
         }),
       });
       if (!res.ok) {
@@ -1207,6 +1209,7 @@ export class PaymentsService {
       rideId,
       referenceType: 'RIDE',
       referenceId: rideId,
+      counterpartyUserId: driverUserId,
     });
     return {
       success: true,
@@ -1304,6 +1307,7 @@ export class PaymentsService {
       rideId: type === 'RIDE' || type === 'RIDE_SHARE' ? (info.parentRideId ?? referenceId) : undefined,
       referenceType: type,
       referenceId,
+      counterpartyUserId: driverUserId,
     });
     return {
       success: true,

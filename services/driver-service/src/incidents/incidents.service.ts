@@ -13,6 +13,7 @@ export type CreateIncidentInput = {
   lng?: number;
   referenceType?: string;
   referenceId?: string;
+  counterpartyUserId?: string;
   isEmergency?: boolean;
 };
 
@@ -32,6 +33,7 @@ export class IncidentsService {
         lng: input.lng,
         referenceType: input.referenceType,
         referenceId: input.referenceId,
+        counterpartyUserId: input.counterpartyUserId,
         isEmergency,
       },
     });

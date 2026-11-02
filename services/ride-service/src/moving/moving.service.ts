@@ -220,6 +220,10 @@ export class MovingService {
       isPaid,
       paymentReferenceId: request.id,
       paymentStatus: payment.paymentStatus,
+      paymentMethod: 'paymentMethod' in payment ? (payment.paymentMethod ?? null) : null,
+      cashDisputed: 'cashDisputed' in payment ? payment.cashDisputed === true : false,
+      passengerClaimedPaid:
+        'passengerClaimedPaid' in payment ? payment.passengerClaimedPaid === true : false,
       completionPin: request.completionPin ?? undefined,
       itemsNotes: request.itemsNotes ?? undefined,
       priceCdf: request.estimatedPriceCdf,

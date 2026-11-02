@@ -11,6 +11,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../booking/payment_screen.dart';
+import '../billing/cash_paid_claim_button.dart';
 import '../history/history_detail_dialog.dart';
 
 class MovingTrackingScreen extends ConsumerStatefulWidget {
@@ -143,11 +144,37 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
   void _maybeGoToPayment() {
     if (_paymentNavigated || !mounted || _totalCdf <= 0) return;
     if (_request?['isPaid'] == true) return;
+    final method = _request?['paymentMethod']?.toString().toUpperCase();
+    final cashPending = method == 'CASH' &&
+        _request?['paymentStatus']?.toString().toUpperCase() == 'PENDING';
+    if (cashPending || _request?['cashDisputed'] == true) return;
     final paymentReady = _request?['paymentReady'] == true ||
         (_request?['status']?.toString() == 'COMPLETED' && _request?['isPaid'] != true);
     if (!paymentReady) return;
     _paymentNavigated = true;
     _openPayment();
+  }
+
+  bool get _movingCashPending {
+    if (_request?['isPaid'] == true) return false;
+    if (_request?['status']?.toString() != 'COMPLETED') return false;
+    return _request?['paymentMethod']?.toString().toUpperCase() == 'CASH' &&
+        _request?['paymentStatus']?.toString().toUpperCase() == 'PENDING';
+  }
+
+  Future<void> _claimCashPaid() async {
+    final api = ref.read(apiClientProvider);
+    final claim = await api.claimCashPaidService('MOVING', widget.movingId);
+    if (!mounted) return;
+    await showCashClaimResult(
+      context: context,
+      claim: claim,
+      onClaimed: () {
+        final current = _request;
+        if (current == null) return;
+        setState(() => _request = {...current, 'passengerClaimedPaid': true});
+      },
+    );
   }
 
   @override
@@ -197,7 +224,20 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (paymentReady && !isPaid) ...[
+                      if (_movingCashPending) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          _request?['cashDisputed'] == true
+                              ? 'Litige : l\'équipe signale ne pas avoir reçu les espèces.'
+                              : 'Paiement espèces en attente — l\'équipe confirmera la réception.',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                        const SizedBox(height: 8),
+                        CashPaidClaimButton(
+                          claimed: _request?['passengerClaimedPaid'] == true,
+                          onPressed: _claimCashPaid,
+                        ),
+                      ] else if (paymentReady && !isPaid) ...[
                         const SizedBox(height: 12),
                         MovaButton(
                           label: 'Payer le déménagement',

@@ -23,6 +23,7 @@ import '../chat/delivery_voice_call_screen.dart';
 import '../chat/ride_chat_screen.dart';
 import '../passenger/passenger_alert_service.dart';
 import '../geo/suggest_place_screen.dart';
+import '../billing/cash_paid_claim_button.dart';
 import '../rating/rating_screen.dart';
 import 'payment_screen.dart';
 import 'widgets/mova_ride_map.dart';
@@ -189,6 +190,29 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     if (_status.toUpperCase() != 'COMPLETED') return false;
     if (_ride?['isPaid'] == true) return false;
     return _ride?['paymentStatus']?.toString().toUpperCase() == 'PENDING';
+  }
+
+  bool get _cashDisputed => _ride?['cashDisputed'] == true;
+
+  bool get _cashClaimed => _ride?['passengerClaimedPaid'] == true;
+
+  Future<void> _claimCashPaid() async {
+    final api = ref.read(apiClientProvider);
+    final type = _ride?['type']?.toString().toUpperCase();
+    final paymentRef = _ride?['paymentReferenceId']?.toString();
+    final claim = type == 'RIDE_SHARE' && paymentRef != null && paymentRef.isNotEmpty
+        ? await api.claimCashPaidService('RIDE_SHARE', paymentRef)
+        : await api.claimCashPaidRide(widget.rideId);
+    if (!mounted) return;
+    await showCashClaimResult(
+      context: context,
+      claim: claim,
+      onClaimed: () {
+        final ride = _ride;
+        if (ride == null) return;
+        setState(() => _ride = {...ride, 'passengerClaimedPaid': true});
+      },
+    );
   }
 
   bool get _needsPayment {
@@ -1118,7 +1142,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
-                                        'Paiement espèces en attente — remettez l\'argent au chauffeur ; il confirmera « Cash reçu ».',
+                                        _cashDisputed
+                                            ? 'Litige : le chauffeur signale ne pas avoir reçu les espèces. Déclarez le paiement ou réglez autrement.'
+                                            : 'Paiement espèces en attente — remettez l\'argent au chauffeur ; il confirmera « Cash reçu ».',
                                         style: const TextStyle(
                                           color: MovaColors.orange,
                                           fontWeight: FontWeight.w600,
@@ -1128,6 +1154,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                     ),
                                   ],
                                 ),
+                              ),
+                              const SizedBox(height: 8),
+                              CashPaidClaimButton(
+                                claimed: _cashClaimed,
+                                onPressed: _claimCashPaid,
                               ),
                             ],
                           ],

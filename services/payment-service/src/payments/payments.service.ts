@@ -228,6 +228,41 @@ export class PaymentsService {
     }
   }
 
+  /** Ouvre un litige admin distinct (CASH_NOT_RECEIVED), pas un SOS. */
+  private async openCashNotReceivedIncident(input: {
+    userId: string;
+    amountCdf: number;
+    rideId?: string;
+    referenceType: string;
+    referenceId: string;
+  }) {
+    try {
+      const res = await fetch(serviceUrl('driver', '/internal/incidents'), {
+        method: 'POST',
+        headers: {
+          'x-internal-api-key': INTERNAL_API_KEY,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: input.userId,
+          type: 'CASH_NOT_RECEIVED',
+          description:
+            `Litige espèces non reçues — ${input.amountCdf} FC. ` +
+            `Le chauffeur/livreur signale ne pas avoir encaissé (${input.referenceType} ${input.referenceId}). ` +
+            `Ce n’est pas une alerte SOS.`,
+          rideId: input.rideId,
+          referenceType: input.referenceType,
+          referenceId: input.referenceId,
+        }),
+      });
+      if (!res.ok) {
+        this.logger.warn(`cash dispute incident HTTP ${res.status}`);
+      }
+    } catch (e) {
+      this.logger.warn(`cash dispute incident failed`, e);
+    }
+  }
+
   private async publishCashDisputed(payload: CashDisputedPayload) {
     try {
       this.logger.warn(
@@ -1166,6 +1201,13 @@ export class PaymentsService {
       referenceType: 'RIDE',
       referenceId: rideId,
     });
+    await this.openCashNotReceivedIncident({
+      userId: existing.userId,
+      amountCdf: existing.amountCdf,
+      rideId,
+      referenceType: 'RIDE',
+      referenceId: rideId,
+    });
     return {
       success: true,
       payment,
@@ -1253,6 +1295,13 @@ export class PaymentsService {
       amountCdf: existing.amountCdf,
       reason: reason ?? 'CASH_NOT_RECEIVED',
       rideId: type === 'RIDE_SHARE' ? (info.parentRideId ?? undefined) : undefined,
+      referenceType: type,
+      referenceId,
+    });
+    await this.openCashNotReceivedIncident({
+      userId: existing.userId,
+      amountCdf: existing.amountCdf,
+      rideId: type === 'RIDE' || type === 'RIDE_SHARE' ? (info.parentRideId ?? referenceId) : undefined,
       referenceType: type,
       referenceId,
     });

@@ -1594,11 +1594,12 @@ class ApiClient {
   Future<Result<Map<String, dynamic>>> endLiveKitCall({
     required String scope,
     required String threadId,
+    String reason = 'hangup',
   }) async {
     final path = scope == 'ride'
         ? '/rides/$threadId/livekit-end'
         : '/deliveries/$threadId/livekit-end';
-    final result = await post(path, {});
+    final result = await post(path, {'reason': reason});
     return switch (result) {
       Success(:final data) => Success(Map<String, dynamic>.from(data as Map? ?? {})),
       Failure(:final error) => Failure(error),

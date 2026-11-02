@@ -49,6 +49,7 @@ class IncomingCallOverlay extends ConsumerWidget {
       await ref.read(apiClientProvider).endLiveKitCall(
             scope: info.kind == 'ride' ? 'ride' : 'delivery',
             threadId: info.deliveryId,
+            reason: 'declined',
           );
     } catch (_) {
       /* best-effort — le message chat « terminé » / timeout appelant restent des filets */

@@ -186,27 +186,24 @@ export class DeliveryLiveKitService {
     }
   }
 
-  async endCall(scope: LiveKitCallScope, id: string, userId: string) {
+  async endCall(
+    scope: LiveKitCallScope,
+    id: string,
+    userId: string,
+    reason: 'declined' | 'hangup' = 'hangup',
+  ) {
     const participants = await this.assertParticipant(scope, id, userId);
     const recipients = this.participantUserIds(participants);
-    // Message chat : le poll mobile coupe la sonnerie même sans socket tracking.
-    try {
-      const endText = 'Appel vocal SENGA terminé.';
-      if (scope === 'ride') {
-        await this.rideChat.sendMessage(id, userId, endText);
-      } else {
-        await this.deliveryChat.sendMessage(id, userId, endText);
-      }
-    } catch {
-      /* best-effort */
-    }
+    // Socket d'abord : l'appelant coupe sans attendre le message chat.
+    const action = reason === 'declined' ? 'decline' : 'end';
     if (scope === 'ride') {
       this.trackingGateway.broadcastRideCall(
         {
           rideId: id,
           starterId: userId,
           starterRole: participants.role,
-          action: 'end',
+          action,
+          reason,
           ts: Date.now(),
         },
         recipients,
@@ -217,11 +214,26 @@ export class DeliveryLiveKitService {
           deliveryId: id,
           starterId: userId,
           starterRole: participants.role,
-          action: 'end',
+          action,
+          reason,
           ts: Date.now(),
         },
         recipients,
       );
+    }
+    // Message chat : filet si le socket tracking est absent (poll ~8 s).
+    try {
+      const endText =
+        reason === 'declined'
+          ? 'Appel vocal SENGA refusé.'
+          : 'Appel vocal SENGA terminé.';
+      if (scope === 'ride') {
+        await this.rideChat.sendMessage(id, userId, endText);
+      } else {
+        await this.deliveryChat.sendMessage(id, userId, endText);
+      }
+    } catch {
+      /* best-effort */
     }
     return { ok: true };
   }

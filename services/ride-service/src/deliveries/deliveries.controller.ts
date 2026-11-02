@@ -302,7 +302,12 @@ export class DeliveriesController {
 
   @Post(':id/livekit-end')
   @ApiOperation({ summary: 'Signaler la fin d’un appel vocal (arrête la sonnerie chez les autres)' })
-  liveKitEnd(@Request() req: { user: { id: string } }, @Param('id') id: string) {
-    return this.deliveryLiveKit.endCall('delivery', id, req.user.id);
+  liveKitEnd(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() body?: { reason?: string },
+  ) {
+    const reason = body?.reason === 'declined' ? 'declined' : 'hangup';
+    return this.deliveryLiveKit.endCall('delivery', id, req.user.id, reason);
   }
 }

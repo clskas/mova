@@ -14,11 +14,32 @@ import {
   StatusBadge,
 } from "@/components/ui";
 
+const TYPE_FILTERS: Array<{ id: string; label: string }> = [
+  { id: "ALL", label: "Tous" },
+  { id: "SOS", label: "SOS" },
+  { id: "CASH_NOT_RECEIVED", label: "Espèces non reçues" },
+  { id: "FRAUD", label: "Fraude" },
+  { id: "ACCIDENT", label: "Accident" },
+  { id: "HARASSMENT", label: "Harcèlement" },
+  { id: "OTHER", label: "Autre" },
+];
+
+const TYPE_LABELS: Record<string, string> = {
+  SOS: "Alerte SOS",
+  CASH_NOT_RECEIVED: "Litige espèces non reçues",
+  FRAUD: "Litige fraude",
+  ACCIDENT: "Litige accident",
+  HARASSMENT: "Litige harcèlement",
+  OTHER: "Autre réclamation",
+};
+
 export default function LitigesPage() {
   const { canWrite } = useAdmin();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("OPEN");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,19 +65,62 @@ export default function LitigesPage() {
     }
   }
 
+  const visible = incidents.filter((i) => {
+    if (statusFilter !== "ALL" && (i.status ?? "OPEN") !== statusFilter) return false;
+    if (typeFilter === "ALL") return true;
+    if (typeFilter === "SOS") return i.type === "SOS" || i.isEmergency === true;
+    return i.type === typeFilter;
+  });
+
   return (
     <div className="max-w-4xl mx-auto">
-      <PageHeader title="Litiges" subtitle="Incidents et réclamations utilisateurs" />
+      <PageHeader title="Litiges" subtitle="Incidents et réclamations — filtrés par type" />
+      <div className="flex flex-wrap gap-2 mb-3">
+        {TYPE_FILTERS.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            onClick={() => setTypeFilter(f.id)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border ${
+              typeFilter === f.id
+                ? "bg-[#6C63FF] text-white border-[#6C63FF]"
+                : "bg-white text-gray-700 border-gray-200"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex gap-2 mb-4">
+        {[
+          { id: "OPEN", label: "Ouverts" },
+          { id: "RESOLVED", label: "Résolus" },
+          { id: "ALL", label: "Tous statuts" },
+        ].map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            onClick={() => setStatusFilter(f.id)}
+            className={`px-3 py-1 rounded-full text-xs border ${
+              statusFilter === f.id ? "bg-[#1A1A2E] text-white border-[#1A1A2E]" : "bg-white border-gray-200"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
       {error && <ErrorBanner message={error} onRetry={load} />}
       {loading ? (
         <LoadingState />
-      ) : incidents.length === 0 ? (
-        <EmptyState message="Aucun litige" />
+      ) : visible.length === 0 ? (
+        <EmptyState message="Aucun litige pour ce filtre" />
       ) : (
         <div className="space-y-3">
-          {incidents.map((i) => {
+          {visible.map((i) => {
             const hasGps = i.lat != null && i.lng != null;
             const isSos = i.type === "SOS" || i.isEmergency;
+            const isCash = i.type === "CASH_NOT_RECEIVED";
+            const label = TYPE_LABELS[i.type ?? ""] ?? i.type ?? "Litige";
             return (
               <Card key={i.id} className="p-4 flex flex-wrap justify-between gap-4">
                 <div className="flex-1 min-w-[260px]">
@@ -64,7 +128,10 @@ export default function LitigesPage() {
                     {isSos ? (
                       <span className="px-2 py-0.5 rounded bg-red-600 text-white text-xs font-bold">SOS</span>
                     ) : null}
-                    {i.type}
+                    {isCash ? (
+                      <span className="px-2 py-0.5 rounded bg-orange-500 text-white text-xs font-bold">ESPÈCES</span>
+                    ) : null}
+                    {label}
                   </p>
                   <p className="text-sm text-gray-600 mt-1">{i.description}</p>
                   {i.rideId && <p className="text-xs text-gray-500 mt-1">Course : {i.rideId}</p>}

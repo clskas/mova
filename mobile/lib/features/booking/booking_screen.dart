@@ -151,13 +151,16 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     if (result case Success(:final data?) when data['id'] != null) {
       final rideId = data['id'].toString();
       final amount = (data['finalFareCdf'] ?? data['estimatedFareCdf'] ?? 0) as int;
+      final cashDispute = data['cashDisputed'] == true;
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Paiement en attente'),
-          content: const Text(
-            'Un paiement est en litige (espèces non reçues ou autre). '
-            'Réglez-le ou contactez le support avant de commander.',
+          title: Text(cashDispute ? 'Litige : espèces non reçues' : 'Paiement en attente'),
+          content: Text(
+            cashDispute
+                ? 'Le chauffeur a signalé ne pas avoir reçu les espèces de cette course. '
+                    'Ce n’est pas une alerte SOS. Réglez ce litige (ou contactez le support) avant de commander.'
+                : 'Un paiement est encore dû sur une course terminée. Réglez-le avant de commander.',
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),

@@ -37,6 +37,7 @@ enum IncidentType {
   HARASSMENT
   FRAUD
   SOS
+  CASH_NOT_RECEIVED
   OTHER
 }
 

@@ -104,14 +104,18 @@ class ChatPollService {
         final body = n['body']?.toString() ?? '';
         if (threadId.isNotEmpty &&
             (body.contains('Appel vocal SENGA terminé') ||
-                body.contains('Appel SENGA terminé'))) {
+                body.contains('Appel SENGA terminé') ||
+                body.contains('Appel vocal SENGA refusé'))) {
           // Ignore un « terminé » périmé du 1er appel si plus rien ne sonne
           // (évite de couper un 2ᵉ appel sur le même fil dans le même batch).
           final activeId = CallRingService.incoming.value?.deliveryId;
           final inCall = CallRingService.inCallDeliveryId == threadId;
           final ringingThis = CallRingService.isRinging && activeId == threadId;
           if (ringingThis || inCall || activeId == threadId) {
-            CallRingService.notifyPeerEnded(threadId);
+            CallRingService.notifyPeerEnded(
+              threadId,
+              reason: body.contains('refusé') ? 'declined' : 'hangup',
+            );
             await CallRingService.forceStop();
           }
           continue;

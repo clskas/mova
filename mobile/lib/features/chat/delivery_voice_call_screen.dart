@@ -131,9 +131,13 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     final id = payload['rideId']?.toString() ?? payload['deliveryId']?.toString();
     if (id != null && id != widget.threadId) return;
     final action = payload['action']?.toString() ?? 'start';
-    if (action != 'end') return;
+    if (action != 'end' && action != 'decline') return;
     // Refus / raccroché distant via socket — même si l'écran parent n'écoute plus.
-    CallRingService.notifyPeerEnded(widget.threadId);
+    final declined = action == 'decline' || payload['reason']?.toString() == 'declined';
+    CallRingService.notifyPeerEnded(
+      widget.threadId,
+      reason: declined ? 'declined' : 'hangup',
+    );
   }
 
   void _onPeerEndedSignal() {
@@ -144,7 +148,10 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     }
     if (!mounted) return;
     if (_phase == _CallPhase.peerLeft || _phase == _CallPhase.error) return;
-    final reason = _phase == _CallPhase.ringingOut || _phase == _CallPhase.connecting
+    final remoteDeclined = CallRingService.lastEndReason == 'declined';
+    final reason = remoteDeclined ||
+            _phase == _CallPhase.ringingOut ||
+            _phase == _CallPhase.connecting
         ? _PeerLeftReason.declined
         : _PeerLeftReason.hungUp;
     _ringTimeout?.cancel();

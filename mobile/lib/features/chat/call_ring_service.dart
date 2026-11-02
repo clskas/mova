@@ -51,8 +51,11 @@ class CallRingService {
   /// Thread (ride/delivery id) dont l'autre partie a refusé / raccroché via socket.
   /// L'écran d'appel sortant écoute ça pour passer en « Appel terminé ».
   static final ValueNotifier<String?> peerEndedThreadId = ValueNotifier<String?>(null);
+  /// `declined` | `hangup` — dernier motif reçu (socket).
+  static String? lastEndReason;
 
-  static void notifyPeerEnded(String threadId) {
+  static void notifyPeerEnded(String threadId, {String? reason}) {
+    if (reason != null) lastEndReason = reason;
     if (threadId.isEmpty) return;
     // Toujours notifier (ValueNotifier ignore si la valeur est identique).
     if (peerEndedThreadId.value == threadId) {

@@ -961,8 +961,18 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                 ),
                 const SizedBox(height: 12),
               ],
+              if (_cashDisputed) ...[
+                MovaCard(
+                  child: const Text(
+                    'Litige : espèces non reçues. Le passager a été notifié et ne peut plus commander tant que ce n’est pas réglé. '
+                    'Ce n’est pas une alerte SOS. Si vous avez finalement reçu l’argent, confirmez ci-dessous pour clôturer ce litige.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               MovaButton(
-                label: 'Cash reçu',
+                label: _cashDisputed ? 'J’ai reçu les espèces' : 'Cash reçu',
                 isSecondary: true,
                 icon: Icons.payments_outlined,
                 onPressed: _confirmCash,
@@ -984,14 +994,12 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
 
   Future<void> _confirmCash({bool auto = false}) async {
     if (_cashDialogOpen) return;
-    if (_status != 'COMPLETED' || _isPaid || _cashDisputed) {
+    if (_status != 'COMPLETED' || _isPaid) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text(
-              _cashDisputed
-                  ? 'Litige espèces déjà ouvert pour cette course.'
-                  : 'Cette course n’attend plus d’encaissement espèces (annulée ou déjà réglée).',
+              'Cette course n’attend plus d’encaissement espèces (annulée ou déjà réglée).',
             ),
           ),
         );
@@ -1000,9 +1008,12 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     }
     _cashDialogOpen = true;
     final api = ref.read(apiClientProvider);
+    final closingDispute = _cashDisputed;
     final result = await DriverCashReceivedDialog.show(
       context,
-      title: auto ? 'Le passager paie en espèces' : 'Cash reçu ?',
+      title: closingDispute
+          ? 'Clôturer le litige espèces ?'
+          : (auto ? 'Le passager paie en espèces' : 'Cash reçu ?'),
       passengerTotalCdf: _passengerCashTotalCdf,
       driverNetCdf: _driverNetCdf,
       confirm: () async {
@@ -1051,16 +1062,25 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       _skipCashAutoOpen = true;
       setState(() => _ride = {..._ride, 'cashDisputed': true});
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Litige enregistré — le passager a été notifié')),
+        const SnackBar(
+          content: Text('Litige espèces non reçues enregistré — le passager a été notifié'),
+        ),
       );
       await _refreshRide();
       return;
     }
     if (result != CashDialogResult.confirmed) return;
+    setState(() => _ride = {..._ride, 'cashDisputed': false, 'isPaid': true});
     await _refreshRide();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Paiement espèces confirmé')),
+      SnackBar(
+        content: Text(
+          closingDispute
+              ? 'Litige espèces non reçues clôturé — paiement confirmé.'
+              : 'Paiement espèces confirmé',
+        ),
+      ),
     );
   }
 

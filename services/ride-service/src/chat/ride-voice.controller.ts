@@ -25,7 +25,12 @@ export class RideVoiceController {
 
   @Post(':id/livekit-end')
   @ApiOperation({ summary: 'Fin d’appel vocal course — coupe la sonnerie chez l’autre' })
-  liveKitEnd(@Request() req: { user: { id: string } }, @Param('id') id: string) {
-    return this.liveKit.endCall('ride', id, req.user.id);
+  liveKitEnd(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() body?: { reason?: string },
+  ) {
+    const reason = body?.reason === 'declined' ? 'declined' : 'hangup';
+    return this.liveKit.endCall('ride', id, req.user.id, reason);
   }
 }

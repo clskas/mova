@@ -382,7 +382,8 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       deliveryId: string;
       starterId: string;
       starterRole: string;
-      action: 'start' | 'end';
+      action: 'start' | 'end' | 'decline';
+      reason?: 'declined' | 'hangup';
       ts: number;
     },
     recipientUserIds: Array<string | null | undefined> = [],
@@ -396,7 +397,8 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       rideId: string;
       starterId: string;
       starterRole: string;
-      action: 'start' | 'end';
+      action: 'start' | 'end' | 'decline';
+      reason?: 'declined' | 'hangup';
       ts: number;
     },
     recipientUserIds: Array<string | null | undefined> = [],

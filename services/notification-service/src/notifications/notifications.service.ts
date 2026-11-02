@@ -169,11 +169,11 @@ export class NotificationsService implements OnModuleInit {
 
   async onCashDisputed(payload: CashDisputedPayload) {
     const amount = payload.amountCdf ?? 0;
-    const title = 'Espèces non reçues — action requise';
+    const title = 'Litige espèces non reçues';
     const body =
-      `Le chauffeur/livreur signale ne pas avoir reçu ${amount} FC en espèces. ` +
-      `Ouvrez SENGA pour déclarer « J’ai payé », régler autrement, ou contacter le support. ` +
-      `De nouvelles courses sont bloquées tant que le litige n’est pas résolu.`;
+      `Litige espèces non reçues (pas une alerte SOS) : le chauffeur/livreur signale ne pas avoir reçu ${amount} FC. ` +
+      `Ouvrez SENGA pour déclarer « J’ai payé », payer autrement, ou contacter le support. ` +
+      `De nouvelles courses sont bloquées tant que ce litige n’est pas résolu.`;
     await this.create(payload.userId, title, body, 'CASH_DISPUTED', payload);
     await this.pushToUsersAnyFlavor([payload.userId], title, body, {
       type: 'CASH_DISPUTED',

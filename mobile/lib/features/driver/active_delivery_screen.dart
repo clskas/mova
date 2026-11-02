@@ -758,10 +758,19 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
               onPressed: _loading ? null : _markUnreachable,
             ),
           ],
-          if (_awaitingCashConfirm) ...[
+          if (_awaitingCashConfirm || _cashDisputed) ...[
             const SizedBox(height: 8),
+            if (_cashDisputed)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Litige : espèces non reçues (pas une alerte SOS). Le client a été notifié. '
+                  'Si vous avez finalement reçu l’argent, confirmez pour clôturer ce litige.',
+                  style: TextStyle(fontSize: 13),
+                ),
+              ),
             MovaButton(
-              label: 'Cash reçu',
+              label: _cashDisputed ? 'J’ai reçu les espèces' : 'Cash reçu',
               isSecondary: true,
               icon: Icons.payments_outlined,
               onPressed: _loading ? null : () => _confirmCash(),

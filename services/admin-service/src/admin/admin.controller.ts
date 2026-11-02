@@ -1070,12 +1070,16 @@ export class AdminController {
     @Query('q') q?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     return this.adminService.listPoiCatalog({
       city: resolveManagedCityScope(req.user) ?? city,
       q,
       skip: Number(skip ?? 0),
       take: Number(take ?? 80),
+      from,
+      to,
     });
   }
 
@@ -1149,12 +1153,15 @@ export class AdminController {
     @Query('skip') skip?: string,
     @Query('take') take?: string,
     @Query('city') city?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     return this.adminService.listPoiSuggestions(
       status,
       Number(skip ?? 0),
       Number(take ?? 50),
       resolveManagedCityScope(req.user) ?? city,
+      { from, to },
     );
   }
 

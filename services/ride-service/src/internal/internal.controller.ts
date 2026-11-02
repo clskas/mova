@@ -843,12 +843,16 @@ export class InternalController {
     @Query('q') q?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     return this.geo.listCatalogPlaces({
       city,
       q,
       skip: Number(skip ?? 0),
       take: Number(take ?? 80),
+      from,
+      to,
     });
   }
 
@@ -879,12 +883,16 @@ export class InternalController {
     @Query('skip') skip?: string,
     @Query('take') take?: string,
     @Query('city') city?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     return this.poiSuggestions.listForAdmin({
       status: status as 'PENDING' | 'APPROVED' | 'REJECTED' | undefined,
       skip: Number(skip ?? 0),
       take: Number(take ?? 50),
       city,
+      from,
+      to,
     });
   }
 

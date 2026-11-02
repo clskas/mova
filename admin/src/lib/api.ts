@@ -1598,9 +1598,17 @@ export type PoiSuggestion = {
   updatedAt: string;
 };
 
-export async function fetchPoiSuggestions(status = "PENDING", skip = 0, take = 50, city?: string) {
+export async function fetchPoiSuggestions(
+  status = "PENDING",
+  skip = 0,
+  take = 50,
+  city?: string,
+  range?: { from?: string | null; to?: string | null },
+) {
   const params = new URLSearchParams({ status, skip: String(skip), take: String(take) });
   if (city?.trim()) params.set("city", city.trim());
+  if (range?.from?.trim()) params.set("from", range.from.trim());
+  if (range?.to?.trim()) params.set("to", range.to.trim());
   return apiFetch<{ items: PoiSuggestion[]; total: number }>(`/api/admin/poi-suggestions?${params}`);
 }
 
@@ -1670,13 +1678,17 @@ export type CatalogPoi = {
   updatedAt?: string;
 };
 
-export async function fetchPoiCatalog(opts: { city?: string; q?: string; skip?: number; take?: number } = {}) {
+export async function fetchPoiCatalog(
+  opts: { city?: string; q?: string; skip?: number; take?: number; from?: string | null; to?: string | null } = {},
+) {
   const params = new URLSearchParams({
     skip: String(opts.skip ?? 0),
     take: String(opts.take ?? 200),
   });
   if (opts.city) params.set("city", opts.city);
   if (opts.q?.trim()) params.set("q", opts.q.trim());
+  if (opts.from?.trim()) params.set("from", opts.from.trim());
+  if (opts.to?.trim()) params.set("to", opts.to.trim());
   return apiFetch<{ items: CatalogPoi[]; total: number }>(`/api/admin/poi-catalog?${params}`);
 }
 

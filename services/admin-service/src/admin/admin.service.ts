@@ -1736,13 +1736,17 @@ export class AdminService {
     return this.proxy('ride', `/internal/poi/seed${q}`, { method: 'POST' });
   }
 
-  listPoiCatalog(opts: { city?: string | null; q?: string; skip?: number; take?: number } = {}) {
+  listPoiCatalog(
+    opts: { city?: string | null; q?: string; skip?: number; take?: number; from?: string; to?: string } = {},
+  ) {
     const params = new URLSearchParams({
       skip: String(opts.skip ?? 0),
       take: String(opts.take ?? 80),
     });
     if (opts.city?.trim()) params.set('city', opts.city.trim());
     if (opts.q?.trim()) params.set('q', opts.q.trim());
+    if (opts.from?.trim()) params.set('from', opts.from.trim());
+    if (opts.to?.trim()) params.set('to', opts.to.trim());
     return this.fetchJson('ride', `/internal/poi-catalog?${params.toString()}`);
   }
 
@@ -2282,10 +2286,18 @@ export class AdminService {
     return this.fetchJson('payment', `/internal/subscriptions?${params}`);
   }
 
-  listPoiSuggestions(status?: string, skip = 0, take = 50, managedCity?: string | null) {
+  listPoiSuggestions(
+    status?: string,
+    skip = 0,
+    take = 50,
+    managedCity?: string | null,
+    range?: { from?: string; to?: string },
+  ) {
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (status) params.set('status', status);
     if (managedCity?.trim()) params.set('city', managedCity.trim());
+    if (range?.from?.trim()) params.set('from', range.from.trim());
+    if (range?.to?.trim()) params.set('to', range.to.trim());
     return this.fetchJson('ride', `/internal/poi-suggestions?${params.toString()}`);
   }
 

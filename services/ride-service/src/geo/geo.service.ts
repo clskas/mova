@@ -20,6 +20,18 @@ import { rankAutocompleteResults, type AutocompleteResult } from './geo-autocomp
 import { parsePoiCategory, TAXI_POI_CHIP_CATEGORIES, type PoiCategory } from './poi-category.map';
 import { PoiImportService } from './poi-import.service';
 
+/** Inclusive Kinshasa calendar day → createdAt bounds. Invalid dates are ignored. */
+function kinshasaCreatedAtRange(from?: string | null, to?: string | null) {
+  const start = from?.trim();
+  const end = to?.trim();
+  const gte =
+    start && /^\d{4}-\d{2}-\d{2}$/.test(start) ? new Date(`${start}T00:00:00+01:00`) : undefined;
+  const lte = end && /^\d{4}-\d{2}-\d{2}$/.test(end) ? new Date(`${end}T23:59:59.999+01:00`) : undefined;
+  if ((gte && !Number.isFinite(gte.getTime())) || (lte && !Number.isFinite(lte.getTime()))) return undefined;
+  if (!gte && !lte) return undefined;
+  return { ...(gte ? { gte } : {}), ...(lte ? { lte } : {}) };
+}
+
 @Injectable()
 export class GeoService implements OnModuleInit {
   private readonly logger = new Logger(GeoService.name);
@@ -721,6 +733,8 @@ export class GeoService implements OnModuleInit {
     q?: string;
     skip?: number;
     take?: number;
+    from?: string;
+    to?: string;
   }) {
     const skip = Math.max(0, Math.round(opts.skip ?? 0));
     // Admin catalogue : jusqu’à 500 par page (911+ lieux) pour éviter les « disparitions ».
@@ -737,6 +751,8 @@ export class GeoService implements OnModuleInit {
         { address: { contains: q, mode: 'insensitive' } },
       ];
     }
+    const createdAt = kinshasaCreatedAtRange(opts.from, opts.to);
+    if (createdAt) where.createdAt = createdAt;
     const [items, total] = await Promise.all([
       this.prisma.placeOfInterest.findMany({
         where,

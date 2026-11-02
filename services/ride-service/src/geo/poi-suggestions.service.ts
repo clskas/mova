@@ -14,6 +14,18 @@ import { ApprovePoiSuggestionDto, CreatePoiSuggestionDto, RejectPoiSuggestionDto
 const MAX_PENDING_PER_USER = 500;
 const DUPLICATE_RADIUS_KM = 0.15;
 
+/** Inclusive Kinshasa calendar day → createdAt bounds. Invalid dates are ignored. */
+function kinshasaCreatedAtRange(from?: string | null, to?: string | null) {
+  const start = from?.trim();
+  const end = to?.trim();
+  const gte =
+    start && /^\d{4}-\d{2}-\d{2}$/.test(start) ? new Date(`${start}T00:00:00+01:00`) : undefined;
+  const lte = end && /^\d{4}-\d{2}-\d{2}$/.test(end) ? new Date(`${end}T23:59:59.999+01:00`) : undefined;
+  if ((gte && !Number.isFinite(gte.getTime())) || (lte && !Number.isFinite(lte.getTime()))) return undefined;
+  if (!gte && !lte) return undefined;
+  return { ...(gte ? { gte } : {}), ...(lte ? { lte } : {}) };
+}
+
 const OSM_AMENITY_BY_CATEGORY: Partial<Record<PlaceOfInterestCategory, string>> = {
   MARKET: 'marketplace',
   HOSPITAL: 'hospital',
@@ -177,6 +189,8 @@ export class PoiSuggestionsService {
     skip?: number;
     take?: number;
     city?: string | null;
+    from?: string | null;
+    to?: string | null;
   }) {
     const where: Prisma.PoiSuggestionWhereInput = {};
     if (opts.status) where.status = opts.status;
@@ -184,6 +198,8 @@ export class PoiSuggestionsService {
     if (city) {
       where.city = { equals: city, mode: 'insensitive' };
     }
+    const createdAt = kinshasaCreatedAtRange(opts.from, opts.to);
+    if (createdAt) where.createdAt = createdAt;
     const skip = opts.skip ?? 0;
     const take = Math.min(opts.take ?? 50, 100);
     const [rows, total] = await Promise.all([

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   approvePoiSuggestion,
   fetchPoiCatalog,
@@ -13,6 +13,13 @@ import {
   type PoiSuggestion,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
+import { PeriodFilterBar } from "@/components/PeriodFilterBar";
+import {
+  rangeForPresetDays,
+  todayYmdKinshasa,
+  type PeriodMode,
+  type PeriodPresetDays,
+} from "@/lib/period-filter";
 import {
   BtnPrimary,
   Card,
@@ -138,6 +145,21 @@ export default function LieuxPage() {
   const [editCategory, setEditCategory] = useState("OTHER");
   const [editCity, setEditCity] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("preset");
+  const [period, setPeriod] = useState<PeriodPresetDays>(30);
+  const [customFrom, setCustomFrom] = useState(() => rangeForPresetDays(30).from);
+  const [customTo, setCustomTo] = useState(todayYmdKinshasa);
+  const [appliedFrom, setAppliedFrom] = useState<string | null>(null);
+  const [appliedTo, setAppliedTo] = useState<string | null>(null);
+
+  const periodBounds = useMemo(() => {
+    if (periodMode === "all") return { from: null as string | null, to: null as string | null };
+    if (periodMode === "custom" && appliedFrom && appliedTo) {
+      return { from: appliedFrom, to: appliedTo };
+    }
+    if (periodMode === "preset") return rangeForPresetDays(period);
+    return { from: null as string | null, to: null as string | null };
+  }, [periodMode, period, appliedFrom, appliedTo]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setCatalogQDebounced(catalogQ.trim()), 300);
@@ -146,7 +168,7 @@ export default function LieuxPage() {
 
   useEffect(() => {
     setCatalogSkip(0);
-  }, [catalogQDebounced, scopeCity, tab]);
+  }, [catalogQDebounced, scopeCity, tab, periodBounds.from, periodBounds.to]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -158,13 +180,15 @@ export default function LieuxPage() {
           q: catalogQDebounced,
           skip: 0,
           take: CATALOG_PAGE,
+          from: periodBounds.from,
+          to: periodBounds.to,
         });
         setCatalog(data.items ?? []);
         setCatalogTotal(data.total ?? 0);
         setCatalogSkip(data.items?.length ?? 0);
         setItems([]);
       } else {
-        const data = await fetchPoiSuggestions(tab, 0, 50, scopeCity ?? undefined);
+        const data = await fetchPoiSuggestions(tab, 0, 100, scopeCity ?? undefined, periodBounds);
         setItems(data.items ?? []);
         setCatalog([]);
       }
@@ -173,7 +197,7 @@ export default function LieuxPage() {
     } finally {
       setLoading(false);
     }
-  }, [tab, catalogQDebounced, scopeCity]);
+  }, [tab, catalogQDebounced, scopeCity, periodBounds]);
 
   const loadMoreCatalog = useCallback(async () => {
     if (loadingMore || catalog.length >= catalogTotal) return;
@@ -185,6 +209,8 @@ export default function LieuxPage() {
         q: catalogQDebounced,
         skip: catalogSkip,
         take: CATALOG_PAGE,
+        from: periodBounds.from,
+        to: periodBounds.to,
       });
       const next = data.items ?? [];
       setCatalog((prev) => {
@@ -198,7 +224,7 @@ export default function LieuxPage() {
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, catalog.length, catalogTotal, catalogSkip, scopeCity, catalogQDebounced]);
+  }, [loadingMore, catalog.length, catalogTotal, catalogSkip, scopeCity, catalogQDebounced, periodBounds]);
 
   useEffect(() => {
     void load();
@@ -338,6 +364,33 @@ export default function LieuxPage() {
         </div>
       )}
 
+      <div className="mb-4">
+        <PeriodFilterBar
+          mode={periodMode}
+          period={period}
+          customFrom={customFrom}
+          customTo={customTo}
+          appliedFrom={appliedFrom}
+          appliedTo={appliedTo}
+          onModeChange={(m) => {
+            setPeriodMode(m);
+            if (m !== "custom") {
+              setAppliedFrom(null);
+              setAppliedTo(null);
+            }
+          }}
+          onPeriodChange={setPeriod}
+          onCustomFromChange={setCustomFrom}
+          onCustomToChange={setCustomTo}
+          onApplyCustom={() => {
+            if (!customFrom || !customTo || customFrom > customTo) return;
+            setAppliedFrom(customFrom);
+            setAppliedTo(customTo);
+            setPeriodMode("custom");
+          }}
+        />
+      </div>
+
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {(["PENDING", "APPROVED", "REJECTED", "CATALOG"] as const).map((s) => (
           <button
@@ -376,6 +429,7 @@ export default function LieuxPage() {
           <p className="text-xs text-gray-500 mt-1">
             {catalogTotal} lieu{catalogTotal > 1 ? "x" : ""} dans le catalogue
             {scopeCity ? ` · ${scopeCity}` : ""}
+            {periodBounds.from && periodBounds.to ? ` · ${periodBounds.from} → ${periodBounds.to}` : ""}
             {catalogTotal > 0
               ? ` — affichage ${catalog.length} / ${catalogTotal} (plus récents d’abord)`
               : ""}

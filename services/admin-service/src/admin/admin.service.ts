@@ -1047,7 +1047,12 @@ export class AdminService {
     managedCity?: string | null,
   ) {
     await this.getDriver(userId, managedCity);
-    if (vehicleType && actorRole !== UserRole.SUPER_ADMIN && actorRole !== UserRole.ADMIN) {
+    if (
+      vehicleType &&
+      actorRole !== UserRole.SUPER_ADMIN &&
+      actorRole !== UserRole.ADMIN &&
+      actorRole !== UserRole.CITY_ADMIN
+    ) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,

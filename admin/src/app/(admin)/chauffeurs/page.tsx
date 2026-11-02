@@ -193,7 +193,7 @@ export default function ChauffeursPage() {
   const { canWrite, role, user } = useAdmin();
   const readOnly = !canWrite("chauffeurs");
   const canReviewKyc = canWrite("kyc");
-  const canSetVehicleType = role === "SUPER_ADMIN" || role === "ADMIN";
+  const canSetVehicleType = role === "SUPER_ADMIN" || role === "ADMIN" || role === "CITY_ADMIN";
   const canEditOperatingCity = role === "SUPER_ADMIN" || role === "ADMIN";
   const canFilterCity = role === "SUPER_ADMIN" || role === "ADMIN";
   const [drivers, setDrivers] = useState<AdminDriver[]>([]);

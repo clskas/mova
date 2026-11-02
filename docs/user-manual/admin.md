@@ -103,7 +103,7 @@ Dans **Règles plateforme** (SUPER_ADMIN, ADMIN, **CITY_ADMIN** — section docu
 Pour les véhicules **VIP**, **Confort** ou autres catégories réglementées :
 
 1. **Chauffeurs → Détail** → section véhicule.
-2. **Approuver** ou **Rejeter** le type d'engin.
+2. **Approuver** ou **Rejeter** le type d'engin. Le **SUPER_ADMIN**, l'**ADMIN** et l'**admin ville** peuvent aussi corriger la catégorie (Moto-taxi, Standard, Confort, VIP) avant de valider. L'admin ville ne le fait que pour un chauffeur de sa ville.
 3. Tant que le type n'est pas **APPROVED**, le chauffeur ne peut pas recevoir de missions (`canOperate` bloqué).
 
 ## Opérations (lecture + mise à jour)

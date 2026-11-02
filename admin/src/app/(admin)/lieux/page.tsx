@@ -13,6 +13,7 @@ import {
   type PoiSuggestion,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
+import { MetricCard } from "@/components/dashboard/MetricCard";
 import { PeriodFilterBar } from "@/components/PeriodFilterBar";
 import {
   rangeForPresetDays,
@@ -124,6 +125,7 @@ export default function LieuxPage() {
   const scopeCity = managedCity || (canFilterCity ? cityFilter.trim() : "") || null;
   const [tab, setTab] = useState<"PENDING" | "APPROVED" | "REJECTED" | "CATALOG">("PENDING");
   const [items, setItems] = useState<PoiSuggestion[]>([]);
+  const [suggestionTotal, setSuggestionTotal] = useState(0);
   const [catalog, setCatalog] = useState<CatalogPoi[]>([]);
   const [catalogTotal, setCatalogTotal] = useState(0);
   const [catalogSkip, setCatalogSkip] = useState(0);
@@ -187,9 +189,11 @@ export default function LieuxPage() {
         setCatalogTotal(data.total ?? 0);
         setCatalogSkip(data.items?.length ?? 0);
         setItems([]);
+        setSuggestionTotal(0);
       } else {
         const data = await fetchPoiSuggestions(tab, 0, 100, scopeCity ?? undefined, periodBounds);
         setItems(data.items ?? []);
+        setSuggestionTotal(data.total ?? data.items?.length ?? 0);
         setCatalog([]);
       }
     } catch (e) {
@@ -198,6 +202,33 @@ export default function LieuxPage() {
       setLoading(false);
     }
   }, [tab, catalogQDebounced, scopeCity, periodBounds]);
+
+  const filteredCount = tab === "CATALOG" ? catalogTotal : suggestionTotal;
+  const filterSummaryHint = useMemo(() => {
+    const parts: string[] = [];
+    parts.push(scopeCity || "toutes villes");
+    if (periodMode === "preset") parts.push(period === 1 ? "aujourd'hui" : `${period}j`);
+    else if (periodMode === "custom" && appliedFrom && appliedTo) parts.push(`${appliedFrom} → ${appliedTo}`);
+    else parts.push("toutes périodes");
+    parts.push(STATUS_LABELS[tab] ?? tab);
+    if (tab === "CATALOG" && catalog.length > 0 && catalog.length < catalogTotal) {
+      parts.push(`${catalog.length} affichés`);
+    } else if (tab !== "CATALOG" && items.length > 0 && items.length < suggestionTotal) {
+      parts.push(`${items.length} affichés`);
+    }
+    return parts.join(" · ");
+  }, [
+    scopeCity,
+    periodMode,
+    period,
+    appliedFrom,
+    appliedTo,
+    tab,
+    catalog.length,
+    catalogTotal,
+    items.length,
+    suggestionTotal,
+  ]);
 
   const loadMoreCatalog = useCallback(async () => {
     if (loadingMore || catalog.length >= catalogTotal) return;
@@ -389,6 +420,14 @@ export default function LieuxPage() {
             setPeriodMode("custom");
           }}
         />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl mt-3">
+          <MetricCard
+            label="Lieux filtrés"
+            value={loading ? "…" : filteredCount}
+            hint={filterSummaryHint}
+            accent="violet"
+          />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-4">

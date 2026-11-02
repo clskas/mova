@@ -14,6 +14,7 @@ import {
   type Restaurant,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
+import { MetricCard } from "@/components/dashboard/MetricCard";
 import { PeriodFilterBar } from "@/components/PeriodFilterBar";
 import {
   createdAtInRange,
@@ -175,6 +176,18 @@ export default function RestaurantsPage() {
     () => restaurants.filter((r) => createdAtInRange(r.createdAt, periodBounds.from, periodBounds.to)),
     [restaurants, periodBounds],
   );
+
+  const filterSummaryHint = useMemo(() => {
+    const parts: string[] = [];
+    parts.push(scopedCity || "toutes villes");
+    if (periodMode === "preset") parts.push(period === 1 ? "aujourd'hui" : `${period}j`);
+    else if (periodMode === "custom" && appliedFrom && appliedTo) parts.push(`${appliedFrom} → ${appliedTo}`);
+    else parts.push("toutes périodes");
+    if (restaurants.length > 0 && filteredRestaurants.length !== restaurants.length) {
+      parts.push(`sur ${restaurants.length} chargés`);
+    }
+    return parts.join(" · ");
+  }, [scopedCity, periodMode, period, appliedFrom, appliedTo, restaurants.length, filteredRestaurants.length]);
 
   function parseCoord(value: string, fallback: number) {
     const n = Number.parseFloat(value.replace(",", "."));
@@ -348,6 +361,14 @@ export default function RestaurantsPage() {
             setPeriodMode("custom");
           }}
         />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl w-full">
+          <MetricCard
+            label="Commerces filtrés"
+            value={loading ? "…" : filteredRestaurants.length}
+            hint={filterSummaryHint}
+            accent="orange"
+          />
+        </div>
       </div>
 
       {!readOnly && (

@@ -136,6 +136,16 @@ export default function PnlPage() {
           }}
         />
       </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl mt-3">
+        <MetricCard
+          label="Courses filtrées"
+          value={loading || !data ? "…" : data.completedRides}
+          hint={`${lockedCity || city || "toutes villes"} · ${query.label}${
+            data ? ` · ${data.cancelledRides} annulées` : ""
+          }`}
+          accent="green"
+        />
+      </div>
       {error && <ErrorBanner message={error} onRetry={load} />}
       {loading || !data ? (
         <LoadingState />

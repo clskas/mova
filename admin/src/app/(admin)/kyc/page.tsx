@@ -20,6 +20,7 @@ import {
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import { AuthenticatedMedia } from "@/components/AuthenticatedMedia";
+import { MetricCard } from "@/components/dashboard/MetricCard";
 import { PeriodFilterBar } from "@/components/PeriodFilterBar";
 import { KYC_DOC_LABELS, kycDocLabel, personDisplayName } from "@/lib/kyc-labels";
 import { commerceTypeLabel } from "@/lib/commerce-type";
@@ -654,6 +655,21 @@ export default function KycPage() {
       });
   }, [rentalPartners, kindFilter, docTypeFilter, q, inPeriod]);
 
+  const filteredCount =
+    driverDossiers.length + driversWithoutDocs.length + filteredRestaurants.length + filteredRentals.length;
+
+  const filterSummaryHint = useMemo(() => {
+    const parts: string[] = [];
+    if (managedCity) parts.push(managedCity);
+    else if (cityFilter.trim()) parts.push(cityFilter.trim());
+    else parts.push("toutes villes");
+    if (periodMode === "preset") parts.push(period === 1 ? "aujourd'hui" : `${period}j`);
+    else if (periodMode === "custom" && appliedFrom && appliedTo) parts.push(`${appliedFrom} → ${appliedTo}`);
+    else parts.push("toutes périodes");
+    if (search.trim()) parts.push(`recherche « ${search.trim()} »`);
+    return parts.join(" · ");
+  }, [managedCity, cityFilter, periodMode, period, appliedFrom, appliedTo, search]);
+
   const empty =
     driverDossiers.length === 0 &&
     driversWithoutDocs.length === 0 &&
@@ -726,6 +742,14 @@ export default function KycPage() {
             setPeriodMode("custom");
           }}
         />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+          <MetricCard
+            label="Dossiers filtrés"
+            value={loading ? "…" : filteredCount}
+            hint={filterSummaryHint}
+            accent="orange"
+          />
+        </div>
         <div className="flex flex-wrap gap-2">
           <select
             value={kindFilter}

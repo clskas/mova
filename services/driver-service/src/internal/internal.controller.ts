@@ -117,12 +117,14 @@ export class InternalController {
     @Query('isAvailable') isAvailable?: string,
     @Query('includeHidden') includeHidden?: string,
     @Query('city') city?: string,
+    @Query('q') q?: string,
   ) {
     return this.drivers.listDriversAdmin(Number(skip ?? 0), Number(take ?? 50), {
       kycStatus,
       isAvailable: isAvailable === undefined ? undefined : isAvailable === 'true',
       includeHidden: includeHidden === 'true' || includeHidden === '1',
       operatingCity: city?.trim() || undefined,
+      q: q?.trim() || undefined,
     });
   }
   @Get('kyc/pending') pendingKyc(@Query('status') status?: string, @Query('city') city?: string) {

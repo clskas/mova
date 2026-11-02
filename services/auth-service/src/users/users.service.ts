@@ -233,20 +233,12 @@ export class UsersService {
     const q = search?.trim();
     const roleFromSearch = this.roleFromSearch(q);
     const roleFilter = this.parseRoleFilter(opts?.role) ?? undefined;
-    const fromAt = this.parseDayBound(opts?.from, false);
-    const toAt = this.parseDayBound(opts?.to, true);
+    // A person lookup (name, phone, e-mail) ignores the period. A role word ("chauffeur") keeps it.
+    const personLookup = Boolean(q) && !roleFromSearch;
+    const fromAt = personLookup ? undefined : this.parseDayBound(opts?.from, false);
+    const toAt = personLookup ? undefined : this.parseDayBound(opts?.to, true);
     const searchWhere = q
-      ? {
-          OR: [
-            { phone: { contains: q, mode: 'insensitive' as const } },
-            { firstName: { contains: q, mode: 'insensitive' as const } },
-            { lastName: { contains: q, mode: 'insensitive' as const } },
-            { email: { contains: q, mode: 'insensitive' as const } },
-            { homeCity: { contains: q, mode: 'insensitive' as const } },
-            { managedCity: { contains: q, mode: 'insensitive' as const } },
-            ...(roleFromSearch && !roleFilter ? [{ role: roleFromSearch }] : []),
-          ],
-        }
+      ? this.userSearchWhere(q, roleFromSearch && !roleFilter ? roleFromSearch : undefined)
       : undefined;
     const hiddenIds = await this.hiddenAdminUserIds(includePlayPrelaunch);
     const clauses: Record<string, unknown>[] = [];
@@ -417,6 +409,31 @@ export class UsersService {
       ),
     ];
     return emails.length === 1 ? emails[0] : null;
+  }
+
+  /**
+   * One word matches any identity field. Several words (e.g. "Georges Katahindwa")
+   * must each match somewhere — a full name is stored in firstName + lastName, never
+   * in a single column.
+   */
+  private userSearchWhere(q: string, role?: UserRole) {
+    const fieldOr = (token: string) => ({
+      OR: [
+        { phone: { contains: token, mode: 'insensitive' as const } },
+        { firstName: { contains: token, mode: 'insensitive' as const } },
+        { lastName: { contains: token, mode: 'insensitive' as const } },
+        { email: { contains: token, mode: 'insensitive' as const } },
+        { homeCity: { contains: token, mode: 'insensitive' as const } },
+        { managedCity: { contains: token, mode: 'insensitive' as const } },
+      ],
+    });
+    const tokens = q.split(/\s+/).filter(Boolean);
+    if (tokens.length > 1) {
+      return { AND: tokens.map((token) => fieldOr(token)) };
+    }
+    return {
+      OR: [...fieldOr(q).OR, ...(role ? [{ role }] : [])],
+    };
   }
 
   private roleFromSearch(q?: string): UserRole | undefined {

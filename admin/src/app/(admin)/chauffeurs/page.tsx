@@ -198,6 +198,7 @@ export default function ChauffeursPage() {
   const canFilterCity = role === "SUPER_ADMIN" || role === "ADMIN";
   const [drivers, setDrivers] = useState<AdminDriver[]>([]);
   const [search, setSearch] = useState("");
+  const [committedSearch, setCommittedSearch] = useState("");
   const [includeHidden, setIncludeHidden] = useState(false);
   const [cityFilter, setCityFilter] = useState("");
   const [periodMode, setPeriodMode] = useState<PeriodMode>("preset");
@@ -233,13 +234,21 @@ export default function ChauffeursPage() {
     return { from: null, to: null };
   }, [periodMode, period, appliedFrom, appliedTo]);
 
+  useEffect(() => {
+    const handle = window.setTimeout(() => setCommittedSearch(search.trim()), 400);
+    return () => window.clearTimeout(handle);
+  }, [search]);
+
+  const serverSearch = committedSearch.length >= 2 ? committedSearch : "";
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await fetchDrivers(includeHidden, {
-        take: 500,
+        take: serverSearch ? 200 : 500,
         city: scopedCity || null,
+        q: serverSearch || null,
       });
       setDrivers(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -247,7 +256,7 @@ export default function ChauffeursPage() {
     } finally {
       setLoading(false);
     }
-  }, [includeHidden, scopedCity]);
+  }, [includeHidden, scopedCity, serverSearch]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -294,17 +303,24 @@ export default function ChauffeursPage() {
       if (roleFilter === "both" && mode !== "BOTH") return false;
       if (roleFilter === "ride_only" && mode !== "RIDES_ONLY") return false;
       if (roleFilter === "delivery_only" && mode !== "DELIVERIES_ONLY") return false;
-      if (!createdAtInRange(d.createdAt, periodBounds.from, periodBounds.to)) return false;
+      // A name / phone search looks through every driver, not only the last 30 days.
+      if (q.length < 2 && !createdAtInRange(d.createdAt, periodBounds.from, periodBounds.to)) return false;
       if (!q) return true;
-      return (
-        d.userId.toLowerCase().includes(q) ||
-        d.publicId?.toLowerCase().includes(q) ||
-        d.kycStatus?.toLowerCase().includes(q) ||
-        d.phone?.toLowerCase().includes(q) ||
-        d.operatingCity?.toLowerCase().includes(q) ||
-        `${d.firstName ?? ""} ${d.lastName ?? ""}`.toLowerCase().includes(q) ||
-        d.vehicles?.some((v) => v.plateNumber.toLowerCase().includes(q))
-      );
+      const tokens = q.split(/\s+/).filter(Boolean);
+      const hay = [
+        d.userId,
+        d.publicId,
+        d.kycStatus,
+        d.phone,
+        d.operatingCity,
+        d.firstName,
+        d.lastName,
+        ...(d.vehicles?.map((v) => v.plateNumber) ?? []),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return tokens.every((token) => hay.includes(token));
     });
   }, [drivers, search, roleFilter, periodBounds]);
 
@@ -315,14 +331,16 @@ export default function ChauffeursPage() {
     if (roleFilter === "both") parts.push("courses + livraisons");
     else if (roleFilter === "ride_only") parts.push("courses uniquement");
     else if (roleFilter === "delivery_only") parts.push("livraisons uniquement");
-    if (periodMode === "preset") {
+    if (search.trim().length >= 2) {
+      parts.push("toutes périodes");
+      parts.push(`recherche « ${search.trim()} »`);
+    } else if (periodMode === "preset") {
       parts.push(period === 1 ? "aujourd'hui" : `${period}j`);
     } else if (periodMode === "custom" && appliedFrom && appliedTo) {
       parts.push(`${appliedFrom} → ${appliedTo}`);
     } else {
       parts.push("toutes périodes");
     }
-    if (search.trim()) parts.push(`recherche « ${search.trim()} »`);
     if (drivers.length > 0 && filtered.length !== drivers.length) {
       parts.push(`sur ${drivers.length} chargés`);
     }
@@ -581,6 +599,7 @@ export default function ChauffeursPage() {
       <p className="text-sm text-gray-600 mb-4">
         <strong>Chauffeurs</strong> = dossier véhicule et KYC. <strong>Utilisateurs</strong> = comptes de connexion.
         Un chauffeur réel (y compris Google sans +243) apparaît ici <em>et</em> dans Utilisateurs avec le rôle Chauffeur.
+        La liste suit la période choisie ; une recherche par nom, téléphone ou plaque ignore la période et parcourt tous les dossiers.
         Seuls les vrais orphelins (sans compte) et Test Lab sont masqués.
       </p>
       <p className="text-sm text-gray-600 mb-4 rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2">

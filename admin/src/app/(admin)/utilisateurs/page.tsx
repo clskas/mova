@@ -172,14 +172,16 @@ export default function UtilisateursPage() {
     } else if (role === "CITY_ADMIN" && user?.managedCity) {
       parts.push(user.managedCity);
     }
-    if (periodMode === "preset") {
+    if (searchQuery.trim()) {
+      parts.push("toutes périodes");
+      parts.push(`recherche « ${searchQuery.trim()} »`);
+    } else if (periodMode === "preset") {
       parts.push(period === 1 ? "aujourd'hui" : `${period}j`);
     } else if (periodMode === "custom" && appliedFrom && appliedTo) {
       parts.push(`${appliedFrom} → ${appliedTo}`);
     } else {
       parts.push("toutes périodes");
     }
-    if (searchQuery.trim()) parts.push(`recherche « ${searchQuery.trim()} »`);
     return parts.join(" · ");
   }, [
     roleFilter,
@@ -207,8 +209,8 @@ export default function UtilisateursPage() {
           canFilterCities && cityFilter.length > 0 ? cityFilter : undefined,
           {
             role: roleFilter || undefined,
-            from: periodBounds.from,
-            to: periodBounds.to,
+            from: searchQuery.trim() ? undefined : periodBounds.from,
+            to: searchQuery.trim() ? undefined : periodBounds.to,
           },
         ),
         fetchDrivers(true).catch(() => []),
@@ -537,6 +539,7 @@ export default function UtilisateursPage() {
         ligne dans Chauffeurs. Les partenaires restaurant / location apparaissent ici même sans +243 (connexion Google).
         Les robots Google Play / Test Lab restent masqués par défaut (case ci-dessous) —
         ce sont des faux comptes créés lors des tests automatiques Google, pas des clients SENGA.
+        Une recherche par nom, téléphone ou e-mail ignore la période et retrouve le compte quelle que soit sa date de création.
         {role === "CITY_ADMIN" && user?.managedCity ? (
           <> Liste limitée à <strong>{user.managedCity}</strong> (passagers actifs dans cette ville inclus).</>
         ) : null}

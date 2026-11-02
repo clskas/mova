@@ -236,12 +236,14 @@ export class AdminController {
     @Query('isAvailable') isAvailable?: string,
     @Query('includeHidden') includeHidden?: string,
     @Query('city') city?: string,
+    @Query('q') q?: string,
   ) {
     const cities = resolveCityFilterList(req.user, city);
     return this.adminService.listDrivers(Number(skip ?? 0), Number(take ?? 50), {
       kycStatus,
       isAvailable,
       includeHidden: includeHidden === 'true' || includeHidden === '1',
+      q,
     }, cities[0] ?? null);
   }
 

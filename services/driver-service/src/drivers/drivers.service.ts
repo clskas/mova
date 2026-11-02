@@ -1470,7 +1470,13 @@ export class DriversService {
   async listDriversAdmin(
     skip = 0,
     take = 50,
-    filters?: { kycStatus?: KycStatus; isAvailable?: boolean; includeHidden?: boolean; operatingCity?: string },
+    filters?: {
+      kycStatus?: KycStatus;
+      isAvailable?: boolean;
+      includeHidden?: boolean;
+      operatingCity?: string;
+      q?: string;
+    },
   ) {
     const where = {
       ...(filters?.kycStatus ? { kycStatus: filters.kycStatus } : {}),
@@ -1537,7 +1543,35 @@ export class DriversService {
         _hidden: visibility.hidden,
       };
     });
-    const visible = filters?.includeHidden ? mapped : mapped.filter((d) => !d._hidden);
+    let visible = filters?.includeHidden ? mapped : mapped.filter((d) => !d._hidden);
+    const tokens = (filters?.q ?? '')
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (tokens.length > 0) {
+      visible = visible.filter((d) => {
+        const plates = (d.vehicles ?? [])
+          .map((v) => v.plateNumber)
+          .filter(Boolean)
+          .join(' ');
+        const hay = [
+          d.userId,
+          d.publicId,
+          d.firstName,
+          d.lastName,
+          d.phone,
+          d.email,
+          d.operatingCity,
+          d.kycStatus,
+          plates,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return tokens.every((token) => hay.includes(token));
+      });
+    }
     const total = visible.length;
     const data = visible.slice(skip, skip + take).map(({ _hidden, ...row }) => row);
     return { data, total, skip, take };

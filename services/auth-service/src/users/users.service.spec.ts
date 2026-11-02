@@ -134,6 +134,40 @@ describe('UsersService owner lock', () => {
     expect(result.data[0].id).toBe('resto-1');
   });
 
+  it('matches a full name across first and last name and ignores the period', async () => {
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.user.findMany.mockImplementation(async (args: { where?: { phone?: { startsWith?: string } } }) => {
+      if (args?.where?.phone?.startsWith === '+2439000000') return [];
+      return [{ id: 'g-1', firstName: 'Georges', lastName: 'Katahindwa', role: UserRole.DRIVER }];
+    });
+    prisma.user.count.mockResolvedValue(1);
+    const result = await service.listUsers(0, 50, 'Georges Katahindwa', false, {
+      from: '2026-10-01',
+      to: '2026-11-02',
+    });
+    expect(result.data[0].id).toBe('g-1');
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            {
+              OR: expect.arrayContaining([
+                { firstName: { contains: 'Georges', mode: 'insensitive' } },
+                { lastName: { contains: 'Georges', mode: 'insensitive' } },
+              ]),
+            },
+            {
+              OR: expect.arrayContaining([
+                { firstName: { contains: 'Katahindwa', mode: 'insensitive' } },
+                { lastName: { contains: 'Katahindwa', mode: 'insensitive' } },
+              ]),
+            },
+          ],
+        },
+      }),
+    );
+  });
+
   it('lists Play Test Lab rows when includePlayPrelaunch is true', async () => {
     prisma.user.findMany.mockImplementation(async (args: { where?: { phone?: { startsWith?: string } } }) => {
       if (args?.where?.phone?.startsWith === '+2439000000') return [];

@@ -13,6 +13,34 @@ import { filterRowsByManagedCity, filterRowsByCityName, assertCityMatch, forceCi
 
 type MovaService = 'auth' | 'ride' | 'driver' | 'payment' | 'notification';
 
+/** Name, phone or e-mail — not a role word like "chauffeur" or "restaurant". */
+function isPersonLookup(search?: string): boolean {
+  const q = (search ?? '').trim().toLowerCase();
+  if (!q || q === 'partenaire location') return false;
+  if (q.includes(' ')) return true;
+  const roleWords = new Set([
+    'chauffeur',
+    'chauffeurs',
+    'driver',
+    'passager',
+    'passenger',
+    'restaurant',
+    'resto',
+    'location',
+    'loueur',
+    'partenaire',
+    'rental',
+    'admin',
+    'support',
+    'finance',
+    'content',
+    'super_admin',
+    'superadmin',
+    'city_admin',
+  ]);
+  return !roleWords.has(q);
+}
+
 const STAFF_ROLES = new Set<string>([
   UserRole.SUPER_ADMIN,
   UserRole.ADMIN,
@@ -359,8 +387,9 @@ export class AdminService {
     if (search) params.set('search', search);
     if (includePlayPrelaunch) params.set('includePlayPrelaunch', 'true');
     if (filters?.role?.trim()) params.set('role', filters.role.trim());
-    if (filters?.from?.trim()) params.set('from', filters.from.trim());
-    if (filters?.to?.trim()) params.set('to', filters.to.trim());
+    // A person search looks up the account on every date; a role word keeps the period.
+    if (!isPersonLookup(search) && filters?.from?.trim()) params.set('from', filters.from.trim());
+    if (!isPersonLookup(search) && filters?.to?.trim()) params.set('to', filters.to.trim());
     const result = await this.fetchJson<{
       data?: Array<{ id: string; role?: string; status?: string; commerceType?: string; managedCity?: string | null; [key: string]: unknown }>;
       total?: number;
@@ -604,10 +633,12 @@ export class AdminService {
       ? Date.parse(`${filters.to.trim()}T23:59:59.999+01:00`)
       : NaN;
     const q = (search ?? '').trim().toLowerCase();
+    const tokens = q.split(/\s+/).filter(Boolean);
     let filtered = loaded.filter((u) => {
       if (!includePlayPrelaunch && u.playPrelaunch) return false;
       if (roleFilter && String(u.role ?? '').toUpperCase() !== roleFilter) return false;
-      if (Number.isFinite(fromAt) || Number.isFinite(toAt)) {
+      // A person search looks across every registration date. A role word keeps the period.
+      if (!isPersonLookup(search) && (Number.isFinite(fromAt) || Number.isFinite(toAt))) {
         const created = u.createdAt ? new Date(u.createdAt).getTime() : NaN;
         if (!Number.isFinite(created)) return false;
         if (Number.isFinite(fromAt) && created < fromAt) return false;
@@ -626,7 +657,7 @@ export class AdminService {
       ]
         .map((x) => String(x ?? '').toLowerCase())
         .join(' ');
-      return hay.includes(q);
+      return tokens.every((token) => hay.includes(token));
     });
 
     const restaurantUsers = filtered.filter((u) => u.role === 'RESTAURANT');
@@ -938,13 +969,14 @@ export class AdminService {
   async listDrivers(
     skip = 0,
     take = 50,
-    filters?: { kycStatus?: string; isAvailable?: string; includeHidden?: boolean },
+    filters?: { kycStatus?: string; isAvailable?: string; includeHidden?: boolean; q?: string },
     managedCity?: string | null,
   ) {
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (filters?.kycStatus) params.set('kycStatus', filters.kycStatus);
     if (filters?.isAvailable) params.set('isAvailable', filters.isAvailable);
     if (filters?.includeHidden) params.set('includeHidden', 'true');
+    if (filters?.q?.trim()) params.set('q', filters.q.trim());
     if (managedCity?.trim()) params.set('city', managedCity.trim());
     const [result, onDuty] = await Promise.all([
       this.fetchJson<{ data?: Array<Record<string, unknown>>; total?: number; skip?: number; take?: number }>(

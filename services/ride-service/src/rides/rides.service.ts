@@ -888,6 +888,8 @@ export class RidesService {
             isPaid: false,
             paymentStatus: null as string | null,
             paymentMethod: null as string | null,
+            cashDisputed: false,
+            passengerClaimedPaid: false,
           }));
           return [p.id, pay] as const;
         }),

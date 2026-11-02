@@ -161,6 +161,9 @@ export default function ReglesPlateformePage() {
     requiredRentalCompanyDocuments: [],
     requiredRentalIndividualDocuments: [],
   });
+  const [cashAutoEnabled, setCashAutoEnabled] = useState(true);
+  const [cashAutoHours, setCashAutoHours] = useState("24");
+  const [cashAutoMaxCdf, setCashAutoMaxCdf] = useState("150000");
 
   function applyConfig(c: PlatformConfigData) {
     setConfig(c);
@@ -201,6 +204,9 @@ export default function ReglesPlateformePage() {
       requiredRentalCompanyDocuments: c.driverOps?.requiredRentalCompanyDocuments ?? [],
       requiredRentalIndividualDocuments: c.driverOps?.requiredRentalIndividualDocuments ?? [],
     });
+    setCashAutoEnabled(c.cashPayment?.autoConfirmEnabled !== false);
+    setCashAutoHours(String(c.cashPayment?.autoConfirmHours ?? 24));
+    setCashAutoMaxCdf(String(c.cashPayment?.autoConfirmMaxCdf ?? 150000));
   }
 
   const load = useCallback(async () => {
@@ -439,6 +445,55 @@ export default function ReglesPlateformePage() {
 
           {!cityAdminDocsOnly && (
           <>
+          <section>
+            <h2 className="font-semibold text-[#1A1A2E] mb-3">Paiements espèces (timeout)</h2>
+            <Card className="p-4 space-y-4 max-w-xl">
+              <p className="text-sm text-gray-600">
+                Sans confirmation chauffeur, un paiement espèces PENDING peut être clôturé automatiquement
+                (considéré payé). Un litige « Cash non reçu » annule toujours l’auto-clôture et rebloque le passager.
+              </p>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={cashAutoEnabled}
+                  disabled={readOnly}
+                  onChange={(e) => setCashAutoEnabled(e.target.checked)}
+                />
+                <span>Activer l’auto-clôture après délai</span>
+              </label>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <NumField
+                  label="Délai (heures, 1–168)"
+                  value={cashAutoHours}
+                  onChange={setCashAutoHours}
+                  disabled={readOnly || !cashAutoEnabled}
+                />
+                <NumField
+                  label="Plafond montant (FC)"
+                  value={cashAutoMaxCdf}
+                  onChange={setCashAutoMaxCdf}
+                  disabled={readOnly || !cashAutoEnabled}
+                />
+              </div>
+              {!readOnly && (
+                <BtnPrimary
+                  disabled={savingSection === "cashPayment"}
+                  onClick={() =>
+                    savePlatform("cashPayment", {
+                      cashPayment: {
+                        autoConfirmEnabled: cashAutoEnabled,
+                        autoConfirmHours: Number(cashAutoHours) || 24,
+                        autoConfirmMaxCdf: Number(cashAutoMaxCdf) || 0,
+                      },
+                    })
+                  }
+                >
+                  {savingSection === "cashPayment" ? "…" : "Enregistrer timeout espèces"}
+                </BtnPrimary>
+              )}
+            </Card>
+          </section>
+
           <section>
             <h2 className="font-semibold text-[#1A1A2E] mb-3">Courses planifiées</h2>
             <Card className="p-4 grid sm:grid-cols-2 gap-4 max-w-xl">

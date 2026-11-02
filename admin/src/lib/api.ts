@@ -585,6 +585,11 @@ export type PlatformConfigData = {
     requiredRentalCompanyDocuments?: string[];
     requiredRentalIndividualDocuments?: string[];
   };
+  cashPayment?: {
+    autoConfirmEnabled: boolean;
+    autoConfirmHours: number;
+    autoConfirmMaxCdf: number;
+  };
 };
 
 export type PlatformConfigResponse = {

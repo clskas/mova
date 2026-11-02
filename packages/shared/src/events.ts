@@ -6,6 +6,8 @@ export const MOVA_EVENTS = {
   PAYMENT_COMPLETED: 'payment.completed',
   RIDE_CASH_PENDING: 'ride.cash.pending',
   SERVICE_CASH_PENDING: 'service.cash.pending',
+  /** Chauffeur a signalé espèces non reçues — notifier le passager. */
+  CASH_DISPUTED: 'payment.cash.disputed',
   DRIVER_RATING_UPDATED: 'driver.rating.updated',
   DELIVERY_CREATED: 'delivery.created',
   DELIVERY_STATUS_UPDATED: 'delivery.status.updated',
@@ -69,6 +71,15 @@ export interface ServiceCashPendingPayload {
   amountCdf: number;
   /** Course parente pour RIDE_SHARE (room socket ride:). */
   rideId?: string;
+}
+
+export interface CashDisputedPayload {
+  userId: string;
+  amountCdf: number;
+  reason?: string;
+  rideId?: string;
+  referenceType?: string;
+  referenceId?: string;
 }
 
 export interface IncidentCreatedPayload {

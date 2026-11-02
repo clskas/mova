@@ -58,10 +58,12 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   String get _deliveryId => _delivery['id']?.toString() ?? '';
   String get _status => _delivery['status']?.toString() ?? 'PENDING';
   bool get _isPaid => _delivery['isPaid'] == true;
+  bool get _cashDisputed => _delivery['cashDisputed'] == true;
   bool get _cashPending {
     final done = _isErrand ? _status == 'COMPLETED' : _status == 'DELIVERED';
     return done &&
         !_isPaid &&
+        !_cashDisputed &&
         _delivery['paymentStatus']?.toString().toUpperCase() == 'PENDING';
   }
 
@@ -463,7 +465,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
             _delivery['amountCdf'] ??
             _delivery['totalCdf']) as num?;
     final net = (_delivery['driverNetCdf'] ?? _delivery['driverEarningsCdf'] ?? _delivery['courierFeeCdf']) as num?;
-    final ok = await DriverCashReceivedDialog.show(
+    final dialogResult = await DriverCashReceivedDialog.show(
       context,
       title: auto ? 'Le client paie en espèces' : 'Cash reçu ?',
       passengerTotalCdf: total?.round(),
@@ -491,7 +493,17 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       },
     );
     _cashDialogOpen = false;
-    if (!ok || !mounted) return;
+    if (!mounted) return;
+    if (dialogResult == CashDialogResult.disputed) {
+      _skipNextCashAutoOpen = true;
+      setState(() => _delivery = {..._delivery, 'cashDisputed': true});
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Litige enregistré — le client a été notifié')),
+      );
+      await _refresh();
+      return;
+    }
+    if (dialogResult != CashDialogResult.confirmed) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Paiement espèces confirmé')),
     );

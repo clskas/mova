@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/config/market_config.dart';
 import '../../../core/theme/mova_colors.dart';
 
+enum CashDialogResult { confirmed, disputed, dismissed }
+
 /// Confirmation « Cash reçu » (sans PIN) — avec option « Cash non reçu » (litige).
 class DriverCashReceivedDialog extends StatefulWidget {
   const DriverCashReceivedDialog({
@@ -10,6 +12,7 @@ class DriverCashReceivedDialog extends StatefulWidget {
     this.title = 'Cash reçu ?',
     this.passengerTotalCdf,
     this.driverNetCdf,
+    this.autoConfirmHours = 24,
     this.confirm,
     this.dispute,
   });
@@ -17,30 +20,33 @@ class DriverCashReceivedDialog extends StatefulWidget {
   final String title;
   final int? passengerTotalCdf;
   final int? driverNetCdf;
+  final int autoConfirmHours;
   final Future<({bool ok, String? message})> Function()? confirm;
   /// Litige : espèces non reçues (bloque auto-confirm + rebloque le passager).
   final Future<({bool ok, String? message})> Function()? dispute;
 
-  static Future<bool> show(
+  static Future<CashDialogResult> show(
     BuildContext context, {
     String title = 'Cash reçu ?',
     int? passengerTotalCdf,
     int? driverNetCdf,
+    int autoConfirmHours = 24,
     Future<({bool ok, String? message})> Function()? confirm,
     Future<({bool ok, String? message})> Function()? dispute,
   }) async {
-    final result = await showDialog<bool>(
+    final result = await showDialog<CashDialogResult>(
       context: context,
       barrierDismissible: false,
       builder: (_) => DriverCashReceivedDialog(
         title: title,
         passengerTotalCdf: passengerTotalCdf,
         driverNetCdf: driverNetCdf,
+        autoConfirmHours: autoConfirmHours,
         confirm: confirm,
         dispute: dispute,
       ),
     );
-    return result == true;
+    return result ?? CashDialogResult.dismissed;
   }
 
   @override
@@ -59,13 +65,13 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
     });
     final confirm = widget.confirm;
     if (confirm == null) {
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) Navigator.of(context).pop(CashDialogResult.confirmed);
       return;
     }
     final result = await confirm();
     if (!mounted) return;
     if (result.ok) {
-      Navigator.pop(context, true);
+      Navigator.of(context).pop(CashDialogResult.confirmed);
       return;
     }
     setState(() {
@@ -83,7 +89,7 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
       builder: (ctx) => AlertDialog(
         title: const Text('Cash non reçu ?'),
         content: const Text(
-          'Le passager sera bloqué pour de nouvelles courses jusqu’à résolution. '
+          'Le passager sera notifié et bloqué pour de nouvelles courses jusqu’à résolution. '
           'N’utilisez ceci que si vous n’avez vraiment pas reçu les espèces.',
         ),
         actions: [
@@ -103,10 +109,8 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
     final result = await dispute();
     if (!mounted) return;
     if (result.ok) {
-      final messenger = ScaffoldMessenger.maybeOf(context);
-      final msg = result.message ?? 'Litige enregistré';
-      Navigator.pop(context, false);
-      messenger?.showSnackBar(SnackBar(content: Text(msg)));
+      // Ferme explicitement le dialogue principal (pas seulement la confirmation).
+      Navigator.of(context).pop(CashDialogResult.disputed);
       return;
     }
     setState(() {
@@ -117,6 +121,7 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final hours = widget.autoConfirmHours.clamp(1, 168);
     return AlertDialog(
       title: Text(widget.title),
       content: Column(
@@ -148,10 +153,10 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
             ],
             const SizedBox(height: 12),
           ],
-          const Text(
+          Text(
             'Confirmez uniquement après avoir reçu les espèces du client. '
-            'Sans action de votre part, le paiement pourra être clôturé automatiquement après 24 h.',
-            style: TextStyle(fontSize: 14),
+            'Sans action de votre part, le paiement pourra être clôturé automatiquement après $hours h.',
+            style: const TextStyle(fontSize: 14),
           ),
           if (_error != null) ...[
             const SizedBox(height: 12),
@@ -169,7 +174,7 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
             ),
           ),
         TextButton(
-          onPressed: _submitting ? null : () => Navigator.pop(context, false),
+          onPressed: _submitting ? null : () => Navigator.of(context).pop(CashDialogResult.dismissed),
           child: const Text('Plus tard'),
         ),
         FilledButton(

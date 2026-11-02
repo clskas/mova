@@ -114,7 +114,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
     final api = ref.read(apiClientProvider);
     final total = (_ride?['finalFareCdf'] ?? _ride?['estimatedFareCdf'] ?? _ride?['amountCdf']) as num?;
     final net = (_ride?['driverNetCdf'] ?? _ride?['driverEarningsCdf']) as num?;
-    final ok = await DriverCashReceivedDialog.show(
+    final dialogResult = await DriverCashReceivedDialog.show(
       context,
       passengerTotalCdf: total?.round(),
       driverNetCdf: net?.round(),
@@ -140,7 +140,14 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
         };
       },
     );
-    if (!ok || !mounted) return;
+    if (!mounted) return;
+    if (dialogResult == CashDialogResult.disputed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Litige enregistré — le client a été notifié')),
+      );
+      return;
+    }
+    if (dialogResult != CashDialogResult.confirmed) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Paiement espèces confirmé')),
     );

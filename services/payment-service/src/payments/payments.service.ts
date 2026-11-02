@@ -5,6 +5,7 @@ import {
   MOVA_EVENTS,
   MovaErrorCode,
   MovaHttpException,
+  CashDisputedPayload,
   PaymentCompletedPayload,
   RideCashPendingPayload,
   INTERNAL_API_KEY,
@@ -41,10 +42,9 @@ const MOBILE_MONEY_METHODS = new Set<PaymentMethod>([
 const PAY_LOCK_PREFIX = 'pay:intent:';
 const PAY_LOCK_TTL_SEC = 60;
 
-/** Délai avant auto-clôture espèces (considéré payé) si pas de litige. */
-const CASH_AUTO_CONFIRM_HOURS = 24;
-/** Plafond CDF : au-delà, pas d’auto-confirm (support / confirmation manuelle). */
-const CASH_AUTO_CONFIRM_MAX_CDF = 150_000;
+/** Défauts si platform-config indisponible. */
+const CASH_AUTO_CONFIRM_HOURS_DEFAULT = 24;
+const CASH_AUTO_CONFIRM_MAX_CDF_DEFAULT = 150_000;
 
 /**
  * Only forward hosted checkout URLs (CinetPay). SerdiPay/AfriMomo already push
@@ -225,6 +225,63 @@ export class PaymentsService {
         `Redis publish SERVICE_CASH_PENDING failed for ${payload.referenceType}/${payload.referenceId}`,
         e,
       );
+    }
+  }
+
+  private async publishCashDisputed(payload: CashDisputedPayload) {
+    try {
+      this.logger.warn(
+        `Publishing CASH_DISPUTED for user=${payload.userId} amount=${payload.amountCdf}`,
+      );
+      await this.redis.publish(MOVA_EVENTS.CASH_DISPUTED, payload);
+    } catch (e) {
+      this.logger.warn(`Redis publish CASH_DISPUTED failed`, e);
+    }
+  }
+
+  /** Lit les paramètres admin (Règles plateforme → Paiements espèces). */
+  private async resolveCashAutoConfirmPolicy(): Promise<{
+    enabled: boolean;
+    hours: number;
+    maxCdf: number;
+  }> {
+    try {
+      const res = await fetch(serviceUrl('ride', '/internal/platform-config'), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      });
+      if (!res.ok) {
+        return {
+          enabled: true,
+          hours: CASH_AUTO_CONFIRM_HOURS_DEFAULT,
+          maxCdf: CASH_AUTO_CONFIRM_MAX_CDF_DEFAULT,
+        };
+      }
+      const data = (await res.json()) as {
+        config?: {
+          cashPayment?: {
+            autoConfirmEnabled?: boolean;
+            autoConfirmHours?: number;
+            autoConfirmMaxCdf?: number;
+          };
+        };
+      };
+      const c = data.config?.cashPayment;
+      const hours = Math.max(1, Math.min(168, Math.floor(Number(c?.autoConfirmHours) || CASH_AUTO_CONFIRM_HOURS_DEFAULT)));
+      const maxCdf = Math.max(
+        0,
+        Math.floor(Number(c?.autoConfirmMaxCdf) || CASH_AUTO_CONFIRM_MAX_CDF_DEFAULT),
+      );
+      return {
+        enabled: c?.autoConfirmEnabled !== false,
+        hours,
+        maxCdf,
+      };
+    } catch {
+      return {
+        enabled: true,
+        hours: CASH_AUTO_CONFIRM_HOURS_DEFAULT,
+        maxCdf: CASH_AUTO_CONFIRM_MAX_CDF_DEFAULT,
+      };
     }
   }
 
@@ -1101,11 +1158,19 @@ export class PaymentsService {
       },
     });
     this.logger.warn(`Cash dispute ride=${rideId} by driver=${driverUserId}`);
+    await this.publishCashDisputed({
+      userId: existing.userId,
+      amountCdf: existing.amountCdf,
+      reason: reason ?? 'CASH_NOT_RECEIVED',
+      rideId,
+      referenceType: 'RIDE',
+      referenceId: rideId,
+    });
     return {
       success: true,
       payment,
       cashDisputed: true,
-      message: 'Litige enregistré — le passager est bloqué jusqu’à résolution.',
+      message: 'Litige enregistré — le passager est notifié et bloqué jusqu’à résolution.',
     };
   }
 
@@ -1183,11 +1248,19 @@ export class PaymentsService {
       },
     });
     this.logger.warn(`Cash dispute ${type}/${referenceId} by driver=${driverUserId}`);
+    await this.publishCashDisputed({
+      userId: existing.userId,
+      amountCdf: existing.amountCdf,
+      reason: reason ?? 'CASH_NOT_RECEIVED',
+      rideId: type === 'RIDE_SHARE' ? (info.parentRideId ?? undefined) : undefined,
+      referenceType: type,
+      referenceId,
+    });
     return {
       success: true,
       payment,
       cashDisputed: true,
-      message: 'Litige enregistré — le client est bloqué jusqu’à résolution.',
+      message: 'Litige enregistré — le client est notifié et bloqué jusqu’à résolution.',
     };
   }
 
@@ -1273,7 +1346,12 @@ export class PaymentsService {
    * Plafond montant ; litige chauffeur → skip.
    */
   async autoConfirmStaleCashPayments(): Promise<number> {
-    const cutoff = new Date(Date.now() - CASH_AUTO_CONFIRM_HOURS * 60 * 60 * 1000);
+    const policy = await this.resolveCashAutoConfirmPolicy();
+    if (!policy.enabled) {
+      this.logger.debug('Cash auto-confirm désactivé (platform-config)');
+      return 0;
+    }
+    const cutoff = new Date(Date.now() - policy.hours * 60 * 60 * 1000);
     let confirmed = 0;
 
     const ridePending = await this.prisma.payment.findMany({
@@ -1282,7 +1360,7 @@ export class PaymentsService {
         status: PaymentStatus.PENDING,
         cashDisputedAt: null,
         createdAt: { lte: cutoff },
-        amountCdf: { lte: CASH_AUTO_CONFIRM_MAX_CDF },
+        amountCdf: { lte: policy.maxCdf },
       },
       take: 40,
       orderBy: { createdAt: 'asc' },
@@ -1318,7 +1396,7 @@ export class PaymentsService {
         status: PaymentStatus.PENDING,
         cashDisputedAt: null,
         createdAt: { lte: cutoff },
-        amountCdf: { lte: CASH_AUTO_CONFIRM_MAX_CDF },
+        amountCdf: { lte: policy.maxCdf },
       },
       take: 40,
       orderBy: { createdAt: 'asc' },

@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
   MOVA_EVENTS,
+  CashDisputedPayload,
   ChatMessagePayload,
   DeliveryCreatedPayload,
   DeliveryStatusUpdatedPayload,
@@ -40,6 +41,7 @@ export class NotificationsService implements OnModuleInit {
     const channels = [
       MOVA_EVENTS.RIDE_CREATED,
       MOVA_EVENTS.PAYMENT_COMPLETED,
+      MOVA_EVENTS.CASH_DISPUTED,
       MOVA_EVENTS.DELIVERY_CREATED,
       MOVA_EVENTS.DELIVERY_STATUS_UPDATED,
       MOVA_EVENTS.SERVICE_ASSIGNED,
@@ -65,6 +67,7 @@ export class NotificationsService implements OnModuleInit {
         const data = JSON.parse(message);
         if (channel === MOVA_EVENTS.RIDE_CREATED) await this.onRideCreated(data as RideCreatedPayload);
         if (channel === MOVA_EVENTS.PAYMENT_COMPLETED) await this.onPaymentCompleted(data as PaymentCompletedPayload);
+        if (channel === MOVA_EVENTS.CASH_DISPUTED) await this.onCashDisputed(data as CashDisputedPayload);
         if (channel === MOVA_EVENTS.DELIVERY_CREATED) await this.onDeliveryCreated(data as DeliveryCreatedPayload);
         if (channel === MOVA_EVENTS.DELIVERY_STATUS_UPDATED) await this.onDeliveryStatusUpdated(data as DeliveryStatusUpdatedPayload);
         if (channel === MOVA_EVENTS.SERVICE_ASSIGNED) await this.onServiceAssigned(data as ServiceAssignedPayload);
@@ -154,7 +157,7 @@ export class NotificationsService implements OnModuleInit {
       ? `Le chauffeur a confirmé votre paiement de ${payload.amountCdf} FC. Vous pouvez noter la course.`
       : `Paiement de ${payload.amountCdf} FC effectué. Merci d'utiliser SENGA.`;
     await this.create(payload.userId, title, body, 'PAYMENT_COMPLETED', payload);
-    await this.pushToDrivers([payload.userId], title, body, {
+    await this.pushToUsersAnyFlavor([payload.userId], title, body, {
       type: 'PAYMENT_COMPLETED',
       method,
       rideId: payload.rideId ?? '',
@@ -162,6 +165,26 @@ export class NotificationsService implements OnModuleInit {
       referenceId: payload.referenceId ?? '',
     });
     this.logger.log(`payment.completed notification for ${payload.rideId ?? payload.referenceId} (${method || 'n/a'})`);
+  }
+
+  async onCashDisputed(payload: CashDisputedPayload) {
+    const amount = payload.amountCdf ?? 0;
+    const title = 'Espèces non reçues — action requise';
+    const body =
+      `Le chauffeur/livreur signale ne pas avoir reçu ${amount} FC en espèces. ` +
+      `Ouvrez SENGA pour déclarer « J’ai payé », régler autrement, ou contacter le support. ` +
+      `De nouvelles courses sont bloquées tant que le litige n’est pas résolu.`;
+    await this.create(payload.userId, title, body, 'CASH_DISPUTED', payload);
+    await this.pushToUsersAnyFlavor([payload.userId], title, body, {
+      type: 'CASH_DISPUTED',
+      rideId: payload.rideId ?? '',
+      referenceType: payload.referenceType ?? '',
+      referenceId: payload.referenceId ?? '',
+      amountCdf: String(amount),
+    });
+    this.logger.log(
+      `cash.disputed notification for user=${payload.userId} ${payload.referenceType ?? 'RIDE'}/${payload.referenceId ?? payload.rideId}`,
+    );
   }
 
   private chatSenderLabel(role: string): string {

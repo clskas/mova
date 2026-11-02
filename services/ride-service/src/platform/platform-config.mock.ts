@@ -35,6 +35,11 @@ export function mockPlatformConfig(
       requiredRentalCompanyDocuments: [],
       requiredRentalIndividualDocuments: [],
     },
+    cashPayment: {
+      autoConfirmEnabled: true,
+      autoConfirmHours: 24,
+      autoConfirmMaxCdf: 150_000,
+    },
   };
   return {
     get: () => ({ ...base, ...overrides }),

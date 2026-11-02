@@ -51,6 +51,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   double? _currentLat;
   double? _currentLng;
   bool _cashDialogOpen = false;
+  bool _skipCashAutoOpen = false;
   bool _autoNavTriggered = false;
   bool _passengerCancelled = false;
   bool _closingCancelled = false;
@@ -75,11 +76,14 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     return v;
   }
 
+  bool get _cashDisputed => _ride['cashDisputed'] == true;
+
   /// Le passager a initié un paiement espèces (statut backend PENDING) :
-  /// le chauffeur doit confirmer « Cash reçu ».
+  /// le chauffeur doit confirmer « Cash reçu » (sauf litige déjà ouvert).
   bool get _cashPending =>
       _status == 'COMPLETED' &&
       !_isPaid &&
+      !_cashDisputed &&
       _ride['paymentStatus']?.toString().toUpperCase() == 'PENDING';
 
   @override
@@ -247,7 +251,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   }
 
   void _autoOpenCashConfirm() {
-    if (!mounted || _cashDialogOpen || _isPaid || !_cashPending) return;
+    if (!mounted || _cashDialogOpen || _isPaid || _skipCashAutoOpen || !_cashPending) return;
     _confirmCash(auto: true);
   }
 
@@ -268,13 +272,13 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       // Fallback fiable si l'événement socket a été manqué : dès que le
       // paiement espèces passe en attente, ouvrir la confirmation — jamais
       // sur une course CANCELLED.
-      if (_cashPending) _autoOpenCashConfirm();
+      if (_cashPending && !_skipCashAutoOpen) _autoOpenCashConfirm();
     }
   }
 
   void _syncPaymentPolling() {
     _paymentPollTimer?.cancel();
-    if (_status == 'COMPLETED' && !_isPaid) {
+    if (_status == 'COMPLETED' && !_isPaid && !_cashDisputed) {
       _paymentPollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _refreshRide());
     }
   }
@@ -980,12 +984,14 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
 
   Future<void> _confirmCash({bool auto = false}) async {
     if (_cashDialogOpen) return;
-    if (_status != 'COMPLETED' || _isPaid) {
+    if (_status != 'COMPLETED' || _isPaid || _cashDisputed) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Cette course n’attend plus d’encaissement espèces (annulée ou déjà réglée).',
+              _cashDisputed
+                  ? 'Litige espèces déjà ouvert pour cette course.'
+                  : 'Cette course n’attend plus d’encaissement espèces (annulée ou déjà réglée).',
             ),
           ),
         );
@@ -994,7 +1000,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     }
     _cashDialogOpen = true;
     final api = ref.read(apiClientProvider);
-    final ok = await DriverCashReceivedDialog.show(
+    final result = await DriverCashReceivedDialog.show(
       context,
       title: auto ? 'Le passager paie en espèces' : 'Cash reçu ?',
       passengerTotalCdf: _passengerCashTotalCdf,
@@ -1015,32 +1021,22 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
           for (final p in pending) {
             final bookingId = (p['bookingId'] ?? p['id'])?.toString() ?? '';
             if (bookingId.isEmpty) continue;
-            final result = await api.confirmCashService('RIDE_SHARE', bookingId);
-            if (result case Failure(:final error)) {
+            final r = await api.confirmCashService('RIDE_SHARE', bookingId);
+            if (r case Failure(:final error)) {
               return (ok: false, message: error.message);
             }
           }
           return (ok: true, message: null);
         }
-        final result = await api.confirmCashRide(_rideId);
-        return switch (result) {
+        final r = await api.confirmCashRide(_rideId);
+        return switch (r) {
           Success() => (ok: true, message: null),
           Failure(:final error) => (ok: false, message: error.message),
         };
       },
       dispute: () async {
-        if (_isSharedPool) {
-          final result = await api.disputeCashRide(_rideId, reason: 'CASH_NOT_RECEIVED');
-          return switch (result) {
-            Success(:final data) => (
-                ok: true,
-                message: data['message']?.toString() ?? 'Litige enregistré',
-              ),
-            Failure(:final error) => (ok: false, message: error.message),
-          };
-        }
-        final result = await api.disputeCashRide(_rideId, reason: 'CASH_NOT_RECEIVED');
-        return switch (result) {
+        final r = await api.disputeCashRide(_rideId, reason: 'CASH_NOT_RECEIVED');
+        return switch (r) {
           Success(:final data) => (
               ok: true,
               message: data['message']?.toString() ?? 'Litige enregistré',
@@ -1050,7 +1046,17 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       },
     );
     _cashDialogOpen = false;
-    if (!ok || !mounted) return;
+    if (!mounted) return;
+    if (result == CashDialogResult.disputed) {
+      _skipCashAutoOpen = true;
+      setState(() => _ride = {..._ride, 'cashDisputed': true});
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Litige enregistré — le passager a été notifié')),
+      );
+      await _refreshRide();
+      return;
+    }
+    if (result != CashDialogResult.confirmed) return;
     await _refreshRide();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

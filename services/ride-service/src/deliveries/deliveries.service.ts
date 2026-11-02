@@ -922,6 +922,8 @@ export class DeliveriesService {
       isPaid: payment.isPaid,
       paymentStatus: payment.paymentStatus,
       paymentMethod: payment.paymentMethod ?? null,
+      cashDisputed: payment.cashDisputed === true,
+      passengerClaimedPaid: payment.passengerClaimedPaid === true,
       paymentReady: Boolean(formatted.paymentReady) && !payment.isPaid,
       escrowHeld: payment.escrowHeld ?? false,
       payoutReleased: payment.payoutReleased ?? false,

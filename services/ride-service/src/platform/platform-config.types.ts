@@ -13,6 +13,16 @@ export type DriverOpsConfig = {
   requiredRentalIndividualDocuments: string[];
 };
 
+/** Timeout / garde-fous paiements espèces (courses & livraisons). */
+export type CashPaymentConfig = {
+  /** Auto-clôturer les PENDING sans litige après ce délai. */
+  autoConfirmEnabled: boolean;
+  /** Délai en heures (1–168). */
+  autoConfirmHours: number;
+  /** Plafond CDF : au-delà, pas d’auto-confirm. */
+  autoConfirmMaxCdf: number;
+};
+
 export type PlatformConfigOverrides = {
   interCity?: Partial<typeof MARKET_RDC.interCity>;
   delivery?: Partial<typeof MARKET_RDC.delivery> & { maxFoodInterCityDistanceKm?: number };
@@ -34,6 +44,7 @@ export type PlatformConfigOverrides = {
     maxDetourKm?: number;
   };
   driverOps?: Partial<DriverOpsConfig>;
+  cashPayment?: Partial<CashPaymentConfig>;
 };
 
 export type MergedPlatformConfig = {
@@ -81,6 +92,7 @@ export type MergedPlatformConfig = {
     maxDetourKm: number;
   };
   driverOps: DriverOpsConfig;
+  cashPayment: CashPaymentConfig;
 };
 
 export const PLATFORM_CONFIG_DEFAULTS: MergedPlatformConfig = {
@@ -112,7 +124,33 @@ export const PLATFORM_CONFIG_DEFAULTS: MergedPlatformConfig = {
     requiredRentalCompanyDocuments: [],
     requiredRentalIndividualDocuments: [],
   },
+  cashPayment: {
+    autoConfirmEnabled: true,
+    autoConfirmHours: 24,
+    autoConfirmMaxCdf: 150_000,
+  },
 };
+
+export function mergeCashPayment(
+  base: CashPaymentConfig,
+  patch?: Partial<CashPaymentConfig>,
+): CashPaymentConfig {
+  if (!patch) return base;
+  return {
+    autoConfirmEnabled:
+      patch.autoConfirmEnabled !== undefined
+        ? patch.autoConfirmEnabled === true
+        : base.autoConfirmEnabled,
+    autoConfirmHours:
+      patch.autoConfirmHours !== undefined
+        ? Math.max(1, Math.min(168, Math.floor(Number(patch.autoConfirmHours) || base.autoConfirmHours)))
+        : base.autoConfirmHours,
+    autoConfirmMaxCdf:
+      patch.autoConfirmMaxCdf !== undefined
+        ? Math.max(0, Math.floor(Number(patch.autoConfirmMaxCdf) || 0))
+        : base.autoConfirmMaxCdf,
+  };
+}
 
 function sortedDocKey(list: string[]): string {
   return [...list].map((s) => s.toUpperCase()).sort().join('|');

@@ -5,6 +5,7 @@ import {
   MergedPlatformConfig,
   PLATFORM_CONFIG_DEFAULTS,
   PlatformConfigOverrides,
+  mergeCashPayment,
   mergeDriverOps,
 } from './platform-config.types';
 
@@ -27,6 +28,7 @@ function mergeConfig(overrides: PlatformConfigOverrides): MergedPlatformConfig {
     pricing: { ...d.pricing, ...o.pricing },
     carpool: { ...d.carpool, ...o.carpool },
     driverOps: mergeDriverOps(d.driverOps, o.driverOps),
+    cashPayment: mergeCashPayment(d.cashPayment, o.cashPayment),
   };
 }
 
@@ -119,6 +121,16 @@ export class PlatformConfigService implements OnModuleInit {
             patch.driverOps,
           )
         : this.overrides.driverOps,
+      cashPayment: patch.cashPayment
+        ? mergeCashPayment(
+            {
+              autoConfirmEnabled: this.overrides.cashPayment?.autoConfirmEnabled !== false,
+              autoConfirmHours: this.overrides.cashPayment?.autoConfirmHours ?? 24,
+              autoConfirmMaxCdf: this.overrides.cashPayment?.autoConfirmMaxCdf ?? 150_000,
+            },
+            patch.cashPayment,
+          )
+        : this.overrides.cashPayment,
     };
     this.validate(next);
     const row = await this.prisma.platformConfig.update({
@@ -172,6 +184,20 @@ export class PlatformConfigService implements OnModuleInit {
         MovaErrorCode.VALIDATION_ERROR,
         HttpStatus.BAD_REQUEST,
         'Détour max Pool : entre 0,5 et 15 km.',
+      );
+    }
+    if (m.cashPayment.autoConfirmHours < 1 || m.cashPayment.autoConfirmHours > 168) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Délai auto-clôture espèces : entre 1 et 168 heures.',
+      );
+    }
+    if (m.cashPayment.autoConfirmMaxCdf < 0) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Plafond auto-clôture espèces invalide.',
       );
     }
   }

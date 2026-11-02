@@ -12,6 +12,7 @@ import {
   reviewPartnerKycDocument,
   reviewPartnerKycSubject,
   apiFetch,
+  MOVA_CITIES,
   type AdminDriver,
   type KycItem,
   type PartnerKycChecklistItem,
@@ -320,7 +321,9 @@ function partnerAccountLabel(r: PartnerKycDossier) {
 
 export default function KycPage() {
   const { canWrite, role, user } = useAdmin();
+  const canFilterCity = role === "SUPER_ADMIN" || role === "ADMIN";
   const managedCity = role === "CITY_ADMIN" ? user?.managedCity?.trim() || null : null;
+  const [cityFilter, setCityFilter] = useState("");
   const [items, setItems] = useState<KycItem[]>([]);
   const [pendingDrivers, setPendingDrivers] = useState<AdminDriver[]>([]);
   const [allDrivers, setAllDrivers] = useState<AdminDriver[]>([]);
@@ -382,12 +385,15 @@ export default function KycPage() {
         fetchDrivers(includeHidden, { take: 200, kycStatus: "REJECTED" }),
         fetchPartnerKycPending(statusFilter, includeHidden).catch(() => ({ restaurants: [], rentalPartners: [] })),
       ]);
-      const cityKey = managedCity?.toLowerCase() ?? null;
+      const scopeCity = (managedCity || cityFilter).trim();
+      const cityKey = scopeCity.toLowerCase() || null;
       const inCity = (city?: string | null) =>
         !cityKey || (city?.trim().toLowerCase() ?? "") === cityKey;
-      const driversRaw = [...pendingOnly, ...rejectedOnly].filter((d) => inCity(d.operatingCity));
+      const driversFetched = [...pendingOnly, ...rejectedOnly];
+      const driverCity = new Map(driversFetched.map((d) => [d.userId, d.operatingCity]));
+      const driversRaw = driversFetched.filter((d) => inCity(d.operatingCity));
       const docsRaw = (Array.isArray(data) ? data : []).filter((d) =>
-        inCity((d as KycItem & { operatingCity?: string }).operatingCity),
+        inCity(d.operatingCity || driverCity.get(d.userId ?? "") || null),
       );
       setItems(docsRaw);
       setAllDrivers(driversRaw);
@@ -406,7 +412,7 @@ export default function KycPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, includeHidden, managedCity]);
+  }, [statusFilter, includeHidden, managedCity, cityFilter]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -748,6 +754,19 @@ export default function KycPage() {
               <option key={o.value || "all-docs"} value={o.value}>{o.label}</option>
             ))}
           </select>
+          {canFilterCity && (
+            <select
+              value={cityFilter}
+              onChange={(e) => setCityFilter(e.target.value)}
+              className="rounded-xl border-0 bg-white p-3 shadow-sm text-sm min-w-[11rem]"
+              aria-label="Ville"
+            >
+              <option value="">Toutes les villes</option>
+              {MOVA_CITIES.map((city) => (
+                <option key={city} value={city}>{city}</option>
+              ))}
+            </select>
+          )}
           {role === "SUPER_ADMIN" && (
             <label className="flex items-center gap-2 text-sm text-gray-600 px-1">
               <input
@@ -775,7 +794,7 @@ export default function KycPage() {
       ) : empty ? (
         <EmptyState
           message={
-            q || kindFilter || docTypeFilter || periodBounds.from
+            q || kindFilter || docTypeFilter || cityFilter || periodBounds.from
               ? "Aucun dossier ne correspond aux filtres"
               : "Aucun KYC en attente"
           }

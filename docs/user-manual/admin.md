@@ -39,7 +39,7 @@ Source technique : `admin/src/lib/rbac.ts`.
 | **Métriques** | Utilisateurs, chauffeurs, courses, revenus, litiges |
 | **Utilisateurs** | Comptes de connexion (rôle Passager, Chauffeur, Restaurant, Location, staff). Les robots Test Lab sont masqués. |
 | **Chauffeurs** | Profils véhicule / KYC uniquement. Un chauffeur réel a aussi le rôle Chauffeur dans Utilisateurs. Les profils sans compte (fantômes) sont masqués. |
-| **KYC** | Approbation dossiers chauffeur / resto / location. Après validation partenaire : PIN affiché + renvoyer SMS/e-mail. |
+| **KYC** | Approbation dossiers chauffeur / resto / location. Le **SUPER_ADMIN** et l'**ADMIN** filtrent par ville. Après validation partenaire : PIN affiché + renvoyer SMS/e-mail. |
 | **Restaurants** | Partenaires SENGA Business (type : restaurant, supermarché, pharmacie, boutique) |
 | **Courses** | Trajets en cours ; **trace GPS** dans le détail |
 | **Livraisons** | Colis, repas, courses & commissions (ERRAND) ; trace GPS ; assignation chauffeur |

@@ -12,6 +12,10 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   smoke:
     if: >
@@ -68,3 +72,12 @@ jobs:
             sleep 15
           done
           GATEWAY_URL="$GATEWAY_URL" ./scripts/smoke-test.sh
+
+      # Mobile Release would be a 4th level of workflow_run chaining, which GitHub
+      # silently ignores. Dispatch it explicitly: AAB to the Play internal track only
+      # (no production promotion, no banner change). Production releases use a v* tag.
+      - name: Trigger Mobile Release (internal track)
+        if: ${{ success() && github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run mobile-release.yml --repo "$GITHUB_REPOSITORY" --ref main

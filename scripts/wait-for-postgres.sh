@@ -22,11 +22,17 @@ stable=0
 
 echo "=== wait-for-postgres: up to ${MAX_WAIT}s (${STABLE_NEED} consecutive OK) ==="
 
+# libpq rejects Prisma-only URL parameters (?schema=, connection_limit, …):
+# pg_isready then fails forever although Postgres is up. Probe without them.
+PROBE_URL=$(printf '%s' "$DATABASE_URL" | sed -E \
+  -e 's/([?&])(schema|connection_limit|pool_timeout|pgbouncer|socket_timeout|statement_cache_size)=[^&]*/\1/g' \
+  -e 's/&&+/\&/g' -e 's/\?&/?/' -e 's/[?&]$//')
+
 probe() {
   if command -v pg_isready >/dev/null 2>&1; then
-    pg_isready -d "$DATABASE_URL" -t 3 >/dev/null 2>&1
+    pg_isready -d "$PROBE_URL" -t 3 >/dev/null 2>&1
   elif command -v psql >/dev/null 2>&1; then
-    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'SELECT 1' >/dev/null 2>&1
+    psql "$PROBE_URL" -v ON_ERROR_STOP=1 -c 'SELECT 1' >/dev/null 2>&1
   else
     echo "ERROR: need pg_isready or psql (postgresql-client)" >&2
     exit 1

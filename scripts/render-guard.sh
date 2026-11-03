@@ -66,6 +66,14 @@ service_state() {
       else "pending" end'
 }
 
+# Last Render logs of a service, so a failed deploy explains itself in the CI log.
+print_logs() {
+  local id="$1" name="$2" owner="${RENDER_OWNER_ID:-tea-d8gnpfm7r5hc73bceacg}"
+  echo "::group::Render logs — $name (last 60 lines)"
+  curl -sf "${auth[@]}" "$API/logs?ownerId=$owner&resource=$id&direction=backward&limit=60"     | jq -r '(.logs // .)[]? | "\(.timestamp // "") \(.message // .)"' 2>/dev/null | tac || echo "(logs unavailable)"
+  echo "::endgroup::"
+}
+
 cmd_verify() {
   local sha="$1" deadline=$(( $(date +%s) + TIMEOUT_SEC ))
   declare -A done_=()
@@ -77,7 +85,7 @@ cmd_verify() {
       [ -n "${done_[$id]:-}" ] && continue
       case "$(service_state "$id" "$sha" || echo pending)" in
         live) done_[$id]=1; echo "✓ $name live" ;;
-        failed) echo "::error::$name deploy failed for $sha"; failed=1 ;;
+        failed) echo "::error::$name deploy failed for $sha"; print_logs "$id" "$name"; failed=1 ;;
       esac
     done < <(services)
     [ "$failed" = 1 ] && return 1

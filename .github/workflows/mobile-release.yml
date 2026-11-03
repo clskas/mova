@@ -44,6 +44,11 @@ on:
         required: false
         type: boolean
         default: false
+      complete_rollout:
+        description: "Play — passer la release production (déployée à 20 %) à 100 % puis afficher la bannière de mise à jour. Aucun rebuild."
+        required: false
+        type: boolean
+        default: false
       asc_submit_only:
         description: "iOS â€” soumettre pour review App Store sans rebuild (IPA dÃ©jÃ  sur TestFlight). Utilise scripts/asc_update_review_and_submit.py."
         required: false
@@ -76,6 +81,7 @@ jobs:
       (startsWith(github.ref, 'refs/tags/v') ||
        (github.event_name == 'workflow_dispatch' &&
         inputs.promote_only != true &&
+        inputs.complete_rollout != true &&
         inputs.asc_submit_only != true &&
         (inputs.promote_to_production == true ||
          (inputs.build_ios != true && inputs.upload_ios_testflight != true && inputs.submit_ios_app_store != true))))
@@ -402,18 +408,8 @@ jobs:
             bundle exec fastlane promote_internal_to_production
           fi
 
-      # Advertise only builds users can actually install: an internal-track upload
-      # (push to main / tag) is invisible to production users, so announcing it showed
-      # banners Play could not satisfy. iOS is served from the live App Store by the API.
-      - name: Lock in-app update banners (store file + Render)
-        if: ${{ success() && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.promote_to_production == true)) }}
-        env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          VERSION_NAME: ${{ needs.build-android.outputs.version_name }}
-          VERSION_CODE: ${{ needs.build-android.outputs.version_code }}
-          # Optional: push the store-version commit to afri-soft-com/mova (Render git source).
-          AFRI_SOFT_PUSH_TOKEN: ${{ secrets.AFRI_SOFT_PUSH_TOKEN }}
-        run: bash scripts/sync-mobile-app-version-env.sh
+      # No banner lock here: production starts at 20 % (staged rollout). Banners are
+      # announced by the complete-android-rollout job, once every user can install.
 
   promote-android-production:
     name: Promote Play internal â†’ production
@@ -462,6 +458,53 @@ jobs:
           export PLAY_STORE_JSON_KEY_PATH=/tmp/play-store-key.json
           echo "Promote Play internal â†’ production (passenger + driver)"
           bundle exec fastlane promote_internal_to_production
+
+  complete-android-rollout:
+    name: Play production rollout → 100 % + update banners
+    if: >
+      github.repository != 'afri-soft-com/mova' &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.complete_rollout == true
+    runs-on: ubuntu-latest
+    environment: production-mobile
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # sync-mobile-app-version-env.sh commits the store file onto main.
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: mobile/android
+
+      - name: Complete production rollout (Fastlane)
+        working-directory: mobile/android
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          PLAY_STORE_JSON: ${{ secrets.PLAY_STORE_JSON }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -e
+          if [ -n "$PLAY_STORE_JSON_KEY" ]; then
+            echo "$PLAY_STORE_JSON_KEY" | base64 -d > /tmp/play-store-key.json
+          elif [ -n "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            if printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" | head -c 1 | grep -q '{'; then
+              printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > /tmp/play-store-key.json
+            else
+              echo "$PLAY_SERVICE_ACCOUNT_JSON" | base64 -d > /tmp/play-store-key.json
+            fi
+          elif [ -n "$PLAY_STORE_JSON" ]; then
+            printf '%s' "$PLAY_STORE_JSON" > /tmp/play-store-key.json
+          else
+            echo "::error::Secrets Play absents."
+            exit 1
+          fi
+          export PLAY_STORE_JSON_KEY_PATH=/tmp/play-store-key.json
+          bundle exec fastlane complete_production_rollout
           # Version actually on the production track (not pubspec: may have moved since).
           PLAY_VERSION_OUT=/tmp/play-production-version bundle exec fastlane production_version
           echo "PROMOTED_NAME=$(sed -n 1p /tmp/play-production-version)" >> "$GITHUB_ENV"

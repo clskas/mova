@@ -99,15 +99,13 @@ for id in $IDS; do
     -H "Content-Type: application/json" \
     -d "$payload") || true
 
-  # If Render's linked Git repo doesn't contain this SHA (wrong fork/remote),
-  # fall back to deploying the connected branch tip.
+  # Render builds from afri-soft-com/mova. A SHA missing there used to fall back to
+  # that repo's branch tip — silently redeploying OLD code while the run looked green.
   if [ "$http_code" = "404" ] && [ -n "$COMMIT_SHA" ]; then
-    echo "  Commit not on linked repo — retrying without commitId (branch tip)"
-    http_code=$(curl -sS -w "%{http_code}" -o "$response" -X POST \
-      "https://api.render.com/v1/services/${id}/deploys" \
-      -H "Authorization: Bearer ${RENDER_API_KEY}" \
-      -H "Content-Type: application/json" \
-      -d "$payload_latest") || true
+    echo "::error::Commit $COMMIT_SHA is not on Render's linked repo (afri-soft-com/mova)."
+    echo "Push it first: git push afri-soft $COMMIT_SHA:refs/heads/main"
+    rm -f "$response"
+    exit 1
   fi
 
   if [ "$http_code" = "201" ] || [ "$http_code" = "202" ]; then

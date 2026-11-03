@@ -11,6 +11,10 @@ FAIL=0
 
 log() { echo "$@"; }
 fail() { echo "FAIL: $*" >&2; FAIL=1; }
+# SMOKE_STRICT=true (deploy guard): business checks fail the run instead of warning.
+soft_fail() {
+  if [ "${SMOKE_STRICT:-}" = "true" ]; then fail "$*"; else echo "WARN: $*"; fi
+}
 
 echo "=== Gateway health ($GATEWAY_URL) ==="
 if ! health=$(curl -sf "${HEADERS[@]}" "${GATEWAY_URL}/health"); then
@@ -19,6 +23,12 @@ if ! health=$(curl -sf "${HEADERS[@]}" "${GATEWAY_URL}/health"); then
 fi
 echo "$health" | head -c 500
 echo ""
+if [ "${SMOKE_STRICT:-}" = "true" ]; then
+  down=$(echo "$health" | jq -r '[.services[]? | select(.status != "ok") | .name] | join(",")' 2>/dev/null || echo "?")
+  if [ -n "$down" ]; then
+    fail "Backend services not ok behind the gateway: $down"
+  fi
+fi
 
 rid=$(curl -sI "${HEADERS[@]}" "${GATEWAY_URL}/health" | awk -F': ' 'tolower($1)=="x-request-id"{print $2}' | tr -d '\r')
 if [ -n "$rid" ]; then
@@ -51,7 +61,7 @@ echo "=== Geo communes (via gateway) ==="
 if curl -sf "${HEADERS[@]}" "${GATEWAY_URL}/api/geo/communes?city=Kinshasa" | head -c 200; then
   echo ""
 else
-  echo "WARN: GET /api/geo/communes failed (ride-service may still be starting)"
+  soft_fail "GET /api/geo/communes failed (ride-service may still be starting)"
 fi
 
 echo "=== Ride estimate ==="
@@ -61,16 +71,15 @@ if curl -sf -X POST "${HEADERS[@]}" "${GATEWAY_URL}/api/rides/estimate" \
   -d "$estimate_body" | head -c 300; then
   echo ""
 else
-  echo "WARN: estimate failed (seed rides may be required)"
+  soft_fail "POST /api/rides/estimate failed"
 fi
 
-echo "=== OTP request (mock or Twilio) ==="
-if curl -sf -X POST "${GATEWAY_URL}/api/auth/otp/request" \
-  -H 'Content-Type: application/json' \
-  -d '{"phone":"+243812345678"}' | head -c 200; then
+echo "=== Auth login options (no SMS) ==="
+# Never request a real OTP here: it sent an SMS to a stranger's number on every deploy.
+if curl -sf -X POST "${HEADERS[@]}" "${GATEWAY_URL}/api/auth/login/options"   -H 'Content-Type: application/json'   -d '{"phone":"+243900000010"}' | head -c 200; then
   echo ""
 else
-  echo "WARN: OTP request failed"
+  soft_fail "POST /api/auth/login/options failed"
 fi
 
 if [ "$FAIL" -ne 0 ]; then

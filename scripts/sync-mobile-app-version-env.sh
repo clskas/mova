@@ -183,8 +183,10 @@ PY
     sleep 2
   done
   if [[ "$push_ok" -ne 1 ]]; then
-    echo "::error::Failed to push store version to origin/main after retries — Render mirror already applied $NAME+$CODE"
-    exit 1
+    # Protected main rejects bot pushes. Banners are already live: MOBILE_* on Render
+    # can only raise the advertised version above the committed file, never lower it.
+    echo "::warning::Could not push store version to origin/main (protected branch?) — Render already advertises $NAME+$CODE. Bump services/ride-service/src/public/mobile-store-version.json in the next PR."
+    exit 0
   fi
   echo "Committed mobile-store-version.json ($NAME+$CODE) to origin/main"
 

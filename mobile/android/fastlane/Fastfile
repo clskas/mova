@@ -44,6 +44,29 @@ def upload_aab_internal(package_name:, aab:)
   end
 end
 
+# Production share for a new release: 0.2 = 20 % staged rollout. 1 = everyone.
+def play_rollout
+  raw = ENV.fetch("PLAY_ROLLOUT", "0.2").to_f
+  raw.positive? && raw <= 1 ? raw : 0.2
+end
+
+def for_both_apps(label)
+  results = {}
+  { driver: DRIVER_PACKAGE, passenger: PASSENGER_PACKAGE }.each do |app, package_name|
+    begin
+      yield package_name
+      results[app] = :ok
+      UI.success("#{label} OK: #{app}")
+    rescue => e
+      results[app] = e.message
+      UI.error("#{label} FAILED: #{app} — #{e.message}")
+    end
+  end
+  return if results.values.all? { |status| status == :ok }
+  summary = results.map { |app, status| "#{app}=#{status == :ok ? 'OK' : 'FAIL'}" }.join(", ")
+  UI.user_error!("#{label} partial/complete failure: #{summary}")
+end
+
 platform :android do
   desc "Publie l'AAB passager (Senga) sur internal testing"
   lane :deploy_internal_passenger do |options|
@@ -114,40 +137,51 @@ versionCode » de la piste production (passager) dans PLAY_VERSION_OUT"
     end
   end
 
-  desc "Promouvoir la dernière version internal → production (les testeurs ne voient plus « Interne »)"
+  desc "Promouvoir internal → production en déploiement progressif (PLAY_ROLLOUT, 20 % par défaut)"
   lane :promote_internal_to_production do
     UI.user_error!("JSON Play Store introuvable : #{play_json_key}") unless File.exist?(play_json_key)
-    results = {}
-    {
-      driver: DRIVER_PACKAGE,
-      passenger: PASSENGER_PACKAGE
-    }.each do |app, package_name|
-      begin
-        upload_to_play_store(
-          package_name: package_name,
-          track: "internal",
-          track_promote_to: "production",
-          json_key: play_json_key,
-          skip_upload_apk: true,
-          skip_upload_aab: true,
-          skip_upload_metadata: true,
-          skip_upload_images: true,
-          skip_upload_screenshots: true,
-          skip_upload_changelogs: true
-        )
-        results[app] = :ok
-        UI.success("Play promote internal→production OK: #{app}")
-      rescue => e
-        results[app] = e.message
-        UI.error("Play promote FAILED: #{app} — #{e.message}")
-      end
+    rollout = play_rollout
+    UI.important("Play production rollout : #{(rollout * 100).round} %")
+    for_both_apps("Play promote internal→production") do |package_name|
+      upload_to_play_store(
+        package_name: package_name,
+        track: "internal",
+        track_promote_to: "production",
+        track_promote_release_status: rollout < 1 ? "inProgress" : "completed",
+        rollout: rollout < 1 ? rollout.to_s : nil,
+        json_key: play_json_key,
+        skip_upload_apk: true,
+        skip_upload_aab: true,
+        skip_upload_metadata: true,
+        skip_upload_images: true,
+        skip_upload_screenshots: true,
+        skip_upload_changelogs: true
+      )
     end
-    failed = results.select { |_app, status| status != :ok }
-    if failed.empty?
-      UI.success("Play production: driver + passenger promus")
-    else
-      summary = results.map { |app, status| "#{app}=#{status == :ok ? 'OK' : 'FAIL'}" }.join(", ")
-      UI.user_error!("Play promote partial/complete failure: #{summary}")
+  end
+
+  desc "Passer la release production en cours de déploiement progressif à 100 %"
+  lane :complete_production_rollout do
+    UI.user_error!("JSON Play Store introuvable : #{play_json_key}") unless File.exist?(play_json_key)
+    for_both_apps("Play rollout 100 %") do |package_name|
+      code = google_play_track_version_codes(
+        package_name: package_name, track: "production", json_key: play_json_key
+      ).map(&:to_i).max
+      UI.user_error!("Aucune release production pour #{package_name}") if code.nil?
+      upload_to_play_store(
+        package_name: package_name,
+        track: "production",
+        version_code: code,
+        rollout: "1",
+        release_status: "completed",
+        json_key: play_json_key,
+        skip_upload_apk: true,
+        skip_upload_aab: true,
+        skip_upload_metadata: true,
+        skip_upload_images: true,
+        skip_upload_screenshots: true,
+        skip_upload_changelogs: true
+      )
     end
   end
 end

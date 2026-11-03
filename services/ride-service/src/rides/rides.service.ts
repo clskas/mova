@@ -496,16 +496,28 @@ export class RidesService {
     if (ride.status !== RideStatus.SEARCHING) throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
     await assertDriverEligibleForRide(driverUserId, ride.vehicleType);
     const completionPin = this.tripShare.generateCompletionPin();
-    const updated = await this.prisma.ride.update({
-      where: { id: rideId },
-      data: {
-        driverId: driverUserId,
-        vehicleId,
-        status: RideStatus.ACCEPTED,
-        acceptedAt: new Date(),
-        completionPin,
-      },
-    });
+    // Conditional on SEARCHING: two drivers tapping « Accepter » together must not both win.
+    const updated = await this.prisma.ride
+      .update({
+        where: { id: rideId, status: RideStatus.SEARCHING },
+        data: {
+          driverId: driverUserId,
+          vehicleId,
+          status: RideStatus.ACCEPTED,
+          acceptedAt: new Date(),
+          completionPin,
+        },
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string })?.code === 'P2025') {
+          throw new MovaHttpException(
+            MovaErrorCode.RIDE_INVALID_STATUS,
+            HttpStatus.CONFLICT,
+            'Course déjà acceptée par un autre chauffeur.',
+          );
+        }
+        throw e;
+      });
     await this.prisma.rideEvent.create({ data: { rideId, event: RideStatus.ACCEPTED } });
     this.emitStatusChange(rideId, RideStatus.ACCEPTED);
     this.trackingGateway.broadcastOfferTaken('ride:taken', { rideId, driverId: driverUserId });

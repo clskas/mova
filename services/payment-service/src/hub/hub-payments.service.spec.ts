@@ -24,6 +24,40 @@ describe('HubPaymentsService.finalizeFromAggregator amount check', () => {
     jest.spyOn(service, 'notifyApp').mockResolvedValue(false);
   });
 
+  it('unsigned callbacks match only the aggregator ref, never hub id / reference', async () => {
+    prisma.hubPayment.findFirst.mockResolvedValue(null);
+
+    const result = await service.finalizeFromAggregator('hub-forged', 'COMPLETED', undefined, undefined, {
+      aggregatorRefOnly: true,
+    });
+
+    expect(result).toEqual({ found: false });
+    expect(prisma.hubPayment.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { providerRef: { in: expect.arrayContaining(['hub-forged']) } } }),
+    );
+    expect(prisma.hubPayment.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('unsigned callbacks ignore rows whose providerRef fell back to the hub id', async () => {
+    prisma.hubPayment.findFirst.mockResolvedValue({
+      id: 'hub-9',
+      reference: 'senga_topup_x',
+      amountCdf: 5000,
+      purpose: 'topup',
+      status: 'PENDING',
+      completedAt: null,
+      notifiedAt: null,
+      providerRef: 'hub-9',
+    });
+
+    const result = await service.finalizeFromAggregator('hub-9', 'COMPLETED', undefined, undefined, {
+      aggregatorRefOnly: true,
+    });
+
+    expect(result).toEqual({ found: false });
+    expect(prisma.hubPayment.updateMany).not.toHaveBeenCalled();
+  });
+
   it('marks FAILED when paid amount ≠ expected (underpay)', async () => {
     prisma.hubPayment.findFirst.mockResolvedValue({
       id: 'hub-1',

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { AUTH_IP_LIMIT } from '../src/proxy/auth-rate-limit.middleware';
 
 describe('ApiGateway (e2e)', () => {
   let app: INestApplication;
@@ -60,4 +61,20 @@ describe('ApiGateway (e2e)', () => {
         );
       });
   });
+  it('rate-limits OTP requests per client IP before proxying', async () => {
+    const server = app.getHttpServer();
+    const ip = '203.0.113.77';
+    for (let i = 0; i < AUTH_IP_LIMIT; i++) {
+      const res = await request(server).post('/api/auth/otp/request').set('X-Forwarded-For', ip).send({});
+      expect(res.status).not.toBe(429);
+    }
+    const blocked = await request(server).post('/api/auth/otp/request').set('X-Forwarded-For', ip).send({});
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers['retry-after']).toBeDefined();
+    const otherIp = await request(server)
+      .post('/api/auth/otp/request')
+      .set('X-Forwarded-For', '203.0.113.78')
+      .send({});
+    expect(otherIp.status).not.toBe(429);
+  }, 120000);
 });

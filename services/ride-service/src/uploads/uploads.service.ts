@@ -139,7 +139,7 @@ export class UploadsService implements OnModuleInit {
       await this.recacheLocal(category, safe, fromDb.data).catch(() => undefined);
       // Best-effort: if this row never made it to Supabase, push it now.
       void this.pushOneToSupabase(category as UploadCategory, safe, Buffer.from(fromDb.data), fromDb.mimeType);
-      res.setHeader('Content-Type', fromDb.mimeType || this.mimeForFilename(safe));
+      res.setHeader('Content-Type', this.mimeForFilename(safe));
       res.setHeader('Cache-Control', 'private, max-age=300');
       return res.send(Buffer.from(fromDb.data));
     }
@@ -150,7 +150,7 @@ export class UploadsService implements OnModuleInit {
       const downloaded = await supabaseDownloadObject(this.get, { bucket, objectPath });
       if (downloaded.success && downloaded.body) {
         await this.persistDurable(category, safe, downloaded.body, downloaded.contentType ?? this.mimeForFilename(safe));
-        res.setHeader('Content-Type', this.mimeForFilename(safe, downloaded.contentType));
+        res.setHeader('Content-Type', this.mimeForFilename(safe));
         res.setHeader('Cache-Control', 'private, max-age=300');
         return res.send(downloaded.body);
       }
@@ -181,7 +181,8 @@ export class UploadsService implements OnModuleInit {
     const objectPath = `${category}/${id}.${ext}`;
     const filename = `${id}.${ext}`;
     const photoUrl = `/api/uploads/${category}/${filename}`;
-    const contentType = mimeType || 'application/octet-stream';
+    // Derived from our own extension — never echo the client mimeType (text/html → stored XSS).
+    const contentType = this.mimeForFilename(filename);
 
     let storage: 'supabase+db' | 'db' | 'local' = 'db';
     let bucket: string | undefined;

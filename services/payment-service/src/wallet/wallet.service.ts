@@ -771,6 +771,7 @@ export class WalletService {
     amountCdf: number,
     provider: string,
     phone: string,
+    accountPhone?: string | null,
   ) {
     const { amount, normalizedProvider, normalizedPhone } = this.assertWithdrawParams(
       amountCdf,
@@ -779,6 +780,7 @@ export class WalletService {
     );
 
     if (this.isWithdrawOtpSkipped()) {
+      this.assertWithdrawToAccountPhone(normalizedPhone, accountPhone);
       const standing = this.getWithdrawStandingOtp() ?? '000000';
       const challenge: WithdrawOtpChallenge = {
         h: hashWithdrawOtp(standing),
@@ -893,7 +895,7 @@ export class WalletService {
     amountCdf: number,
     provider: string,
     phone: string,
-    opts: { otp?: string; skipOtp?: boolean } = {},
+    opts: { otp?: string; skipOtp?: boolean; accountPhone?: string | null } = {},
   ) {
     const { amount, normalizedProvider, normalizedPhone } = this.assertWithdrawParams(
       amountCdf,
@@ -907,6 +909,11 @@ export class WalletService {
       Boolean(opts.skipOtp) ||
       this.isWithdrawOtpSkipped() ||
       (standing != null && otpDigits === standing);
+    // Server-side callers (opts.skipOtp) pick the destination themselves; end-user
+    // withdrawals without a real OTP may only pay out to the account's own number.
+    if (skipOtp && !opts.skipOtp) {
+      this.assertWithdrawToAccountPhone(normalizedPhone, opts.accountPhone);
+    }
     if (!skipOtp) {
       await this.consumeWithdrawOtp(userId, amount, normalizedProvider, normalizedPhone, opts.otp);
     } else if (standing && otpDigits === standing) {
@@ -924,6 +931,28 @@ export class WalletService {
       return await this.executeWithdraw(userId, amount, normalizedProvider, normalizedPhone);
     } finally {
       await this.releaseMoneyLock(lockKey);
+    }
+  }
+
+  /**
+   * Without SMS OTP, possession of the session is the only proof — a stolen token must
+   * not be able to send the balance to an arbitrary number.
+   */
+  private assertWithdrawToAccountPhone(normalizedPhone: string, accountPhone?: string | null) {
+    const account = accountPhone?.trim() ? normalizePhoneRdc(accountPhone) : '';
+    if (!account) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Ajoutez votre numéro de téléphone au compte (profil) pour effectuer un retrait.',
+      );
+    }
+    if (account !== normalizedPhone) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Retrait possible uniquement vers le numéro de votre compte SENGA pour le moment.',
+      );
     }
   }
 

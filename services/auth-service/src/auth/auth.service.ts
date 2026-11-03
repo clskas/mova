@@ -72,6 +72,11 @@ const OTP_FAIL_PREFIX = 'auth:otp:fail:';
 const OTP_FAIL_MAX = 5;
 const OTP_FAIL_TTL_SEC = 15 * 60;
 
+/** SMS OTP sends per phone (SMS cost / pumping). Mobile resend timer is ≥ 30 s. */
+const OTP_SEND_PREFIX = 'auth:otp:send:';
+const OTP_SEND_MAX = 6;
+const OTP_SEND_TTL_SEC = 15 * 60;
+
 const GOOGLE_CHALLENGE_PREFIX = 'auth:google:ch:';
 const GOOGLE_CHALLENGE_TTL_SEC = 10 * 60;
 
@@ -200,6 +205,7 @@ export class AuthService {
     await this.assertNotBlacklisted({ phone: normalized });
     await this.assertInviteOnlyAccountExists(normalized, requestedRole);
     const useTestOtp = isTestOtpAllowedForPhone(normalized);
+    if (!useTestOtp) await this.consumeOtpSendQuota(normalized);
     const liveCode = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     try {
@@ -1961,6 +1967,32 @@ export class AuthService {
       if (e instanceof MovaHttpException) throw e;
       // Redis down (free-tier sleep / closed client): fail-open so SMS login still works.
       this.logger.warn(`assertOtpNotLocked failed: ${(e as Error).message}`);
+    }
+  }
+
+  private async consumeOtpSendQuota(phone: string) {
+    try {
+      const key = `${OTP_SEND_PREFIX}${phone}`;
+      const raw = await this.redis.client.get(key);
+      const sent = raw ? Number.parseInt(raw, 10) : 0;
+      if (sent >= OTP_SEND_MAX) {
+        this.logger.warn(`OTP send quota reached for ${maskPhoneRdc(phone)}`);
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.TOO_MANY_REQUESTS,
+          'Trop de codes demandés pour ce numéro. Réessayez dans 15 minutes.',
+        );
+      }
+      // Window starts at the first send and is not extended by later ones.
+      if (sent === 0) {
+        await this.redis.client.set(key, '1', 'EX', OTP_SEND_TTL_SEC);
+      } else {
+        await this.redis.client.set(key, String(sent + 1), 'KEEPTTL');
+      }
+    } catch (e) {
+      if (e instanceof MovaHttpException) throw e;
+      // Redis down (free-tier sleep / closed client): fail-open so SMS login still works.
+      this.logger.warn(`consumeOtpSendQuota failed: ${(e as Error).message}`);
     }
   }
 

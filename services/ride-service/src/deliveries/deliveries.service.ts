@@ -1593,16 +1593,28 @@ export class DeliveriesService {
       }
     }
     const courierSource = await this.resolveAssignSource(delivery.restaurantId, driverUserId);
-    const updated = await this.prisma.delivery.update({
-      where: { id: deliveryId },
-      data: {
-        driverId: driverUserId,
-        status: DeliveryStatus.PICKED_UP,
-        pickedUpAt: new Date(),
-        courierSource,
-      },
-      include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
-    });
+    // Conditional claim: concurrent accepts must not both assign (and both credit the restaurant).
+    const updated = await this.prisma.delivery
+      .update({
+        where: { id: deliveryId, driverId: null, status: delivery.status },
+        data: {
+          driverId: driverUserId,
+          status: DeliveryStatus.PICKED_UP,
+          pickedUpAt: new Date(),
+          courierSource,
+        },
+        include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string })?.code === 'P2025') {
+          throw new MovaHttpException(
+            MovaErrorCode.VALIDATION_ERROR,
+            HttpStatus.CONFLICT,
+            'Livraison déjà assignée.',
+          );
+        }
+        throw e;
+      });
     await this.prisma.deliveryEvent.create({
       data: { deliveryId, event: 'ASSIGNED', metadata: { driverUserId, courierSource } },
     });

@@ -42,12 +42,19 @@ const headers = {
   'Content-Type': 'application/json',
 };
 
-async function api(method, path, body) {
+async function api(method, path, body, attempt = 1) {
   const res = await fetch(`${API}${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
   });
+  // Wiring ~130 env vars trips Render's API rate limit: back off and retry.
+  if (res.status === 429 && attempt <= 8) {
+    const wait = Number(res.headers.get('retry-after')) * 1000 || 15_000 * attempt;
+    console.log(`  rate limited on ${method} ${path} — retry in ${Math.round(wait / 1000)}s`);
+    await sleep(wait);
+    return api(method, path, body, attempt + 1);
+  }
   const text = await res.text();
   let data;
   try {

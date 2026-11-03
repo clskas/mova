@@ -2,7 +2,7 @@
 /**
  * Provision the SENGA pre-production (staging) stack on Render — idempotent.
  *
- * Isolated from production: own Postgres instance (one database per service),
+ * Isolated from production: own Postgres instance (one schema per service, no external access),
  * own Key Value, mocked SMS / OTP / e-mail / Mobile Money, separate JWT and
  * internal keys. Writes config/render-services.staging.json with the SAME role
  * keys as config/render-services.json ("mova-auth", …) so render-deploy.sh and
@@ -10,9 +10,7 @@
  *
  * Env: RENDER_API_KEY (required), RENDER_OWNER_ID, RENDER_REPO, RENDER_BRANCH,
  *      STAGING_PLAN (default starter), STAGING_DB_PLAN (default basic_256mb).
- * Requires `psql` (creates the per-service databases).
  */
-import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -101,29 +99,14 @@ async function ensurePostgres() {
     await sleep(15_000);
   }
   const info = await api('GET', `/postgres/${db.id}/connection-info`);
-  return { id: db.id, internal: info.internalConnectionString, external: info.externalConnectionString };
+  return { id: db.id, internal: info.internalConnectionString };
 }
 
-function withDatabase(url, dbName) {
+/** One Postgres database, one schema per service (Prisma creates it on migrate). */
+function withSchema(url, schema) {
   const u = new URL(url);
-  u.pathname = `/${dbName}`;
+  u.searchParams.set('schema', schema);
   return u.toString();
-}
-
-function ensureDatabases(externalUrl) {
-  for (const dbName of ['mova_rides', 'mova_payments', 'mova_drivers', 'mova_notifications']) {
-    const exists = execFileSync(
-      'psql',
-      [externalUrl, '-tAc', `SELECT 1 FROM pg_database WHERE datname = '${dbName}'`],
-      { encoding: 'utf8' },
-    ).trim();
-    if (exists === '1') {
-      console.log(`✓ database ${dbName}`);
-      continue;
-    }
-    execFileSync('psql', [externalUrl, '-v', 'ON_ERROR_STOP=1', '-c', `CREATE DATABASE ${dbName} OWNER mova`]);
-    console.log(`+ database ${dbName}`);
-  }
 }
 
 async function ensureKeyValue() {
@@ -212,7 +195,7 @@ async function wireEnv(services, pgInternal, redisUrl) {
   const jwtSecret = (await readEnv(gw, 'JWT_SECRET')) || randomBytes(48).toString('base64url');
   const internalKey = (await readEnv(gw, 'INTERNAL_API_KEY')) || randomBytes(32).toString('base64url');
   const url = (role) => services[role].url;
-  const db = (name) => withDatabase(pgInternal, name);
+  const db = (schema) => withSchema(pgInternal, schema);
 
   const common = {
     NODE_ENV: 'staging',
@@ -240,23 +223,23 @@ async function wireEnv(services, pgInternal, redisUrl) {
       HEALTH_CHECK_RETRIES: '2',
       CORS_ORIGIN: [url('mova-web'), url('mova-admin-web')].join(','),
     },
-    'mova-auth': { ...common, ...mocks, ...urls, DATABASE_URL: db('mova_auth') },
+    'mova-auth': { ...common, ...mocks, ...urls, DATABASE_URL: db('auth') },
     'mova-ride': {
       ...common,
       ...urls,
-      DATABASE_URL: db('mova_rides'),
+      DATABASE_URL: db('rides'),
       MOCK_PAYMENTS: 'true',
       NODE_OPTIONS: '--max-old-space-size=384',
     },
     'mova-payment': {
       ...common,
       ...urls,
-      DATABASE_URL: db('mova_payments'),
+      DATABASE_URL: db('payments'),
       MOCK_PAYMENTS: 'true',
       MOBILE_MONEY_GATEWAY: 'mock',
     },
-    'mova-driver': { ...common, ...urls, DATABASE_URL: db('mova_drivers') },
-    'mova-notification': { ...common, ...mocks, DATABASE_URL: db('mova_notifications') },
+    'mova-driver': { ...common, ...urls, DATABASE_URL: db('drivers') },
+    'mova-notification': { ...common, ...mocks, DATABASE_URL: db('notifications') },
     'mova-admin': { ...common, ...urls },
     'mova-web': { NEXT_PUBLIC_API_URL: url('mova-gateway') },
     'mova-admin-web': { NEXT_PUBLIC_API_URL: url('mova-gateway') },
@@ -270,7 +253,6 @@ async function wireEnv(services, pgInternal, redisUrl) {
 async function main() {
   console.log(`Staging provision — workspace ${OWNER_ID}, ${REPO}@${BRANCH}, plan ${PLAN}`);
   const pg = await ensurePostgres();
-  ensureDatabases(pg.external);
   const redisUrl = await ensureKeyValue();
   const services = await ensureServices();
   await wireEnv(services, pg.internal, redisUrl);

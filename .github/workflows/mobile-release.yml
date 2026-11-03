@@ -1,9 +1,12 @@
 ﻿name: Mobile Release
 
-# SÃ©rialise les runs : des uploads Play parallÃ¨les font expirer l'Edit API (Â« This edit has expired Â»).
+# Internal-track builds (dispatched after each main deploy) share one group: a newer
+# one supersedes the older. Production releases (v* tags, manual store options) get a
+# group of their own so an internal build can never cancel them — GitHub cancels any
+# older PENDING run of a group. Play "edit expired" races are retried by Fastlane.
 concurrency:
-  group: mobile-release
-  cancel-in-progress: false
+  group: ${{ (github.event_name == 'workflow_dispatch' && inputs.promote_to_production != true && inputs.promote_only != true && inputs.complete_rollout != true && inputs.build_ios != true && inputs.upload_ios_testflight != true && inputs.submit_ios_app_store != true && inputs.asc_submit_only != true && inputs.build_apks != true) && 'mobile-release-internal' || format('mobile-release-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' && inputs.promote_to_production != true && inputs.promote_only != true && inputs.complete_rollout != true && inputs.build_ios != true && inputs.upload_ios_testflight != true && inputs.submit_ios_app_store != true && inputs.asc_submit_only != true && inputs.build_apks != true }}
 
 on:
   push:

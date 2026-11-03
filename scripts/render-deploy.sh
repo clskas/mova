@@ -9,8 +9,10 @@ fi
 
 COMMIT_SHA="${1:-}"
 IDS="${RENDER_SERVICE_IDS:-}"
+# Production map by default; deploy.yml points it at render-services.staging.json for pre-production.
+SERVICES_FILE="${RENDER_SERVICES_FILE:-config/render-services.json}"
 
-if [ -f config/render-services.json ]; then
+if [ -f "$SERVICES_FILE" ]; then
   # Always prefer the in-repo map so restaurant / rental / admin-web cannot be dropped
   # when the GitHub secret still lists only the original 8 services.
   JSON_IDS=$(jq -r '
@@ -27,7 +29,7 @@ if [ -f config/render-services.json ]; then
       .services["mova-restaurant"].id // empty,
       .services["mova-rental-partner"].id // empty
     ] | map(select(length > 0)) | join(" ")
-  ' config/render-services.json)
+  ' "$SERVICES_FILE")
   if [ -n "$JSON_IDS" ]; then
     IDS="$JSON_IDS"
   fi
@@ -38,10 +40,10 @@ if [ -z "$IDS" ]; then
   exit 0
 fi
 
-if [ -f config/render-services.json ]; then
-  restaurant_id=$(jq -r '.services["mova-restaurant"].id // empty' config/render-services.json)
-  rental_id=$(jq -r '.services["mova-rental-partner"].id // empty' config/render-services.json)
-  admin_web_id=$(jq -r '.services["mova-admin-web"].id // empty' config/render-services.json)
+if [ -f "$SERVICES_FILE" ]; then
+  restaurant_id=$(jq -r '.services["mova-restaurant"].id // empty' "$SERVICES_FILE")
+  rental_id=$(jq -r '.services["mova-rental-partner"].id // empty' "$SERVICES_FILE")
+  admin_web_id=$(jq -r '.services["mova-admin-web"].id // empty' "$SERVICES_FILE")
   missing=""
   for required in "$restaurant_id" "$rental_id" "$admin_web_id"; do
     if [ -n "$required" ] && ! printf ' %s ' "$IDS" | grep -q " $required "; then

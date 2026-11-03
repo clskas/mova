@@ -33,7 +33,7 @@ services() {
                        "mova-admin","mova-gateway","mova-web","mova-admin-web","mova-restaurant",
                        "mova-rental-partner"))
     | select(.value.id != null and .value.id != "")
-    | "\(.value.id) \(.key)"' "$ROOT/config/render-services.json"
+    | "\(.value.id) \(.key)"' "${RENDER_SERVICES_FILE:-$ROOT/config/render-services.json}"
 }
 
 deploys() {

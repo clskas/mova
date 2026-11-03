@@ -297,17 +297,26 @@ export class HubPaymentsService {
     outcome: 'COMPLETED' | 'FAILED',
     message?: string,
     confirmedAmountCdf?: number,
+    options?: { aggregatorRefOnly?: boolean },
   ): Promise<{ found: boolean; notified?: boolean; payment_id?: string; status?: string }> {
     const ref = providerRef.trim();
     if (!ref) return { found: false };
 
     const keys = expandProviderRefKeys(ref);
+    // Unsigned callbacks: match only the aggregator transaction id (known to the hub and
+    // the aggregator). Hub ids / merchant references are returned to end-user apps, so a
+    // forged unsigned « success » keyed on them would mint wallet credit.
+    const where = options?.aggregatorRefOnly
+      ? { providerRef: { in: keys } }
+      : { OR: [{ providerRef: { in: keys } }, { id: { in: keys } }, { reference: { in: keys } }] };
     const row =
       (await this.prisma.hubPayment.findFirst({
-        where: { OR: [{ providerRef: { in: keys } }, { id: { in: keys } }, { reference: { in: keys } }] },
+        where,
         orderBy: { updatedAt: 'desc' },
       })) ?? null;
     if (!row) return { found: false };
+    // providerRef falls back to the hub id when the aggregator returned none.
+    if (options?.aggregatorRefOnly && row.providerRef === row.id) return { found: false };
 
     if (row.status === 'COMPLETED' || row.status === 'FAILED') {
       if (!row.notifiedAt) {

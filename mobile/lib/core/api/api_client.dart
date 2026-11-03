@@ -170,6 +170,10 @@ class ApiClient {
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         'X-Senga-Client': AppFlavor.isDriver ? 'senga_driver' : 'senga',
+        // Lets /public/app-version advertise the live App Store version to iPhones.
+        if (!kIsWeb)
+          'X-Senga-Platform':
+              defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
         if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
       };
 

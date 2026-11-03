@@ -383,21 +383,46 @@ describe('WalletService', () => {
     });
     tx.$queryRaw.mockResolvedValue([{ id: 'w1', balanceCdf: 5000, heldBalanceCdf: 0 }]);
     tx.wallet.update.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 2700 });
-    const otpRes = await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000001');
+    const otpRes = await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000001', '+243890000001');
     expect(otpRes).toMatchObject({
       skipOtp: true,
       otpRequired: false,
       standingOtp: '000000',
     });
     expect(String(otpRes.message)).toMatch(/Tous les clients/i);
-    const result = await service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000001');
+    const result = await service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000001', {
+      accountPhone: '0890000001',
+    });
     expect(result.success).toBe(true);
     expect(tx.wallet.update).toHaveBeenCalledTimes(1);
     tx.wallet.update.mockClear();
     const withStanding = await service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000001', {
       otp: '000000',
+      accountPhone: '+243890000001',
     });
     expect(withStanding.success).toBe(true);
+  });
+
+  it('WITHDRAW_SKIP_OTP=true refuse un numéro autre que celui du compte (jeton volé)', async () => {
+    configGet.mockImplementation((key: string) => {
+      if (key === 'MOCK_PAYMENTS') return 'true';
+      if (key === 'NODE_ENV') return 'test';
+      if (key === 'WITHDRAW_SKIP_OTP') return 'true';
+      return undefined;
+    });
+    await expect(
+      service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000009', '+243890000001'),
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000009', {
+        otp: '000000',
+        accountPhone: '+243890000001',
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000001'),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(tx.wallet.update).not.toHaveBeenCalled();
   });
 
   it('refuse un retrait si l’OTP a été envoyé vers un autre numéro', async () => {

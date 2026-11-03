@@ -130,17 +130,18 @@ export class WalletController {
 
   @Post('withdraw/otp')
   @ApiOperation({ summary: 'Envoyer un code OTP au numéro Mobile Money de versement' })
-  requestWithdrawOtp(@Request() req: { user: { id: string } }, @Body() dto: WithdrawRequestDto) {
-    return this.walletService.requestWithdrawOtp(req.user.id, dto.amountCdf, dto.provider, dto.phone);
+  requestWithdrawOtp(@Request() req: { user: { id: string; phone?: string } }, @Body() dto: WithdrawRequestDto) {
+    return this.walletService.requestWithdrawOtp(req.user.id, dto.amountCdf, dto.provider, dto.phone, req.user.phone);
   }
 
   @Post('withdraw')
   @ApiOperation({
     summary: 'Retrait mobile money (OTP requis sauf si WITHDRAW_SKIP_OTP=true)',
   })
-  async withdraw(@Request() req: { user: { id: string } }, @Body() dto: WithdrawDto) {
+  async withdraw(@Request() req: { user: { id: string; phone?: string } }, @Body() dto: WithdrawDto) {
     return this.walletService.withdrawToMobileMoney(req.user.id, dto.amountCdf, dto.provider, dto.phone, {
       otp: dto.otp,
+      accountPhone: req.user.phone,
     });
   }
 }

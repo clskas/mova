@@ -703,10 +703,18 @@ export class ErrandsService {
     }
     assertEscrowAllowsDispatch(order);
     const pin = order.completionPin ?? this.tripShare.generateCompletionPin();
-    const updated = await this.prisma.errandOrder.update({
-      where: { id: errandId },
-      data: { driverId: driverUserId, status: ErrandOrderStatus.ASSIGNED, completionPin: pin },
-    });
+    // Conditional claim: concurrent accepts must not both assign.
+    const updated = await this.prisma.errandOrder
+      .update({
+        where: { id: errandId, driverId: null, status: ErrandOrderStatus.PENDING },
+        data: { driverId: driverUserId, status: ErrandOrderStatus.ASSIGNED, completionPin: pin },
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string })?.code === 'P2025') {
+          throw new MovaHttpException(MovaErrorCode.ERRAND_INVALID_STATUS, HttpStatus.CONFLICT);
+        }
+        throw e;
+      });
     const requester = await fetchAuthUserBrief(updated.userId);
     await sendPlatformSms(requester?.phone, deliveryPinSms(pin, 'course'), 'delivery_pin');
     const formatted = this.formatErrand(updated);

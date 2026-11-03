@@ -385,8 +385,11 @@ jobs:
             bundle exec fastlane promote_internal_to_production
           fi
 
+      # Advertise only builds users can actually install: an internal-track upload
+      # (push to main / tag) is invisible to production users, so announcing it showed
+      # banners Play could not satisfy. iOS is served from the live App Store by the API.
       - name: Lock in-app update banners (store file + Render)
-        if: success()
+        if: ${{ success() && github.event_name == 'workflow_dispatch' && inputs.promote_to_production == true }}
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           VERSION_NAME: ${{ needs.build-android.outputs.version_name }}
@@ -442,6 +445,19 @@ jobs:
           export PLAY_STORE_JSON_KEY_PATH=/tmp/play-store-key.json
           echo "Promote Play internal â†’ production (passenger + driver)"
           bundle exec fastlane promote_internal_to_production
+          # Version actually on the production track (not pubspec: may have moved since).
+          PLAY_VERSION_OUT=/tmp/play-production-version bundle exec fastlane production_version
+          echo "PROMOTED_NAME=$(sed -n 1p /tmp/play-production-version)" >> "$GITHUB_ENV"
+          echo "PROMOTED_CODE=$(sed -n 2p /tmp/play-production-version)" >> "$GITHUB_ENV"
+
+      - name: Lock in-app update banners (store file + Render)
+        if: ${{ success() && env.PROMOTED_NAME != '' && env.PROMOTED_CODE != '' }}
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          VERSION_NAME: ${{ env.PROMOTED_NAME }}
+          VERSION_CODE: ${{ env.PROMOTED_CODE }}
+          AFRI_SOFT_PUSH_TOKEN: ${{ secrets.AFRI_SOFT_PUSH_TOKEN }}
+        run: bash scripts/sync-mobile-app-version-env.sh
 
   build-ios:
     name: Build iOS IPA (${{ matrix.flavor }})

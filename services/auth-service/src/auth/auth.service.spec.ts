@@ -187,6 +187,19 @@ describe('AuthService', () => {
     expect(prisma.otpCode.create).toHaveBeenCalled();
   });
 
+  it('caps SMS OTP sends per phone (no SMS once the quota is reached)', async () => {
+    redis.client.get.mockResolvedValueOnce('6');
+    await expect(service.requestOtp('+243893515173', UserRole.DRIVER)).rejects.toMatchObject({
+      status: 429,
+    });
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+  });
+
+  it('starts the OTP send window on the first SMS', async () => {
+    await service.requestOtp('+243893515173', UserRole.DRIVER);
+    expect(redis.client.set).toHaveBeenCalledWith('auth:otp:send:+243893515173', '1', 'EX', 900);
+  });
+
   it('allows SUPER_ADMIN on the passenger app without changing role', async () => {
     const admin = makeUser({
       id: 'owner-1',

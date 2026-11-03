@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Headers, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from '../prisma/prisma.service';
 import { TrackingReferenceType } from '@prisma/client';
@@ -6,7 +6,8 @@ import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { HttpStatus } from '@nestjs/common';
 import { toMobileRideStatus } from '@mova/shared';
 import { TrackingService } from '../tracking/tracking.service';
-import { buildMobileAppVersionResponse } from './app-version';
+import { applyIosLiveVersions, buildMobileAppVersionResponse, resolveClientPlatform } from './app-version';
+import { IosStoreVersionService } from './ios-store-version';
 import { LegalDocumentsService } from '../legal-documents/legal-documents.service';
 import { ClientAppsConfigService } from '../platform/client-apps-config.service';
 
@@ -18,12 +19,18 @@ export class PublicController {
     private tracking: TrackingService,
     private legalDocuments: LegalDocumentsService,
     private clientAppsConfig: ClientAppsConfigService,
+    private iosStoreVersions: IosStoreVersionService,
   ) {}
 
   @Get('app-version')
   @ApiOperation({ summary: 'Versions courantes / minimales (apps mobiles + web)' })
-  getAppVersion() {
-    return buildMobileAppVersionResponse();
+  async getAppVersion(
+    @Headers('x-senga-platform') platformHeader?: string,
+    @Query('platform') platformQuery?: string,
+  ) {
+    const response = buildMobileAppVersionResponse();
+    if (resolveClientPlatform(platformHeader, platformQuery) !== 'ios') return response;
+    return applyIosLiveVersions(response, await this.iosStoreVersions.get());
   }
 
   @Get('client-config')

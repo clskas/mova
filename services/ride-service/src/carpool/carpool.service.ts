@@ -570,13 +570,27 @@ export class CarpoolService {
     if (trip.passengers.some((p) => p.userId === userId)) throw new MovaHttpException(MovaErrorCode.CARPOOL_ALREADY_JOINED);
     if (trip.seatsAvailable < seats) throw new MovaHttpException(MovaErrorCode.CARPOOL_NO_SEATS);
     const passenger = await this.prisma.carpoolPassenger.create({ data: { tripId, userId, seats } });
-    const seatsAvailable = trip.seatsAvailable - seats;
-    const status = seatsAvailable === 0 ? CarpoolStatus.MATCHED : CarpoolStatus.OPEN;
-    const updated = await this.prisma.carpoolTrip.update({
-      where: { id: tripId },
-      data: { seatsAvailable, status },
-      include: { passengers: true },
-    });
+    // Atomic decrement guarded on remaining seats: concurrent bookings must not overbook.
+    let updated = await this.prisma.carpoolTrip
+      .update({
+        where: { id: tripId, seatsAvailable: { gte: seats } },
+        data: { seatsAvailable: { decrement: seats } },
+        include: { passengers: true },
+      })
+      .catch(async (e: unknown) => {
+        if ((e as { code?: string })?.code === 'P2025') {
+          await this.prisma.carpoolPassenger.delete({ where: { id: passenger.id } });
+          throw new MovaHttpException(MovaErrorCode.CARPOOL_NO_SEATS);
+        }
+        throw e;
+      });
+    if (updated.seatsAvailable <= 0 && updated.status === CarpoolStatus.OPEN) {
+      updated = await this.prisma.carpoolTrip.update({
+        where: { id: tripId },
+        data: { status: CarpoolStatus.MATCHED },
+        include: { passengers: true },
+      });
+    }
     const driverUser = await this.fetchUserBrief(trip.driverId);
     const driverProfile = await this.fetchDriverProfile(trip.driverId);
     const formatted = await this.formatTripForMobile(

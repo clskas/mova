@@ -91,6 +91,29 @@ platform :android do
     end
   end
 
+  desc "Écrit « versionName
+versionCode » de la piste production (passager) dans PLAY_VERSION_OUT"
+  lane :production_version do
+    UI.user_error!("JSON Play Store introuvable : #{play_json_key}") unless File.exist?(play_json_key)
+    codes = google_play_track_version_codes(
+      package_name: PASSENGER_PACKAGE, track: "production", json_key: play_json_key
+    )
+    names = google_play_track_release_names(
+      package_name: PASSENGER_PACKAGE, track: "production", json_key: play_json_key
+    )
+    code = codes.map(&:to_i).max
+    # Play names releases « 208 (1.0.43) » by default; accept a bare « 1.0.43 » too.
+    name = names.map { |n| n.to_s[/\d+\.\d+\.\d+/] }.compact.first
+    out = ENV.fetch("PLAY_VERSION_OUT", "/tmp/play-production-version")
+    if code.nil? || name.nil?
+      UI.important("Version production introuvable (codes=#{codes} names=#{names}) — bannières inchangées")
+      File.write(out, "")
+    else
+      UI.success("Play production : #{name}+#{code}")
+      File.write(out, "#{name}\n#{code}\n")
+    end
+  end
+
   desc "Promouvoir la dernière version internal → production (les testeurs ne voient plus « Interne »)"
   lane :promote_internal_to_production do
     UI.user_error!("JSON Play Store introuvable : #{play_json_key}") unless File.exist?(play_json_key)

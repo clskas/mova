@@ -86,6 +86,28 @@ describe('CarpoolService', () => {
     const result = await service.join('t1', 'user-2', 2);
     expect(result.trip.availableSeats).toBe(1);
     expect(result.confirmation.totalCdf).toBe(8000);
+    expect(prisma.carpoolTrip.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 't1', seatsAvailable: { gte: 2 } },
+        data: { seatsAvailable: { decrement: 2 } },
+      }),
+    );
+  });
+
+  it('join rolls back the booking when a concurrent booking took the last seats', async () => {
+    prisma.carpoolTrip.findUnique.mockResolvedValue({
+      id: 't1',
+      driverId: 'driver-1',
+      status: CarpoolStatus.OPEN,
+      seatsAvailable: 1,
+      seatsTotal: 3,
+      pricePerSeatCdf: 4000,
+      passengers: [],
+    });
+    prisma.carpoolPassenger.create.mockResolvedValue({ id: 'p9', tripId: 't1', userId: 'user-3', seats: 1 });
+    prisma.carpoolTrip.update.mockRejectedValue(Object.assign(new Error('not found'), { code: 'P2025' }));
+    await expect(service.join('t1', 'user-3', 1)).rejects.toMatchObject({ code: 'MOVA_CAR_002' });
+    expect(prisma.carpoolPassenger.delete).toHaveBeenCalledWith({ where: { id: 'p9' } });
   });
 
   it('recherche et trie par prix', async () => {

@@ -575,6 +575,32 @@ describe('DeliveriesService', () => {
     );
   });
 
+  it('acceptDelivery : un second livreur concurrent reçoit 409, sans second crédit restaurant', async () => {
+    prisma.delivery.findUnique.mockResolvedValue({
+      id: 'd1',
+      userId: 'u1',
+      type: 'FOOD',
+      status: 'READY_FOR_PICKUP',
+      restaurantId: 'r1',
+      driverId: null,
+      escrowReady: true,
+      escrowAmountCdf: 15000,
+      estimatedPriceCdf: 15000,
+      deliveryPin: '1234',
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+    });
+    prisma.restaurant.findUnique.mockResolvedValue({ courierMode: 'OWN' });
+    prisma.restaurantDriver.findUnique.mockResolvedValue({ isActive: true });
+    prisma.delivery.update.mockRejectedValue(Object.assign(new Error('not found'), { code: 'P2025' }));
+    const credit = jest.spyOn(service as never, 'creditRestaurantAtPickup' as never);
+    await expect(service.acceptDelivery('d1', 'fleet-drv')).rejects.toMatchObject({ status: 409 });
+    expect(prisma.delivery.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'd1', driverId: null, status: 'READY_FOR_PICKUP' } }),
+    );
+    expect(credit).not.toHaveBeenCalled();
+  });
+
   it('PIN déjà livré : idempotent, pas de second split', async () => {
     prisma.delivery.findUnique.mockResolvedValue({
       id: 'd1',

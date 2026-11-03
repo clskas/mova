@@ -79,7 +79,9 @@ describe('PaymentsWebhookController aggregator gate', () => {
       found: true,
       status: 'COMPLETED',
     });
-    expect(finalizeFromAggregator).toHaveBeenCalledWith('SD2609053C7J9', 'COMPLETED', undefined, undefined);
+    expect(finalizeFromAggregator).toHaveBeenCalledWith('SD2609053C7J9', 'COMPLETED', undefined, undefined, {
+      aggregatorRefOnly: true,
+    });
   });
 
   it('rejects SerdiPay webhook when signature is invalid (401 not 200)', async () => {
@@ -129,7 +131,7 @@ describe('PaymentsWebhookController aggregator gate', () => {
       found: true,
       status: 'COMPLETED',
     });
-    expect(finalizeFromAggregator).toHaveBeenCalledWith('SD260829CPHOG', 'COMPLETED', undefined, undefined);
+    expect(finalizeFromAggregator).toHaveBeenCalledWith('SD260829CPHOG', 'COMPLETED', undefined, undefined, undefined);
   });
 
   it('passes confirmed amount from SerdiPay payload to hub finalize', async () => {
@@ -164,6 +166,6 @@ describe('PaymentsWebhookController aggregator gate', () => {
       success: true,
       found: true,
     });
-    expect(finalizeFromAggregator).toHaveBeenCalledWith('SD260829AMT', 'COMPLETED', undefined, 8500);
+    expect(finalizeFromAggregator).toHaveBeenCalledWith('SD260829AMT', 'COMPLETED', undefined, 8500, undefined);
   });
 });

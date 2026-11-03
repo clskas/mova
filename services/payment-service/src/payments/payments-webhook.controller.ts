@@ -136,14 +136,21 @@ export class PaymentsWebhookController {
     this.logger.log(`SerdiPay webhook ${outcome} ref=${providerRef}`);
     const failure = pickString(payload, ['message', 'description', 'failureReason']);
     const confirmedAmountCdf = this.extractConfirmedAmountCdf(payload);
+    const unsigned = sig === 'unsigned';
     if (this.hub.isEnabled()) {
       const hubResult = await this.hub.finalizeFromAggregator(
         providerRef,
         outcome,
         failure,
         confirmedAmountCdf,
+        unsigned ? { aggregatorRefOnly: true } : undefined,
       );
       if (hubResult.found) return { success: true, ...hubResult };
+    }
+    if (unsigned) {
+      // Local payments are keyed on ids end users can see — never finalize them unsigned.
+      this.logger.warn(`SerdiPay unsigned webhook: no hub row for aggregator ref=${providerRef} — ACK 200`);
+      return { success: true, message: 'Référence inconnue (ack)' };
     }
     const result = await this.payments.completeMobileMoneyFromWebhook(
       providerRef,

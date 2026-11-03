@@ -70,5 +70,5 @@ Pour publier une version :
 
 - Création ou réparation : **Actions → Render Provision Staging → Run workflow**. Le workflow
   produit `config/render-services.staging.json`, qu'il faut commiter.
-- Coût : environ 69 $/mois (9 services Starter + Postgres basic-256mb).
+- Coût : environ 79 $/mois (9 services Starter + Postgres basic-256mb + Key Value Starter).
 - Comptes de test : numéros `+2439000000xx`, code `123456`. Les SMS et paiements sont simulés.

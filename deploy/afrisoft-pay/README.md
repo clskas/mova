@@ -75,3 +75,23 @@ docker compose --profile infra up -d
 # after image build:
 docker compose --profile hub up -d
 ```
+
+## Déploiement automatique (CI)
+
+Le job `deploy-hub` de `.github/workflows/deploy.yml` déploie le hub après chaque déploiement Render
+de `main` : sauvegarde de la base, build d'une image candidate (le conteneur en service n'est pas
+touché), bascule, contrôle `/health`, et **retour automatique** à l'image précédente si le contrôle échoue.
+
+Il utilise une clé SSH dédiée, **limitée à un seul script** sur le VPS (`command=` forcé). Elle ne
+donne pas de shell. Mise en place, une seule fois, depuis un poste qui a déjà `~/.ssh/afrisoft_pay` :
+
+```bash
+ssh-keygen -t ed25519 -N "" -C senga-ci-hub-deploy -f ~/.ssh/senga_ci_hub
+ssh -i ~/.ssh/afrisoft_pay root@178.104.82.66 "echo 'command=\"/opt/afrisoft-pay/scripts/ci-deploy.sh\",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding $(cat ~/.ssh/senga_ci_hub.pub)' >> /root/.ssh/authorized_keys"
+gh secret set HUB_DEPLOY_SSH_KEY --repo clskas/mova < ~/.ssh/senga_ci_hub
+ssh-keyscan -t ed25519 178.104.82.66 | gh secret set HUB_SSH_KNOWN_HOSTS --repo clskas/mova
+```
+
+Le script installé sur le VPS (`/opt/afrisoft-pay/scripts/ci-deploy.sh`) est la copie de
+`deploy/afrisoft-pay/scripts/ci-deploy.sh` : recopiez-le après chaque modification.
+Retour arrière manuel : `docker images afrisoft-pay/payment` liste les images `pre-<date>`.

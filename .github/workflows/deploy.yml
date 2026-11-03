@@ -189,7 +189,13 @@ jobs:
           migrate_one auth "${DATABASE_URL_AUTH:-}" services/auth-service
           migrate_one rides "${DATABASE_URL_RIDES:-}" services/ride-service
 
+      - name: Snapshot live Render deploys (rollback target)
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: bash scripts/render-guard.sh snapshot render-snapshot.json
+
       - name: Trigger Render deploy (API + web + portals)
+        id: trigger
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_IDS: ${{ steps.render.outputs.ids }}
@@ -203,42 +209,79 @@ jobs:
           echo "Containers still run scripts/migrate-with-backup.sh as a safety net (usually no-op)."
           echo "prisma db seed is FORBIDDEN on production — never create +2439000000xx demo users."
 
-      - name: Wait for Render deploy (gateway)
+      # Every service must run the new commit — not only the gateway — then the
+      # strict smoke must pass. Otherwise the pre-deploy versions are restored.
+      - name: Wait for every Render service
+        id: verify
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          GATEWAY_RENDER_SERVICE_ID: ${{ steps.render.outputs.gateway }}
-          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: bash scripts/render-guard.sh verify "${{ github.event.workflow_run.head_sha || github.sha }}"
+
+      - name: Strict smoke test (production)
+        id: smoke
         run: |
-          if [ -z "$RENDER_API_KEY" ] || [ -z "$GATEWAY_RENDER_SERVICE_ID" ]; then
-            echo "RENDER_API_KEY or GATEWAY_RENDER_SERVICE_ID not set — skip wait"
-            sleep 30
-            exit 0
+          set -euo pipefail
+          GATEWAY_URL="${{ vars.GATEWAY_URL }}"
+          if [ -z "$GATEWAY_URL" ] && [ -f config/render-services.json ]; then
+            GATEWAY_URL=$(jq -r '.gatewayUrl // empty' config/render-services.json)
           fi
-          # A second API trigger for the same commit can finish as build_failed in ~2s
-          # while an earlier deploy of that commit is already live. Poll several
-          # recent deploys and succeed if the expected SHA is live.
-          for i in $(seq 1 45); do
-            json=$(curl -sf -H "Authorization: Bearer $RENDER_API_KEY" \
-              "https://api.render.com/v1/services/${GATEWAY_RENDER_SERVICE_ID}/deploys?limit=5")
-            latest=$(echo "$json" | jq -r '.[0].status // .[0].deploy.status // "unknown"')
-            live_for_sha=$(echo "$json" | jq -r --arg sha "$EXPECTED_SHA" '
-              [.[] | (.deploy // .) | select(.status == "live" and .commit.id == $sha)] | length
-            ')
-            failed_for_sha=$(echo "$json" | jq -r --arg sha "$EXPECTED_SHA" '
-              [.[] | (.deploy // .) | select((.status == "build_failed" or .status == "update_failed") and .commit.id == $sha)] | length
-            ')
-            echo "Gateway latest=$latest live_for_sha=$live_for_sha failed_for_sha=$failed_for_sha (attempt $i)"
-            if [ "$live_for_sha" != "0" ]; then
-              echo "Gateway deploy live for $EXPECTED_SHA"
+          GATEWAY_URL="${GATEWAY_URL:-${{ secrets.SMOKE_API_URL }}}"
+          # Services restart one by one: give the stack a few tries before calling it broken.
+          for attempt in 1 2 3 4 5; do
+            if SMOKE_STRICT=true GATEWAY_URL="$GATEWAY_URL" bash scripts/smoke-test.sh; then
               exit 0
             fi
-            if [ "$latest" = "build_failed" ] || [ "$latest" = "update_failed" ]; then
-              if [ "$failed_for_sha" != "0" ] && [ "$live_for_sha" = "0" ]; then
-                echo "Deploy failed on Render for $EXPECTED_SHA"
-                exit 1
-              fi
-            fi
-            sleep 20
+            echo "Smoke attempt $attempt failed — retry in 30s"
+            sleep 30
           done
-          echo "Timeout waiting for Render deploy"
           exit 1
+
+      - name: Roll back to the pre-deploy versions
+        if: ${{ failure() && steps.trigger.outcome == 'success' }}
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          bash scripts/render-guard.sh rollback render-snapshot.json
+          echo "::error::Deploy of ${{ github.event.workflow_run.head_sha || github.sha }} failed checks — production rolled back."
+
+      - name: Upload Render snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: render-snapshot-${{ github.event.workflow_run.head_sha || github.sha }}
+          path: render-snapshot.json
+          if-no-files-found: ignore
+
+  # AfriSoft Pay hub (Hetzner VPS, not Render). The CI key is pinned on the VPS to
+  # deploy/afrisoft-pay/scripts/ci-deploy.sh (forced command): backup, build,
+  # swap, /health check and automatic rollback. Inactive until the secret exists.
+  deploy-hub:
+    needs: deploy-render
+    if: ${{ github.repository != 'afri-soft-com/mova' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Deploy payment hub
+        env:
+          HUB_DEPLOY_SSH_KEY: ${{ secrets.HUB_DEPLOY_SSH_KEY }}
+          HUB_SSH_KNOWN_HOSTS: ${{ secrets.HUB_SSH_KNOWN_HOSTS }}
+          HUB_HOST: ${{ vars.HUB_HOST || '178.104.82.66' }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HUB_DEPLOY_SSH_KEY:-}" ] || [ -z "${HUB_SSH_KNOWN_HOSTS:-}" ]; then
+            echo "::warning::HUB_DEPLOY_SSH_KEY / HUB_SSH_KNOWN_HOSTS not set — payment hub not deployed (see deploy/afrisoft-pay/README.md)"
+            exit 0
+          fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$HUB_DEPLOY_SSH_KEY" > ~/.ssh/hub && chmod 600 ~/.ssh/hub
+          printf '%s\n' "$HUB_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          git archive --format=tar "$SHA" \
+            | ssh -i ~/.ssh/hub -o BatchMode=yes -o ServerAliveInterval=30 "root@$HUB_HOST" "deploy $SHA"
+          curl -sf -m 15 https://pay.afri-soft.com/health

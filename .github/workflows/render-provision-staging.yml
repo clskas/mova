@@ -1,0 +1,39 @@
+name: Render Provision Staging
+
+# Creates / repairs the pre-production stack (idempotent): mova-stg-* services,
+# one Postgres (one database per service), one Key Value. Mocked SMS / OTP /
+# Mobile Money — never touches production data or real customers.
+# The generated config/render-services.staging.json activates the staging stage
+# of deploy.yml once committed.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    if: github.repository != 'afri-soft-com/mova'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Provision staging on Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: node scripts/render-provision-staging.mjs
+
+      - name: Upload staging service map
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-services-staging
+          path: config/render-services.staging.json

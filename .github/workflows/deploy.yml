@@ -31,7 +31,63 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Pre-production gate: the same commit is deployed to the mova-stg-* stack
+  # (mocked SMS / Mobile Money, own databases) and must pass the strict smoke
+  # before production is touched. Skipped until config/render-services.staging.json exists.
+  deploy-staging:
+    if: >
+      github.repository != 'afri-soft-com/mova' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Staging configured?
+        id: cfg
+        run: |
+          if [ -f config/render-services.staging.json ]; then
+            echo "active=true" >> "$GITHUB_OUTPUT"
+            echo "gateway=$(jq -r '.gatewayUrl' config/render-services.staging.json)" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No config/render-services.staging.json — staging gate skipped (run Render Provision Staging)."
+            echo "active=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to staging
+        if: steps.cfg.outputs.active == 'true'
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICES_FILE: config/render-services.staging.json
+          RENDER_SERVICE_IDS: ''
+        run: bash scripts/render-deploy.sh "${{ github.event.workflow_run.head_sha || github.sha }}"
+
+      - name: Wait for every staging service
+        if: steps.cfg.outputs.active == 'true'
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICES_FILE: config/render-services.staging.json
+        run: bash scripts/render-guard.sh verify "${{ github.event.workflow_run.head_sha || github.sha }}"
+
+      - name: Strict smoke test (staging)
+        if: steps.cfg.outputs.active == 'true'
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if SMOKE_STRICT=true GATEWAY_URL="${{ steps.cfg.outputs.gateway }}" bash scripts/smoke-test.sh; then
+              exit 0
+            fi
+            echo "Staging smoke attempt $attempt failed — retry in 30s"
+            sleep 30
+          done
+          echo "::error::Staging failed the strict smoke — production NOT deployed."
+          exit 1
+
   deploy-render:
+    needs: deploy-staging
     # Deploy from clskas/mova only (same commit SHA pushed to afri-soft for Render).
     if: >
       github.repository != 'afri-soft-com/mova' &&

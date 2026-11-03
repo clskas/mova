@@ -4,8 +4,12 @@ import 'package:in_app_update/in_app_update.dart';
 /// Snapshot of Play Core in-app update (versionCode only — the boolean
 /// `updateAvailable` stays true after a store install and kept the banner).
 class PlayUpdateProbe {
-  const PlayUpdateProbe({this.availableVersionCode = 0});
+  const PlayUpdateProbe({this.availableVersionCode = 0, this.confirmedNoUpdate = false});
   final int availableVersionCode;
+
+  /// Play answered and has nothing newer for this device (not in rollout, review
+  /// pending, internal-only build). False when the probe failed / sideload / iOS.
+  final bool confirmedNoUpdate;
 }
 
 /// Google Play In-App Updates (Android). No-op on iOS / web / sideload.
@@ -17,7 +21,11 @@ class PlayInAppUpdate {
     if (!supported) return const PlayUpdateProbe();
     try {
       final info = await InAppUpdate.checkForUpdate();
-      return PlayUpdateProbe(availableVersionCode: info.availableVersionCode ?? 0);
+      return PlayUpdateProbe(
+        availableVersionCode: info.availableVersionCode ?? 0,
+        confirmedNoUpdate:
+            info.updateAvailability == UpdateAvailability.updateNotAvailable,
+      );
     } catch (_) {
       return const PlayUpdateProbe();
     }

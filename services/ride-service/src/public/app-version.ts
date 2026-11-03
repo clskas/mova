@@ -145,3 +145,41 @@ export function buildMobileAppVersionResponse(
     },
   };
 }
+
+export type MobileClientPlatform = 'ios' | 'android' | 'unknown';
+
+export function resolveClientPlatform(header?: string | string[], query?: string): MobileClientPlatform {
+  const raw = (Array.isArray(header) ? header[0] : header) || query || '';
+  const value = raw.trim().toLowerCase();
+  if (value === 'ios') return 'ios';
+  if (value === 'android') return 'android';
+  return 'unknown';
+}
+
+function iosBlock(block: MobileAppVersionBlock, live: string | null): MobileAppVersionBlock {
+  // Not live / unknown → advertise nothing (no banner beats a banner the App Store cannot satisfy).
+  const current = live ?? '0.0.0';
+  // A forced min above what Apple serves would lock iPhones on an impossible update.
+  const minVersion = compareSemver(block.minVersion, current) > 0 ? current : block.minVersion;
+  return {
+    ...block,
+    currentVersion: current,
+    // Build numbers are not exposed by Apple's lookup: compare marketing versions only.
+    currentVersionCode: 0,
+    minVersion,
+    minVersionCode: 0,
+    storeUrl: block.storeUrlIos,
+  };
+}
+
+/** iOS clients: advertise only what the App Store actually serves. */
+export function applyIosLiveVersions(
+  response: MobileAppVersionResponse,
+  live: { passenger: string | null; driver: string | null },
+): MobileAppVersionResponse {
+  return {
+    ...response,
+    passenger: iosBlock(response.passenger, live.passenger),
+    driver: iosBlock(response.driver, live.driver),
+  };
+}

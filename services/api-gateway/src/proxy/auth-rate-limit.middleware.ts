@@ -9,7 +9,7 @@ import { Request, Response, NextFunction } from 'express';
  * This middleware is registered ahead of the proxy instead.
  *
  * Limit is generous on purpose: RDC mobile carriers put many subscribers behind
- * one CGNAT address. Per-phone limits live in auth-service.
+ * one CGNAT address. The SMS-cost protection is the per-phone quota in auth-service.
  */
 const AUTH_SENSITIVE_PREFIXES = [
   '/api/auth/otp/request',
@@ -21,7 +21,11 @@ const AUTH_SENSITIVE_PREFIXES = [
   '/api/auth/link-phone',
 ];
 
-export const AUTH_IP_LIMIT = 30;
+/** Several logins (2 sensitive calls each) per subscriber behind a shared IP. Override: AUTH_IP_RATE_LIMIT. */
+export const AUTH_IP_LIMIT = (() => {
+  const n = Number.parseInt(process.env.AUTH_IP_RATE_LIMIT ?? '', 10);
+  return Number.isFinite(n) && n > 0 ? n : 120;
+})();
 export const AUTH_IP_WINDOW_MS = 60_000;
 const MAX_TRACKED_KEYS = 50_000;
 

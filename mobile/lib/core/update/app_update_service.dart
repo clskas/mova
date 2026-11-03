@@ -221,6 +221,7 @@ class AppUpdateService extends Notifier<AppUpdateState> {
       next = reconcileWithPlay(
         next,
         playCode: play.availableVersionCode,
+        playConfirmedNoUpdate: play.confirmedNoUpdate,
         localBuild: localBuild,
         fallbackStoreUrl: defaultStoreUrl,
         advertisedCode: advertisedCode,
@@ -307,15 +308,23 @@ class AppUpdateService extends Notifier<AppUpdateState> {
   ///
   /// After install, when [localBuild] ≥ advertised store code, soft banners
   /// clear. Forced min-version banners are never cleared by Play.
+  ///
+  /// When Play explicitly answers « no update » ([playConfirmedNoUpdate]), the
+  /// soft banner hides: tapping it could only open a store page with nothing to
+  /// install (review pending, staged rollout, internal-only build).
   static AppUpdateState reconcileWithPlay(
     AppUpdateState next, {
     required int playCode,
     required int localBuild,
     String? fallbackStoreUrl,
     int advertisedCode = 0,
+    bool playConfirmedNoUpdate = false,
   }) {
     // Installed build already at/above store advertisement → hide.
     if (advertisedCode > 0 && localBuild > 0 && localBuild >= advertisedCode) {
+      return next.copyWith(updateAvailable: false, flexibleDownloaded: false);
+    }
+    if (playConfirmedNoUpdate && !next.forceUpdate) {
       return next.copyWith(updateAvailable: false, flexibleDownloaded: false);
     }
     if (playCode > 0 && localBuild > 0 && playCode > localBuild) {

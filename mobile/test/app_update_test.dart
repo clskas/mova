@@ -453,6 +453,54 @@ void main() {
       expect(afterPlay.showBanner, isTrue);
     });
 
+    test('Play confirming no update hides the soft banner (review / rollout pending)', () {
+      final fromApi = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.5',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 65,
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.5',
+        localBuild: 50,
+      )!;
+      final afterPlay = AppUpdateService.reconcileWithPlay(
+        fromApi,
+        playCode: 0,
+        localBuild: 50,
+        advertisedCode: 65,
+        playConfirmedNoUpdate: true,
+      );
+      expect(afterPlay.updateAvailable, isFalse);
+      expect(afterPlay.showBanner, isFalse);
+    });
+
+    test('Play confirming no update never clears a forced min-version banner', () {
+      final forced = AppUpdateService.parseRemote(
+        {
+          'passenger': {
+            'currentVersion': '1.0.9',
+            'minVersion': '1.0.9',
+            'currentVersionCode': 65,
+          },
+        },
+        isDriver: false,
+        localVersion: '1.0.5',
+        localBuild: 50,
+      )!;
+      final afterPlay = AppUpdateService.reconcileWithPlay(
+        forced,
+        playCode: 0,
+        localBuild: 50,
+        advertisedCode: 65,
+        playConfirmedNoUpdate: true,
+      );
+      expect(afterPlay.forceUpdate, isTrue);
+      expect(afterPlay.showBanner, isTrue);
+    });
+
     test('Play probe failure keeps API soft banner', () {
       final fromApi = AppUpdateService.parseRemote(
         {

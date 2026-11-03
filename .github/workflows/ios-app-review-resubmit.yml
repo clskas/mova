@@ -35,4 +35,8 @@ jobs:
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
           ASC_APPS: ${{ inputs.apps }}
           ASC_SUBMIT: ${{ inputs.submit }}
-        run: python scripts/asc_update_review_and_submit.py
+        run: |
+          # The script used to default to 1.0.18 and rename the version under review.
+          ASC_VERSION=$(grep -E '^version:' mobile/pubspec.yaml | head -1 | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+          export ASC_VERSION
+          python scripts/asc_update_review_and_submit.py

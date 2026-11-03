@@ -9,7 +9,8 @@
  * render-guard.sh work unchanged with RENDER_SERVICES_FILE.
  *
  * Env: RENDER_API_KEY (required), RENDER_OWNER_ID, RENDER_REPO, RENDER_BRANCH,
- *      STAGING_PLAN (default starter), STAGING_DB_PLAN (default basic_256mb).
+ *      STAGING_PLAN (default starter), STAGING_DB_PLAN (default basic_256mb),
+ *      STAGING_KV_PLAN (default starter).
  */
 import { randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
@@ -25,6 +26,8 @@ const BRANCH = process.env.RENDER_BRANCH || 'main';
 const REGION = process.env.RENDER_REGION || 'frankfurt';
 const PLAN = process.env.STAGING_PLAN || 'starter';
 const DB_PLAN = process.env.STAGING_DB_PLAN || 'basic_256mb';
+// Render allows a single free Key Value per workspace — production already uses it.
+const KV_PLAN = process.env.STAGING_KV_PLAN || 'starter';
 const PREFIX = 'mova-stg';
 
 const key = process.env.RENDER_API_KEY;
@@ -113,11 +116,11 @@ async function ensureKeyValue() {
   const name = `${PREFIX}-redis`;
   let kv = (await listAll('/key-value', 'keyValue')).find((k) => k.name === name);
   if (!kv) {
-    console.log(`+ Creating Key Value ${name} (free)…`);
+    console.log(`+ Creating Key Value ${name} (${KV_PLAN})…`);
     kv = await api('POST', '/key-value', {
       name,
       ownerId: OWNER_ID,
-      plan: 'free',
+      plan: KV_PLAN,
       region: REGION,
     });
   } else {

@@ -536,6 +536,8 @@ jobs:
     timeout-minutes: 90
     strategy:
       fail-fast: false
+      # One macOS runner at a time: the second matrix job sat queued and was cancelled.
+      max-parallel: 1
       matrix:
         include:
           - flavor: passenger
@@ -838,12 +840,17 @@ jobs:
             # shellcheck disable=SC1091
             source /tmp/asc-venv/bin/activate
             pip install --quiet PyJWT cryptography
-            # App Store version record must carry the app's marketing version: it is what
-            # Apple publishes and what /public/app-version serves to iPhones.
-            export ASC_VERSION=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
             # MÃªme logique que build-ios (max run_number / pubspec +N), pas run_number seul.
             FLOOR=207
             PUBSPEC_LINE=$(grep -E '^version:' "$(git rev-parse --show-toplevel)/mobile/pubspec.yaml" | head -1)
+            # App Store version record must carry the app's marketing version: it is what
+            # Apple publishes and what /public/app-version serves to iPhones.
+            ASC_VERSION=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+            if ! printf '%s' "$ASC_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Cannot read the marketing version from mobile/pubspec.yaml"
+              exit 1
+            fi
+            export ASC_VERSION
             PUBSPEC_CODE=$(printf '%s' "$PUBSPEC_LINE" | sed -E 's/.*\+([0-9]+).*/\1/')
             ASC_CODE="${{ github.run_number }}"
             if [ "$ASC_CODE" -lt "$FLOOR" ]; then ASC_CODE="$FLOOR"; fi

@@ -18,6 +18,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -566,7 +567,10 @@ def process_app(token: str, key: str, do_submit: bool) -> None:
     cfg = APPS[key]
     print(f"\n=== {key} ({cfg['bundle_id']}) ===")
     app_id = find_app_id(token, cfg["bundle_id"])
-    version_string = os.environ.get("ASC_VERSION", "1.0.18").strip() or "1.0.18"
+    # No default: a silent fallback (formerly 1.0.18) renamed the App Store version under review.
+    version_string = os.environ.get("ASC_VERSION", "").strip()
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version_string):
+        raise SystemExit(f"ASC_VERSION must be the marketing version (x.y.z), got {version_string!r}")
     prefer_build = os.environ.get("ASC_BUILD_NUMBER", "").strip() or None
     replace_in_review = os.environ.get("ASC_REPLACE_IN_REVIEW", "false").strip().lower() in (
         "1",

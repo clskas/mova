@@ -1,7 +1,7 @@
 name: Render Provision Staging
 
 # Creates / repairs the pre-production stack (idempotent): mova-stg-* services,
-# one Postgres (one database per service), one Key Value. Mocked SMS / OTP /
+# one Postgres (one schema per service), one Key Value. Mocked SMS / OTP /
 # Mobile Money — never touches production data or real customers.
 # The generated config/render-services.staging.json activates the staging stage
 # of deploy.yml once committed.
@@ -23,9 +23,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-
-      - name: Install psql
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
 
       - name: Provision staging on Render
         env:

@@ -21,6 +21,16 @@ on:
         required: false
         type: boolean
         default: false
+      staging_only:
+        description: Pre-production only — deploy + check staging, never touch production
+        required: false
+        type: boolean
+        default: false
+      commit:
+        description: Commit SHA to deploy (default = the workflow ref). Must exist on afri-soft-com/mova.
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -64,14 +74,14 @@ jobs:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICES_FILE: config/render-services.staging.json
           RENDER_SERVICE_IDS: ''
-        run: bash scripts/render-deploy.sh "${{ github.event.workflow_run.head_sha || github.sha }}"
+        run: bash scripts/render-deploy.sh "${{ inputs.commit || github.event.workflow_run.head_sha || github.sha }}"
 
       - name: Wait for every staging service
         if: steps.cfg.outputs.active == 'true'
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICES_FILE: config/render-services.staging.json
-        run: bash scripts/render-guard.sh verify "${{ github.event.workflow_run.head_sha || github.sha }}"
+        run: bash scripts/render-guard.sh verify "${{ inputs.commit || github.event.workflow_run.head_sha || github.sha }}"
 
       - name: Strict smoke test (staging)
         if: steps.cfg.outputs.active == 'true'
@@ -91,6 +101,7 @@ jobs:
     # Deploy from clskas/mova only (same commit SHA pushed to afri-soft for Render).
     if: >
       github.repository != 'afri-soft-com/mova' &&
+      !(github.event_name == 'workflow_dispatch' && inputs.staging_only) &&
       (github.event_name == 'workflow_dispatch' ||
        (github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.head_branch == 'main'))

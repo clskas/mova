@@ -10,6 +10,11 @@ async function ensureWebHome(page: Page) {
   await expect(loginHeading).toBeVisible({ timeout: 15_000 });
 
   await page.getByPlaceholder("+243 8XX XXX XXX").fill("+243900000010");
+  // First login on this browser: « Continuer » stays disabled until CGU are accepted.
+  const cgu = page.getByRole("checkbox", { name: /j'accepte les CGU/i });
+  if (await cgu.isVisible().catch(() => false)) {
+    await cgu.check();
+  }
   await page.getByRole("button", { name: "Continuer", exact: true }).click();
   const smsFallback = page.getByRole("button", { name: "Recevoir un code SMS" });
   if (await smsFallback.isVisible().catch(() => false)) {

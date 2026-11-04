@@ -12,7 +12,7 @@ const DEMO_PHONES = {
 };
 
 async function userIdByPhone(phone: string): Promise<string | null> {
-  const res = await fetch(`${AUTH_SERVICE_URL}/internal/users?take=200`, {
+  const res = await fetch(`${AUTH_SERVICE_URL}/internal/users?take=200&includePlayPrelaunch=true`, {
     headers: { 'x-internal-api-key': INTERNAL_API_KEY },
   });
   if (!res.ok) return null;

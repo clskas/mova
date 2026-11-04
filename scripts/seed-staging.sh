@@ -60,7 +60,10 @@ export AUTH_SERVICE_URL="$AUTH_URL" INTERNAL_API_KEY
 run_seed() {
   local svc="$1" schema="$2"
   echo "=== seed $svc (schema $schema) ==="
-  ( cd "services/$svc" && DATABASE_URL="$(with_schema "$schema")" npx --yes tsx prisma/seed-demo.ts )
+  # npm workspaces hoist one shared @prisma/client: regenerate it for THIS service
+  # right before its seed, or it carries another service's models (UserRole undefined).
+  ( cd "services/$svc" && npx prisma generate >/dev/null \
+      && DATABASE_URL="$(with_schema "$schema")" npx --yes tsx prisma/seed-demo.ts )
 }
 
 run_seed auth-service auth

@@ -4,7 +4,8 @@ import {
   vehicleFitsPassengers,
   vehiclePassengerSeats,
 } from './passenger-seats';
-import { mergeClientAppsConfig, isPassengerCountEnabled } from './client-apps-config';
+import { mergeClientAppsConfig, isFamilialeEnabled, isPassengerCountEnabled } from './client-apps-config';
+import { RIDE_PASSENGER_LIMIT_BY_TYPE } from './passenger-seats';
 
 describe('passenger seats', () => {
   it('uses the category default when nothing is declared', () => {
@@ -51,5 +52,28 @@ describe('passenger seats', () => {
     expect(isPassengerCountEnabled(mergeClientAppsConfig({}))).toBe(false);
     expect(isPassengerCountEnabled(mergeClientAppsConfig({ features: { passengerCountEnabled: true } }))).toBe(true);
     expect(mergeClientAppsConfig({ features: { passengerCountEnabled: true } }).features.sengaPlusVisible).toBe(true);
+  });
+
+  it('handles the Familiale gamme (6 default, 5–8 declared)', () => {
+    expect(vehiclePassengerSeats('FAMILIALE')).toBe(6);
+    expect(vehiclePassengerSeats('XL', 8)).toBe(8);
+    expect(normalizeDeclaredSeats('FAMILIALE', 7)).toBe(7);
+    expect(normalizeDeclaredSeats('FAMILIALE', 4)).toBeNull();
+    expect(normalizeDeclaredSeats('FAMILIALE', 9)).toBeNull();
+    expect(vehicleFitsPassengers({ type: 'FAMILIALE', passengerSeats: null }, 6)).toBe(true);
+    expect(vehicleFitsPassengers({ type: 'FAMILIALE', passengerSeats: null }, 7)).toBe(false);
+    expect(normalizeRidePassengerCount('FAMILIALE', 8)).toBe(8);
+  });
+
+  it('caps groups per gamme in the passenger app', () => {
+    expect(RIDE_PASSENGER_LIMIT_BY_TYPE.STANDARD).toBe(4);
+    expect(RIDE_PASSENGER_LIMIT_BY_TYPE.VIP).toBe(4);
+    expect(RIDE_PASSENGER_LIMIT_BY_TYPE.FAMILIALE).toBe(8);
+  });
+
+  it('keeps the Familiale switch off by default', () => {
+    expect(isFamilialeEnabled(mergeClientAppsConfig({}))).toBe(false);
+    expect(isFamilialeEnabled(mergeClientAppsConfig({ features: { familialeEnabled: true } }))).toBe(true);
+    expect(mergeClientAppsConfig({ features: { familialeEnabled: true } }).features.passengerCountEnabled).toBe(false);
   });
 });

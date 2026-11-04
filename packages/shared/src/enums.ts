@@ -23,6 +23,8 @@ export enum VehicleType {
   STANDARD = 'STANDARD',
   COMFORT = 'COMFORT',
   VIP = 'VIP',
+  /** Grand véhicule 6–8 places (groupes de 5+ passagers). */
+  FAMILIALE = 'FAMILIALE',
   UTILITAIRE = 'UTILITAIRE',
   CAMION = 'CAMION',
 }

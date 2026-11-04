@@ -63,4 +63,30 @@ describe('DriversService — places passagers', () => {
     await expect(service.setVehiclePassengerSeats('u1', 2)).rejects.toBeDefined();
     expect(prisma.vehicle.update).not.toHaveBeenCalled();
   });
+
+  it('searches Familiale vehicles for Standard rides, and only them for Familiale rides', async () => {
+    prisma.driverProfile.findMany.mockResolvedValue([
+      { ...driver('xl', null), vehicles: [{ id: 'v-xl', type: VehicleType.FAMILIALE, passengerSeats: null }] },
+    ]);
+    const typesIn = () =>
+      (prisma.driverProfile.findMany.mock.calls.at(-1)?.[0] as { where: { vehicles: { some: { type: { in: string[] } } } } })
+        .where.vehicles.some.type.in;
+
+    await service.findNearby(-4.32, 15.31, VehicleType.STANDARD, 0, 'Kinshasa');
+    expect(typesIn()).toEqual([VehicleType.STANDARD, VehicleType.FAMILIALE]);
+
+    const seven = await service.findNearby(-4.32, 15.31, VehicleType.FAMILIALE, 0, 'Kinshasa', { minSeats: 6 });
+    expect(typesIn()).toEqual([VehicleType.FAMILIALE]);
+    expect(seven.map((d) => d.userId)).toEqual(['xl']); // 6 seats by default
+    const tooMany = await service.findNearby(-4.32, 15.31, VehicleType.FAMILIALE, 0, 'Kinshasa', { minSeats: 7 });
+    expect(tooMany).toEqual([]);
+  });
+
+  it('requires 5 to 8 declared seats on a Familiale vehicle', async () => {
+    prisma.driverProfile.findUnique.mockResolvedValue({
+      vehicles: [{ id: 'v1', type: VehicleType.FAMILIALE, isActive: true, typeApprovalStatus: KycStatus.APPROVED }],
+    });
+    await expect(service.setVehiclePassengerSeats('u1', 4)).rejects.toBeDefined();
+    await expect(service.setVehiclePassengerSeats('u1', 8)).resolves.toMatchObject({ passengerSeats: 8 });
+  });
 });

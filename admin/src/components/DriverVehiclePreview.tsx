@@ -9,6 +9,7 @@ const VEHICLE_TYPE_LABELS: Record<string, string> = {
   STANDARD: "Standard",
   COMFORT: "Confort",
   VIP: "VIP",
+  FAMILIALE: "Familiale",
   UTILITAIRE: "Utilitaire",
   CAMION: "Camion",
 };

@@ -10,11 +10,15 @@ class PassengerCountSelector extends StatelessWidget {
     required this.count,
     required this.onChanged,
     this.max = kMaxRidePassengerCount,
+    this.note,
   });
 
   final int count;
   final ValueChanged<int> onChanged;
   final int max;
+
+  /// Replaces the default hint (e.g. « gamme Familiale sélectionnée »).
+  final String? note;
 
   @override
   Widget build(BuildContext context) {
@@ -55,10 +59,22 @@ class PassengerCountSelector extends StatelessWidget {
             ),
           ],
         ),
-        if (count > standardSeats)
+        if (note != null)
+          Text(
+            note!,
+            key: const Key('passengerCountNote'),
+            style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+          )
+        else if (count > standardSeats)
           Text(
             'Seules les voitures de $count places ou plus recevront la course : l\'attente peut être plus longue.',
             style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+          )
+        else if (count >= max && max <= kCarPassengerLimit)
+          const Text(
+            '4 passagers maximum par voiture.',
+            key: Key('passengerCountNote'),
+            style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
           ),
       ],
     );

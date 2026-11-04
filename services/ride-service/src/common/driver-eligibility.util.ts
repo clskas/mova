@@ -249,7 +249,13 @@ export async function assertDriverEligibleForRentalLogistics(userId: string): Pr
     })
     .filter((t): t is VehicleTypeValue => t != null);
   const hasCargo = types.some(
-    (t) => t === 'STANDARD' || t === 'COMFORT' || t === 'VIP' || t === 'UTILITAIRE' || t === 'CAMION',
+    (t) =>
+      t === 'STANDARD' ||
+      t === 'COMFORT' ||
+      t === 'VIP' ||
+      t === 'FAMILIALE' ||
+      t === 'UTILITAIRE' ||
+      t === 'CAMION',
   );
   if (!hasCargo) {
     throw new MovaHttpException(

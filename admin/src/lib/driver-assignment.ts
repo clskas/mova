@@ -1,6 +1,6 @@
 import type { AdminDriver } from "./api";
 
-const CARGO_VEHICLE_TYPES = new Set(["STANDARD", "COMFORT", "VIP", "UTILITAIRE", "CAMION"]);
+const CARGO_VEHICLE_TYPES = new Set(["STANDARD", "COMFORT", "VIP", "FAMILIALE", "UTILITAIRE", "CAMION"]);
 
 function activeVehicleTypes(driver: AdminDriver): string[] {
   return (driver.vehicles ?? [])
@@ -80,6 +80,9 @@ export function filterDriversForRideVehicle(
     }
     if (rideType === "VIP") {
       return types.includes("VIP");
+    }
+    if (rideType === "FAMILIALE") {
+      return types.includes("FAMILIALE");
     }
     return true;
   });

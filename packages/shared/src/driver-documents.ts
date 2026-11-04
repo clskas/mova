@@ -129,7 +129,7 @@ export function evaluateDriverDocuments(
         : "Type d'engin refusé par SENGA. Modifiez le type déclaré ou la photo de l'engin dans Enregistrement.";
     } else {
       blockReason =
-        "Type d'engin en attente de validation SENGA (vérifiez la photo et la catégorie déclarée : Moto-taxi, Standard, Confort ou VIP).";
+        "Type d'engin en attente de validation SENGA (vérifiez la photo et la catégorie déclarée : Moto-taxi, Standard, Confort, VIP ou Familiale).";
     }
   }
 

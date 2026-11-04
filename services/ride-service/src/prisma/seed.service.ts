@@ -11,6 +11,8 @@ const PRICING_RULES = [
   { vehicleType: VehicleType.STANDARD, baseFareCdf: 3000, perKmCdf: 1500, perMinuteCdf: 200, minFareCdf: 5000, peakMultiplier: 1.3, nightMultiplier: 1.2 },
   { vehicleType: VehicleType.COMFORT, baseFareCdf: 5000, perKmCdf: 2500, perMinuteCdf: 300, minFareCdf: 8000, peakMultiplier: 1.4, nightMultiplier: 1.3 },
   { vehicleType: VehicleType.VIP, baseFareCdf: 8000, perKmCdf: 3500, perMinuteCdf: 400, minFareCdf: 12000, peakMultiplier: 1.5, nightMultiplier: 1.4 },
+  // Familiale (6–8 places) ≈ Standard + 30 %, as UberXL / Bolt XL. Editable in Admin → Tarifs.
+  { vehicleType: VehicleType.FAMILIALE, baseFareCdf: 4000, perKmCdf: 1950, perMinuteCdf: 260, minFareCdf: 6500, peakMultiplier: 1.3, nightMultiplier: 1.2 },
 ];
 
 const SEED_CITIES = DRC_SERVICE_AREAS.map((a) => a.name);
@@ -20,6 +22,7 @@ const CANCELLATION_POLICIES = [
   { vehicleType: VehicleType.STANDARD, freeCancelMinutes: 3, passengerFeeCdf: 2000, driverCompensationCdf: 1000, noShowFeeCdf: 5000 },
   { vehicleType: VehicleType.COMFORT, freeCancelMinutes: 5, passengerFeeCdf: 3000, driverCompensationCdf: 1500, noShowFeeCdf: 8000 },
   { vehicleType: VehicleType.VIP, freeCancelMinutes: 5, passengerFeeCdf: 5000, driverCompensationCdf: 2500, noShowFeeCdf: 10000 },
+  { vehicleType: VehicleType.FAMILIALE, freeCancelMinutes: 3, passengerFeeCdf: 2500, driverCompensationCdf: 1250, noShowFeeCdf: 6000 },
 ];
 
 const RESTAURANTS = [

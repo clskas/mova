@@ -797,7 +797,7 @@ describe('RidesService', () => {
   });
 
   describe('nombre de passagers (voiture)', () => {
-    const flags = { passengerCountEnabled: true };
+    const flags = { passengerCountEnabled: true, familialeEnabled: false };
     const clientApps = { get: () => ({ features: { sengaPlusVisible: true, ...flags } }) };
     const groupService = new RidesService(
       prisma as never,
@@ -864,6 +864,7 @@ describe('RidesService', () => {
 
     beforeEach(() => {
       flags.passengerCountEnabled = true;
+      flags.familialeEnabled = false;
       Object.assign(trackingGateway, { broadcastOfferTaken: jest.fn() });
       prisma.ride.findFirst.mockResolvedValue(null);
       prisma.ride.findMany.mockResolvedValue([]);
@@ -884,6 +885,50 @@ describe('RidesService', () => {
         expect.objectContaining({ data: expect.objectContaining({ passengerCount: 3 }) }),
       );
       expect(result.passengerCount).toBe(3);
+    });
+
+    it('refuses a Familiale ride while its switch is off', async () => {
+      await expect(
+        groupService.createRide('p1', { ...baseCreate, vehicleType: VehicleType.FAMILIALE, passengerCount: 6 }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ message: expect.stringContaining('Familiale') }),
+      });
+      expect(prisma.ride.create).not.toHaveBeenCalled();
+    });
+
+    it('books a Familiale ride for a group of 7 when the switch is on', async () => {
+      flags.familialeEnabled = true;
+      const result = await groupService.createRide('p1', {
+        ...baseCreate,
+        vehicleType: VehicleType.FAMILIALE,
+        passengerCount: 7,
+      });
+      expect(prisma.ride.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ vehicleType: VehicleType.FAMILIALE, passengerCount: 7 }),
+        }),
+      );
+      expect(result.passengerCount).toBe(7);
+    });
+
+    it('lets a Familiale vehicle (6 seats by default) take a Standard group of 5', async () => {
+      prisma.ride.findUnique.mockResolvedValue(searchingRide(5));
+      prisma.ride.update.mockResolvedValue({ ...searchingRide(5), status: RideStatus.ACCEPTED, driverId: 'driver-1' });
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          userId: 'driver-1',
+          isAvailable: true,
+          kycStatus: 'APPROVED',
+          activationPinVerified: true,
+          documentsStatus: { canOperate: true },
+          currentLat: -4.321,
+          currentLng: 15.311,
+          vehicles: [{ id: 'v9', type: 'FAMILIALE', isActive: true, typeApprovalStatus: 'APPROVED', passengerSeats: null }],
+        }),
+      }) as never;
+      const result = await groupService.acceptRide('ride-g', 'driver-1');
+      expect(result.passengerCount).toBe(5);
     });
 
     it('forces 1 passenger on a moto and when the feature is off', async () => {

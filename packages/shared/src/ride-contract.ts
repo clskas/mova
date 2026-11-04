@@ -9,9 +9,16 @@ export type MobileRideStatus =
   | 'COMPLETED'
   | 'CANCELLED';
 
-export type MobileVehicleType = 'MOTO' | 'STANDARD' | 'CONFORT' | 'VIP';
+export type MobileVehicleType = 'MOTO' | 'STANDARD' | 'CONFORT' | 'VIP' | 'FAMILIALE';
 
-export type VehicleTypeValue = 'MOTO_TAXI' | 'STANDARD' | 'COMFORT' | 'VIP' | 'UTILITAIRE' | 'CAMION';
+export type VehicleTypeValue =
+  | 'MOTO_TAXI'
+  | 'STANDARD'
+  | 'COMFORT'
+  | 'VIP'
+  | 'FAMILIALE'
+  | 'UTILITAIRE'
+  | 'CAMION';
 export type RideStatusValue =
   | 'REQUESTED'
   | 'SEARCHING'
@@ -34,6 +41,13 @@ const VEHICLE_ALIASES: Record<string, VehicleTypeValue> = {
   CONFORT: 'COMFORT',
   COMFORT: 'COMFORT',
   VIP: 'VIP',
+  FAMILIALE: 'FAMILIALE',
+  FAMILIAL: 'FAMILIALE',
+  FAMILY: 'FAMILIALE',
+  XL: 'FAMILIALE',
+  VAN: 'FAMILIALE',
+  MINIVAN: 'FAMILIALE',
+  MONOSPACE: 'FAMILIALE',
   UTILITAIRE: 'UTILITAIRE',
   CAMION: 'CAMION',
 };
@@ -65,6 +79,8 @@ export function toMobileVehicleType(type: VehicleTypeValue): MobileVehicleType {
       return 'CONFORT';
     case 'VIP':
       return 'VIP';
+    case 'FAMILIALE':
+      return 'FAMILIALE';
     case 'UTILITAIRE':
     case 'CAMION':
       return 'STANDARD';
@@ -84,6 +100,10 @@ export function rideTypesDriverCanServe(driverVehicleTypes: VehicleTypeValue[]):
       case 'VIP':
         types.add(vt);
         break;
+      case 'FAMILIALE':
+        types.add('FAMILIALE');
+        types.add('STANDARD');
+        break;
       case 'UTILITAIRE':
       case 'CAMION':
         break;
@@ -101,10 +121,13 @@ export function driverVehicleTypesForRide(rideType: VehicleTypeValue | string): 
     return [];
   }
   switch (normalized) {
-    case 'MOTO_TAXI':
     case 'STANDARD':
+      // A Familiale (6–8 seats) vehicle can also take a Standard ride.
+      return ['STANDARD', 'FAMILIALE'];
+    case 'MOTO_TAXI':
     case 'COMFORT':
     case 'VIP':
+    case 'FAMILIALE':
       return [normalized];
     default:
       return [];
@@ -124,7 +147,13 @@ export function driverEligibleForParcelWeight(
 ): boolean {
   const types = driverVehicleTypes.filter(Boolean);
   const hasCar = types.some(
-    (t) => t === 'STANDARD' || t === 'COMFORT' || t === 'VIP' || t === 'UTILITAIRE' || t === 'CAMION',
+    (t) =>
+      t === 'STANDARD' ||
+      t === 'COMFORT' ||
+      t === 'VIP' ||
+      t === 'FAMILIALE' ||
+      t === 'UTILITAIRE' ||
+      t === 'CAMION',
   );
   const hasMoto = types.includes('MOTO_TAXI');
   const cat = (weightCategory ?? 'SMALL').toUpperCase();
@@ -163,11 +192,14 @@ export function driverEligibleForMoving(
           t === 'STANDARD' ||
           t === 'COMFORT' ||
           t === 'VIP' ||
+          t === 'FAMILIALE' ||
           t === 'UTILITAIRE' ||
           t === 'CAMION',
       );
     case 'CAMION_30M3':
-      return active.some((t) => t === 'UTILITAIRE' || t === 'CAMION' || t === 'COMFORT' || t === 'VIP');
+      return active.some(
+        (t) => t === 'UTILITAIRE' || t === 'CAMION' || t === 'COMFORT' || t === 'VIP' || t === 'FAMILIALE',
+      );
     case 'CAMION_50M3':
       return active.some((t) => t === 'CAMION' || t === 'UTILITAIRE');
     default:

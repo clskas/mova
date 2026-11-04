@@ -26,10 +26,11 @@ void main() {
       expect(MarketConfig.vehicleTypesForCategory('TAXI').map((v) => v.id), ['STANDARD', 'COMFORT', 'VIP']);
     });
 
-    test('matching chauffeur : catégorie exacte uniquement', () {
+    test('matching chauffeur : catégorie exacte (+ Familiale pour Standard)', () {
       expect(MarketConfig.driverVehicleTypesForRide('MOTO'), ['MOTO_TAXI']);
-      expect(MarketConfig.driverVehicleTypesForRide('TAXI'), ['STANDARD']);
-      expect(MarketConfig.driverVehicleTypesForRide('STANDARD'), ['STANDARD']);
+      expect(MarketConfig.driverVehicleTypesForRide('TAXI'), ['STANDARD', 'FAMILIALE']);
+      expect(MarketConfig.driverVehicleTypesForRide('STANDARD'), ['STANDARD', 'FAMILIALE']);
+      expect(MarketConfig.driverVehicleTypesForRide('FAMILIALE'), ['FAMILIALE']);
       expect(MarketConfig.driverVehicleTypesForRide('CONFORT'), ['COMFORT']);
       expect(MarketConfig.driverVehicleTypesForRide('VIP'), ['VIP']);
     });

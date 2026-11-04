@@ -43,6 +43,29 @@ case "$PG_URL" in
 esac
 echo "::add-mask::$PG_URL"
 
+# The staging DB accepts no outside connection (empty IP allow list). Open it to this
+# machine's IP only for the duration of the seed, and always restore it on exit.
+ORIG_ALLOW=$(render "/postgres/$PG_ID" | jq -c '.ipAllowList // []')
+MY_IP=$(curl -sf -m 10 https://api.ipify.org)
+[ -n "$MY_IP" ] || { echo "::error::Cannot read this runner's public IP."; exit 1; }
+set_allow() {
+  curl -sf -o /dev/null -X PATCH "$API/postgres/$PG_ID" \
+    -H "Authorization: Bearer $RENDER_API_KEY" -H 'Content-Type: application/json' \
+    -d "$(jq -n --argjson l "$1" '{ipAllowList: $l}')"
+}
+restore_allow() {
+  if set_allow "$ORIG_ALLOW"; then echo "Staging DB allow list restored: $ORIG_ALLOW"
+  else echo "::error::Could not restore the staging DB allow list — reset it to $ORIG_ALLOW in Render."; fi
+}
+trap restore_allow EXIT
+set_allow "$(jq -c --arg ip "$MY_IP/32" '. + [{cidrBlock: $ip, description: "seed-staging (temporary)"}]' <<<"$ORIG_ALLOW")"
+echo "Staging DB temporarily open to $MY_IP/32"
+for i in $(seq 1 12); do
+  node -e 'const n=require("net"),u=new URL(process.argv[1]);const s=n.connect(+(u.port||5432),u.hostname,()=>{s.end();process.exit(0)});s.on("error",()=>process.exit(1));setTimeout(()=>process.exit(1),5000)' "$PG_URL" && break
+  sleep 5
+done
+sleep 15  # allow-list propagation
+
 INTERNAL_API_KEY=$(render "/services/$GW_ID/env-vars?limit=100" \
   | jq -r '[.[] | (.envVar // .) | select(.key == "INTERNAL_API_KEY") | .value][0] // empty')
 [ -n "$INTERNAL_API_KEY" ] || { echo "::error::INTERNAL_API_KEY not found on staging gateway."; exit 1; }
@@ -62,8 +85,13 @@ run_seed() {
   echo "=== seed $svc (schema $schema) ==="
   # npm workspaces hoist one shared @prisma/client: regenerate it for THIS service
   # right before its seed, or it carries another service's models (UserRole undefined).
-  ( cd "services/$svc" && npx prisma generate >/dev/null \
-      && DATABASE_URL="$(with_schema "$schema")" npx --yes tsx prisma/seed-demo.ts )
+  ( cd "services/$svc" && npx prisma generate >/dev/null ) || return 1
+  local url; url="$(with_schema "$schema")"
+  for attempt in 1 2 3 4; do  # idempotent: retries cover allow-list propagation
+    ( cd "services/$svc" && DATABASE_URL="$url" npx --yes tsx prisma/seed-demo.ts ) && return 0
+    echo "seed $svc attempt $attempt failed — retry in 20s"; sleep 20
+  done
+  return 1
 }
 
 run_seed auth-service auth

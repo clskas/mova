@@ -32,7 +32,7 @@ export class MatchingService {
     lng: number,
     vehicleType: VehicleType | string,
     searchAttempt = 0,
-    opts?: { forDelivery?: boolean },
+    opts?: { forDelivery?: boolean; minSeats?: number },
   ): Promise<DriverCandidate[]> {
     let normalized: VehicleType;
     try {
@@ -42,9 +42,10 @@ export class MatchingService {
     }
     const city = resolveCityFromCoords(lat, lng);
     const deliveryQ = opts?.forDelivery ? '&forDelivery=true' : '';
+    const seatsQ = opts?.minSeats && opts.minSeats > 1 ? `&minSeats=${Math.floor(opts.minSeats)}` : '';
     const url = serviceUrl(
       'driver',
-      `/internal/drivers/nearby?lat=${lat}&lng=${lng}&vehicleType=${normalized}&searchAttempt=${searchAttempt}&city=${encodeURIComponent(city)}${deliveryQ}`,
+      `/internal/drivers/nearby?lat=${lat}&lng=${lng}&vehicleType=${normalized}&searchAttempt=${searchAttempt}&city=${encodeURIComponent(city)}${deliveryQ}${seatsQ}`,
     );
     const res = await fetch(url, { headers: { 'x-internal-api-key': INTERNAL_API_KEY } });
     if (!res.ok) return [];

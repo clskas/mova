@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { AdminPermission, VehicleType, normalizeVehicleType } from '@mova/shared';
-import { IsArray, IsBoolean, IsEnum, IsIn, IsOptional, IsString, ValidateIf } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min, ValidateIf } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -26,6 +26,16 @@ class ApproveKycDto {
   @IsOptional()
   @IsEnum(VehicleType)
   vehicleType?: VehicleType;
+}
+
+class VehicleSeatsDto {
+  @ApiProperty({ nullable: true, description: 'Places passagers (1–8, moto 1) ; null = valeur par défaut de la catégorie' })
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(8)
+  passengerSeats: number | null;
 }
 
 class UpdateUserDto {
@@ -340,6 +350,17 @@ export class AdminController {
       dto.notes,
       resolveManagedCityScope(req.user),
     );
+  }
+
+  @Patch('drivers/:userId/vehicle-seats')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: 'Corriger le nombre de places passagers du véhicule actif' })
+  setVehicleSeats(
+    @Param('userId') userId: string,
+    @Body() dto: VehicleSeatsDto,
+    @Request() req: { user: AdminJwtUser },
+  ) {
+    return this.adminService.setDriverVehicleSeats(userId, dto.passengerSeats ?? null, resolveManagedCityScope(req.user));
   }
 
   @Patch('drivers/:userId/vehicle-type')

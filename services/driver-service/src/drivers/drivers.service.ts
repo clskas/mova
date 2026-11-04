@@ -29,6 +29,9 @@ import {
   type DriverDocumentsStatus,
   type AuthUserNotifyResult,
   type DocumentsReminder,
+  normalizeDeclaredSeats,
+  vehicleFitsPassengers,
+  vehiclePassengerSeats,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateOnboardingDto } from './drivers.dto';
@@ -212,9 +215,10 @@ export class DriversService {
     vehicleType: VehicleType,
     searchAttempt = 0,
     city?: string,
-    opts?: { forDelivery?: boolean },
+    opts?: { forDelivery?: boolean; minSeats?: number },
   ): Promise<DriverCandidate[]> {
     const matching = this.matchingConfig.get();
+    const minSeats = Math.max(1, Math.floor(opts?.minSeats ?? 1));
     const effectiveRadius = Math.min(
       matching.initialRadiusKm + searchAttempt * matching.radiusIncrementKm,
       matching.maxRadiusKm,
@@ -239,6 +243,9 @@ export class DriversService {
     for (const driver of drivers) {
       if (!this.documentsStatusFor(driver).canOperate) continue;
       if (driver.currentLat == null || driver.currentLng == null) continue;
+      // Group rides: only vehicles with enough passenger seats (undeclared = category default).
+      const fitting = driver.vehicles.filter((v) => vehicleFitsPassengers(v, minSeats));
+      if (fitting.length === 0) continue;
       const distanceKm = this.haversineKm(lat, lng, driver.currentLat, driver.currentLng);
       if (distanceKm > effectiveRadius) continue;
       const sameCity = driver.operatingCity === pickupCity;
@@ -252,7 +259,7 @@ export class DriversService {
         rating,
         distanceKm,
         score: sameCity ? baseScore : baseScore * 0.85,
-        vehicleId: driver.vehicles[0]?.id,
+        vehicleId: fitting[0]?.id,
       });
     }
     return candidates.sort((a, b) => b.score - a.score);
@@ -593,6 +600,8 @@ export class DriversService {
             plateNumber: vehicle.plateNumber,
             color: vehicle.color,
             imageUrl: vehicle.imageUrl,
+            passengerSeats: vehiclePassengerSeats(vehicle.type, vehicle.passengerSeats),
+            passengerSeatsDeclared: vehicle.passengerSeats != null,
             typeApprovalStatus: vehicle.typeApprovalStatus,
             typeApprovalNotes: vehicle.typeApprovalNotes,
             typeApprovedAt: vehicle.typeApprovedAt,
@@ -639,9 +648,32 @@ export class DriversService {
 
     await this.prisma.driverProfile.update({ where: { userId }, data: profileData });
 
-    if (dto.plateNumber || dto.vehicleMake || dto.vehicleModel || dto.vehicleType || dto.vehicleColor || dto.vehicleImageUrl) {
+    if (
+      dto.plateNumber ||
+      dto.vehicleMake ||
+      dto.vehicleModel ||
+      dto.vehicleType ||
+      dto.vehicleColor ||
+      dto.vehicleImageUrl ||
+      dto.vehiclePassengerSeats !== undefined
+    ) {
       const vehicle = profile.vehicles.find((v) => v.isActive) ?? profile.vehicles[0];
       if (vehicle) {
+        // Seats are checked against the (new) type: a moto carries 1 passenger.
+        let passengerSeats: number | null | undefined;
+        if (dto.vehiclePassengerSeats !== undefined) {
+          passengerSeats = normalizeDeclaredSeats(dto.vehicleType ?? vehicle.type, dto.vehiclePassengerSeats);
+          if (passengerSeats == null) {
+            throw new MovaHttpException(
+              MovaErrorCode.VALIDATION_ERROR,
+              undefined,
+              'Nombre de places invalide pour ce type de véhicule (moto : 1 ; voiture : 1 à 8).',
+            );
+          }
+        } else if (dto.vehicleType !== undefined && vehicle.passengerSeats != null) {
+          // Type changed: keep the declaration only if still valid for the new type.
+          if (normalizeDeclaredSeats(dto.vehicleType, vehicle.passengerSeats) == null) passengerSeats = null;
+        }
         const typeOrPhotoChanged = dto.vehicleType !== undefined || dto.vehicleImageUrl !== undefined;
         await this.prisma.vehicle.update({
           where: { id: vehicle.id },
@@ -652,6 +684,7 @@ export class DriversService {
             ...(dto.vehicleType !== undefined ? { type: dto.vehicleType } : {}),
             ...(dto.vehicleColor !== undefined ? { color: dto.vehicleColor } : {}),
             ...(dto.vehicleImageUrl !== undefined ? { imageUrl: dto.vehicleImageUrl } : {}),
+            ...(passengerSeats !== undefined ? { passengerSeats } : {}),
             ...(typeOrPhotoChanged
               ? { typeApprovalStatus: KycStatus.PENDING, typeApprovalNotes: null, typeApprovedAt: null }
               : {}),
@@ -727,6 +760,35 @@ export class DriversService {
       notes: notes ?? null,
       documentsStatus: this.documentsStatusFor(updated),
       message: 'Renouvellement validé — le chauffeur peut repasser en ligne.',
+    };
+  }
+
+  /** Admin correction of a vehicle's passenger seats (null = back to the category default). */
+  async setVehiclePassengerSeats(userId: string, seats: number | null) {
+    const profile = await this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
+    if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+    const vehicle = profile.vehicles.find((v) => v.isActive) ?? profile.vehicles[0];
+    if (!vehicle) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Aucun véhicule enregistré pour ce chauffeur.');
+    }
+    let passengerSeats: number | null = null;
+    if (seats != null) {
+      passengerSeats = normalizeDeclaredSeats(vehicle.type, seats);
+      if (passengerSeats == null) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'Nombre de places invalide pour ce type de véhicule (moto : 1 ; voiture : 1 à 8).',
+        );
+      }
+    }
+    await this.prisma.vehicle.update({ where: { id: vehicle.id }, data: { passengerSeats } });
+    return {
+      userId,
+      vehicleId: vehicle.id,
+      vehicleType: vehicle.type,
+      passengerSeats: vehiclePassengerSeats(vehicle.type, passengerSeats),
+      passengerSeatsDeclared: passengerSeats != null,
     };
   }
 
@@ -1660,6 +1722,8 @@ export class DriversService {
             plateNumber: vehicle.plateNumber,
             color: vehicle.color,
             imageUrl: vehicle.imageUrl,
+            passengerSeats: vehiclePassengerSeats(vehicle.type, vehicle.passengerSeats),
+            passengerSeatsDeclared: vehicle.passengerSeats != null,
             typeApprovalStatus: vehicle.typeApprovalStatus,
             typeApprovalNotes: vehicle.typeApprovalNotes,
             typeApprovedAt: vehicle.typeApprovedAt,

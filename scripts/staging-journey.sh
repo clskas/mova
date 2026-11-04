@@ -65,6 +65,19 @@ call GET "/rides/$RIDE" | field '.id // .ride.id // .data.id' | grep -q "$RIDE" 
 step "Cancel ride"
 call POST "/rides/$RIDE/cancel" '{"reason":"staging journey"}' >/dev/null || fail "cancel ride"
 
+step "Group ride (3 passengers)"
+# Feature off -> the API stores 1 passenger; on -> 3. Either way the field must be accepted.
+FLAG=$(curl -s --max-time 30 "$API/public/client-config" | jq -r '.features.passengerCountEnabled // false')
+GROUP_TRIP=$(jq -c '. + {passengerCount: 3}' <<<"$TRIP")
+GRIDE_JSON=$(call POST /rides "$GROUP_TRIP") || fail "create group ride"
+GRIDE=$(field '.id // .ride.id // .data.id' <<<"$GRIDE_JSON")
+[ -n "$GRIDE" ] || fail "no group ride id"
+GOT=$(call GET "/rides/$GRIDE" | field '.passengerCount // .ride.passengerCount // .data.passengerCount')
+WANT=1; [ "$FLAG" = "true" ] && WANT=3
+[ "$GOT" = "$WANT" ] || { call POST "/rides/$GRIDE/cancel" '{"reason":"staging journey"}' >/dev/null || true; fail "passengerCount=$GOT, expected $WANT (feature=$FLAG)"; }
+echo "passengerCount=$GOT (feature=$FLAG)"
+call POST "/rides/$GRIDE/cancel" '{"reason":"staging journey"}' >/dev/null || fail "cancel group ride"
+
 step "Wallet (payment-service)"
 call GET /wallet >/dev/null || fail "GET /wallet"
 

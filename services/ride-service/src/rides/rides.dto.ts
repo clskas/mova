@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 import { RideStatus, VehicleType } from '@prisma/client';
 import { normalizeVehicleType } from '@mova/shared';
 
@@ -28,6 +28,13 @@ export class EstimateRideDto {
 export class CreateRideDto extends EstimateRideDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() pickupAddress?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() dropoffAddress?: string;
+  @ApiProperty({ required: false, description: 'Nombre de passagers (voiture 1–8, moto 1). Absent = 1.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(8)
+  passengerCount?: number;
 }
 
 export class UpdateRideStatusDto {
@@ -58,6 +65,13 @@ export class NearbyVehiclesQueryDto {
   @Transform(({ value }) => toVehicleType(value))
   @IsEnum(VehicleType)
   vehicleType: VehicleType;
+  @ApiProperty({ required: false, description: 'Taille du groupe : seuls les véhicules assez grands' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(8)
+  passengerCount?: number;
 }
 
 /** Uber Pool — estimation tarif partagé. */

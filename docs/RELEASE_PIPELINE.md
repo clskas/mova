@@ -96,3 +96,19 @@ Pour publier une version :
 version qui tournait juste avant (Render + hub), sans repasser par la préproduction. Pour une
 version précise, indiquez son commit. Les mêmes contrôles et sauvegardes que pour un déploiement
 s'appliquent. Rappel : les migrations de base ne sont pas annulées.
+
+## Interrupteurs de fonctionnalité
+
+Une nouveauté risquée arrive **éteinte** et s'allume dans l'admin, sans redéploiement :
+Admin → Services SENGA. On l'allume d'abord en préproduction, puis en production.
+Si elle pose problème, on l'éteint : l'effet est immédiat, y compris pour les courses en cours de recherche.
+
+| Interrupteur | Effet quand il est éteint |
+|---|---|
+| Nombre de passagers (`features.passengerCountEnabled`) | Le sélecteur est masqué dans l'app passager ; toute course compte pour 1 passager ; la recherche ignore les places des véhicules. |
+
+Nombre de passagers : le chauffeur déclare les places de sa voiture (sans lui) dans
+Enregistrement → Véhicule ; sans déclaration, la valeur de la catégorie s'applique
+(moto 1, voiture 4). L'admin peut corriger sur la fiche chauffeur. Le prix ne dépend pas
+du nombre de passagers. Le Pool garde 1 place par réservation.
+

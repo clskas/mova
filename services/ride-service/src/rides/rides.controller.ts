@@ -129,7 +129,7 @@ export class RidesController {
   @Get('nearby-vehicles')
   @ApiOperation({ summary: 'Pins véhicules à proximité (filtrés Taxi / Moto)' })
   nearbyVehicles(@Query() q: NearbyVehiclesQueryDto) {
-    return this.ridesService.listNearbyVehicles(q.lat, q.lng, q.vehicleType);
+    return this.ridesService.listNearbyVehicles(q.lat, q.lng, q.vehicleType, q.passengerCount);
   }
 
   @Post()

@@ -175,6 +175,8 @@ export type AdminDriver = {
     typeApprovalStatus?: string;
     typeApprovalNotes?: string | null;
     typeApprovedAt?: string | null;
+    /** Declared passenger seats; null = category default. */
+    passengerSeats?: number | null;
   }[];
   createdAt?: string;
 };
@@ -2287,6 +2289,13 @@ export async function reviewDriverDocumentsRenewal(userId: string, approved: boo
   });
 }
 
+export async function setDriverVehicleSeats(userId: string, passengerSeats: number | null) {
+  return apiFetch(`/api/admin/drivers/${userId}/vehicle-seats`, {
+    method: "PATCH",
+    body: JSON.stringify({ passengerSeats }),
+  });
+}
+
 export async function reviewVehicleTypeApproval(
   userId: string,
   approved: boolean,
@@ -2810,7 +2819,7 @@ export type ClientAppsConfig = {
     apps: Record<ClientAppId, boolean>;
   };
   passengerServices: Record<PassengerServiceId, boolean>;
-  features?: { sengaPlusVisible?: boolean };
+  features?: { sengaPlusVisible?: boolean; passengerCountEnabled?: boolean };
   sosAlertUserIds?: string[];
   /** PASSENGER | DRIVER | PARTNER — audiences supplémentaires (push / in-app). */
   sosAlertAudiences?: Array<"PASSENGER" | "DRIVER" | "PARTNER">;

@@ -24,3 +24,27 @@ bool passengerServiceVisible(Object? services, String id) {
   if (v is bool) return v;
   return true;
 }
+
+/// Admin switch « nombre de passagers » (courses voiture). Off unless explicitly true.
+bool passengerCountFeatureEnabled(Object? features) =>
+    features is Map && features['passengerCountEnabled'] == true;
+
+/// Mirrors @mova/shared passenger-seats (driver excluded).
+const Map<String, int> kDefaultPassengerSeats = {
+  'MOTO_TAXI': 1,
+  'STANDARD': 4,
+  'COMFORT': 4,
+  'VIP': 4,
+  'UTILITAIRE': 2,
+  'CAMION': 2,
+};
+const int kMaxRidePassengerCount = 8;
+
+int defaultPassengerSeats(String vehicleType) => kDefaultPassengerSeats[vehicleType] ?? 4;
+
+/// « 3 passagers » — null for a single passenger (nothing to show).
+String? passengerCountLabel(Object? raw) {
+  final n = raw is num ? raw.toInt() : int.tryParse(raw?.toString() ?? '');
+  if (n == null || n <= 1) return null;
+  return '$n passagers';
+}

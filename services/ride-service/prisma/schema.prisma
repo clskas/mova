@@ -219,6 +219,8 @@ model Ride {
   completionPin    String?
   roundTrip        Boolean       @default(false)
   roundTripLeg     RoundTripLeg?
+  /// Group size for a car ride (driver excluded). 1 for moto and older apps.
+  passengerCount   Int        @default(1)
   // Uber Pool: shared on-demand ride (not BlaBlaCar scheduled carpool).
   isShared         Boolean    @default(false)
   shareSeatsTotal  Int?

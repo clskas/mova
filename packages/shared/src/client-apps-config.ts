@@ -33,6 +33,11 @@ export type MaintenanceConfig = {
 export type ClientAppsFeatures = {
   /** When false, SENGA Plus subscription entry is hidden in the passenger app. */
   sengaPlusVisible: boolean;
+  /**
+   * Kill switch for « nombre de passagers » (car rides). Off = apps hide the selector
+   * and dispatch ignores capacity (every ride counts as 1 passenger).
+   */
+  passengerCountEnabled: boolean;
 };
 
 /** Extra SOS recipient audiences beyond ops staff (push / in-app; SMS stays ops-only). */
@@ -128,7 +133,7 @@ export const DEFAULT_CLIENT_APPS_CONFIG: ClientAppsConfig = {
     },
   },
   passengerServices: defaultPassengerServices(),
-  features: { sengaPlusVisible: true },
+  features: { sengaPlusVisible: true, passengerCountEnabled: false },
   sosAlertUserIds: [],
   sosAlertAudiences: [],
   sosEmergencyContacts: structuredClone(DEFAULT_SOS_EMERGENCY_CONTACTS),
@@ -230,6 +235,9 @@ export function mergeClientAppsConfig(raw: unknown): ClientAppsConfig {
   if (featuresSrc && typeof featuresSrc === 'object') {
     if (typeof featuresSrc.sengaPlusVisible === 'boolean') {
       base.features.sengaPlusVisible = featuresSrc.sengaPlusVisible;
+    }
+    if (typeof featuresSrc.passengerCountEnabled === 'boolean') {
+      base.features.passengerCountEnabled = featuresSrc.passengerCountEnabled;
     }
   }
 
@@ -399,6 +407,10 @@ export function isPassengerServiceEnabled(
 ): boolean {
   if (!isPassengerServiceId(serviceId)) return true;
   return config.passengerServices[serviceId] !== false;
+}
+
+export function isPassengerCountEnabled(config: ClientAppsConfig): boolean {
+  return config.features?.passengerCountEnabled === true;
 }
 
 export function isSengaPlusVisible(config: ClientAppsConfig): boolean {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/config/client_apps_config.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
@@ -332,6 +333,33 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                       ),
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
                     ),
+                    if (passengerCountLabel(widget.offer['passengerCount']) != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        key: const Key('offerPassengerCount'),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: MovaColors.green.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: MovaColors.green.withValues(alpha: 0.5)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.people_alt, color: Colors.white, size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              passengerCountLabel(widget.offer['passengerCount'])!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (widget.offer['roundTrip'] == true) ...[
                       const SizedBox(height: 10),
                       Container(

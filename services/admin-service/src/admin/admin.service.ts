@@ -1070,6 +1070,13 @@ export class AdminService {
       body: JSON.stringify({ approved, notes }),
     });
   }
+  async setDriverVehicleSeats(userId: string, passengerSeats: number | null, managedCity?: string | null) {
+    await this.getDriver(userId, managedCity);
+    return this.proxy('driver', `/internal/drivers/${userId}/vehicle-seats`, {
+      method: 'PATCH',
+      body: JSON.stringify({ passengerSeats }),
+    });
+  }
   async reviewVehicleTypeApproval(
     userId: string,
     approved: boolean,

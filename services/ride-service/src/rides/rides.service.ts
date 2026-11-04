@@ -20,6 +20,8 @@ import {
   toRideSummary,
   RideStatusSmsPayload,
   DriverJobAlertPayload,
+  isPassengerCountEnabled,
+  normalizeRidePassengerCount,
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -35,7 +37,7 @@ import { TrackingService } from '../tracking/tracking.service';
 import { assertServiceAreaPair, assertServiceAreaCoords } from '../common/address.util';
 import { tripDistanceKm } from '../common/geo.util';
 import { RoutingService } from '../geo/routing.service';
-import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, driverAcceptsRides, driverApprovedVehicleTypes, driverCanReceiveJobs, fetchDriverProfileSnapshot, filterDriversAcceptingRides } from '../common/driver-eligibility.util';
+import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, driverAcceptsRides, driverFitsRideGroup, driverApprovedVehicleTypes, driverCanReceiveJobs, fetchDriverProfileSnapshot, filterDriversAcceptingRides } from '../common/driver-eligibility.util';
 import { fetchDriverDebtStatus, filterDriversNotDebtBlocked } from '../common/driver-debt.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
@@ -54,6 +56,7 @@ import { rideDriverGrossCdf, rideShareBookingDriverGrossCdf } from '../common/ri
 import { PromoService } from './surcharge.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { RidePoolService } from './ride-pool.service';
+import { ClientAppsConfigService } from '../platform/client-apps-config.service';
 
 const ACTIVE_STATUSES: RideStatus[] = [
   RideStatus.REQUESTED,
@@ -88,7 +91,20 @@ export class RidesService {
     private routing: RoutingService,
     private platformConfig: PlatformConfigService,
     private ridePool: RidePoolService,
+    private clientApps?: ClientAppsConfigService,
   ) {}
+
+  /** « Nombre de passagers » is live only while the admin switch is on. */
+  private passengerCountEnabled(): boolean {
+    const cfg = this.clientApps?.get();
+    return cfg ? isPassengerCountEnabled(cfg) : false;
+  }
+
+  /** Group size used for dispatch: 1 when the feature is off (the switch also covers rides in flight). */
+  private dispatchGroupSize(ride: { passengerCount?: number | null }): number {
+    if (!this.passengerCountEnabled()) return 1;
+    return Math.max(1, ride.passengerCount ?? 1);
+  }
 
   private emitStatusChange(rideId: string, status: RideStatus) {
     this.trackingGateway.broadcastRideStatus(rideId, toMobileRideStatus(status));
@@ -187,11 +203,14 @@ export class RidesService {
   }
 
   /** Pins carte passager — lat/lng + type uniquement (pas d'identité chauffeur). */
-  async listNearbyVehicles(lat: number, lng: number, vehicleType: VehicleType) {
+  async listNearbyVehicles(lat: number, lng: number, vehicleType: VehicleType, passengerCount?: number) {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST);
     }
-    const drivers = await this.matching.findDrivers(lat, lng, vehicleType, 0);
+    const minSeats = this.dispatchGroupSize({
+      passengerCount: normalizeRidePassengerCount(vehicleType, passengerCount),
+    });
+    const drivers = await this.matching.findDrivers(lat, lng, vehicleType, 0, { minSeats });
     const mobileType = toMobileVehicleType(vehicleType);
     return {
       vehicleType: mobileType,
@@ -217,6 +236,7 @@ export class RidesService {
       dropoffAddress?: string;
       promoCode?: string;
       roundTrip?: boolean;
+      passengerCount?: number;
     },
   ) {
     const active = await this.prisma.ride.findFirst({
@@ -258,6 +278,10 @@ export class RidesService {
         durationMin: estimate.etaMinutes,
         roundTrip,
         roundTripLeg: roundTrip ? RoundTripLeg.OUTBOUND : null,
+        // Feature off: every ride is a single passenger (older apps never send it).
+        passengerCount: this.passengerCountEnabled()
+          ? normalizeRidePassengerCount(data.vehicleType, data.passengerCount)
+          : 1,
       },
     });
     await this.prisma.rideEvent.create({ data: { rideId: ride.id, event: 'CREATED' } });
@@ -352,6 +376,7 @@ export class RidesService {
     vehicleType: VehicleType;
     estimatedFareCdf?: number | null;
     roundTrip?: boolean | null;
+    passengerCount?: number | null;
   }) {
     if (ride.status === RideStatus.REQUESTED) {
       await this.prisma.ride.update({ where: { id: ride.id }, data: { status: RideStatus.SEARCHING } });
@@ -360,7 +385,10 @@ export class RidesService {
     }
 
     const attempts = await this.prisma.rideEvent.count({ where: { rideId: ride.id, event: 'SEARCH_ATTEMPT' } });
-    const driversRaw = await this.matching.findDrivers(ride.pickupLat, ride.pickupLng, ride.vehicleType, attempts);
+    const groupSize = this.dispatchGroupSize(ride);
+    const driversRaw = await this.matching.findDrivers(ride.pickupLat, ride.pickupLng, ride.vehicleType, attempts, {
+      minSeats: groupSize,
+    });
     // Exclure les chauffeurs déjà en course / livraison / commission (pas de 2ᵉ sonnerie).
     const onDuty = new Set((await this.listOnDutyDriverIds()).driverIds);
     const drivers = driversRaw.filter((d) => !onDuty.has(d.userId));
@@ -380,6 +408,7 @@ export class RidesService {
       const pickup = ride.pickupAddress?.trim() || 'près de vous';
       const fare = ride.estimatedFareCdf != null ? ` · ${ride.estimatedFareCdf} FC` : '';
       const ar = ride.roundTrip ? ' · Aller-retour' : '';
+      const group = groupSize > 1 ? ` · ${groupSize} passagers` : '';
       let driverUserIds = await filterDriversNotDebtBlocked(drivers.map((d) => d.userId));
       driverUserIds = await filterDriversAcceptingRides(driverUserIds);
       const eligibleDrivers = drivers.filter((d) => driverUserIds.includes(d.userId));
@@ -400,7 +429,7 @@ export class RidesService {
         referenceId: ride.id,
         driverUserIds,
         title: 'Nouvelle course SENGA',
-        body: `Course disponible${ar} · ${pickup}${fare}`,
+        body: `Course disponible${ar}${group} · ${pickup}${fare}`,
         pickupAddress: ride.pickupAddress ?? undefined,
         pickupLat: ride.pickupLat,
         pickupLng: ride.pickupLng,
@@ -413,6 +442,7 @@ export class RidesService {
         pickupLat: ride.pickupLat,
         pickupLng: ride.pickupLng,
         roundTrip: ride.roundTrip === true,
+        passengerCount: groupSize,
       });
       const meta = this.matching.getMatchingMeta(attempts);
       return {
@@ -494,7 +524,15 @@ export class RidesService {
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (ride.status !== RideStatus.SEARCHING) throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
-    await assertDriverEligibleForRide(driverUserId, ride.vehicleType);
+    const driverProfile = await assertDriverEligibleForRide(driverUserId, ride.vehicleType);
+    const groupSize = this.dispatchGroupSize(ride);
+    if (!driverFitsRideGroup(driverProfile, ride.vehicleType, groupSize)) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.FORBIDDEN,
+        `Votre véhicule n'a pas assez de places pour ce groupe (${groupSize} passagers).`,
+      );
+    }
     const completionPin = this.tripShare.generateCompletionPin();
     // Conditional on SEARCHING: two drivers tapping « Accepter » together must not both win.
     const updated = await this.prisma.ride
@@ -588,7 +626,9 @@ export class RidesService {
         const rejected = ride.events.some(
           (e) => e.event === 'DRIVER_REJECTED' && (e.metadata as { driverUserId?: string })?.driverUserId === driverUserId,
         );
-        return !rejected;
+        if (rejected) return false;
+        // Group rides only for vehicles with enough seats.
+        return driverFitsRideGroup(profile, ride.vehicleType, this.dispatchGroupSize(ride));
       })
       .map((ride) => {
         const attempts = ride.events.filter((e) => e.event === 'SEARCH_ATTEMPT').length;
@@ -1413,6 +1453,7 @@ export class RidesService {
     completionPin?: string | null;
     roundTrip?: boolean;
     roundTripLeg?: RoundTripLeg | null;
+    passengerCount?: number | null;
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -1443,6 +1484,7 @@ export class RidesService {
       status: mobileStatus,
       internalStatus: ride.status,
       vehicleType: toMobileVehicleType(ride.vehicleType),
+      passengerCount: ride.passengerCount ?? 1,
       pickupLat: ride.pickupLat,
       pickupLng: ride.pickupLng,
       pickupAddress: ride.pickupAddress,

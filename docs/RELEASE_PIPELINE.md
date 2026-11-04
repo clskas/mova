@@ -25,7 +25,9 @@ Le job **Deploy** enchaîne :
 
 1. **Préproduction** (`deploy-staging`) : même commit sur la pile `mova-stg-*`, avec SMS et
    paiements simulés et une base dédiée. Il attend que tous les services soient en ligne,
-   puis lance le smoke strict. **Si ça échoue, la production n'est pas touchée.**
+   lance le smoke strict, puis un **parcours passager complet** (`scripts/staging-journey.sh`) :
+   connexion OTP, profil, estimation, création et annulation d'une course, portefeuille,
+   notifications, historique. **Si une étape échoue, la production n'est pas touchée.**
 2. **Production** (`deploy-render`) :
    - sauvegarde des bases, migrations, photo des versions en ligne ;
    - déploiement, attente de **tous** les services ;
@@ -45,7 +47,7 @@ que le code qui cesse de les utiliser.
 | Action | Résultat |
 |---|---|
 | Fusion sur `main` | AAB sur la **piste interne** Play. Aucun utilisateur ne la voit, aucune bannière. |
-| Tag `v1.0.43` (= version du `pubspec`, commit présent sur `main`) | Build AAB + IPA, Play **production à 20 %**, TestFlight, soumission à l'examen Apple. |
+| Tag `v1.0.43` (= version du `pubspec`, commit présent sur `main`) | Build AAB + IPA, Play **production à 20 %**, TestFlight, soumission à l'examen Apple avec **diffusion progressive sur 7 jours**. |
 | Actions → Mobile Release → `complete_rollout` | Play production à **100 %**, puis annonce de la **bannière de mise à jour**. |
 
 Pour publier une version :
@@ -72,3 +74,25 @@ Pour publier une version :
   produit `config/render-services.staging.json`, qu'il faut commiter.
 - Coût : environ 79 $/mois (9 services Starter + Postgres basic-256mb + Key Value Starter).
 - Comptes de test : numéros `+2439000000xx`, code `123456`. Les SMS et paiements sont simulés.
+
+## Être alerté
+
+- **Production Monitor** (toutes les 10 min) : smoke strict de l'API et santé du hub de paiement.
+  En cas de panne, un ticket GitHub « 🚨 Production en panne » (label `incident`) est ouvert, et
+  vous êtes notifié par mention (e-mail ou app GitHub). Le ticket se ferme tout seul au retour.
+- **Sentry** (erreurs détaillées) : inactif tant qu'aucune clé n'est configurée.
+  1. Créez un compte sur sentry.io (gratuit), puis deux projets : « senga-backend » (Node) et
+     « senga-mobile » (Flutter). Copiez la *DSN* de chacun (Project settings → Client keys).
+  2. Créez les secrets GitHub `SENTRY_DSN` (backend) et `SENTRY_DSN_MOBILE` (apps).
+  3. Lancez **Actions → Configure Sentry** : la clé est posée sur les 7 services Render, qui
+     redémarrent. Les apps l'intègrent à la prochaine release mobile.
+
+  Côté serveur, les erreurs 500 et les plantages sont remontés avec le service, la route et la
+  version. Côté apps, ce sont les erreurs Dart (les plantages natifs ne sont pas captés).
+
+## Revenir en arrière
+
+**Actions → Rollback Production → Run workflow**, sans rien remplir : remet en production la
+version qui tournait juste avant (Render + hub), sans repasser par la préproduction. Pour une
+version précise, indiquez son commit. Les mêmes contrôles et sauvegardes que pour un déploiement
+s'appliquent. Rappel : les migrations de base ne sont pas annulées.

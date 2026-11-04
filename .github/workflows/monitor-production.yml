@@ -1,0 +1,73 @@
+name: Production Monitor
+
+# Every 10 minutes: strict smoke on the production API + payment hub health.
+# Down → opens (or updates) a GitHub issue labelled "incident": GitHub notifies the
+# repository owner by e-mail / mobile app. Back up → the issue is closed.
+# No external account needed; Sentry / UptimeRobot can come on top.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: production-monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.repository != 'afri-soft-com/mova'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check production
+        id: check
+        run: |
+          set -uo pipefail
+          GATEWAY_URL="${{ vars.GATEWAY_URL }}"
+          GATEWAY_URL="${GATEWAY_URL:-https://api.afri-soft.com}"
+          ok=0
+          # Two tries a minute apart: one blip (cold start, deploy restart) is not an incident.
+          for attempt in 1 2; do
+            if SMOKE_STRICT=true GATEWAY_URL="$GATEWAY_URL" bash scripts/smoke-test.sh > smoke.log 2>&1 \
+               && curl -sf -m 15 https://pay.afri-soft.com/health | grep -q '"database":"connected"'; then
+              ok=1
+              break
+            fi
+            sleep 60
+          done
+          tail -40 smoke.log
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the incident
+        if: steps.check.outputs.ok != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create incident --color B60205 --description "Production down" 2>/dev/null || true
+          # The mention makes GitHub notify the owner (e-mail / mobile app) whatever their watch settings.
+          body=$(printf '@%s **Production ne répond pas correctement** — %s UTC\n\n```\n%s\n```\n\n[Run](%s/%s/actions/runs/%s)' \
+            "${{ vars.INCIDENT_NOTIFY || github.repository_owner }}" "$(date -u '+%Y-%m-%d %H:%M')" "$(tail -30 smoke.log)" \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+          open=$(gh issue list --label incident --state open --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$body"
+          else
+            gh issue create --title "🚨 Production en panne" --label incident --body "$body"
+          fi
+          exit 1
+
+      - name: Close the incident when back up
+        if: steps.check.outputs.ok == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list --label incident --state open --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "✅ Production rétablie — $(date -u '+%Y-%m-%d %H:%M') UTC"
+          done

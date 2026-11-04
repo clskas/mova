@@ -34,6 +34,7 @@ export * from './afrisoft-sms-hub';
 export * from './cinetpay';
 export * from './prod-security';
 export * from './http-exception.filter';
+export * from './error-reporting';
 export * from './supabase-storage';
 export * from './platform-wallet';
 export * from './service-cancel.util';

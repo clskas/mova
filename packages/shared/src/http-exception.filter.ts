@@ -9,6 +9,7 @@ import {
 import { Response } from 'express';
 import { REQUEST_ID_HEADER, RequestWithId } from './request-id.middleware';
 import { MovaErrorCode, MOVA_ERROR_MESSAGES } from './mova-error-codes';
+import { ErrorReportContext, reportError } from './error-reporting';
 import {
   isAfriSoftHubHmacError,
   isSerdiPayChannelDisabledError,
@@ -189,6 +190,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
     return raw ? `[${raw}] ` : '';
   }
 
+  private reportContext(host: ArgumentsHost, status: number): ErrorReportContext {
+    const req = host.switchToHttp().getRequest<RequestWithId & { method?: string; originalUrl?: string; url?: string }>();
+    const id = req.requestId ?? req.headers[REQUEST_ID_HEADER];
+    return {
+      requestId: (Array.isArray(id) ? id[0] : id) || undefined,
+      method: req.method,
+      // Path only: query strings may carry phone numbers or tokens.
+      path: String(req.originalUrl ?? req.url ?? '').split('?')[0],
+      status,
+    };
+  }
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -231,7 +244,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
                   : bodyCode === 'HUB_PROVIDER_FAILED'
                     ? MovaErrorCode.PAYMENT_FAILED
                     : MovaErrorCode.VALIDATION_ERROR;
-      if (status >= 500) this.logger.error(`${tag}${code}: ${truncateForLog(rawMessage)}`);
+      if (status >= 500) {
+        this.logger.error(`${tag}${code}: ${truncateForLog(rawMessage)}`);
+        void reportError(exception, this.reportContext(host, status));
+      }
       else this.logger.warn(`${tag}${code}: ${truncateForLog(rawMessage)}`);
       return response.status(status).json({
         success: false,
@@ -242,6 +258,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     if (exception instanceof Error) {
       this.logger.error(`${tag}${truncateForLog(exception.message)}`, truncateForLog(exception.stack, 600));
+      void reportError(exception, this.reportContext(host, 500));
       if (exception.message.includes('entity too large')) {
         const message = 'Fichier trop volumineux (max 3 Mo pour les photos colis).';
         this.logger.warn(`${tag}${MovaErrorCode.VALIDATION_ERROR}: ${message}`);

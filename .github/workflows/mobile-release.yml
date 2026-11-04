@@ -231,6 +231,7 @@ jobs:
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
             --dart-define=APP_BUILD=${{ steps.playver.outputs.code }} \
+            --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN_MOBILE }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT
 
       - name: Verify passenger AAB flavor
@@ -265,6 +266,7 @@ jobs:
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
             --dart-define=APP_BUILD=${{ steps.playver.outputs.code }} \
+            --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN_MOBILE }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT
 
       - name: Verify driver AAB flavor
@@ -291,6 +293,7 @@ jobs:
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
             --dart-define=APP_BUILD=${{ steps.playver.outputs.code }} \
+            --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN_MOBILE }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT
 
       - name: Build driver APK (install direct)
@@ -307,6 +310,7 @@ jobs:
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
             --dart-define=APP_BUILD=${{ steps.playver.outputs.code }} \
+            --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN_MOBILE }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT
 
       - name: Upload passenger APK artifact
@@ -739,6 +743,7 @@ jobs:
             --build-name=${{ steps.iosver.outputs.name }} \
             --build-number=${{ steps.iosver.outputs.code }} \
             --dart-define=APP_BUILD=${{ steps.iosver.outputs.code }} \
+            --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN_MOBILE }} \
             --dart-define=API_URL=${{ steps.urls.outputs.api }} \
             --dart-define=WS_URL=${{ steps.urls.outputs.ws }} \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$WEB_CLIENT \

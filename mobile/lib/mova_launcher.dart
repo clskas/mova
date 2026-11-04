@@ -7,6 +7,7 @@ import 'core/api/api_client.dart';
 import 'core/api/ride_chat_socket.dart';
 import 'core/api/ride_socket.dart';
 import 'core/config/app_version.dart';
+import 'core/monitoring/error_reporter.dart';
 import 'core/navigation/mova_navigator.dart';
 import 'core/offline/mova_app_lifecycle.dart';
 import 'core/offline/sync_queue.dart';
@@ -37,6 +38,7 @@ void _wireCallRingSocketHooks() {
 Future<void> runMovaPassengerApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppFlavor.current = MovaAppFlavor.passenger;
+  ErrorReporter.install();
   await SyncQueue.init();
   await PassengerAlertService.init();
   await ChatAlertService.init();
@@ -52,6 +54,7 @@ Future<void> runMovaPassengerApp() async {
 Future<void> runMovaDriverApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppFlavor.current = MovaAppFlavor.driver;
+  ErrorReporter.install();
   await SyncQueue.init();
   await DriverPushService.registerBackgroundHandlerEarly();
   await DriverJobAlertService.init();

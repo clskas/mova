@@ -1,10 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter, assertProductionSecurity, resolveCorsOrigin } from '@mova/shared';
+import { HttpExceptionFilter, assertProductionSecurity, installErrorReporting, resolveCorsOrigin } from '@mova/shared';
 
 async function bootstrap() {
   assertProductionSecurity('admin-service');
+  installErrorReporting('admin-service');
   const app = await NestFactory.create(AppModule);
   const http = app.getHttpAdapter().getInstance() as { set?: (k: string, v: unknown) => void };
   http.set?.('etag', false);

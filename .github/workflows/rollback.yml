@@ -8,6 +8,14 @@ name: Rollback Production
 on:
   workflow_dispatch:
     inputs:
+      target:
+        description: "production = vrai retour arrière. staging = exercice sans risque sur la préproduction."
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+          - staging
       commit:
         description: "Commit to restore (vide = la version d'avant). Doit exister sur afri-soft-com/mova."
         required: false
@@ -31,6 +39,7 @@ jobs:
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           WANTED: ${{ inputs.commit }}
+          SERVICES_FILE: ${{ inputs.target == 'staging' && 'config/render-services.staging.json' || 'config/render-services.json' }}
         run: |
           set -euo pipefail
           if [ -n "$WANTED" ]; then
@@ -38,7 +47,7 @@ jobs:
             echo "Restoring requested commit $WANTED"
             exit 0
           fi
-          gw=$(jq -r '.gatewayServiceId' config/render-services.json)
+          gw=$(jq -r '.gatewayServiceId' "$SERVICES_FILE")
           deploys=$(curl -sf -H "Authorization: Bearer $RENDER_API_KEY" \
             "https://api.render.com/v1/services/$gw/deploys?limit=30" | jq '[.[] | (.deploy // .)]')
           current=$(jq -r '[.[] | select(.status == "live")][0].commit.id // empty' <<<"$deploys")
@@ -52,9 +61,21 @@ jobs:
           echo "commit=$previous" >> "$GITHUB_OUTPUT"
 
       - name: Deploy the previous version (skips the staging gate)
+        if: inputs.target != 'staging'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main \
             -f environment=production -f commit="${{ steps.pick.outputs.commit }}" -f skip_staging=true
           echo "::notice::Rollback to ${{ steps.pick.outputs.commit }} started — follow it in Actions → Deploy."
+
+      # Drill: the same pick + deploy path, on pre-production only. Production untouched.
+      # Staging returns to main at the next merge (or Deploy → staging_only).
+      - name: Deploy the previous version to staging (drill)
+        if: inputs.target == 'staging'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main \
+            -f environment=staging -f staging_only=true -f commit="${{ steps.pick.outputs.commit }}"
+          echo "::notice::Staging drill: rollback to ${{ steps.pick.outputs.commit }} started — production is not touched."

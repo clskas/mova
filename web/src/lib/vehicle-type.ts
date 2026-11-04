@@ -12,6 +12,10 @@ const ALIASES: Record<string, string> = {
   CONFORT: "COMFORT",
   COMFORT: "COMFORT",
   VIP: "VIP",
+  // Gamme Familiale (6–8 places): known for display; booked from the mobile app only.
+  FAMILIALE: "FAMILIALE",
+  XL: "FAMILIALE",
+  VAN: "FAMILIALE",
 };
 
 export const VEHICLE_CATEGORIES = [

@@ -116,9 +116,17 @@ Si elle pose problème, on l'éteint : l'effet est immédiat, y compris pour les
 | Interrupteur | Effet quand il est éteint |
 |---|---|
 | Nombre de passagers (`features.passengerCountEnabled`) | Le sélecteur est masqué dans l'app passager ; toute course compte pour 1 passager ; la recherche ignore les places des véhicules. |
+| Gamme Familiale (`features.familialeEnabled`) | La gamme Familiale (6–8 places) est masquée et refusée à la commande ; le sélecteur s'arrête à 4 passagers. Les chauffeurs peuvent déjà inscrire un véhicule Familiale. |
 
 Nombre de passagers : le chauffeur déclare les places de sa voiture (sans lui) dans
 Enregistrement → Véhicule ; sans déclaration, la valeur de la catégorie s'applique
 (moto 1, voiture 4). L'admin peut corriger sur la fiche chauffeur. Le prix ne dépend pas
 du nombre de passagers. Le Pool garde 1 place par réservation.
+
+Gamme Familiale : comme UberXL / Bolt XL, on paie le véhicule, pas chaque passager.
+Standard, Confort et VIP sont limités à 4 passagers dans l'app ; dès 5, l'app passe en
+Familiale (6 à 8 places, 6 par défaut, tarif ≈ Standard + 30 %, réglable dans Admin → Tarifs).
+Un véhicule Familiale reçoit aussi les courses Standard. Pas de Familiale en Pool ni en
+course planifiée pour l'instant. Avant d'allumer l'interrupteur, validez des véhicules
+Familiale (fiche chauffeur → type d'engin).
 

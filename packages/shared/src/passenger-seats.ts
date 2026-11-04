@@ -9,6 +9,7 @@ export const DEFAULT_VEHICLE_PASSENGER_SEATS: Record<VehicleTypeValue, number> =
   STANDARD: 4,
   COMFORT: 4,
   VIP: 4,
+  FAMILIALE: 6,
   UTILITAIRE: 2,
   CAMION: 2,
 };
@@ -19,12 +20,31 @@ export const MAX_VEHICLE_PASSENGER_SEATS: Record<VehicleTypeValue, number> = {
   STANDARD: 8,
   COMFORT: 8,
   VIP: 8,
+  FAMILIALE: 8,
   UTILITAIRE: 8,
   CAMION: 2,
 };
 
+/** Smallest declaration accepted (a Familiale vehicle carries at least 5). */
+export const MIN_VEHICLE_PASSENGER_SEATS: Partial<Record<VehicleTypeValue, number>> = {
+  FAMILIALE: 5,
+};
+
 /** Largest group a passenger can request in one car ride. */
 export const MAX_RIDE_PASSENGER_COUNT = 8;
+
+/**
+ * Largest group the passenger app offers per gamme. Standard / Confort / VIP are
+ * 4-seat cars; 5+ passengers go to Familiale. (The API still accepts up to 8 on
+ * any car for older apps, matched against declared seats.)
+ */
+export const RIDE_PASSENGER_LIMIT_BY_TYPE: Partial<Record<VehicleTypeValue, number>> = {
+  MOTO_TAXI: 1,
+  STANDARD: 4,
+  COMFORT: 4,
+  VIP: 4,
+  FAMILIALE: 8,
+};
 
 function typeOrNull(type: string | null | undefined): VehicleTypeValue | null {
   try {
@@ -50,7 +70,7 @@ export function normalizeDeclaredSeats(type: string | null | undefined, value: u
   const t = typeOrNull(type);
   const n = typeof value === 'string' ? Number(value) : (value as number);
   if (!t || typeof n !== 'number' || !Number.isInteger(n)) return null;
-  if (n < 1 || n > MAX_VEHICLE_PASSENGER_SEATS[t]) return null;
+  if (n < (MIN_VEHICLE_PASSENGER_SEATS[t] ?? 1) || n > MAX_VEHICLE_PASSENGER_SEATS[t]) return null;
   return n;
 }
 

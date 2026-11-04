@@ -203,6 +203,7 @@ class MarketConfig {
     VehicleTypeOption(id: 'STANDARD', label: 'Standard', icon: '🚗'),
     VehicleTypeOption(id: 'COMFORT', label: 'Confort', icon: '✨'),
     VehicleTypeOption(id: 'VIP', label: 'VIP', icon: '👑'),
+    VehicleTypeOption(id: 'FAMILIALE', label: 'Familiale', icon: '🚐'),
   ];
 
   static const vehicleCategories = [
@@ -223,6 +224,12 @@ class MarketConfig {
     'CONFORT': 'COMFORT',
     'COMFORT': 'COMFORT',
     'VIP': 'VIP',
+    'FAMILIALE': 'FAMILIALE',
+    'FAMILIAL': 'FAMILIALE',
+    'FAMILY': 'FAMILIALE',
+    'XL': 'FAMILIALE',
+    'VAN': 'FAMILIALE',
+    'MINIVAN': 'FAMILIALE',
   };
 
   /// Alias UI / contrat mobile → enum Prisma ride-service (`MOTO_TAXI`, `COMFORT`, …).
@@ -242,12 +249,19 @@ class MarketConfig {
   static String defaultTypeForCategory(String category) =>
       category.toUpperCase() == 'MOTO' ? 'MOTO_TAXI' : 'STANDARD';
 
-  static List<VehicleTypeOption> vehicleTypesForCategory(String category) {
+  /// Gammes for a category. Familiale (6–8 places) only when its admin switch is on.
+  static List<VehicleTypeOption> vehicleTypesForCategory(String category, {bool includeFamiliale = false}) {
     if (category.toUpperCase() == 'MOTO') {
       return vehicleTypes.where((v) => v.id == 'MOTO_TAXI').toList();
     }
-    return vehicleTypes.where((v) => v.id != 'MOTO_TAXI').toList();
+    return vehicleTypes
+        .where((v) => v.id != 'MOTO_TAXI' && (includeFamiliale || v.id != 'FAMILIALE'))
+        .toList();
   }
+
+  /// Every gamme the passenger can book right now (estimates are fetched for these).
+  static List<VehicleTypeOption> bookableVehicleTypes({bool includeFamiliale = false}) =>
+      vehicleTypes.where((v) => includeFamiliale || v.id != 'FAMILIALE').toList();
 
   /// Véhicules chauffeur compatibles avec une course (même règle stricte que le backend).
   static List<String> driverVehicleTypesForRide(String rideType) {
@@ -255,11 +269,14 @@ class MarketConfig {
       case 'MOTO_TAXI':
         return const ['MOTO_TAXI'];
       case 'STANDARD':
-        return const ['STANDARD'];
+        // A Familiale (6–8 places) vehicle can also take a Standard ride.
+        return const ['STANDARD', 'FAMILIALE'];
       case 'COMFORT':
         return const ['COMFORT'];
       case 'VIP':
         return const ['VIP'];
+      case 'FAMILIALE':
+        return const ['FAMILIALE'];
       default:
         return const [];
     }

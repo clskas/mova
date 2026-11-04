@@ -13,6 +13,7 @@ enum VehicleType {
   STANDARD
   COMFORT
   VIP
+  FAMILIALE
   UTILITAIRE
   CAMION
 }

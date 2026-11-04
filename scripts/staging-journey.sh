@@ -78,6 +78,25 @@ WANT=1; [ "$FLAG" = "true" ] && WANT=3
 echo "passengerCount=$GOT (feature=$FLAG)"
 call POST "/rides/$GRIDE/cancel" '{"reason":"staging journey"}' >/dev/null || fail "cancel group ride"
 
+step "Gamme Familiale (6-8 places)"
+# The migration + boot-time pricing seed must give Familiale a price, above zero.
+FAM_TRIP=$(jq -c '.vehicleType = "FAMILIALE"' <<<"$TRIP")
+FAM_PRICE=$(call POST /rides/estimate "$FAM_TRIP" | field '.estimatedFareCdf // .data.estimatedFareCdf') || fail "Familiale estimate"
+[ "${FAM_PRICE:-0}" -gt 0 ] 2>/dev/null || fail "Familiale estimate has no price ($FAM_PRICE)"
+FAM_FLAG=$(curl -s --max-time 30 "$API/public/client-config" | jq -r '.features.familialeEnabled // false')
+if [ "$FAM_FLAG" = "true" ]; then
+  FRIDE=$(call POST /rides "$(jq -c '. + {passengerCount: 6}' <<<"$FAM_TRIP")" | field '.id // .ride.id // .data.id') || fail "create Familiale ride"
+  [ -n "$FRIDE" ] || fail "no Familiale ride id"
+  call POST "/rides/$FRIDE/cancel" '{"reason":"staging journey"}' >/dev/null || fail "cancel Familiale ride"
+else
+  # Switch off: booking must be refused (the app hides the gamme).
+  if FRIDE=$(call POST /rides "$FAM_TRIP" 2>/dev/null | field '.id // .ride.id // .data.id') && [ -n "$FRIDE" ]; then
+    call POST "/rides/$FRIDE/cancel" '{"reason":"staging journey"}' >/dev/null || true
+    fail "Familiale ride accepted while its switch is off"
+  fi
+fi
+echo "Familiale price=$FAM_PRICE CDF (switch=$FAM_FLAG)"
+
 step "Wallet (payment-service)"
 call GET /wallet >/dev/null || fail "GET /wallet"
 

@@ -36,6 +36,7 @@ const DEFAULT_PASSENGER_SEATS: Record<string, number> = {
   STANDARD: 4,
   COMFORT: 4,
   VIP: 4,
+  FAMILIALE: 6,
   UTILITAIRE: 2,
   CAMION: 2,
 };

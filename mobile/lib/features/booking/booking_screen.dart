@@ -74,6 +74,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   /// Admin switch (client-config features.passengerCountEnabled); hidden until confirmed on.
   bool _passengerCountEnabled = false;
   int _passengerCount = 1;
+  /// Admin switch « gamme Familiale » (6–8 places); hidden until confirmed on.
+  bool _familialeEnabled = false;
   List<Map<String, dynamic>> _poiPlaces = [];
   String? _poiCategoryFilter;
   int _poiLoadGeneration = 0;
@@ -133,13 +135,52 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     if (!mounted) return;
     if (result case Success(:final data)) {
       final enabled = passengerCountFeatureEnabled(data['features']);
-      if (enabled != _passengerCountEnabled) {
+      final familiale = familialeFeatureEnabled(data['features']);
+      final familialeChanged = familiale != _familialeEnabled;
+      if (enabled != _passengerCountEnabled || familialeChanged) {
         setState(() {
           _passengerCountEnabled = enabled;
+          _familialeEnabled = familiale;
           if (!enabled) _passengerCount = 1;
+          if (!familiale && _vehicleType == 'FAMILIALE') {
+            _vehicleType = 'STANDARD';
+            _selectedEstimate = _estimateDetails['STANDARD'];
+          }
+          if (_passengerCount > _passengerMax) _passengerCount = _passengerMax;
         });
+        if (familialeChanged && (_dropoff != null || _destinationController.text.trim().isNotEmpty)) {
+          unawaited(_fetchAllEstimates());
+        }
       }
     }
+  }
+
+  /// Familiale is offered for exclusive rides only (Pool books seats, not a vehicle).
+  bool get _showFamiliale => _familialeEnabled && !_sharedPool;
+
+  /// Without Familiale every car is a 4-seat car.
+  int get _passengerMax => _showFamiliale ? kMaxRidePassengerCount : kCarPassengerLimit;
+
+  String? get _passengerNote {
+    if (_vehicleType != 'FAMILIALE' || _passengerCount <= kCarPassengerLimit) return null;
+    if (_passengerCount > defaultPassengerSeats('FAMILIALE')) {
+      return 'Gamme Familiale : seuls les véhicules de $_passengerCount places recevront la course, '
+          'l\'attente peut être plus longue.';
+    }
+    return 'Plus de 4 passagers : gamme Familiale (6 à 8 places) sélectionnée.';
+  }
+
+  /// 5+ passengers move a Standard / Confort / VIP booking to Familiale.
+  void _onPassengerCountChanged(int n) {
+    final upgrade = n > kCarPassengerLimit && isFourSeatGamme(_vehicleType) && _showFamiliale;
+    setState(() {
+      _passengerCount = n;
+      if (upgrade) {
+        _vehicleType = 'FAMILIALE';
+        _selectedEstimate = _estimateDetails['FAMILIALE'];
+      }
+    });
+    unawaited(_loadNearbyVehicles());
   }
 
   /// Group size sent to the API: only for exclusive car rides with the feature on.
@@ -542,7 +583,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       _error = null;
       _validationError = null;
       _estimates = {
-        for (final v in MarketConfig.vehicleTypes)
+        for (final v in MarketConfig.bookableVehicleTypes(includeFamiliale: _showFamiliale))
           v.id: VehicleEstimate(vehicleType: v.id, loading: true),
       };
     });
@@ -562,7 +603,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       await api.checkHealth();
 
       final results = await Future.wait(
-        MarketConfig.vehicleTypes.map((v) async {
+        MarketConfig.bookableVehicleTypes(includeFamiliale: _showFamiliale).map((v) async {
           final payload = _estimatePayload(v.id);
           final usePool = _sharedPool && MarketConfig.vehicleCategory(v.id) == 'TAXI';
           final result = usePool
@@ -611,10 +652,19 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   void _onVehicleSelected(String type) {
     final normalized = MarketConfig.normalizeVehicleType(type);
+    final capped = isFourSeatGamme(normalized) && _passengerCount > kCarPassengerLimit;
     setState(() {
       _vehicleType = normalized;
       _selectedEstimate = _estimateDetails[normalized];
+      if (capped) _passengerCount = kCarPassengerLimit;
     });
+    if (capped && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Standard, Confort et VIP : 4 passagers maximum. Pour 5 à 8, choisissez Familiale.'),
+        ),
+      );
+    }
     _loadNearbyVehicles();
   }
 
@@ -893,6 +943,14 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                         setState(() {
                           _sharedPool = v;
                           if (v) _roundTrip = false;
+                          if (v && _vehicleType == 'FAMILIALE') {
+                            _vehicleType = 'STANDARD';
+                            _selectedEstimate = _estimateDetails['STANDARD'];
+                          }
+                          if (_passengerCount > _passengerMax ||
+                              (isFourSeatGamme(_vehicleType) && _passengerCount > kCarPassengerLimit)) {
+                            _passengerCount = kCarPassengerLimit;
+                          }
                         });
                         if (_dropoff != null || _destinationController.text.trim().isNotEmpty) {
                           unawaited(_fetchAllEstimates());
@@ -924,16 +982,15 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       selected: _vehicleType,
                       estimates: _estimates,
                       onSelected: _onVehicleSelected,
-                      types: MarketConfig.vehicleTypesForCategory('TAXI'),
+                      types: MarketConfig.vehicleTypesForCategory('TAXI', includeFamiliale: _showFamiliale),
                     ),
                     if (_passengerCountEnabled && !_sharedPool) ...[
                       const SizedBox(height: 12),
                       PassengerCountSelector(
                         count: _passengerCount,
-                        onChanged: (n) {
-                          setState(() => _passengerCount = n);
-                          unawaited(_loadNearbyVehicles());
-                        },
+                        max: _passengerMax,
+                        note: _passengerNote,
+                        onChanged: _onPassengerCountChanged,
                       ),
                     ],
                   ],

@@ -11,7 +11,7 @@ function toVehicleType(value: unknown): VehicleType {
 
 export class CreateScheduledRideDto {
   @ApiProperty() @IsDateString() scheduledAt: string;
-  @ApiProperty({ enum: ['MOTO', 'MOTO_TAXI', 'STANDARD', 'CONFORT', 'COMFORT', 'VIP'] })
+  @ApiProperty({ enum: ['MOTO', 'MOTO_TAXI', 'STANDARD', 'CONFORT', 'COMFORT', 'VIP', 'FAMILIALE'] })
   @Transform(({ value }) => toVehicleType(value))
   @IsEnum(VehicleType)
   vehicleType: VehicleType;

@@ -20,6 +20,7 @@ import {
   toRideSummary,
   RideStatusSmsPayload,
   DriverJobAlertPayload,
+  isFamilialeEnabled,
   isPassengerCountEnabled,
   normalizeRidePassengerCount,
 } from '@mova/shared';
@@ -98,6 +99,12 @@ export class RidesService {
   private passengerCountEnabled(): boolean {
     const cfg = this.clientApps?.get();
     return cfg ? isPassengerCountEnabled(cfg) : false;
+  }
+
+  /** Gamme Familiale: bookable only while its admin switch is on (drivers can register anyway). */
+  private familialeEnabled(): boolean {
+    const cfg = this.clientApps?.get();
+    return cfg ? isFamilialeEnabled(cfg) : false;
   }
 
   /** Group size used for dispatch: 1 when the feature is off (the switch also covers rides in flight). */
@@ -243,6 +250,14 @@ export class RidesService {
       where: { passengerId, status: { in: ACTIVE_STATUSES } },
     });
     if (active) throw new MovaHttpException(MovaErrorCode.RIDE_ALREADY_ACTIVE);
+
+    if (data.vehicleType === VehicleType.FAMILIALE && !this.familialeEnabled()) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        "La gamme Familiale n'est pas encore disponible. Choisissez Standard, Confort ou VIP.",
+      );
+    }
 
     await this.assertNoUnpaidCompletedRide(passengerId);
 

@@ -86,6 +86,7 @@ class VehicleSelector extends StatelessWidget {
           final accentColor = switch (option.id) {
             'MOTO_TAXI' => MovaColors.green,
             'VIP' => MovaColors.orange,
+            'FAMILIALE' => MovaColors.green,
             _ => MovaColors.violet,
           };
 

@@ -38,6 +38,11 @@ export type ClientAppsFeatures = {
    * and dispatch ignores capacity (every ride counts as 1 passenger).
    */
   passengerCountEnabled: boolean;
+  /**
+   * Gamme « Familiale » (6–8 places) in the passenger app. Off = hidden, groups capped
+   * at 4. Drivers can register Familiale vehicles either way.
+   */
+  familialeEnabled: boolean;
 };
 
 /** Extra SOS recipient audiences beyond ops staff (push / in-app; SMS stays ops-only). */
@@ -133,7 +138,7 @@ export const DEFAULT_CLIENT_APPS_CONFIG: ClientAppsConfig = {
     },
   },
   passengerServices: defaultPassengerServices(),
-  features: { sengaPlusVisible: true, passengerCountEnabled: false },
+  features: { sengaPlusVisible: true, passengerCountEnabled: false, familialeEnabled: false },
   sosAlertUserIds: [],
   sosAlertAudiences: [],
   sosEmergencyContacts: structuredClone(DEFAULT_SOS_EMERGENCY_CONTACTS),
@@ -238,6 +243,9 @@ export function mergeClientAppsConfig(raw: unknown): ClientAppsConfig {
     }
     if (typeof featuresSrc.passengerCountEnabled === 'boolean') {
       base.features.passengerCountEnabled = featuresSrc.passengerCountEnabled;
+    }
+    if (typeof featuresSrc.familialeEnabled === 'boolean') {
+      base.features.familialeEnabled = featuresSrc.familialeEnabled;
     }
   }
 
@@ -411,6 +419,10 @@ export function isPassengerServiceEnabled(
 
 export function isPassengerCountEnabled(config: ClientAppsConfig): boolean {
   return config.features?.passengerCountEnabled === true;
+}
+
+export function isFamilialeEnabled(config: ClientAppsConfig): boolean {
+  return config.features?.familialeEnabled === true;
 }
 
 export function isSengaPlusVisible(config: ClientAppsConfig): boolean {

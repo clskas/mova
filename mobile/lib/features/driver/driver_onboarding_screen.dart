@@ -959,12 +959,17 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             DropdownMenuItem(value: 'STANDARD', child: Text('Standard')),
             DropdownMenuItem(value: 'COMFORT', child: Text('Confort')),
             DropdownMenuItem(value: 'VIP', child: Text('VIP')),
+            DropdownMenuItem(value: 'FAMILIALE', child: Text('Familiale (6 à 8 places)')),
             DropdownMenuItem(value: 'UTILITAIRE', child: Text('Utilitaire')),
             DropdownMenuItem(value: 'CAMION', child: Text('Camion')),
           ],
           onChanged: (v) => setState(() {
             _vehicleType = v ?? 'STANDARD';
-            if (_vehicleType == 'MOTO_TAXI') _passengerSeats = null;
+            // Drop a declaration the new category does not allow (e.g. 4 seats → Familiale).
+            if (_vehicleType == 'MOTO_TAXI' ||
+                (_passengerSeats != null && !declarableSeats(_vehicleType).contains(_passengerSeats))) {
+              _passengerSeats = null;
+            }
           }),
         ),
         if (_vehicleType != 'MOTO_TAXI') ...[
@@ -972,12 +977,16 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           DropdownButtonFormField<int>(
             key: const Key('vehiclePassengerSeats'),
             value: _passengerSeats ?? defaultPassengerSeats(_vehicleType),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Places passagers (sans compter le chauffeur)',
-              helperText: 'Les groupes plus grands que vos places ne vous seront pas proposés.',
+              helperText: _vehicleType == 'FAMILIALE'
+                  ? 'Familiale : 5 à 8 places. Vous recevez aussi les courses Standard.'
+                  : 'Les groupes plus grands que vos places ne vous seront pas proposés. '
+                      '6 places ou plus ? Choisissez la catégorie Familiale.',
+              helperMaxLines: 3,
             ),
             items: [
-              for (var n = 1; n <= (_vehicleType == 'CAMION' ? 2 : 8); n++)
+              for (final n in declarableSeats(_vehicleType))
                 DropdownMenuItem(value: n, child: Text('$n place${n > 1 ? 's' : ''}')),
             ],
             onChanged: (v) => setState(() => _passengerSeats = v),

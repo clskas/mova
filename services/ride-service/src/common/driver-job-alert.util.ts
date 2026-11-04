@@ -17,6 +17,7 @@ export const DELIVERY_ALERT_VEHICLE_TYPES: VehicleType[] = [
   VehicleType.STANDARD,
   VehicleType.COMFORT,
   VehicleType.VIP,
+  VehicleType.FAMILIALE,
   VehicleType.UTILITAIRE,
   VehicleType.CAMION,
 ];

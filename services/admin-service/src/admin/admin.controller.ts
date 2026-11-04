@@ -14,7 +14,7 @@ import { OpsService } from './ops.service';
 class ApproveKycDto {
   @ApiProperty() @IsBoolean() approved: boolean;
   @ApiProperty({ required: false }) @IsOptional() @IsString() notes?: string;
-  @ApiProperty({ required: false, enum: ['MOTO_TAXI', 'STANDARD', 'COMFORT', 'VIP', 'UTILITAIRE', 'CAMION'] })
+  @ApiProperty({ required: false, enum: ['MOTO_TAXI', 'STANDARD', 'COMFORT', 'VIP', 'FAMILIALE', 'UTILITAIRE', 'CAMION'] })
   @Transform(({ value }) => {
     if (value == null || value === '') return undefined;
     try {
@@ -365,7 +365,7 @@ export class AdminController {
 
   @Patch('drivers/:userId/vehicle-type')
   @RequirePermissions(AdminPermission.KYC_WRITE)
-  @ApiOperation({ summary: 'Valider, refuser ou modifier le type d\'engin (Moto-taxi, Standard, Confort, VIP)' })
+  @ApiOperation({ summary: 'Valider, refuser ou modifier le type d\'engin (Moto-taxi, Standard, Confort, VIP, Familiale)' })
   reviewVehicleType(
     @Param('userId') userId: string,
     @Body() dto: ApproveKycDto,

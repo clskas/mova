@@ -80,6 +80,15 @@ export default function ServicesSengaPage() {
     setOk(null);
   }
 
+  function toggleFamiliale() {
+    if (!config || !canEditSengaPlus) return;
+    setConfig({
+      ...config,
+      features: { ...config.features, familialeEnabled: config.features?.familialeEnabled !== true },
+    });
+    setOk(null);
+  }
+
   async function save() {
     if (!config || (!canEditServices && !canEditSengaPlus)) return;
     setSaving(true);
@@ -92,6 +101,7 @@ export default function ServicesSengaPage() {
         patch.features = {
           sengaPlusVisible: config.features?.sengaPlusVisible !== false,
           passengerCountEnabled: config.features?.passengerCountEnabled === true,
+          familialeEnabled: config.features?.familialeEnabled === true,
         };
       }
       const next = await updateClientAppsConfig(patch);
@@ -116,6 +126,7 @@ export default function ServicesSengaPage() {
 
   const sengaPlusOn = config.features?.sengaPlusVisible !== false;
   const passengerCountOn = config.features?.passengerCountEnabled === true;
+  const familialeOn = config.features?.familialeEnabled === true;
 
   return (
     <div className="p-4 space-y-6 max-w-xl">
@@ -157,6 +168,23 @@ export default function ServicesSengaPage() {
             checked={passengerCountOn}
             disabled={!canEditSengaPlus || saving}
             onChange={togglePassengerCount}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3">
+          <span className="text-sm text-slate-800">
+            <span className="font-medium block">Gamme Familiale (6–8 places)</span>
+            <span className="text-xs text-slate-500">
+              Affiche la gamme Familiale dans l&apos;app passager. Avec le nombre de passagers activé,
+              Standard, Confort et VIP sont limités à 4 personnes et l&apos;app passe en Familiale dès 5.
+              N&apos;activez qu&apos;une fois des véhicules Familiale validés (Chauffeurs → type d&apos;engin).
+              Tarif : Tarifs → Familiale.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={familialeOn}
+            disabled={!canEditSengaPlus || saving}
+            onChange={toggleFamiliale}
           />
         </label>
       </section>

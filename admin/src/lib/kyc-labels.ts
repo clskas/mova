@@ -21,6 +21,7 @@ export const VEHICLE_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: "STANDARD", label: "Standard" },
   { value: "COMFORT", label: "Confort" },
   { value: "VIP", label: "VIP" },
+  { value: "FAMILIALE", label: "Familiale (6–8 places)" },
   { value: "UTILITAIRE", label: "Utilitaire" },
   { value: "CAMION", label: "Camion" },
 ];

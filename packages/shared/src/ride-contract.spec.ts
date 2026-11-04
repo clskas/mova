@@ -34,6 +34,13 @@ describe('ride-contract', () => {
     expect(toMobileVehicleType('MOTO_TAXI')).toBe('MOTO');
     expect(toMobileVehicleType('COMFORT')).toBe('CONFORT');
     expect(toMobileVehicleType('VIP')).toBe('VIP');
+    expect(toMobileVehicleType('FAMILIALE')).toBe('FAMILIALE');
+  });
+
+  it('normalizes Familiale aliases', () => {
+    for (const a of ['FAMILIALE', 'familiale', 'XL', 'van', 'Minivan', 'FAMILY']) {
+      expect(normalizeVehicleType(a)).toBe('FAMILIALE');
+    }
   });
 
   it('matches driver tiers to ride types (exact category only)', () => {
@@ -42,10 +49,13 @@ describe('ride-contract', () => {
     expect(rideTypesDriverCanServe(['VIP'])).toEqual(['VIP']);
     expect(rideTypesDriverCanServe(['COMFORT', 'VIP']).sort()).toEqual(['COMFORT', 'VIP'].sort());
     expect(driverVehicleTypesForRide('COMFORT')).toEqual(['COMFORT']);
-    expect(driverVehicleTypesForRide('STANDARD')).toEqual(['STANDARD']);
+    // A Familiale vehicle may also take a Standard ride (UberXL → UberX).
+    expect(driverVehicleTypesForRide('STANDARD')).toEqual(['STANDARD', 'FAMILIALE']);
+    expect(driverVehicleTypesForRide('FAMILIALE')).toEqual(['FAMILIALE']);
+    expect(rideTypesDriverCanServe(['FAMILIALE']).sort()).toEqual(['FAMILIALE', 'STANDARD']);
     expect(driverVehicleTypesForRide('VIP')).toEqual(['VIP']);
     expect(driverVehicleTypesForRide('MOTO')).toEqual(['MOTO_TAXI']);
-    expect(driverVehicleTypesForRide('TAXI')).toEqual(['STANDARD']);
+    expect(driverVehicleTypesForRide('TAXI')).toEqual(['STANDARD', 'FAMILIALE']);
     expect(driverVehicleTypesForRide('UNKNOWN')).toEqual([]);
   });
 

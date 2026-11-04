@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsIn, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min, ValidateIf } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { IncidentType, KycStatus, VehicleType } from '@prisma/client';
 import { normalizeVehicleType } from '@mova/shared';
@@ -27,6 +27,12 @@ class NearbyQuery {
   @Transform(({ value }) => value === true || value === 'true' || value === '1')
   @IsBoolean()
   forDelivery?: boolean;
+  /** Group size of a car ride: only vehicles with at least this many passenger seats. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(8) minSeats?: number;
+}
+class VehicleSeatsDto {
+  /** null = back to the category default. */
+  @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsInt() @Min(1) @Max(8) passengerSeats: number | null;
 }
 class RatingDto { @IsNumber() ratingAvg: number; }
 class ReviewKycDto {
@@ -100,7 +106,7 @@ export class InternalController {
       q.vehicleType as VehicleType,
       q.searchAttempt ?? 0,
       q.city,
-      { forDelivery: q.forDelivery === true },
+      { forDelivery: q.forDelivery === true, minSeats: q.minSeats },
     );
   }
   @Get('drivers/count') count() { return this.drivers.countDrivers().then((count) => ({ count })); }
@@ -145,6 +151,10 @@ export class InternalController {
   @Patch('drivers/:userId/vehicle-type')
   reviewVehicleType(@Param('userId') userId: string, @Body() dto: ReviewKycDto) {
     return this.drivers.reviewVehicleTypeApproval(userId, dto.approved, dto.notes, dto.vehicleType);
+  }
+  @Patch('drivers/:userId/vehicle-seats')
+  setVehicleSeats(@Param('userId') userId: string, @Body() dto: VehicleSeatsDto) {
+    return this.drivers.setVehiclePassengerSeats(userId, dto.passengerSeats ?? null);
   }
   @Post('drivers/:userId/activation-pin')
   regenerateActivationPin(@Param('userId') userId: string) {

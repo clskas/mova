@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/config/client_apps_config.dart';
 import '../../core/api/api_client.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
@@ -50,6 +51,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   final _fiscalStickerExpiry = TextEditingController();
   final _payoutPhone = TextEditingController();
   String _vehicleType = 'STANDARD';
+  /// Declared passenger seats; null = category default.
+  int? _passengerSeats;
   String _payoutProvider = 'ORANGE_MONEY';
   String _operatingCity = '';
   List<String> _cities = const [];
@@ -300,6 +303,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     _model.text = vehicle?['model']?.toString() ?? '';
     _color.text = vehicle?['color']?.toString() ?? '';
     _vehicleType = vehicle?['type']?.toString() ?? 'STANDARD';
+    final seats = vehicle?['passengerSeats'];
+    _passengerSeats = vehicle?['passengerSeatsDeclared'] == true && seats is num ? seats.toInt() : null;
     _vehicleImageUrl = vehicle?['imageUrl']?.toString();
     _charterAccepted = profile?['charterAcceptedAt'] != null;
     _trainingCompleted = profile?['trainingCompletedAt'] != null;
@@ -413,6 +418,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       'vehicleModel': _model.text.trim(),
       'vehicleType': _vehicleType,
       'vehicleColor': _color.text.trim(),
+      if (_vehicleType != 'MOTO_TAXI' && _passengerSeats != null) 'vehiclePassengerSeats': _passengerSeats,
       if (_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty) 'vehicleImageUrl': _vehicleImageUrl,
       if (_insuranceExpiry.text.trim().isNotEmpty) 'insuranceExpiry': _insuranceExpiry.text.trim(),
       if (_inspectionExpiry.text.trim().isNotEmpty) 'technicalInspectionExpiry': _inspectionExpiry.text.trim(),
@@ -956,8 +962,27 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             DropdownMenuItem(value: 'UTILITAIRE', child: Text('Utilitaire')),
             DropdownMenuItem(value: 'CAMION', child: Text('Camion')),
           ],
-          onChanged: (v) => setState(() => _vehicleType = v ?? 'STANDARD'),
+          onChanged: (v) => setState(() {
+            _vehicleType = v ?? 'STANDARD';
+            if (_vehicleType == 'MOTO_TAXI') _passengerSeats = null;
+          }),
         ),
+        if (_vehicleType != 'MOTO_TAXI') ...[
+          const SizedBox(height: _fieldGap),
+          DropdownButtonFormField<int>(
+            key: const Key('vehiclePassengerSeats'),
+            value: _passengerSeats ?? defaultPassengerSeats(_vehicleType),
+            decoration: const InputDecoration(
+              labelText: 'Places passagers (sans compter le chauffeur)',
+              helperText: 'Les groupes plus grands que vos places ne vous seront pas proposés.',
+            ),
+            items: [
+              for (var n = 1; n <= (_vehicleType == 'CAMION' ? 2 : 8); n++)
+                DropdownMenuItem(value: n, child: Text('$n place${n > 1 ? 's' : ''}')),
+            ],
+            onChanged: (v) => setState(() => _passengerSeats = v),
+          ),
+        ],
         const SizedBox(height: _fieldGap),
         _kycTextField(controller: _plate, label: 'Plaque d\'immatriculation'),
         const SizedBox(height: _fieldGap),

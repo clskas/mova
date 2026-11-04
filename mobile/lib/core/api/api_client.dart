@@ -1733,10 +1733,12 @@ class ApiClient {
     required double lat,
     required double lng,
     required String vehicleType,
+    int passengerCount = 1,
   }) async {
     final type = Uri.encodeQueryComponent(MarketConfig.apiVehicleType(vehicleType));
+    final group = passengerCount > 1 ? '&passengerCount=$passengerCount' : '';
     final result = await get(
-      '/rides/nearby-vehicles?lat=$lat&lng=$lng&vehicleType=$type',
+      '/rides/nearby-vehicles?lat=$lat&lng=$lng&vehicleType=$type$group',
       skipCache: true,
     );
     return switch (result) {

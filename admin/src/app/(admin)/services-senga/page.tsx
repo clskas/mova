@@ -71,6 +71,15 @@ export default function ServicesSengaPage() {
     setOk(null);
   }
 
+  function togglePassengerCount() {
+    if (!config || !canEditSengaPlus) return;
+    setConfig({
+      ...config,
+      features: { ...config.features, passengerCountEnabled: config.features?.passengerCountEnabled !== true },
+    });
+    setOk(null);
+  }
+
   async function save() {
     if (!config || (!canEditServices && !canEditSengaPlus)) return;
     setSaving(true);
@@ -82,6 +91,7 @@ export default function ServicesSengaPage() {
       if (canEditSengaPlus) {
         patch.features = {
           sengaPlusVisible: config.features?.sengaPlusVisible !== false,
+          passengerCountEnabled: config.features?.passengerCountEnabled === true,
         };
       }
       const next = await updateClientAppsConfig(patch);
@@ -105,6 +115,7 @@ export default function ServicesSengaPage() {
   }
 
   const sengaPlusOn = config.features?.sengaPlusVisible !== false;
+  const passengerCountOn = config.features?.passengerCountEnabled === true;
 
   return (
     <div className="p-4 space-y-6 max-w-xl">
@@ -127,6 +138,25 @@ export default function ServicesSengaPage() {
             checked={sengaPlusOn}
             disabled={!canEditSengaPlus || saving}
             onChange={toggleSengaPlus}
+          />
+        </label>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-slate-800">Nombre de passagers (courses voiture)</h2>
+        <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3">
+          <span className="text-sm text-slate-800">
+            <span className="font-medium block">Activer le choix du nombre de passagers</span>
+            <span className="text-xs text-slate-500">
+              Le passager indique combien de personnes voyagent ; seules les voitures avec assez de places
+              reçoivent la course. Désactivé = chaque course compte pour 1 passager (coupure immédiate, sans mise à jour).
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={passengerCountOn}
+            disabled={!canEditSengaPlus || saving}
+            onChange={togglePassengerCount}
           />
         </label>
       </section>

@@ -14,6 +14,7 @@ import '../../core/location/saved_places_store.dart';
 import '../../core/location/service_area_location.dart';
 import '../../core/location/service_area_prefs.dart';
 import '../../core/location/service_areas.dart';
+import '../../core/config/client_apps_config.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
@@ -25,6 +26,7 @@ import 'matching_screen.dart';
 import 'tracking_screen.dart';
 import '../geo/suggest_place_screen.dart';
 import 'widgets/mova_ride_map.dart';
+import 'widgets/passenger_count_selector.dart';
 import 'widgets/vehicle_selector.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
@@ -69,6 +71,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   bool _pickupFromSuggestion = false;
   bool _roundTrip = false;
   bool _sharedPool = false;
+  /// Admin switch (client-config features.passengerCountEnabled); hidden until confirmed on.
+  bool _passengerCountEnabled = false;
+  int _passengerCount = 1;
   List<Map<String, dynamic>> _poiPlaces = [];
   String? _poiCategoryFilter;
   int _poiLoadGeneration = 0;
@@ -118,9 +123,28 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkUnpaidRide();
       _loadUserCatalog();
+      _loadFeatureFlags();
     });
     _nearbyPollTimer = Timer.periodic(const Duration(seconds: 12), (_) => _loadNearbyVehicles());
   }
+
+  Future<void> _loadFeatureFlags() async {
+    final result = await ref.read(apiClientProvider).get('/public/client-config');
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      final enabled = passengerCountFeatureEnabled(data['features']);
+      if (enabled != _passengerCountEnabled) {
+        setState(() {
+          _passengerCountEnabled = enabled;
+          if (!enabled) _passengerCount = 1;
+        });
+      }
+    }
+  }
+
+  /// Group size sent to the API: only for exclusive car rides with the feature on.
+  int get _effectivePassengerCount =>
+      _passengerCountEnabled && _vehicleCategory == 'TAXI' && !_sharedPool ? _passengerCount : 1;
 
   Future<void> _loadUserCatalog() async {
     final chips = await SavedPlacesStore.chips();
@@ -222,6 +246,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           lat: _pickup.latitude,
           lng: _pickup.longitude,
           vehicleType: _vehicleType,
+          passengerCount: _effectivePassengerCount,
         );
     if (!mounted || generation != _nearbyLoadGeneration) return;
     if (result case Success(:final data)) {
@@ -647,6 +672,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             'vehicleType': MarketConfig.apiVehicleType(_vehicleType),
             'pickupAddress': _pickupController.text.trim(),
             'dropoffAddress': _destinationController.text.trim(),
+            if (_effectivePassengerCount > 1) 'passengerCount': _effectivePassengerCount,
           });
 
     if (!mounted) return;
@@ -900,6 +926,16 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       onSelected: _onVehicleSelected,
                       types: MarketConfig.vehicleTypesForCategory('TAXI'),
                     ),
+                    if (_passengerCountEnabled && !_sharedPool) ...[
+                      const SizedBox(height: 12),
+                      PassengerCountSelector(
+                        count: _passengerCount,
+                        onChanged: (n) {
+                          setState(() => _passengerCount = n);
+                          unawaited(_loadNearbyVehicles());
+                        },
+                      ),
+                    ],
                   ],
                   if (_selectedEstimate != null && total != null) ...[
                     const SizedBox(height: 16),

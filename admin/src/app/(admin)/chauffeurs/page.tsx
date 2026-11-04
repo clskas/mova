@@ -14,6 +14,7 @@ import {
   reviewDriverKyc,
   reviewDriverDocumentsRenewal,
   reviewVehicleTypeApproval,
+  setDriverVehicleSeats,
   runKycOcr,
   setDriverOperatingCity,
   setDriverStatus,
@@ -28,6 +29,21 @@ import { AuthenticatedMedia, resolveMediaUrl } from "@/components/AuthenticatedM
 import { PeriodFilterBar } from "@/components/PeriodFilterBar";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { kycDocLabel, VEHICLE_TYPE_LABELS, VEHICLE_TYPE_OPTIONS } from "@/lib/kyc-labels";
+
+/** Mirrors @mova/shared passenger-seats: default when the driver declared nothing. */
+const DEFAULT_PASSENGER_SEATS: Record<string, number> = {
+  MOTO_TAXI: 1,
+  STANDARD: 4,
+  COMFORT: 4,
+  VIP: 4,
+  UTILITAIRE: 2,
+  CAMION: 2,
+};
+function vehicleSeatsLabel(v: { type: string; passengerSeats?: number | null }): string {
+  if (v.passengerSeats != null) return `${v.passengerSeats} place${v.passengerSeats > 1 ? "s" : ""} passagers`;
+  const d = DEFAULT_PASSENGER_SEATS[v.type] ?? 4;
+  return `${d} place${d > 1 ? "s" : ""} passagers (par défaut)`;
+}
 import {
   createdAtInRange,
   rangeForPresetDays,
@@ -218,6 +234,7 @@ export default function ChauffeursPage() {
   const [activationPin, setActivationPin] = useState<string | null>(null);
   const [smsNotice, setSmsNotice] = useState<string | null>(null);
   const [vehicleTypeRejectNotes, setVehicleTypeRejectNotes] = useState("");
+  const [seatsInput, setSeatsInput] = useState("");
   const [selectedVehicleType, setSelectedVehicleType] = useState("");
   const [editOperatingCity, setEditOperatingCity] = useState("");
   const [driverScore, setDriverScore] = useState<{ score: number; band: string; cancelRate: number } | null>(null);
@@ -511,6 +528,27 @@ export default function ChauffeursPage() {
       setSelectedVehicleType(vehicle?.type ?? selectedVehicleType);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec validation type d'engin");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveVehicleSeats(reset: boolean) {
+    if (!selectedId) return;
+    const value = reset ? null : Number(seatsInput);
+    if (!reset && (!Number.isInteger(value) || (value as number) < 1 || (value as number) > 8)) {
+      setError("Nombre de places invalide (1 à 8, moto : 1).");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await setDriverVehicleSeats(selectedId, value);
+      setSeatsInput("");
+      const refreshed = await fetchDriverDetail(selectedId);
+      setDetail(refreshed);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec enregistrement des places");
     } finally {
       setSaving(false);
     }
@@ -1122,6 +1160,32 @@ export default function ChauffeursPage() {
                     )}
                   </label>
                 )}
+                <div className="space-y-1">
+                  <p className="text-xs">
+                    Places passagers : <strong>{vehicleSeatsLabel(selectedVehicle)}</strong>
+                  </p>
+                  {canSetVehicleType && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={8}
+                        value={seatsInput}
+                        onChange={(e) => setSeatsInput(e.target.value)}
+                        placeholder="Places"
+                        className="w-24 rounded-lg border border-gray-300 px-2 py-1 text-sm text-gray-800 bg-white"
+                      />
+                      <BtnSuccess onClick={() => void saveVehicleSeats(false)} disabled={saving || !seatsInput}>
+                        Corriger les places
+                      </BtnSuccess>
+                      {selectedVehicle.passengerSeats != null && (
+                        <BtnDanger onClick={() => void saveVehicleSeats(true)} disabled={saving}>
+                          Revenir au défaut
+                        </BtnDanger>
+                      )}
+                    </div>
+                  )}
+                </div>
                 {selectedVehicle.typeApprovalNotes && vehicleTypeStatus === "REJECTED" && (
                   <p className="text-xs">
                     Motif du refus : <em>{selectedVehicle.typeApprovalNotes}</em>
@@ -1186,6 +1250,7 @@ export default function ChauffeursPage() {
                             {VEHICLE_TYPE_LABELS[v.type] ?? v.type} · {v.plateNumber}
                             {v.make && ` · ${v.make} ${v.model ?? ""}`}
                             {v.color ? ` · ${v.color}` : ""}
+                            <span className="block text-xs text-gray-500 mt-0.5">{vehicleSeatsLabel(v)}</span>
                             {v.typeApprovalStatus && (
                               <span className="block text-xs text-gray-500 mt-0.5">
                                 Validation type : {vehicleTypeApprovalLabel(v.typeApprovalStatus)}

@@ -6,8 +6,10 @@ import {
   INTERNAL_API_KEY,
   MovaErrorCode,
   MovaHttpException,
+  driverVehicleTypesForRide,
   normalizeVehicleType,
   serviceUrl,
+  vehicleFitsPassengers,
   VehicleTypeValue,
 } from '@mova/shared';
 import { fetchDriverDebtStatus } from './driver-debt.util';
@@ -29,7 +31,13 @@ export type DriverProfileSnapshot = {
   currentLng?: number | null;
   operatingCity?: string | null;
   ratingAvg?: number;
-  vehicles?: { id: string; type: string; isActive?: boolean; typeApprovalStatus?: string | null }[];
+  vehicles?: {
+    id: string;
+    type: string;
+    isActive?: boolean;
+    typeApprovalStatus?: string | null;
+    passengerSeats?: number | null;
+  }[];
   vehicleTypeApprovalStatus?: string | null;
 };
 
@@ -202,6 +210,30 @@ export async function assertDriverEligibleForRide(
     );
   }
   return profile;
+}
+
+/**
+ * Group rides: the driver needs an active, approved vehicle of the requested
+ * category with enough passenger seats. passengerCount <= 1 always fits.
+ */
+export function driverFitsRideGroup(
+  profile: DriverProfileSnapshot | null | undefined,
+  rideVehicleType: string,
+  passengerCount: number,
+): boolean {
+  if (passengerCount <= 1) return true;
+  const eligible = driverVehicleTypesForRide(rideVehicleType) as string[];
+  return (profile?.vehicles ?? []).some((v) => {
+    if (v.isActive === false) return false;
+    if (String(v.typeApprovalStatus ?? '').toUpperCase() !== 'APPROVED') return false;
+    let t: string;
+    try {
+      t = normalizeVehicleType(v.type);
+    } catch {
+      return false;
+    }
+    return eligible.includes(t) && vehicleFitsPassengers({ type: t, passengerSeats: v.passengerSeats }, passengerCount);
+  });
 }
 
 export async function assertDriverEligibleForRentalLogistics(userId: string): Promise<DriverProfileSnapshot> {

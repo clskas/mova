@@ -90,6 +90,8 @@ model Vehicle {
   plateNumber        String
   color              String?
   imageUrl           String?
+  /// Passenger seats (driver excluded). Null = category default (see @mova/shared passenger-seats).
+  passengerSeats     Int?
   typeApprovalStatus KycStatus     @default(PENDING)
   typeApprovalNotes  String?
   typeApprovedAt     DateTime?

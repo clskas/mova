@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../core/config/client_apps_config.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/ride_socket.dart';
 import '../../core/config/market_config.dart';
@@ -686,6 +687,19 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (passengerCountLabel(_ride['passengerCount']) != null) ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.people_alt, color: MovaColors.green, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        passengerCountLabel(_ride['passengerCount'])!,
+                        style: const TextStyle(fontWeight: FontWeight.w700, color: MovaColors.green),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 if (_isRoundTrip) ...[
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

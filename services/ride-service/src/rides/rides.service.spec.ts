@@ -140,7 +140,7 @@ describe('RidesService', () => {
       { driverId: 'd1', userId: 'u1', lat: -4.321, lng: 15.313, rating: 4.8, distanceKm: 0.4, score: 0.9 },
     ]);
     const result = await service.listNearbyVehicles(-4.32, 15.31, VehicleType.MOTO_TAXI);
-    expect(matching.findDrivers).toHaveBeenCalledWith(-4.32, 15.31, VehicleType.MOTO_TAXI, 0);
+    expect(matching.findDrivers).toHaveBeenCalledWith(-4.32, 15.31, VehicleType.MOTO_TAXI, 0, { minSeats: 1 });
     expect(result.vehicleType).toBe('MOTO');
     expect(result.count).toBe(1);
     expect(result.vehicles[0]).toEqual(
@@ -794,5 +794,147 @@ describe('RidesService', () => {
     expect(report.periodTo).toBe('2026-10-07');
     expect(report.periodDays).toBe(7);
     expect(report.daily).toHaveLength(7);
+  });
+
+  describe('nombre de passagers (voiture)', () => {
+    const flags = { passengerCountEnabled: true };
+    const clientApps = { get: () => ({ features: { sengaPlusVisible: true, ...flags } }) };
+    const groupService = new RidesService(
+      prisma as never,
+      pricing as never,
+      matching as never,
+      redis as never,
+      trackingGateway as never,
+      trackingService as never,
+      commission as never,
+      tripShare as never,
+      { peek: jest.fn(), redeem: jest.fn(), applyDiscount: jest.fn((p: number) => p) } as never,
+      routing as never,
+      mockPlatformConfig(),
+      { formatSharedRide: jest.fn((r: unknown) => r) } as never,
+      clientApps as never,
+    );
+    const searchingRide = (passengerCount: number) => ({
+      id: 'ride-g',
+      passengerId: 'p1',
+      driverId: null,
+      vehicleId: null,
+      status: RideStatus.SEARCHING,
+      vehicleType: VehicleType.STANDARD,
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      pickupAddress: 'Gombe',
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      dropoffAddress: 'Limete',
+      estimatedFareCdf: 9000,
+      finalFareCdf: null,
+      distanceKm: 4.5,
+      durationMin: 11,
+      roundTrip: false,
+      roundTripLeg: null,
+      passengerCount,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      events: [],
+    });
+    const driverWith = (passengerSeats: number | null) => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          userId: 'driver-1',
+          isAvailable: true,
+          kycStatus: 'APPROVED',
+          activationPinVerified: true,
+          documentsStatus: { canOperate: true },
+          currentLat: -4.321,
+          currentLng: 15.311,
+          vehicles: [{ id: 'v1', type: 'STANDARD', isActive: true, typeApprovalStatus: 'APPROVED', passengerSeats }],
+        }),
+      }) as never;
+    };
+    const baseCreate = {
+      pickupLat: -4.32,
+      pickupLng: 15.31,
+      dropoffLat: -4.34,
+      dropoffLng: 15.33,
+      pickupAddress: 'Gombe',
+      dropoffAddress: 'Limete',
+    };
+
+    beforeEach(() => {
+      flags.passengerCountEnabled = true;
+      Object.assign(trackingGateway, { broadcastOfferTaken: jest.fn() });
+      prisma.ride.findFirst.mockResolvedValue(null);
+      prisma.ride.findMany.mockResolvedValue([]);
+      prisma.ride.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+        ...searchingRide(1),
+        ...data,
+        id: 'ride-new',
+      }));
+    });
+
+    it('stores the group size when the feature is on', async () => {
+      const result = await groupService.createRide('p1', {
+        ...baseCreate,
+        vehicleType: VehicleType.STANDARD,
+        passengerCount: 3,
+      });
+      expect(prisma.ride.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ passengerCount: 3 }) }),
+      );
+      expect(result.passengerCount).toBe(3);
+    });
+
+    it('forces 1 passenger on a moto and when the feature is off', async () => {
+      await groupService.createRide('p1', { ...baseCreate, vehicleType: VehicleType.MOTO_TAXI, passengerCount: 3 });
+      expect(prisma.ride.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ passengerCount: 1 }) }),
+      );
+      flags.passengerCountEnabled = false;
+      await groupService.createRide('p1', { ...baseCreate, vehicleType: VehicleType.STANDARD, passengerCount: 5 });
+      expect(prisma.ride.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ passengerCount: 1 }) }),
+      );
+    });
+
+    it('searches only vehicles with enough seats', async () => {
+      prisma.ride.findUnique.mockResolvedValue(searchingRide(6));
+      prisma.rideEvent.count.mockResolvedValue(0);
+      matching.findDrivers.mockResolvedValue([]);
+      await groupService.autoSearchDrivers('ride-g');
+      expect(matching.findDrivers).toHaveBeenCalledWith(-4.32, 15.31, VehicleType.STANDARD, 0, { minSeats: 6 });
+
+      flags.passengerCountEnabled = false;
+      await groupService.autoSearchDrivers('ride-g');
+      expect(matching.findDrivers).toHaveBeenLastCalledWith(-4.32, 15.31, VehicleType.STANDARD, 0, { minSeats: 1 });
+    });
+
+    it('refuses acceptance by a car too small for the group', async () => {
+      prisma.ride.findUnique.mockResolvedValue(searchingRide(6));
+      driverWith(null); // STANDARD default = 4 seats
+      await expect(groupService.acceptRide('ride-g', 'driver-1')).rejects.toMatchObject({
+        response: expect.objectContaining({ message: expect.stringContaining('6 passagers') }),
+      });
+      expect(prisma.ride.update).not.toHaveBeenCalled();
+    });
+
+    it('lets a declared 7-seat car accept a group of 6', async () => {
+      prisma.ride.findUnique.mockResolvedValue(searchingRide(6));
+      prisma.ride.update.mockResolvedValue({ ...searchingRide(6), status: RideStatus.ACCEPTED, driverId: 'driver-1' });
+      driverWith(7);
+      const result = await groupService.acceptRide('ride-g', 'driver-1');
+      expect(result.passengerCount).toBe(6);
+    });
+
+    it('hides group offers from drivers whose car is too small', async () => {
+      prisma.ride.findMany.mockResolvedValue([searchingRide(6), { ...searchingRide(2), id: 'ride-2' }]);
+      driverWith(null);
+      const small = await groupService.getDriverOffers('driver-1');
+      expect(small.offers.map((o) => o.id)).toEqual(['ride-2']);
+      driverWith(7);
+      const big = await groupService.getDriverOffers('driver-1');
+      expect(big.offers.map((o) => o.id).sort()).toEqual(['ride-2', 'ride-g']);
+    });
   });
 });

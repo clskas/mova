@@ -5,15 +5,18 @@
 `main` est **protégée** : toute modification passe par une Pull Request. La fusion n'est possible
 que si les 17 checks sont verts, Playwright compris. Cela vaut aussi pour les administrateurs.
 
-Render construit depuis **afri-soft-com/mova** : après chaque fusion, poussez aussi `main` là-bas.
+Render construit depuis **afri-soft-com/mova**. Après chaque fusion, le job `mirror` de Deploy
+y pousse `main` tout seul, avec la clé de déploiement `AFRI_SOFT_DEPLOY_KEY` (écriture sur ce
+seul dépôt). Si afri-soft contient des commits absents de `main`, il s'arrête et le signale.
+
+Sans la clé, il faut pousser à la main :
 
 ```bash
 git push afri-soft origin/main:refs/heads/main
 ```
 
 Sans ce push, le déploiement **échoue volontairement**. Avant, il redéployait en silence l'ancien
-code d'afri-soft. Le secret `AFRI_SOFT_PUSH_TOKEN` (jeton GitHub avec droit d'écriture sur
-afri-soft) permettra d'automatiser ce push.
+code d'afri-soft.
 
 ## Backend : chaque fusion sur `main`
 
@@ -74,6 +77,9 @@ Pour publier une version :
   produit `config/render-services.staging.json`, qu'il faut commiter.
 - Coût : environ 79 $/mois (9 services Starter + Postgres basic-256mb + Key Value Starter).
 - Comptes de test : numéros `+2439000000xx`, code `123456`. Les SMS et paiements sont simulés.
+- Données de test : **Actions → Seed Staging → Run workflow**. Crée 15 passagers, 15 chauffeurs
+  (dont 8 validés et disponibles à Kinshasa, avec véhicules), un historique de courses et des
+  signalements. Relançable sans risque. Le script refuse toute base qui n'est pas la préproduction.
 
 ## Être alerté
 
@@ -96,6 +102,10 @@ Pour publier une version :
 version qui tournait juste avant (Render + hub), sans repasser par la préproduction. Pour une
 version précise, indiquez son commit. Les mêmes contrôles et sauvegardes que pour un déploiement
 s'appliquent. Rappel : les migrations de base ne sont pas annulées.
+
+Pour s'entraîner sans risque, choisissez `target = staging` : la même logique remet la version
+d'avant sur la **préproduction** seulement. La production n'est pas touchée, et la préproduction
+revient à jour à la fusion suivante.
 
 ## Interrupteurs de fonctionnalité
 

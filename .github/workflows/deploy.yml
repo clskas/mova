@@ -46,11 +46,58 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Render builds from the afri-soft-com/mova mirror. Push the merged commit there
+  # first (deploy key AFRI_SOFT_DEPLOY_KEY, write access to that repo only).
+  # Without the key: manual `git push afri-soft origin/main:refs/heads/main`, as before.
+  # Manual runs (rollback, redeploy) deploy commits that are already mirrored: no push.
+  mirror:
+    if: >
+      github.repository != 'afri-soft-com/mova' &&
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Push main to afri-soft-com/mova
+        env:
+          AFRI_SOFT_DEPLOY_KEY: ${{ secrets.AFRI_SOFT_DEPLOY_KEY }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AFRI_SOFT_DEPLOY_KEY:-}" ]; then
+            echo "::notice::AFRI_SOFT_DEPLOY_KEY unset — push main to afri-soft by hand (git push afri-soft origin/main:refs/heads/main)."
+            exit 0
+          fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$AFRI_SOFT_DEPLOY_KEY" > ~/.ssh/afri_soft && chmod 600 ~/.ssh/afri_soft
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/afri_soft -o IdentitiesOnly=yes -o BatchMode=yes"
+          # Fast-forward only: if afri-soft has commits main does not, stop and say so.
+          if git push git@github.com:afri-soft-com/mova.git "$SHA:refs/heads/main"; then
+            echo "afri-soft-com/mova main → $SHA"
+          else
+            git fetch -q git@github.com:afri-soft-com/mova.git main
+            if git merge-base --is-ancestor "$SHA" FETCH_HEAD; then
+              echo "afri-soft already contains $SHA (pushed by hand) — OK"
+            else
+              echo "::error::afri-soft-com/mova main has diverged from clskas/mova main — fix by hand, then re-run Deploy."
+              exit 1
+            fi
+          fi
+
   # Pre-production gate: the same commit is deployed to the mova-stg-* stack
   # (mocked SMS / Mobile Money, own databases) and must pass the strict smoke
   # before production is touched. Skipped until config/render-services.staging.json exists.
   deploy-staging:
+    needs: mirror
     if: >
+      !cancelled() && needs.mirror.result != 'failure' &&
       github.repository != 'afri-soft-com/mova' &&
       !(github.event_name == 'workflow_dispatch' && inputs.skip_staging) &&
       (github.event_name == 'workflow_dispatch' ||

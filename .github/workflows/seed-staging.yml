@@ -1,0 +1,42 @@
+name: Seed Staging
+
+# Fills PRE-PRODUCTION with realistic fake data (passengers, approved drivers with
+# vehicles in Kinshasa, past rides). Idempotent: safe to re-run. Never touches
+# production — scripts/seed-staging.sh refuses any non-staging database.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging-seed
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    if: github.repository != 'afri-soft-com/mova'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build shared package
+        run: cd packages/shared && npm ci --no-workspaces && npm run build
+
+      - name: Install seed dependencies (auth, driver, ride)
+        run: |
+          set -euo pipefail
+          for svc in auth-service driver-service ride-service; do
+            ( cd "services/$svc" && npm install --no-audit --no-fund && npx prisma generate )
+          done
+
+      - name: Seed staging
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: bash scripts/seed-staging.sh

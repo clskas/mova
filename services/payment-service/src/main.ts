@@ -2,10 +2,11 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded, Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter, assertProductionSecurity, resolveCorsOrigin } from '@mova/shared';
+import { HttpExceptionFilter, assertProductionSecurity, installErrorReporting, resolveCorsOrigin } from '@mova/shared';
 
 async function bootstrap() {
   assertProductionSecurity('payment-service');
+  installErrorReporting('payment-service');
   const app = await NestFactory.create(AppModule, { rawBody: true, bodyParser: false });
   app.use(
     json({

@@ -563,6 +563,43 @@ def submit_version(token: str, app_id: str, version_id: str) -> None:
     )
 
 
+def ensure_phased_release(token: str, version_id: str) -> None:
+    """Release the update over 7 days (1 % → 100 %) instead of to every iPhone at once.
+
+    Opt out with ASC_PHASED_RELEASE=false. Apple lets the release be paused or
+    completed early from App Store Connect.
+    """
+    if os.environ.get("ASC_PHASED_RELEASE", "true").strip().lower() in ("0", "false", "no"):
+        print("phased release disabled (ASC_PHASED_RELEASE=false)")
+        return
+    try:
+        current = api("GET", f"/v1/appStoreVersions/{version_id}/appStoreVersionPhasedRelease", token)
+        if current.get("data"):
+            print(f"phased release already set ({current['data']['attributes'].get('phasedReleaseState')})")
+            return
+    except RuntimeError:
+        pass  # 404 when none exists yet
+    try:
+        api(
+            "POST",
+            "/v1/appStoreVersionPhasedReleases",
+            token,
+            {
+                "data": {
+                    "type": "appStoreVersionPhasedReleases",
+                    "attributes": {"phasedReleaseState": "INACTIVE"},
+                    "relationships": {
+                        "appStoreVersion": {"data": {"type": "appStoreVersions", "id": version_id}}
+                    },
+                }
+            },
+        )
+        print("phased release enabled (7 days, starts when the version is released)")
+    except RuntimeError as e:
+        # Never block a submission on this: the release is simply not phased.
+        print(f"phased release not set: {e}")
+
+
 def process_app(token: str, key: str, do_submit: bool) -> None:
     cfg = APPS[key]
     print(f"\n=== {key} ({cfg['bundle_id']}) ===")
@@ -614,6 +651,8 @@ def process_app(token: str, key: str, do_submit: bool) -> None:
             ensure_whats_new(token, version_id)
         except Exception as e:
             print(f"whatsNew update skipped/failed: {e}")
+
+    ensure_phased_release(token, version_id)
 
     detail_id = get_or_create_review_detail(token, version_id)
     update_review_detail(token, detail_id, cfg)

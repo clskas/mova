@@ -31,6 +31,11 @@ on:
         required: false
         type: string
         default: ''
+      skip_staging:
+        description: Emergency rollback only — skip the staging gate (the commit was already live)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -47,6 +52,7 @@ jobs:
   deploy-staging:
     if: >
       github.repository != 'afri-soft-com/mova' &&
+      !(github.event_name == 'workflow_dispatch' && inputs.skip_staging) &&
       (github.event_name == 'workflow_dispatch' ||
        (github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.head_branch == 'main'))
@@ -96,10 +102,27 @@ jobs:
           echo "::error::Staging failed the strict smoke — production NOT deployed."
           exit 1
 
+      # Real passenger journey (mock OTP): sign-in, profile, estimate, create +
+      # cancel a ride, wallet, notifications, history — across all services.
+      - name: Passenger journey (staging)
+        if: steps.cfg.outputs.active == 'true'
+        run: |
+          for attempt in 1 2 3; do
+            if GATEWAY_URL="${{ steps.cfg.outputs.gateway }}" bash scripts/staging-journey.sh; then
+              exit 0
+            fi
+            echo "Journey attempt $attempt failed — retry in 30s"
+            sleep 30
+          done
+          echo "::error::Staging passenger journey failed — production NOT deployed."
+          exit 1
+
   deploy-render:
     needs: deploy-staging
     # Deploy from clskas/mova only (same commit SHA pushed to afri-soft for Render).
+    # Staging skipped (rollback / not configured) is fine; staging failed is not.
     if: >
+      !cancelled() && needs.deploy-staging.result != 'failure' &&
       github.repository != 'afri-soft-com/mova' &&
       !(github.event_name == 'workflow_dispatch' && inputs.staging_only) &&
       (github.event_name == 'workflow_dispatch' ||
@@ -173,7 +196,7 @@ jobs:
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
-          name: db-backups-${{ github.event.workflow_run.head_sha || github.sha }}
+          name: db-backups-${{ inputs.commit || github.event.workflow_run.head_sha || github.sha }}
           path: backups/
           retention-days: 14
           if-no-files-found: ignore
@@ -268,7 +291,7 @@ jobs:
           RENDER_SERVICE_IDS: ${{ steps.render.outputs.ids }}
         run: |
           chmod +x scripts/render-deploy.sh
-          ./scripts/render-deploy.sh "${{ github.event.workflow_run.head_sha || github.sha }}"
+          ./scripts/render-deploy.sh "${{ inputs.commit || github.event.workflow_run.head_sha || github.sha }}"
 
       - name: Note — migrations run on container start
         run: |
@@ -282,7 +305,7 @@ jobs:
         id: verify
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-        run: bash scripts/render-guard.sh verify "${{ github.event.workflow_run.head_sha || github.sha }}"
+        run: bash scripts/render-guard.sh verify "${{ inputs.commit || github.event.workflow_run.head_sha || github.sha }}"
 
       - name: Strict smoke test (production)
         id: smoke
@@ -309,14 +332,14 @@ jobs:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: |
           bash scripts/render-guard.sh rollback render-snapshot.json
-          echo "::error::Deploy of ${{ github.event.workflow_run.head_sha || github.sha }} failed checks — production rolled back."
+          echo "::error::Deploy of ${{ inputs.commit || github.event.workflow_run.head_sha || github.sha }} failed checks — production rolled back."
 
       - name: Upload Render snapshot
         if: always()
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
-          name: render-snapshot-${{ github.event.workflow_run.head_sha || github.sha }}
+          name: render-snapshot-${{ inputs.commit || github.event.workflow_run.head_sha || github.sha }}
           path: render-snapshot.json
           if-no-files-found: ignore
 
@@ -332,14 +355,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ inputs.commit || github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
 
       - name: Deploy payment hub
         env:
           HUB_DEPLOY_SSH_KEY: ${{ secrets.HUB_DEPLOY_SSH_KEY }}
           HUB_SSH_KNOWN_HOSTS: ${{ secrets.HUB_SSH_KNOWN_HOSTS }}
           HUB_HOST: ${{ vars.HUB_HOST || '178.104.82.66' }}
-          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          SHA: ${{ inputs.commit || github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -euo pipefail
           if [ -z "${HUB_DEPLOY_SSH_KEY:-}" ] || [ -z "${HUB_SSH_KNOWN_HOSTS:-}" ]; then

@@ -1,10 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter, assertProductionSecurity, resolveCorsOrigin } from '@mova/shared';
+import { HttpExceptionFilter, assertProductionSecurity, installErrorReporting, resolveCorsOrigin } from '@mova/shared';
 
 async function bootstrap() {
   assertProductionSecurity('driver-service');
+  installErrorReporting('driver-service');
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, transformOptions: { enableImplicitConversion: true } }));
   app.useGlobalFilters(new HttpExceptionFilter());

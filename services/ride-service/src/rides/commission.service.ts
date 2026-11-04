@@ -66,6 +66,8 @@ export class CommissionService {
   }
 
   splitGross(grossCdf: number, platformPercent: number) {
+    // A mistyped admin rate (e.g. 120 %) must never produce a negative driver payout.
+    platformPercent = Math.min(100, Math.max(0, Number.isFinite(platformPercent) ? platformPercent : 0));
     const platformFeeCdf = Math.ceil(grossCdf * (platformPercent / 100));
     return {
       grossCdf,

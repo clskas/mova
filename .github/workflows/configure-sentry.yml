@@ -1,0 +1,70 @@
+name: Configure Sentry
+
+# Copies the GitHub secret SENTRY_DSN onto every production backend service on
+# Render (env var SENTRY_DSN), then redeploys production so it takes effect.
+# Mobile apps read SENTRY_DSN_MOBILE at build time (mobile-release.yml).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  configure:
+    if: github.repository != 'afri-soft-com/mova'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set SENTRY_DSN on Render backend services
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SENTRY_DSN" ]; then
+            echo "::error::Create the GitHub secret SENTRY_DSN first (Sentry → Project settings → Client keys)."
+            exit 1
+          fi
+          for role in mova-gateway mova-auth mova-ride mova-payment mova-driver mova-notification mova-admin; do
+            id=$(jq -r --arg r "$role" '.services[$r].id // empty' config/render-services.json)
+            [ -n "$id" ] || continue
+            code=$(curl -s -o /dev/null -w '%{http_code}' -X PUT \
+              "https://api.render.com/v1/services/$id/env-vars/SENTRY_DSN" \
+              -H "Authorization: Bearer $RENDER_API_KEY" -H 'Content-Type: application/json' \
+              -d "$(jq -n --arg v "$SENTRY_DSN" '{value: $v}')")
+            echo "$role: HTTP $code"
+            [[ "$code" == 2* ]] || exit 1
+            sleep 1
+          done
+
+      # Same commit, new env: the regular Deploy would skip services already live.
+      - name: Redeploy the backend services (same commit) to load it
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          set -euo pipefail
+          for role in mova-gateway mova-auth mova-ride mova-payment mova-driver mova-notification mova-admin; do
+            id=$(jq -r --arg r "$role" '.services[$r].id // empty' config/render-services.json)
+            [ -n "$id" ] || continue
+            commit=$(curl -sf -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services/$id/deploys?limit=10" \
+              | jq -r '[.[] | (.deploy // .) | select(.status == "live")][0].commit.id // empty')
+            curl -sf -o /dev/null -X POST "https://api.render.com/v1/services/$id/deploys" \
+              -H "Authorization: Bearer $RENDER_API_KEY" -H 'Content-Type: application/json' \
+              -d "$(jq -n --arg c "$commit" '{clearCache: "do_not_clear"} + (if $c == "" then {} else {commitId: $c} end)')"
+            echo "$role: redeploy triggered (${commit:0:8})"
+            sleep 2
+          done
+
+      - name: Check production after the restart
+        run: |
+          sleep 300
+          for attempt in 1 2 3 4 5 6; do
+            if SMOKE_STRICT=true GATEWAY_URL=https://api.afri-soft.com bash scripts/smoke-test.sh; then exit 0; fi
+            echo "Attempt $attempt failed — retry in 60s"; sleep 60
+          done
+          exit 1

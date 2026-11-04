@@ -6,12 +6,14 @@ import {
   SERVICE_PORTS,
   HttpExceptionFilter,
   assertProductionSecurity,
+  installErrorReporting,
   resolveCorsOrigin,
 } from '@mova/shared';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   assertProductionSecurity('api-gateway');
+  installErrorReporting('api-gateway');
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   app.use(
     helmet({

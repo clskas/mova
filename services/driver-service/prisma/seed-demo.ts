@@ -41,10 +41,32 @@ const DEMO_PASSENGERS = [
   '+243900000013',
 ];
 
+/** Same deterministic ids as auth-service prisma/seed-demo.ts (drivers 20–29, 50–54). */
+function demoUserIdForPhone(phone: string): string | null {
+  const m = /^\+2439000000(\d{2})$/.exec(phone);
+  if (!m) return null;
+  const suffix = Number(m[1]);
+  const driver = (suffix >= 20 && suffix <= 29) || (suffix >= 50 && suffix <= 54);
+  const prefix = driver ? '22222222-2222-2222-2222-' : '11111111-1111-1111-1111-';
+  return `${prefix}${String(suffix).padStart(12, '0')}`;
+}
+
+/**
+ * /internal/users always hides +2439000000xx demo accounts (production safeguard), so
+ * look them up by their deterministic id; fall back to the list for other phones.
+ */
 async function userIdByPhone(phone: string): Promise<string | null> {
-  const res = await fetch(`${AUTH_SERVICE_URL}/internal/users?take=200&includePlayPrelaunch=true`, {
-    headers: { 'x-internal-api-key': INTERNAL_API_KEY },
-  });
+  const headers = { 'x-internal-api-key': INTERNAL_API_KEY };
+  const id = demoUserIdForPhone(phone);
+  if (id) {
+    const res = await fetch(`${AUTH_SERVICE_URL}/internal/users/${id}`, { headers });
+    if (res.ok) {
+      const u = (await res.json()) as { id?: string; phone?: string; data?: { id: string; phone: string } };
+      const row = u.data ?? u;
+      if (row?.phone === phone && row.id) return row.id;
+    }
+  }
+  const res = await fetch(`${AUTH_SERVICE_URL}/internal/users?take=200`, { headers });
   if (!res.ok) return null;
   const body = (await res.json()) as { data?: { id: string; phone: string }[] };
   return body.data?.find((u) => u.phone === phone)?.id ?? null;

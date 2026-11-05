@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 import '../config/market_config.dart';
+import 'location_permission.dart';
 
 class LocationResult {
   const LocationResult({required this.position, required this.label});
@@ -25,7 +26,7 @@ class LocationService {
 
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      permission = await LocationPermissionGate.request();
     }
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {

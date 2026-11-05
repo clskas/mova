@@ -14,6 +14,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'active_ride_screen.dart';
 import 'driver_job_alert_service.dart';
+import '../../core/location/location_permission.dart';
 
 class RideOfferScreen extends ConsumerStatefulWidget {
   const RideOfferScreen({
@@ -142,7 +143,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
       if (!await Geolocator.isLocationServiceEnabled()) return;
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission = await LocationPermissionGate.request();
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {

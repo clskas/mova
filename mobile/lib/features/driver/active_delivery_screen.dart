@@ -24,6 +24,7 @@ import '../../core/safety/sos_helper.dart';
 import '../delivery/delivery_payment_state.dart';
 import 'widgets/driver_cash_pin_dialog.dart';
 import 'widgets/driver_cash_received_dialog.dart';
+import '../../core/location/location_permission.dart';
 
 class ActiveDeliveryScreen extends ConsumerStatefulWidget {
   const ActiveDeliveryScreen({
@@ -232,7 +233,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     if (!await Geolocator.isLocationServiceEnabled()) return;
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      permission = await LocationPermissionGate.request();
     }
     if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
       return;

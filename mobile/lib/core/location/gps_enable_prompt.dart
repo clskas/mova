@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../theme/mova_colors.dart';
+import 'location_permission.dart';
 
 /// État GPS / permissions au démarrage ou au retour sur l'app.
 enum GpsReadiness {
@@ -70,7 +71,7 @@ class _GpsDialog extends StatelessWidget {
       case GpsReadiness.serviceDisabled:
         await Geolocator.openLocationSettings();
       case GpsReadiness.permissionDenied:
-        final result = await Geolocator.requestPermission();
+        final result = await LocationPermissionGate.request();
         if (result == LocationPermission.deniedForever && context.mounted) {
           await Geolocator.openAppSettings();
         }

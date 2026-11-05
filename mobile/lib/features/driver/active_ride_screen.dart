@@ -24,6 +24,7 @@ import '../../core/safety/sos_helper.dart';
 import '../../core/services/cancel_eligibility.dart';
 import 'driver_job_alert_service.dart';
 import 'widgets/driver_cash_received_dialog.dart';
+import '../../core/location/location_permission.dart';
 
 class ActiveRideScreen extends ConsumerStatefulWidget {
   const ActiveRideScreen({
@@ -294,7 +295,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     if (!await Geolocator.isLocationServiceEnabled()) return;
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      permission = await LocationPermissionGate.request();
     }
     if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
       return;

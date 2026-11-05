@@ -27,6 +27,7 @@ import '../billing/cash_paid_claim_button.dart';
 import '../rating/rating_screen.dart';
 import 'payment_screen.dart';
 import 'widgets/mova_ride_map.dart';
+import '../../core/location/location_permission.dart';
 
 List<Map<String, dynamic>> computeRideTimeline(String mobileStatus) {
   const steps = [
@@ -696,7 +697,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       if (await Geolocator.isLocationServiceEnabled()) {
         var permission = await Geolocator.checkPermission();
         if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
+          permission = await LocationPermissionGate.request();
         }
         if (permission == LocationPermission.whileInUse ||
             permission == LocationPermission.always) {

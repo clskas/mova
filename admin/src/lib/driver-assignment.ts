@@ -14,24 +14,20 @@ export function driverHasCargoVehicle(driver: AdminDriver): boolean {
   return activeVehicleTypes(driver).some((t) => CARGO_VEHICLE_TYPES.has(t));
 }
 
+/** Même règle que le serveur (@mova/shared MOVING_ELIGIBLE_VEHICLE_TYPES). */
+const MOVING_VEHICLE_TYPES: Record<string, readonly string[]> = {
+  CAMIONNETTE: ["UTILITAIRE", "CAMION"],
+  CAMION_15M3: ["UTILITAIRE", "CAMION"],
+  CAMION_30M3: ["CAMION"],
+  CAMION_50M3: ["CAMION"],
+};
+
 export function filterDriversForMoving(
   drivers: AdminDriver[],
   vehicleCategory?: string | null,
 ): AdminDriver[] {
-  return drivers.filter((d) => {
-    if (!driverHasCargoVehicle(d)) return false;
-    const types = activeVehicleTypes(d);
-    if (vehicleCategory === "CAMION_50M3") {
-      return types.some((t) => t === "UTILITAIRE" || t === "CAMION");
-    }
-    if (vehicleCategory === "CAMION_30M3") {
-      return types.some((t) => t === "UTILITAIRE" || t === "CAMION" || t === "COMFORT" || t === "VIP");
-    }
-    if (vehicleCategory === "CAMION_15M3" || vehicleCategory === "CAMIONNETTE") {
-      return types.some((t) => CARGO_VEHICLE_TYPES.has(t));
-    }
-    return true;
-  });
+  const allowed = MOVING_VEHICLE_TYPES[vehicleCategory ?? ""] ?? MOVING_VEHICLE_TYPES.CAMION_15M3;
+  return drivers.filter((d) => activeVehicleTypes(d).some((t) => allowed.includes(t)));
 }
 
 /** Chauffeurs éligibles pour logistique location SENGA (livraison/récupération véhicule). */

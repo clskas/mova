@@ -24,4 +24,40 @@ void main() {
     expect((event['tags'] as Map)['flavor'], isNotNull);
     expect(((event['exception'] as Map)['values'] as List).first['type'], 'StateError');
   });
+
+  group('ignores network noise from map tiles and fonts', () {
+    test('offline map tile (SENGA-MOBILE-5)', () {
+      expect(
+        ErrorReporter.shouldIgnore(Exception(
+          'ClientException with SocketException: Connection failed (OS Error: Network is unreachable, errno = 101), '
+          'address = tile.openstreetmap.org, port = 443, uri=https://tile.openstreetmap.org/15/1/2.png',
+        )),
+        isTrue,
+      );
+    });
+
+    test('map tile server timeout (SENGA-MOBILE-3)', () {
+      expect(
+        ErrorReporter.shouldIgnore(Exception(
+          'ClientException: Request to https://tile.openstreetmap.org/15/18516/16836.png failed with status 504: Gateway Timeout.',
+        )),
+        isTrue,
+      );
+    });
+
+    test('runtime font download (SENGA-MOBILE-1)', () {
+      expect(
+        ErrorReporter.shouldIgnore(Exception('Failed to load font with url: https://fonts.gstatic.com/s/a/x.ttf')),
+        isTrue,
+      );
+    });
+
+    test('keeps real bugs and our own API failures', () {
+      expect(ErrorReporter.shouldIgnore(StateError('Cannot use "ref" after the widget was disposed.')), isFalse);
+      expect(
+        ErrorReporter.shouldIgnore(Exception('ClientException: Connection failed, uri=https://api.afri-soft.com/api/rides')),
+        isFalse,
+      );
+    });
+  });
 }

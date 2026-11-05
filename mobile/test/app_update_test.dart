@@ -601,6 +601,51 @@ void main() {
       expect(afterPlay.showBanner, isTrue);
     });
 
+    test('internal tester above the production code sees the next internal build', () {
+      // Production advertises 225; the tester runs internal build 238 and Play
+      // offers internal build 239 on the testing track.
+      final current = AppUpdateService.parseRemote(
+        {
+          'driver': {
+            'currentVersion': '1.0.44',
+            'minVersion': '1.0.0',
+            'currentVersionCode': 225,
+          },
+        },
+        isDriver: true,
+        localVersion: '1.0.46',
+        localBuild: 238,
+      )!;
+      expect(current.updateAvailable, isFalse);
+      final afterPlay = AppUpdateService.reconcileWithPlay(
+        current,
+        playCode: 239,
+        localBuild: 238,
+        advertisedCode: 225,
+        fallbackStoreUrl: 'https://play.google.com/store/apps/details?id=cd.mova.mova.driver',
+      );
+      expect(afterPlay.updateAvailable, isTrue);
+      expect(afterPlay.showBanner, isTrue);
+    });
+
+    test('tester on the latest internal build sees no banner', () {
+      final current = AppUpdateService.parseRemote(
+        {
+          'driver': {'currentVersion': '1.0.44', 'minVersion': '1.0.0', 'currentVersionCode': 225},
+        },
+        isDriver: true,
+        localVersion: '1.0.46',
+        localBuild: 239,
+      )!;
+      final afterPlay = AppUpdateService.reconcileWithPlay(
+        current,
+        playCode: 239,
+        localBuild: 239,
+        advertisedCode: 225,
+      );
+      expect(afterPlay.showBanner, isFalse);
+    });
+
     test('forced min-version banner stays even if Play says current', () {
       final forced = AppUpdateService.parseRemote(
         {

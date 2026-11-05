@@ -300,7 +300,8 @@ class AppUpdateService extends Notifier<AppUpdateState> {
   /// Merge Play Core's available versionCode with the API decision.
   ///
   /// Soft banners show when:
-  /// - Play offers a newer package, or
+  /// - Play offers a newer package to this device (checked first, so internal
+  ///   testers above the production code still see their next build), or
   /// - the public API advertises a store code above the installed build
   ///   (covers staged Play rollouts where In-App Update still reports the
   ///   installed code), or
@@ -320,13 +321,9 @@ class AppUpdateService extends Notifier<AppUpdateState> {
     int advertisedCode = 0,
     bool playConfirmedNoUpdate = false,
   }) {
-    // Installed build already at/above store advertisement → hide.
-    if (advertisedCode > 0 && localBuild > 0 && localBuild >= advertisedCode) {
-      return next.copyWith(updateAvailable: false, flexibleDownloaded: false);
-    }
-    if (playConfirmedNoUpdate && !next.forceUpdate) {
-      return next.copyWith(updateAvailable: false, flexibleDownloaded: false);
-    }
+    // Play offers a newer package to THIS device (internal testers, staged
+    // rollout) → show, even when the installed build is already above the
+    // production code the API advertises.
     if (playCode > 0 && localBuild > 0 && playCode > localBuild) {
       return next.copyWith(
         updateAvailable: true,
@@ -334,6 +331,13 @@ class AppUpdateService extends Notifier<AppUpdateState> {
             ? fallbackStoreUrl
             : next.storeUrl,
       );
+    }
+    // Installed build already at/above store advertisement → hide.
+    if (advertisedCode > 0 && localBuild > 0 && localBuild >= advertisedCode) {
+      return next.copyWith(updateAvailable: false, flexibleDownloaded: false);
+    }
+    if (playConfirmedNoUpdate && !next.forceUpdate) {
+      return next.copyWith(updateAvailable: false, flexibleDownloaded: false);
     }
     // API ahead of installed (floor / env) — keep soft banner even if Play
     // Core has not yet offered the package on this device.

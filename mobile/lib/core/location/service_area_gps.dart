@@ -8,7 +8,11 @@ import 'service_areas.dart';
 
 /// Détecte la ville SENGA la plus proche du GPS et met à jour la préférence.
 class ServiceAreaGps {
+  ///
+  /// Le conteneur Riverpod est lu avant toute attente : l'écran appelant peut
+  /// être fermé pendant la recherche GPS (Sentry SENGA-MOBILE-2).
   static Future<ServiceArea?> sync(WidgetRef ref) async {
+    final container = ProviderScope.containerOf(ref.context, listen: false);
     final location = await LocationService.getCurrentLocation();
     if (location == null) return null;
 
@@ -18,9 +22,9 @@ class ServiceAreaGps {
 
     final area =
         ServiceAreas.byCoords(location.position) ?? ServiceAreas.nearest(location.position);
-    final prefs = await ref.read(serviceAreaPrefsProvider.future);
+    final prefs = await container.read(serviceAreaPrefsProvider.future);
     await prefs.setSelectedAreaId(area.id);
-    ref.invalidate(serviceAreaPrefsProvider);
+    container.invalidate(serviceAreaPrefsProvider);
     return area;
   }
 

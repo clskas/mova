@@ -40,6 +40,7 @@ import 'driver_scheduled_mission_screen.dart';
 import '../delivery/delivery_payment_state.dart';
 import '../notifications/notifications_inbox_screen.dart';
 import '../sos/notification_tap_router.dart';
+import '../../core/location/location_permission.dart';
 
 enum _DriverMenuAction {
   earnings,
@@ -905,7 +906,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     if (!await Geolocator.isLocationServiceEnabled()) return false;
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      permission = await LocationPermissionGate.request();
     }
     if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
       return false;

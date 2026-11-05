@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
+import '../location/location_permission.dart';
 
 /// Resolve GPS for SOS (high accuracy, then optional fallback).
 Future<({double? lat, double? lng})> resolveSosPosition({
@@ -14,7 +15,7 @@ Future<({double? lat, double? lng})> resolveSosPosition({
     if (await Geolocator.isLocationServiceEnabled()) {
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission = await LocationPermissionGate.request();
       }
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {

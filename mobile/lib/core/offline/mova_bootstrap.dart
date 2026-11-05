@@ -9,10 +9,16 @@ import 'connectivity_service.dart';
 import 'sync_queue.dart';
 
 /// Initialise Hive, connectivité, santé API et synchronisation.
+///
+/// [ref] appartient à l'écran de démarrage, qui est fermé bien avant que les
+/// rappels réseau ci-dessous ne s'exécutent : on passe donc par le conteneur
+/// Riverpod de l'app, qui vit aussi longtemps qu'elle (Sentry SENGA-MOBILE-2).
 Future<void> bootstrapMovaApp(WidgetRef ref) async {
-  final connectivity = ref.read(connectivityServiceProvider);
-  final api = ref.read(apiClientProvider);
-  final queue = ref.read(syncQueueProvider);
+  final container = ProviderScope.containerOf(ref.context, listen: false);
+  final connectivity = container.read(connectivityServiceProvider);
+  final api = container.read(apiClientProvider);
+  final queue = container.read(syncQueueProvider);
+  final updates = container.read(appUpdateServiceProvider.notifier);
 
   await connectivity.init();
   await api.loadToken();
@@ -38,7 +44,7 @@ Future<void> bootstrapMovaApp(WidgetRef ref) async {
   connectivity.onBackOnline = () async {
     await api.checkHealth();
     // Passenger cold-start often misses the first app-version probe while offline.
-    ref.read(appUpdateServiceProvider.notifier).onAppResumed();
+    updates.onAppResumed();
     await flushPending();
   };
 
@@ -57,7 +63,7 @@ Future<void> bootstrapMovaApp(WidgetRef ref) async {
   connectivity.onNetworkRestored = () async {
     connectivity.prepareReconnect();
     await api.checkHealth(resetFailures: true);
-    ref.read(appUpdateServiceProvider.notifier).onAppResumed();
+    updates.onAppResumed();
   };
 
   connectivity.prepareReconnect();
@@ -70,5 +76,5 @@ Future<void> bootstrapMovaApp(WidgetRef ref) async {
   }
 
   connectivity.startGatewayHealthRetry(() => api.checkHealth());
-  ref.read(appUpdateServiceProvider.notifier).onAppResumed();
+  updates.onAppResumed();
 }

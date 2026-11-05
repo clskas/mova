@@ -95,6 +95,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   List<Map<String, dynamic>> _deliveryOffers = [];
   List<Map<String, dynamic>> _assignedMissions = [];
   List<Map<String, dynamic>> _scheduledOffers = [];
+  List<Map<String, dynamic>> _movingOffers = [];
+  String? _acceptingMovingId;
   List<Map<String, dynamic>> _publicites = const [];
   final Set<String> _knownMissionKeys = {};
   final Set<String> _knownOfferKeys = {};
@@ -287,6 +289,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final scheduledOffersResult = await api.get('/rides/scheduled/offers', skipCache: true);
     final errandResult = await api.get('/deliveries/assignments', skipCache: true);
     final rentalResult = await api.get('/rental/assignments', skipCache: true);
+    final movingOffersResult = await api.get('/moving/offers', skipCache: true);
     if (!mounted) return;
     final missions = <Map<String, dynamic>>[];
     if (movingResult case Success(:final data)) {
@@ -324,9 +327,14 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       final key = DriverJobAlertService.missionKey(m);
       return key.length > 1 && !_knownMissionKeys.contains(key);
     }).toList();
+    var movingOffers = <Map<String, dynamic>>[];
+    if (movingOffersResult case Success(:final data)) {
+      movingOffers = (data['data'] as List? ?? []).cast<Map<String, dynamic>>();
+    }
     setState(() {
       _assignedMissions = missions;
       _scheduledOffers = scheduledOffers;
+      _movingOffers = movingOffers;
     });
     _knownMissionKeys
       ..clear()
@@ -341,6 +349,42 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     }
     _missionAlertsSeeded = true;
     await _loadActiveDelivery();
+  }
+
+  Future<void> _acceptMovingOffer(Map<String, dynamic> offer) async {
+    final id = offer['id']?.toString();
+    if (id == null || id.isEmpty || _acceptingMovingId != null) return;
+    final volume = (offer['volumeM3'] as num?)?.ceil();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Accepter ce déménagement ?'),
+        content: Text(
+          '${offer['pickupAddress'] ?? ''} → ${offer['dropoffAddress'] ?? ''}'
+          '${volume != null ? '\n$volume m³ à transporter.' : ''}'
+          '\n\nVérifiez que tout tient dans votre véhicule avant d\'accepter.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Accepter')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _acceptingMovingId = id);
+    final result = await ref.read(apiClientProvider).post('/moving/$id/accept', {});
+    if (!mounted) return;
+    setState(() => _acceptingMovingId = null);
+    switch (result) {
+      case Success(:final data):
+        final moving = (data['moving'] as Map?)?.cast<String, dynamic>() ?? offer;
+        await _loadAssignments();
+        if (!mounted) return;
+        _openAssignedMission({...moving, 'id': id, 'type': 'MOVING'});
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        await _loadAssignments();
+    }
   }
 
   String _missionStatusLabel(String? status) {
@@ -1876,6 +1920,91 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   ],
                 );
               },
+            ),
+          ],
+          if (_movingOffers.isNotEmpty) ...[
+            const SizedBox(height: _sectionGap),
+            MovaCard(
+              key: const Key('movingOffersCard'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.local_shipping_outlined, size: 18, color: MovaColors.orange),
+                      SizedBox(width: 8),
+                      Text('Déménagements proposés', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Ces déménagements tiennent dans votre véhicule. Le premier chauffeur qui accepte l\'obtient.',
+                    style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                  ),
+                  ..._movingOffers.map((offer) {
+                    final id = offer['id']?.toString() ?? '';
+                    final volume = (offer['volumeM3'] as num?)?.ceil();
+                    final net = (offer['driverNetCdf'] as num?)?.round();
+                    final items = offer['itemsNotes']?.toString() ?? '';
+                    return Padding(
+                      padding: const EdgeInsets.only(top: _listItemGap),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${offer['pickupAddress'] ?? ''} → ${offer['dropoffAddress'] ?? ''}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            [
+                              if (volume != null) '$volume m³',
+                              if (offer['vehicleLabel'] != null) offer['vehicleLabel'].toString(),
+                              if (offer['distanceKm'] is num) '${(offer['distanceKm'] as num).toStringAsFixed(1)} km',
+                            ].join(' · '),
+                            style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                          ),
+                          if (items.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              items,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                            ),
+                          ],
+                          Row(
+                            children: [
+                              if (net != null)
+                                Expanded(
+                                  child: Text(
+                                    'Gain net ~${MarketConfig.formatCdf(net)}',
+                                    style: const TextStyle(fontSize: 12, color: MovaColors.green),
+                                  ),
+                                )
+                              else
+                                const Spacer(),
+                              FilledButton(
+                                key: Key('acceptMoving_$id'),
+                                onPressed: _acceptingMovingId != null ? null : () => _acceptMovingOffer(offer),
+                                child: _acceptingMovingId == id
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    : const Text('Accepter'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
             ),
           ],
           if (_scheduledOffers.isNotEmpty) ...[

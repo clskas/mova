@@ -35,6 +35,18 @@ export class MovingController {
     return this.movingService.listForDriver(req.user.id);
   }
 
+  @Get('offers')
+  @ApiOperation({ summary: 'Déménagements ouverts que ce chauffeur peut prendre (utilitaire/camion assez grand)' })
+  offers(@Request() req: { user: { id: string } }) {
+    return this.movingService.listOffersForDriver(req.user.id);
+  }
+
+  @Post(':id/accept')
+  @ApiOperation({ summary: 'Accepter un déménagement ouvert (chauffeur, premier arrivé)' })
+  accept(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.movingService.acceptByDriver(id, req.user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Détail déménagement (passager ou chauffeur assigné)' })
   get(@Request() req: { user: { id: string } }, @Param('id') id: string) {

@@ -1,12 +1,31 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { CommissionServiceType, MovingRequestStatus, MovingVehicleCategory, SurchargeType, VehicleType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelMoving, estimateTripDurationMin, formatCdf, resolveCityFromCoords } from '@mova/shared';
+import {
+  MovaErrorCode,
+  MovaHttpException,
+  MOVA_EVENTS,
+  MOVING_ELIGIBLE_VEHICLE_TYPES,
+  MovingVehicleCategoryValue,
+  canCancelMoving,
+  estimateTripDurationMin,
+  formatCdf,
+  resolveCityFromCoords,
+  vehicleFitsMove,
+} from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { buildMovingTimeline } from '../deliveries/parcel.util';
 import { assertServiceAreaPair } from '../common/address.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { fetchServicePaymentStatus } from '../common/payment-status.util';
-import { assertDriverCanReceiveJobs, assertDriverEligibleForMoving } from '../common/driver-eligibility.util';
+import {
+  assertDriverCanReceiveJobs,
+  assertDriverEligibleForMoving,
+  DriverProfileSnapshot,
+  fetchDriverProfileSnapshot,
+} from '../common/driver-eligibility.util';
+import { filterDriversNotDebtBlocked } from '../common/driver-debt.util';
+import { publishDriverJobAlert, publishDriverJobStop } from '../common/driver-job-alert.util';
+import { MatchingService } from '../matching/matching.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { CommissionService } from '../rides/commission.service';
@@ -19,8 +38,15 @@ import { RoutingService } from '../geo/routing.service';
 import { MovingVehiclePricingService } from './moving-vehicle-pricing.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
 
+/** Search attempt high enough to reach the maximum matching radius. */
+const MOVING_SEARCH_ATTEMPT = 50;
+/** Open moves older than this are no longer offered to drivers (the admin follows up). */
+const MOVING_OFFER_MAX_AGE_MS = 7 * 24 * 3600 * 1000;
+
 @Injectable()
 export class MovingService {
+  private readonly logger = new Logger(MovingService.name);
+
   constructor(
     private prisma: PrismaService,
     private pricing: PricingService,
@@ -32,6 +58,7 @@ export class MovingService {
     private commission: CommissionService,
     private movingVehiclePricing: MovingVehiclePricingService,
     private platformConfig: PlatformConfigService,
+    @Optional() private matching?: MatchingService,
   ) {}
 
   private validateCoords(dto: EstimateMovingDto) {
@@ -126,7 +153,161 @@ export class MovingService {
         itemsNotes: dto.itemsNotes?.trim() || undefined,
       },
     });
+    await this.alertMovingOffer(request).catch((e: unknown) =>
+      this.logger.warn(`Moving offer alert failed for ${request.id}: ${(e as Error)?.message ?? e}`),
+    );
     return { moving: request, estimate };
+  }
+
+  /** True when one of the driver's vehicles can take this move (type + declared volume, same city). */
+  private driverFitsMove(
+    profile: DriverProfileSnapshot | null,
+    request: { vehicleCategory: MovingVehicleCategory; volumeM3: number; pickupLat: number; pickupLng: number },
+  ): boolean {
+    if (!profile) return false;
+    if (!(profile.vehicles ?? []).some((v) => vehicleFitsMove(v, request.vehicleCategory, request.volumeM3))) {
+      return false;
+    }
+    const city = profile.operatingCity?.trim();
+    return !city || resolveCityFromCoords(request.pickupLat, request.pickupLng) === city;
+  }
+
+  /**
+   * Notify online drivers near the pickup whose utilitaire / camion fits the move.
+   * They accept from SENGA Driver; the admin can still assign by hand.
+   */
+  private async alertMovingOffer(request: {
+    id: string;
+    vehicleCategory: MovingVehicleCategory;
+    volumeM3: number;
+    pickupLat: number;
+    pickupLng: number;
+    pickupAddress: string;
+    dropoffAddress: string;
+  }) {
+    if (!this.matching) return;
+    const allowed = MOVING_ELIGIBLE_VEHICLE_TYPES[request.vehicleCategory as MovingVehicleCategoryValue] ?? [];
+    const seen = new Set<string>();
+    for (const type of allowed) {
+      const drivers = await this.matching.findDrivers(request.pickupLat, request.pickupLng, type, MOVING_SEARCH_ATTEMPT);
+      for (const d of drivers) seen.add(d.userId);
+    }
+    const candidates = await filterDriversNotDebtBlocked([...seen]);
+    const profiles = await Promise.all(candidates.map((id) => fetchDriverProfileSnapshot(id)));
+    const driverUserIds = candidates.filter((_, i) => this.driverFitsMove(profiles[i], request));
+    if (driverUserIds.length === 0) return;
+    await publishDriverJobAlert(this.redis, {
+      jobKind: 'MISSION',
+      referenceId: request.id,
+      driverUserIds,
+      title: 'Nouveau déménagement',
+      body: `${Math.ceil(request.volumeM3)} m³ · ${request.pickupAddress} → ${request.dropoffAddress}`,
+      pickupAddress: request.pickupAddress,
+      pickupLat: request.pickupLat,
+      pickupLng: request.pickupLng,
+      data: { serviceType: 'MOVING', movingId: request.id },
+    });
+  }
+
+  /** Stop the offer on the other drivers' phones (taken or cancelled). */
+  private async stopMovingOffer(id: string, reason: 'taken' | 'cancelled', excludeUserId?: string) {
+    await publishDriverJobStop(this.redis, {
+      jobKind: 'MISSION',
+      referenceId: id,
+      reason,
+      excludeUserIds: excludeUserId ? [excludeUserId] : [],
+    }).catch(() => undefined);
+  }
+
+  /** Open moves this driver can take: right vehicle and volume, same city, not yet assigned. */
+  async listOffersForDriver(driverId: string) {
+    const profile = await fetchDriverProfileSnapshot(driverId);
+    if (!profile) return { data: [] };
+    const categories = (Object.keys(MOVING_ELIGIBLE_VEHICLE_TYPES) as MovingVehicleCategoryValue[]).filter((c) =>
+      (profile.vehicles ?? []).some((v) => vehicleFitsMove(v, c)),
+    );
+    if (categories.length === 0) return { data: [] };
+    const rows = await this.prisma.movingRequest.findMany({
+      where: {
+        status: MovingRequestStatus.PENDING,
+        driverId: null,
+        vehicleCategory: { in: categories as MovingVehicleCategory[] },
+        createdAt: { gte: new Date(Date.now() - MOVING_OFFER_MAX_AGE_MS) },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+    const offers = rows.filter((r) => this.driverFitsMove(profile, r));
+    const rule = await this.commission.get(CommissionServiceType.MOVING);
+    return {
+      data: await Promise.all(
+        offers.map(async (r) => ({
+          id: r.id,
+          type: 'MOVING',
+          label: 'Déménagement',
+          status: r.status,
+          pickupAddress: r.pickupAddress,
+          dropoffAddress: r.dropoffAddress,
+          volumeM3: r.volumeM3,
+          vehicleCategory: r.vehicleCategory,
+          vehicleLabel: await this.vehicleCategoryLabel(r.vehicleCategory),
+          itemsNotes: r.itemsNotes,
+          photoUrls: Array.isArray(r.photoUrls) ? r.photoUrls : [],
+          distanceKm: r.distanceKm,
+          priceCdf: r.estimatedPriceCdf,
+          createdAt: r.createdAt.toISOString(),
+          ...(await this.buildMovingPricingFields(r, driverId)),
+          driverNetCdf: Math.round(this.commission.splitGross(r.estimatedPriceCdf, rule.platformPercent).driverNetCdf),
+        })),
+      ),
+    };
+  }
+
+  /** A driver takes an open move; the first one wins. */
+  async acceptByDriver(id: string, driverId: string) {
+    const taken = () =>
+      new MovaHttpException(
+        MovaErrorCode.MOVING_INVALID_STATUS,
+        HttpStatus.CONFLICT,
+        'Ce déménagement a déjà été pris par un autre chauffeur ou annulé.',
+      );
+    const request = await this.prisma.movingRequest.findUnique({ where: { id } });
+    if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (request.status !== MovingRequestStatus.PENDING || request.driverId) throw taken();
+    await assertDriverEligibleForMoving(driverId, request.vehicleCategory, request.volumeM3);
+    const updated = await this.prisma.movingRequest
+      .update({
+        where: { id, driverId: null, status: MovingRequestStatus.PENDING },
+        data: {
+          driverId,
+          status: MovingRequestStatus.ASSIGNED,
+          completionPin: request.completionPin ?? this.tripShare.generateCompletionPin(),
+        },
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string })?.code === 'P2025') throw taken();
+        throw e;
+      });
+    await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
+      serviceType: 'MOVING',
+      referenceId: updated.id,
+      driverId,
+      passengerId: updated.userId,
+      summary: `Déménagement ${updated.pickupAddress} → ${updated.dropoffAddress}`,
+      pickupAddress: updated.pickupAddress,
+      dropoffAddress: updated.dropoffAddress,
+    });
+    await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
+      serviceType: 'MOVING',
+      referenceId: updated.id,
+      userId: updated.userId,
+      status: updated.status,
+    });
+    await this.stopMovingOffer(updated.id, 'taken', driverId);
+    return {
+      moving: await this.formatMovingDetail(updated, driverId),
+      timeline: buildMovingTimeline(updated.status, updated.completedAt),
+    };
   }
 
   async list(userId: string) {
@@ -313,10 +494,12 @@ export class MovingService {
         cancelEligibility.cancelBlockReason,
       );
     }
-    return this.prisma.movingRequest.update({
+    const cancelled = await this.prisma.movingRequest.update({
       where: { id },
       data: { status: MovingRequestStatus.CANCELLED, cancelledAt: new Date() },
     });
+    await this.stopMovingOffer(id, 'cancelled');
+    return cancelled;
   }
 
   async listForAdmin(take = 50) {
@@ -366,6 +549,7 @@ export class MovingService {
       data.status = MovingRequestStatus.ASSIGNED;
     }
     const updated = await this.prisma.movingRequest.update({ where: { id }, data });
+    await this.stopMovingOffer(updated.id, 'taken', updated.driverId!);
     const driver = await fetchAuthUserBrief(updated.driverId!);
     await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
       serviceType: 'MOVING',
@@ -399,7 +583,12 @@ export class MovingService {
     if (request.status === MovingRequestStatus.COMPLETED || request.status === MovingRequestStatus.CANCELLED) {
       throw new MovaHttpException(MovaErrorCode.MOVING_INVALID_STATUS);
     }
-    return this.prisma.movingRequest.update({ where: { id }, data: { status: MovingRequestStatus.CANCELLED, cancelledAt: new Date() } });
+    const cancelled = await this.prisma.movingRequest.update({
+      where: { id },
+      data: { status: MovingRequestStatus.CANCELLED, cancelledAt: new Date() },
+    });
+    await this.stopMovingOffer(id, 'cancelled');
+    return cancelled;
   }
 
   async adminUpdateStatus(id: string, status: MovingRequestStatus) {

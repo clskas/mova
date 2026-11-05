@@ -73,7 +73,25 @@ class ErrorReporter {
     };
   }
 
+  /// Hosts whose download failures are network noise, not app bugs: map tiles
+  /// and the runtime font. The app keeps working (grey tiles, default font).
+  static const _noisyHosts = ['tile.openstreetmap.org', 'fonts.gstatic.com', 'fonts.googleapis.com'];
+
+  /// True for errors not worth a Sentry event: a map tile or font download
+  /// that failed because the phone is offline or the remote server timed out.
+  static bool shouldIgnore(Object error) {
+    final text = error.toString();
+    if (text.contains('Failed to load font with url')) return true;
+    final isNetwork = text.contains('ClientException') ||
+        text.contains('SocketException') ||
+        text.contains('HttpException') ||
+        text.contains('HandshakeException') ||
+        text.contains('TimeoutException');
+    return isNetwork && _noisyHosts.any(text.contains);
+  }
+
   static Future<bool> report(Object error, StackTrace? stack, {http.Client? client}) async {
+    if (shouldIgnore(error)) return false;
     final parsed = parseDsn(_dsn);
     if (parsed == null) return false;
     final key = '${error.runtimeType}:$error';

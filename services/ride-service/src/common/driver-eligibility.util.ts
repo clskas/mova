@@ -167,7 +167,7 @@ export async function assertDriverEligibleForMoving(
     throw new MovaHttpException(
       MovaErrorCode.VALIDATION_ERROR,
       HttpStatus.FORBIDDEN,
-      'Ce chauffeur n'a pas d'engin adapté à ce déménagement : utilitaire ou camion jusqu'au camion 15 m³, camion pour 30 et 50 m³.',
+      "Ce chauffeur n'a pas d'engin adapté à ce déménagement : utilitaire ou camion jusqu'au camion 15 m³, camion pour 30 et 50 m³.",
     );
   }
   if (!vehicles.some((v) => vehicleFitsMove(v, vehicleCategory, volumeM3))) {

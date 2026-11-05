@@ -60,6 +60,26 @@ List<int> declarableSeats(String vehicleType) => switch (vehicleType) {
       _ => const [1, 2, 3, 4, 5, 6, 7, 8],
     };
 
+/// Volume utile (m³) a utilitaire / camion may declare; null for other vehicles.
+/// Same ranges as @mova/shared CARGO_VOLUME_RANGE_M3.
+({int min, int max})? cargoVolumeRange(String vehicleType) => switch (vehicleType) {
+      'UTILITAIRE' => (min: 1, max: 25),
+      'CAMION' => (min: 5, max: 100),
+      _ => null,
+    };
+
+/// Error message for a cargo volume entry, or null when valid (or not needed).
+String? validateCargoVolume(String vehicleType, String raw) {
+  final range = cargoVolumeRange(vehicleType);
+  if (range == null) return null;
+  final n = int.tryParse(raw.trim());
+  if (n == null) return 'Indiquez le volume utile de votre véhicule (m³).';
+  if (n < range.min || n > range.max) {
+    return 'Volume utile : entre ${range.min} et ${range.max} m³ pour ce véhicule.';
+  }
+  return null;
+}
+
 int defaultPassengerSeats(String vehicleType) => kDefaultPassengerSeats[vehicleType] ?? 4;
 
 /// « 3 passagers » — null for a single passenger (nothing to show).

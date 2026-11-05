@@ -29,6 +29,7 @@ import {
   type DriverDocumentsStatus,
   type AuthUserNotifyResult,
   type DocumentsReminder,
+  normalizeDeclaredCargoVolume,
   normalizeDeclaredSeats,
   vehicleFitsPassengers,
   vehiclePassengerSeats,
@@ -602,6 +603,7 @@ export class DriversService {
             imageUrl: vehicle.imageUrl,
             passengerSeats: vehiclePassengerSeats(vehicle.type, vehicle.passengerSeats),
             passengerSeatsDeclared: vehicle.passengerSeats != null,
+            cargoVolumeM3: vehicle.cargoVolumeM3,
             typeApprovalStatus: vehicle.typeApprovalStatus,
             typeApprovalNotes: vehicle.typeApprovalNotes,
             typeApprovedAt: vehicle.typeApprovedAt,
@@ -655,7 +657,8 @@ export class DriversService {
       dto.vehicleType ||
       dto.vehicleColor ||
       dto.vehicleImageUrl ||
-      dto.vehiclePassengerSeats !== undefined
+      dto.vehiclePassengerSeats !== undefined ||
+      dto.vehicleCargoVolumeM3 !== undefined
     ) {
       const vehicle = profile.vehicles.find((v) => v.isActive) ?? profile.vehicles[0];
       if (vehicle) {
@@ -674,6 +677,20 @@ export class DriversService {
           // Type changed: keep the declaration only if still valid for the new type.
           if (normalizeDeclaredSeats(dto.vehicleType, vehicle.passengerSeats) == null) passengerSeats = null;
         }
+        // Cargo volume only exists for utilitaire / camion, checked against the (new) type.
+        let cargoVolumeM3: number | null | undefined;
+        if (dto.vehicleCargoVolumeM3 !== undefined) {
+          cargoVolumeM3 = normalizeDeclaredCargoVolume(dto.vehicleType ?? vehicle.type, dto.vehicleCargoVolumeM3);
+          if (cargoVolumeM3 == null) {
+            throw new MovaHttpException(
+              MovaErrorCode.VALIDATION_ERROR,
+              undefined,
+              'Volume utile invalide : utilitaire 1 à 25 m³, camion 5 à 100 m³.',
+            );
+          }
+        } else if (dto.vehicleType !== undefined && vehicle.cargoVolumeM3 != null) {
+          if (normalizeDeclaredCargoVolume(dto.vehicleType, vehicle.cargoVolumeM3) == null) cargoVolumeM3 = null;
+        }
         const typeOrPhotoChanged = dto.vehicleType !== undefined || dto.vehicleImageUrl !== undefined;
         await this.prisma.vehicle.update({
           where: { id: vehicle.id },
@@ -685,6 +702,7 @@ export class DriversService {
             ...(dto.vehicleColor !== undefined ? { color: dto.vehicleColor } : {}),
             ...(dto.vehicleImageUrl !== undefined ? { imageUrl: dto.vehicleImageUrl } : {}),
             ...(passengerSeats !== undefined ? { passengerSeats } : {}),
+            ...(cargoVolumeM3 !== undefined ? { cargoVolumeM3 } : {}),
             ...(typeOrPhotoChanged
               ? { typeApprovalStatus: KycStatus.PENDING, typeApprovalNotes: null, typeApprovedAt: null }
               : {}),
@@ -790,6 +808,29 @@ export class DriversService {
       passengerSeats: vehiclePassengerSeats(vehicle.type, passengerSeats),
       passengerSeatsDeclared: passengerSeats != null,
     };
+  }
+
+  /** Admin correction of a utilitaire / camion cargo volume (null = not declared). */
+  async setVehicleCargoVolume(userId: string, volumeM3: number | null) {
+    const profile = await this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
+    if (!profile) throw new MovaHttpException(MovaErrorCode.DRIVER_KYC_PENDING);
+    const vehicle = profile.vehicles.find((v) => v.isActive) ?? profile.vehicles[0];
+    if (!vehicle) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Aucun véhicule enregistré pour ce chauffeur.');
+    }
+    let cargoVolumeM3: number | null = null;
+    if (volumeM3 != null) {
+      cargoVolumeM3 = normalizeDeclaredCargoVolume(vehicle.type, volumeM3);
+      if (cargoVolumeM3 == null) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'Volume utile invalide : utilitaire 1 à 25 m³, camion 5 à 100 m³ (autres véhicules : sans volume).',
+        );
+      }
+    }
+    await this.prisma.vehicle.update({ where: { id: vehicle.id }, data: { cargoVolumeM3 } });
+    return { userId, vehicleId: vehicle.id, vehicleType: vehicle.type, cargoVolumeM3 };
   }
 
   async reviewVehicleTypeApproval(
@@ -1724,6 +1765,7 @@ export class DriversService {
             imageUrl: vehicle.imageUrl,
             passengerSeats: vehiclePassengerSeats(vehicle.type, vehicle.passengerSeats),
             passengerSeatsDeclared: vehicle.passengerSeats != null,
+            cargoVolumeM3: vehicle.cargoVolumeM3,
             typeApprovalStatus: vehicle.typeApprovalStatus,
             typeApprovalNotes: vehicle.typeApprovalNotes,
             typeApprovedAt: vehicle.typeApprovedAt,

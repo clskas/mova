@@ -29,9 +29,13 @@ export function driverOptionLabel(d: AdminDriver) {
         : d.dutyStatus === "OFFLINE" || d.isAvailable === false
           ? " · Hors ligne"
           : "";
-  if (name && plate) return `${name} · ${plate}${duty}`;
-  if (name) return `${name} · ${id}${duty}`;
-  return plate ? `${id} · ${plate}${duty}` : `${id}${duty}`;
+  const cargo = (d.vehicles ?? []).find(
+    (v) => v.isActive !== false && (v.type === "UTILITAIRE" || v.type === "CAMION"),
+  );
+  const volume = cargo ? (cargo.cargoVolumeM3 != null ? ` · ${cargo.cargoVolumeM3} m³` : " · m³ non déclaré") : "";
+  if (name && plate) return `${name} · ${plate}${volume}${duty}`;
+  if (name) return `${name} · ${id}${volume}${duty}`;
+  return plate ? `${id} · ${plate}${volume}${duty}` : `${id}${volume}${duty}`;
 }
 
 export function AssignDriverSelect({ drivers, value, onChange, disabled }: AssignDriverSelectProps) {

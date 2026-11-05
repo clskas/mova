@@ -1,6 +1,7 @@
 export * from './market-rdc.config';
 export * from './ride-contract';
 export * from './passenger-seats';
+export * from './cargo-volume';
 export * from './mova-error-codes';
 export * from './enums';
 export * from './admin-rbac';

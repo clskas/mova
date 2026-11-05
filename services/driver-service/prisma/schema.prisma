@@ -93,6 +93,8 @@ model Vehicle {
   imageUrl           String?
   /// Passenger seats (driver excluded). Null = category default (see @mova/shared passenger-seats).
   passengerSeats     Int?
+  /// Volume utile (m³) of a utilitaire or camion. Null = not declared yet.
+  cargoVolumeM3      Int?
   typeApprovalStatus KycStatus     @default(PENDING)
   typeApprovalNotes  String?
   typeApprovedAt     DateTime?

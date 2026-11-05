@@ -14,6 +14,7 @@ import {
   reviewDriverKyc,
   reviewDriverDocumentsRenewal,
   reviewVehicleTypeApproval,
+  setDriverVehicleCargoVolume,
   setDriverVehicleSeats,
   runKycOcr,
   setDriverOperatingCity,
@@ -40,6 +41,14 @@ const DEFAULT_PASSENGER_SEATS: Record<string, number> = {
   UTILITAIRE: 2,
   CAMION: 2,
 };
+const CARGO_VOLUME_RANGE: Record<string, { min: number; max: number }> = {
+  UTILITAIRE: { min: 1, max: 25 },
+  CAMION: { min: 5, max: 100 },
+};
+function vehicleCargoLabel(v: { type: string; cargoVolumeM3?: number | null }): string | null {
+  if (!CARGO_VOLUME_RANGE[v.type]) return null;
+  return v.cargoVolumeM3 != null ? `${v.cargoVolumeM3} m³ utiles` : "volume utile non déclaré";
+}
 function vehicleSeatsLabel(v: { type: string; passengerSeats?: number | null }): string {
   if (v.passengerSeats != null) return `${v.passengerSeats} place${v.passengerSeats > 1 ? "s" : ""} passagers`;
   const d = DEFAULT_PASSENGER_SEATS[v.type] ?? 4;
@@ -236,6 +245,7 @@ export default function ChauffeursPage() {
   const [smsNotice, setSmsNotice] = useState<string | null>(null);
   const [vehicleTypeRejectNotes, setVehicleTypeRejectNotes] = useState("");
   const [seatsInput, setSeatsInput] = useState("");
+  const [cargoInput, setCargoInput] = useState("");
   const [selectedVehicleType, setSelectedVehicleType] = useState("");
   const [editOperatingCity, setEditOperatingCity] = useState("");
   const [driverScore, setDriverScore] = useState<{ score: number; band: string; cancelRate: number } | null>(null);
@@ -550,6 +560,28 @@ export default function ChauffeursPage() {
       setDetail(refreshed);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec enregistrement des places");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveVehicleCargoVolume(reset: boolean, vehicleType: string) {
+    if (!selectedId) return;
+    const range = CARGO_VOLUME_RANGE[vehicleType];
+    const value = reset ? null : Number(cargoInput);
+    if (!reset && (!range || !Number.isInteger(value) || (value as number) < range.min || (value as number) > range.max)) {
+      setError(range ? `Volume invalide (${range.min} à ${range.max} m³).` : "Volume réservé aux utilitaires et camions.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await setDriverVehicleCargoVolume(selectedId, value);
+      setCargoInput("");
+      const refreshed = await fetchDriverDetail(selectedId);
+      setDetail(refreshed);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec enregistrement du volume");
     } finally {
       setSaving(false);
     }
@@ -1187,6 +1219,44 @@ export default function ChauffeursPage() {
                     </div>
                   )}
                 </div>
+                {vehicleCargoLabel(selectedVehicle) && (
+                  <div className="space-y-1">
+                    <p className="text-xs">
+                      Volume utile : <strong>{vehicleCargoLabel(selectedVehicle)}</strong>
+                      <span className="text-gray-500">
+                        {" "}— vérifiez-le avec la photo et le modèle : seuls les déménagements qui tiennent dans ce
+                        volume seront assignables.
+                      </span>
+                    </p>
+                    {canSetVehicleType && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="number"
+                          min={CARGO_VOLUME_RANGE[selectedVehicle.type]?.min}
+                          max={CARGO_VOLUME_RANGE[selectedVehicle.type]?.max}
+                          value={cargoInput}
+                          onChange={(e) => setCargoInput(e.target.value)}
+                          placeholder="m³"
+                          className="w-24 rounded-lg border border-gray-300 px-2 py-1 text-sm text-gray-800 bg-white"
+                        />
+                        <BtnSuccess
+                          onClick={() => void saveVehicleCargoVolume(false, selectedVehicle.type)}
+                          disabled={saving || !cargoInput}
+                        >
+                          Corriger le volume
+                        </BtnSuccess>
+                        {selectedVehicle.cargoVolumeM3 != null && (
+                          <BtnDanger
+                            onClick={() => void saveVehicleCargoVolume(true, selectedVehicle.type)}
+                            disabled={saving}
+                          >
+                            Effacer
+                          </BtnDanger>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {selectedVehicle.typeApprovalNotes && vehicleTypeStatus === "REJECTED" && (
                   <p className="text-xs">
                     Motif du refus : <em>{selectedVehicle.typeApprovalNotes}</em>
@@ -1251,7 +1321,10 @@ export default function ChauffeursPage() {
                             {VEHICLE_TYPE_LABELS[v.type] ?? v.type} · {v.plateNumber}
                             {v.make && ` · ${v.make} ${v.model ?? ""}`}
                             {v.color ? ` · ${v.color}` : ""}
-                            <span className="block text-xs text-gray-500 mt-0.5">{vehicleSeatsLabel(v)}</span>
+                            <span className="block text-xs text-gray-500 mt-0.5">
+                              {vehicleSeatsLabel(v)}
+                              {vehicleCargoLabel(v) ? ` · ${vehicleCargoLabel(v)}` : ""}
+                            </span>
                             {v.typeApprovalStatus && (
                               <span className="block text-xs text-gray-500 mt-0.5">
                                 Validation type : {vehicleTypeApprovalLabel(v.typeApprovalStatus)}

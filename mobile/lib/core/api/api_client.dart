@@ -897,6 +897,9 @@ class ApiClient {
     if (path == '/moving' && method == 'POST') {
       return Success(MockData.createMovingRequest(body ?? {}));
     }
+    if (path == '/moving/offers' && method == 'GET') {
+      return const Success({'data': []});
+    }
     if (path == '/moving/assignments' && method == 'GET') {
       return Success({
         'data': [

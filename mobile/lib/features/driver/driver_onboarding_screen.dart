@@ -53,6 +53,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   String _vehicleType = 'STANDARD';
   /// Declared passenger seats; null = category default.
   int? _passengerSeats;
+  final _cargoVolume = TextEditingController();
   String _payoutProvider = 'ORANGE_MONEY';
   String _operatingCity = '';
   List<String> _cities = const [];
@@ -193,6 +194,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     _email.dispose();
     _idNumber.dispose();
     _licenseNumber.dispose();
+    _cargoVolume.dispose();
     _licenseExpiry.dispose();
     _plate.dispose();
     _make.dispose();
@@ -266,7 +268,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         if (!_isEditingDossier && (_vehicleImageUrl == null || _vehicleImageUrl!.isEmpty)) {
           return 'Ajoutez une photo de votre véhicule.';
         }
-        return null;
+        return validateCargoVolume(_vehicleType, _cargoVolume.text);
       case 3:
         if (!_activationConsentsAccepted) {
           return 'Cochez la formation sécurité, la charte et les CGU pour continuer.';
@@ -305,6 +307,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     _vehicleType = vehicle?['type']?.toString() ?? 'STANDARD';
     final seats = vehicle?['passengerSeats'];
     _passengerSeats = vehicle?['passengerSeatsDeclared'] == true && seats is num ? seats.toInt() : null;
+    final cargo = vehicle?['cargoVolumeM3'];
+    _cargoVolume.text = cargo is num ? cargo.toInt().toString() : '';
     _vehicleImageUrl = vehicle?['imageUrl']?.toString();
     _charterAccepted = profile?['charterAcceptedAt'] != null;
     _trainingCompleted = profile?['trainingCompletedAt'] != null;
@@ -419,6 +423,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       'vehicleType': _vehicleType,
       'vehicleColor': _color.text.trim(),
       if (_vehicleType != 'MOTO_TAXI' && _passengerSeats != null) 'vehiclePassengerSeats': _passengerSeats,
+      if (cargoVolumeRange(_vehicleType) != null && int.tryParse(_cargoVolume.text.trim()) != null)
+        'vehicleCargoVolumeM3': int.parse(_cargoVolume.text.trim()),
       if (_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty) 'vehicleImageUrl': _vehicleImageUrl,
       if (_insuranceExpiry.text.trim().isNotEmpty) 'insuranceExpiry': _insuranceExpiry.text.trim(),
       if (_inspectionExpiry.text.trim().isNotEmpty) 'technicalInspectionExpiry': _inspectionExpiry.text.trim(),
@@ -990,6 +996,22 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                 DropdownMenuItem(value: n, child: Text('$n place${n > 1 ? 's' : ''}')),
             ],
             onChanged: (v) => setState(() => _passengerSeats = v),
+          ),
+        ],
+        if (cargoVolumeRange(_vehicleType) != null) ...[
+          const SizedBox(height: _fieldGap),
+          TextFormField(
+            key: const Key('vehicleCargoVolume'),
+            controller: _cargoVolume,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: 'Volume utile (m³)',
+              suffixText: 'm³',
+              helperText: 'Espace de chargement de votre ${_vehicleType == 'CAMION' ? 'camion' : 'utilitaire'} '
+                  '(${cargoVolumeRange(_vehicleType)!.min} à ${cargoVolumeRange(_vehicleType)!.max} m³). '
+                  'Vous ne recevrez que les déménagements qui y tiennent. SENGA le vérifie avec la photo.',
+              helperMaxLines: 4,
+            ),
           ),
         ],
         const SizedBox(height: _fieldGap),

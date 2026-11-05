@@ -34,6 +34,10 @@ class VehicleSeatsDto {
   /** null = back to the category default. */
   @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsInt() @Min(1) @Max(8) passengerSeats: number | null;
 }
+class VehicleCargoVolumeDto {
+  /** null = not declared. */
+  @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsInt() @Min(1) @Max(100) cargoVolumeM3: number | null;
+}
 class RatingDto { @IsNumber() ratingAvg: number; }
 class ReviewKycDto {
   @IsBoolean() approved: boolean;
@@ -155,6 +159,10 @@ export class InternalController {
   @Patch('drivers/:userId/vehicle-seats')
   setVehicleSeats(@Param('userId') userId: string, @Body() dto: VehicleSeatsDto) {
     return this.drivers.setVehiclePassengerSeats(userId, dto.passengerSeats ?? null);
+  }
+  @Patch('drivers/:userId/vehicle-cargo-volume')
+  setVehicleCargoVolume(@Param('userId') userId: string, @Body() dto: VehicleCargoVolumeDto) {
+    return this.drivers.setVehicleCargoVolume(userId, dto.cargoVolumeM3 ?? null);
   }
   @Post('drivers/:userId/activation-pin')
   regenerateActivationPin(@Param('userId') userId: string) {

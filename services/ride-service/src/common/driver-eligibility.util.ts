@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import {
-  driverEligibleForMoving,
+  vehicleFitsMove,
   driverEligibleForParcelWeight,
   driverEligibleForRide,
   INTERNAL_API_KEY,
@@ -37,6 +37,7 @@ export type DriverProfileSnapshot = {
     isActive?: boolean;
     typeApprovalStatus?: string | null;
     passengerSeats?: number | null;
+    cargoVolumeM3?: number | null;
   }[];
   vehicleTypeApprovalStatus?: string | null;
 };
@@ -158,23 +159,23 @@ export async function assertDriverCanReceiveJobs(userId: string): Promise<Driver
 export async function assertDriverEligibleForMoving(
   userId: string,
   vehicleCategory: string,
+  volumeM3?: number | null,
 ): Promise<DriverProfileSnapshot> {
   const profile = await assertDriverCanReceiveJobs(userId);
-  const types = (profile.vehicles ?? [])
-    .filter((v) => v.isActive !== false)
-    .map((v) => {
-      try {
-        return normalizeVehicleType(v.type) as VehicleTypeValue;
-      } catch {
-        return null;
-      }
-    })
-    .filter((t): t is VehicleTypeValue => t != null);
-  if (!driverEligibleForMoving(types, vehicleCategory)) {
+  const vehicles = profile.vehicles ?? [];
+  if (!vehicles.some((v) => vehicleFitsMove(v, vehicleCategory))) {
     throw new MovaHttpException(
       MovaErrorCode.VALIDATION_ERROR,
       HttpStatus.FORBIDDEN,
-      'Ce chauffeur n\'a pas d\'engin adapté au déménagement (moto-taxi exclu).',
+      "Ce chauffeur n'a pas d'engin adapté à ce déménagement : utilitaire ou camion jusqu'au camion 15 m³, camion pour 30 et 50 m³.",
+    );
+  }
+  if (!vehicles.some((v) => vehicleFitsMove(v, vehicleCategory, volumeM3))) {
+    const declared = Math.max(...vehicles.map((v) => v.cargoVolumeM3 ?? 0));
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      HttpStatus.FORBIDDEN,
+      `Véhicule trop petit : ${declared} m³ déclarés pour un déménagement de ${Math.ceil(volumeM3 ?? 0)} m³.`,
     );
   }
   return profile;

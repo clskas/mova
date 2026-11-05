@@ -177,34 +177,27 @@ export function driverEligibleForRide(
   return active.some((t) => eligibleVehicleTypes.includes(t));
 }
 
-/** Chauffeur éligible pour un déménagement (jamais moto seule). */
+/**
+ * Véhicules du chauffeur acceptés pour chaque engin de déménagement.
+ * Une voiture (Standard, Confort, VIP, Familiale) ne transporte pas un
+ * déménagement ; un utilitaire couvre jusqu'au camion ~15 m³, au-delà il faut
+ * un camion.
+ */
+export const MOVING_ELIGIBLE_VEHICLE_TYPES: Record<MovingVehicleCategoryValue, readonly VehicleTypeValue[]> = {
+  CAMIONNETTE: ['UTILITAIRE', 'CAMION'],
+  CAMION_15M3: ['UTILITAIRE', 'CAMION'],
+  CAMION_30M3: ['CAMION'],
+  CAMION_50M3: ['CAMION'],
+};
+
+/** Chauffeur éligible pour un déménagement (utilitaire ou camion selon l'engin). */
 export function driverEligibleForMoving(
   driverVehicleTypes: VehicleTypeValue[],
   category: MovingVehicleCategoryValue | string,
 ): boolean {
-  const active = driverVehicleTypes.filter((t) => t !== 'MOTO_TAXI');
-  if (active.length === 0) return false;
-  switch (category) {
-    case 'CAMIONNETTE':
-    case 'CAMION_15M3':
-      return active.some(
-        (t) =>
-          t === 'STANDARD' ||
-          t === 'COMFORT' ||
-          t === 'VIP' ||
-          t === 'FAMILIALE' ||
-          t === 'UTILITAIRE' ||
-          t === 'CAMION',
-      );
-    case 'CAMION_30M3':
-      return active.some(
-        (t) => t === 'UTILITAIRE' || t === 'CAMION' || t === 'COMFORT' || t === 'VIP' || t === 'FAMILIALE',
-      );
-    case 'CAMION_50M3':
-      return active.some((t) => t === 'CAMION' || t === 'UTILITAIRE');
-    default:
-      return active.length > 0;
-  }
+  const allowed =
+    MOVING_ELIGIBLE_VEHICLE_TYPES[category as MovingVehicleCategoryValue] ?? MOVING_ELIGIBLE_VEHICLE_TYPES.CAMION_15M3;
+  return driverVehicleTypes.some((t) => allowed.includes(t));
 }
 
 const STATUS_TO_MOBILE: Record<RideStatusValue, MobileRideStatus> = {

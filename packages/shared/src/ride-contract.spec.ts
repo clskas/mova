@@ -1,6 +1,7 @@
 import { RideStatus, VehicleType } from './enums';
 import {
   buildFareBreakdown,
+  driverEligibleForMoving,
   driverVehicleTypesForRide,
   fromMobileRideStatus,
   normalizeVehicleType,
@@ -67,5 +68,32 @@ describe('ride-contract', () => {
     expect(fare.totalCdf).toBe(12900);
     expect(fare.estimatedFareCdf).toBe(12900);
     expect(fare.currency).toBe('CDF');
+  });
+});
+
+describe('driverEligibleForMoving', () => {
+  it('refuses passenger cars and motos for every moving vehicle', () => {
+    for (const category of ['CAMIONNETTE', 'CAMION_15M3', 'CAMION_30M3', 'CAMION_50M3']) {
+      for (const type of ['MOTO_TAXI', 'STANDARD', 'COMFORT', 'VIP', 'FAMILIALE'] as const) {
+        expect(driverEligibleForMoving([type], category)).toBe(false);
+      }
+    }
+  });
+
+  it('accepts a utilitaire up to the 15 m³ truck only', () => {
+    expect(driverEligibleForMoving(['UTILITAIRE'], 'CAMIONNETTE')).toBe(true);
+    expect(driverEligibleForMoving(['UTILITAIRE'], 'CAMION_15M3')).toBe(true);
+    expect(driverEligibleForMoving(['UTILITAIRE'], 'CAMION_30M3')).toBe(false);
+    expect(driverEligibleForMoving(['UTILITAIRE'], 'CAMION_50M3')).toBe(false);
+  });
+
+  it('accepts a camion for every moving vehicle', () => {
+    for (const category of ['CAMIONNETTE', 'CAMION_15M3', 'CAMION_30M3', 'CAMION_50M3']) {
+      expect(driverEligibleForMoving(['CAMION'], category)).toBe(true);
+    }
+  });
+
+  it('accepts a driver when one of their vehicles fits', () => {
+    expect(driverEligibleForMoving(['STANDARD', 'CAMION'], 'CAMION_50M3')).toBe(true);
   });
 });

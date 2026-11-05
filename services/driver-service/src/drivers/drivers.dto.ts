@@ -38,6 +38,8 @@ export class UpdateOnboardingDto {
   @ApiPropertyOptional() @IsOptional() @IsString() vehicleImageUrl?: string;
   @ApiPropertyOptional({ description: 'Places passagers (chauffeur non compris), 1–8 ; moto = 1' })
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(8) vehiclePassengerSeats?: number;
+  @ApiPropertyOptional({ description: 'Volume utile (m³) — utilitaire 1–25, camion 5–100' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) vehicleCargoVolumeM3?: number;
 }
 
 export class ActivationPinDto {

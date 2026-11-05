@@ -22,12 +22,23 @@ const MOVING_VEHICLE_TYPES: Record<string, readonly string[]> = {
   CAMION_50M3: ["CAMION"],
 };
 
+/**
+ * Chauffeurs dont un véhicule actif convient : bon type et, si le volume utile
+ * est déclaré, assez grand pour le déménagement (non déclaré = à vérifier à la main).
+ */
 export function filterDriversForMoving(
   drivers: AdminDriver[],
   vehicleCategory?: string | null,
+  volumeM3?: number | null,
 ): AdminDriver[] {
   const allowed = MOVING_VEHICLE_TYPES[vehicleCategory ?? ""] ?? MOVING_VEHICLE_TYPES.CAMION_15M3;
-  return drivers.filter((d) => activeVehicleTypes(d).some((t) => allowed.includes(t)));
+  const needed = volumeM3 != null && volumeM3 > 0 ? Math.ceil(volumeM3) : null;
+  return drivers.filter((d) =>
+    (d.vehicles ?? []).some((v) => {
+      if (v.isActive === false || !allowed.includes((v.type ?? "").toUpperCase())) return false;
+      return needed == null || v.cargoVolumeM3 == null || v.cargoVolumeM3 >= needed;
+    }),
+  );
 }
 
 /** Chauffeurs éligibles pour logistique location SENGA (livraison/récupération véhicule). */

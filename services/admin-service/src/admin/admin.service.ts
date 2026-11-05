@@ -1077,6 +1077,13 @@ export class AdminService {
       body: JSON.stringify({ passengerSeats }),
     });
   }
+  async setDriverVehicleCargoVolume(userId: string, cargoVolumeM3: number | null, managedCity?: string | null) {
+    await this.getDriver(userId, managedCity);
+    return this.proxy('driver', `/internal/drivers/${userId}/vehicle-cargo-volume`, {
+      method: 'PATCH',
+      body: JSON.stringify({ cargoVolumeM3 }),
+    });
+  }
   async reviewVehicleTypeApproval(
     userId: string,
     approved: boolean,

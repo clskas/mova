@@ -354,7 +354,7 @@ export class MovingService {
     }
     const request = await this.prisma.movingRequest.findUnique({ where: { id } });
     if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
-    await assertDriverEligibleForMoving(driverId.trim(), request.vehicleCategory);
+    await assertDriverEligibleForMoving(driverId.trim(), request.vehicleCategory, request.volumeM3);
     if (request.status === MovingRequestStatus.COMPLETED || request.status === MovingRequestStatus.CANCELLED) {
       throw new MovaHttpException(MovaErrorCode.MOVING_INVALID_STATUS);
     }

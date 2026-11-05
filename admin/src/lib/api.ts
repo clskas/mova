@@ -177,6 +177,8 @@ export type AdminDriver = {
     typeApprovedAt?: string | null;
     /** Declared passenger seats; null = category default. */
     passengerSeats?: number | null;
+    /** Volume utile (m³) of a utilitaire / camion; null = not declared. */
+    cargoVolumeM3?: number | null;
   }[];
   createdAt?: string;
 };
@@ -2286,6 +2288,13 @@ export async function reviewDriverDocumentsRenewal(userId: string, approved: boo
   return apiFetch(`/api/admin/drivers/${userId}/documents-renewal`, {
     method: "PATCH",
     body: JSON.stringify({ approved, notes }),
+  });
+}
+
+export async function setDriverVehicleCargoVolume(userId: string, cargoVolumeM3: number | null) {
+  return apiFetch(`/api/admin/drivers/${userId}/vehicle-cargo-volume`, {
+    method: "PATCH",
+    body: JSON.stringify({ cargoVolumeM3 }),
   });
 }
 

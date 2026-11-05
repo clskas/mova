@@ -227,7 +227,7 @@ export default function DemenagementsPage() {
                     <td className="p-3">
                       <AssignDriverPanel
                         compact
-                        drivers={filterDriversForMoving(drivers, r.vehicleCategory)}
+                        drivers={filterDriversForMoving(drivers, r.vehicleCategory, r.volumeM3)}
                         value={rowAssign[r.id] ?? r.driverId ?? ""}
                         currentDriverId={r.driverId}
                         onChange={(v) => setRowAssign((prev) => ({ ...prev, [r.id]: v }))}
@@ -289,7 +289,7 @@ export default function DemenagementsPage() {
 
             {!readOnly && (
               <AssignDriverPanel
-                drivers={filterDriversForMoving(drivers, selected.vehicleCategory)}
+                drivers={filterDriversForMoving(drivers, selected.vehicleCategory, selected.volumeM3)}
                 value={assignDriverId}
                 currentDriverId={selected.driverId}
                 onChange={setAssignDriverId}

@@ -38,6 +38,16 @@ class VehicleSeatsDto {
   passengerSeats: number | null;
 }
 
+class VehicleCargoVolumeDto {
+  @ApiProperty({ nullable: true, description: 'Volume utile (m³) : utilitaire 1–25, camion 5–100 ; null = non déclaré' })
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  cargoVolumeM3: number | null;
+}
+
 class UpdateUserDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() role?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() phone?: string;
@@ -361,6 +371,21 @@ export class AdminController {
     @Request() req: { user: AdminJwtUser },
   ) {
     return this.adminService.setDriverVehicleSeats(userId, dto.passengerSeats ?? null, resolveManagedCityScope(req.user));
+  }
+
+  @Patch('drivers/:userId/vehicle-cargo-volume')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: 'Corriger le volume utile (m³) du véhicule actif (utilitaire ou camion)' })
+  setVehicleCargoVolume(
+    @Param('userId') userId: string,
+    @Body() dto: VehicleCargoVolumeDto,
+    @Request() req: { user: AdminJwtUser },
+  ) {
+    return this.adminService.setDriverVehicleCargoVolume(
+      userId,
+      dto.cargoVolumeM3 ?? null,
+      resolveManagedCityScope(req.user),
+    );
   }
 
   @Patch('drivers/:userId/vehicle-type')

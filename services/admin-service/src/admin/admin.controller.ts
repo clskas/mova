@@ -375,7 +375,7 @@ export class AdminController {
 
   @Post('drivers/:userId/vehicle-photo-check')
   @RequirePermissions(AdminPermission.KYC_WRITE)
-  @ApiOperation({ summary: 'Vérifier les photos du véhicule avec Claude (verdict pour l'admin)' })
+  @ApiOperation({ summary: "Vérifier les photos du véhicule avec Claude (verdict pour l'admin)" })
   checkVehiclePhotos(@Param('userId') userId: string, @Request() req: { user: AdminJwtUser }) {
     return this.adminService.checkDriverVehiclePhotos(userId, resolveManagedCityScope(req.user));
   }

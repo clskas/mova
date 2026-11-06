@@ -37,18 +37,19 @@ Source technique : `admin/src/lib/rbac.ts`.
 | Module | Usage |
 |--------|-------|
 | **Métriques** | Utilisateurs, chauffeurs, courses, revenus, litiges |
+| **Analyses IA** | Résumé du jour (actualisé chaque heure) et questions en langage courant sur les chiffres agrégés (lecture seule ; ni téléphones, ni adresses envoyés à l'IA). Le responsable de ville ne voit que sa ville. |
 | **Utilisateurs** | Comptes de connexion (rôle Passager, Chauffeur, Restaurant, Location, staff). Les robots Test Lab sont masqués. |
 | **Chauffeurs** | Profils véhicule / KYC uniquement. Un chauffeur réel a aussi le rôle Chauffeur dans Utilisateurs. Les profils sans compte (fantômes) sont masqués. |
 | **KYC** | Approbation dossiers chauffeur / resto / location. Le **SUPER_ADMIN** et l'**ADMIN** filtrent par ville. Après validation partenaire : PIN affiché + renvoyer SMS/e-mail. |
 | **Restaurants** | Partenaires SENGA Business (type : restaurant, supermarché, pharmacie, boutique) |
 | **Courses** | Trajets en cours ; **trace GPS** dans le détail |
-| **Livraisons** | Colis, repas, courses & commissions (ERRAND) ; trace GPS ; assignation chauffeur |
+| **Livraisons** | Colis, repas, courses & commissions (ERRAND) ; trace GPS ; assignation chauffeur ; pour les courses, bloc **Ticket d'achat** avec la lecture IA du ticket (Conforme / À vérifier / Écart, indicatif) |
 | **Planifiées** | Réservations à venir |
 | **Locations** | Demandes de location véhicule |
-| **Catalogue location** | Véhicules proposés à la location (jusqu'à 5 photos, tarifs journaliers) |
+| **Catalogue location** | Véhicules proposés à la location (jusqu'à 5 photos, tarifs journaliers, texte d'annonce du loueur) |
 | **Déménagements** | Demandes passagers — proposées automatiquement aux chauffeurs utilitaire/camion éligibles ; assignation manuelle, statut et annulation |
 | **Covoiturage** | Trajets publiés — statut et annulation |
-| **Litiges** | Gestion des incidents |
+| **Litiges** | Gestion des incidents ; **Brouillon de réponse (IA)** à relire puis copier (rien n'est envoyé automatiquement) |
 | **Tarifs** | Grilles, majorations, commissions plateforme, codes promo |
 | **Abonnements** | Offres abonnement passagers |
 | **Portefeuille** | Soldes et opérations wallet |

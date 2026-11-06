@@ -1,3 +1,4 @@
+import '../../core/i18n/i18n.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -531,7 +532,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       switch (result) {
         case Success():
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Dossier mis à jour.'), backgroundColor: MovaColors.green),
+            SnackBar(content: Text(tr('Dossier mis à jour.')), backgroundColor: MovaColors.green),
           );
           Navigator.of(context).pop();
         case Failure(:final error):
@@ -552,8 +553,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         await _clearOnboardingStep();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Dossier envoyé — validation SENGA sous 24-48 h.'),
+          SnackBar(
+            content: Text(tr('Dossier envoyé — validation SENGA sous 24-48 h.')),
             backgroundColor: MovaColors.green,
           ),
         );
@@ -655,7 +656,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         }
       case Failure():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lecture automatique indisponible — remplissez les champs vous-même.')),
+          SnackBar(content: Text(tr('Lecture automatique indisponible — remplissez les champs vous-même.'))),
         );
     }
   }
@@ -773,16 +774,16 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.link, color: MovaColors.violet),
-        title: const Text(
-          'Compte et connexion',
+        title: Text(
+          tr('Compte et connexion'),
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
-        subtitle: const Text('Lier Google ou un numéro +243 — un seul compte chauffeur'),
+        subtitle: Text(tr('Lier Google ou un numéro +243 — un seul compte chauffeur')),
         trailing: const Icon(Icons.chevron_right),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => const ProfileScreen(title: 'Compte et connexion'),
+              builder: (_) => ProfileScreen(title: tr('Compte et connexion')),
             ),
           );
         },
@@ -839,11 +840,11 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           focusNode: focusNode,
           scrollPadding: _fieldScrollPadding,
           decoration: InputDecoration(
-            labelText: 'Ville d\'opération',
+            labelText: tr('Ville d\'opération'),
             hintText: 'Rechercher parmi ${options.length} villes RDC',
-            helperText: 'Capitales provinciales et grandes villes',
+            helperText: tr('Capitales provinciales et grandes villes'),
             suffixIcon: IconButton(
-              tooltip: 'Effacer pour voir toutes les villes',
+              tooltip: tr('Effacer pour voir toutes les villes'),
               icon: const Icon(Icons.clear),
               onPressed: () {
                 controller.clear();
@@ -903,7 +904,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                 );
               }
             },
-            child: const Text('Fermer'),
+            child: Text(tr('Fermer')),
           ),
       ],
       child: _loading && _state == null
@@ -933,7 +934,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                     if (_step > 0)
                       Expanded(
                         child: MovaButton(
-                          label: 'Retour',
+                          label: tr('Retour'),
                           isSecondary: true,
                           icon: Icons.arrow_back_rounded,
                           onPressed: _loading ? null : _back,
@@ -960,20 +961,20 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   Widget _stepPersonal() {
     return _stepScroll(
       children: [
-        const Text('Informations personnelles', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(tr('Informations personnelles'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 10),
-        const Text(
-          'Votre identifiant SENGA (DRV-…) sera visible par le support client.',
+        Text(
+          tr('Votre identifiant SENGA (DRV-…) sera visible par le support client.'),
           style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 16),
-        _kycTextField(controller: _firstName, label: 'Prénom'),
+        _kycTextField(controller: _firstName, label: tr('Prénom')),
         const SizedBox(height: _fieldGap),
-        _kycTextField(controller: _lastName, label: 'Nom'),
+        _kycTextField(controller: _lastName, label: tr('Nom')),
         const SizedBox(height: _fieldGap),
-        _kycTextField(controller: _email, label: 'Email', keyboardType: TextInputType.emailAddress),
+        _kycTextField(controller: _email, label: tr('Email'), keyboardType: TextInputType.emailAddress),
         const SizedBox(height: _fieldGap),
-        _kycTextField(controller: _idNumber, label: 'N° carte d\'identité / passeport'),
+        _kycTextField(controller: _idNumber, label: tr('N° carte d\'identité / passeport')),
         const SizedBox(height: _fieldGap),
         _cityCombobox(),
         const SizedBox(height: 20),
@@ -986,27 +987,27 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   Widget _stepLicense() {
     return _stepScroll(
       children: [
-        const Text('Permis de conduire', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(tr('Permis de conduire'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         if (_renewalPending) ...[
           const SizedBox(height: 12),
-          const MovaCard(
+          MovaCard(
             child: Text(
-              'Renouvellement en attente : après modification des dates, SENGA doit valider vos nouveaux justificatifs avant que vous puissiez repasser en ligne.',
+              tr('Renouvellement en attente : après modification des dates, SENGA doit valider vos nouveaux justificatifs avant que vous puissiez repasser en ligne.'),
               style: TextStyle(color: MovaColors.orange, fontSize: 13),
             ),
           ),
         ],
         if (_isEditingDossier) ...[
           const SizedBox(height: 12),
-          const Text(
-            'Si vous changez une date, téléversez à nouveau le permis correspondant. L\'admin comparera le document avec la date saisie.',
+          Text(
+            tr('Si vous changez une date, téléversez à nouveau le permis correspondant. L\'admin comparera le document avec la date saisie.'),
             style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
           ),
         ],
         const SizedBox(height: 16),
-        _kycTextField(controller: _licenseNumber, label: 'N° permis'),
+        _kycTextField(controller: _licenseNumber, label: tr('N° permis')),
         const SizedBox(height: _fieldGap),
-        _datePickerField(controller: _licenseExpiry, label: 'Date d\'expiration du permis'),
+        _datePickerField(controller: _licenseExpiry, label: tr('Date d\'expiration du permis')),
         const SizedBox(height: 12),
         _docButton('DRIVERS_LICENSE', 'Photographier le permis'),
       ],
@@ -1016,13 +1017,13 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   Widget _stepVehicle() {
     return _stepScroll(
       children: [
-        const Text('Véhicule', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(tr('Véhicule'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
           value: _vehicleType,
-          decoration: const InputDecoration(labelText: 'Type'),
-          items: const [
-            DropdownMenuItem(value: 'MOTO_TAXI', child: Text('Moto-taxi')),
+          decoration: InputDecoration(labelText: tr('Type')),
+          items: [
+            DropdownMenuItem(value: 'MOTO_TAXI', child: Text(tr('Moto-taxi'))),
             DropdownMenuItem(value: 'STANDARD', child: Text('Standard')),
             DropdownMenuItem(value: 'COMFORT', child: Text('Confort')),
             DropdownMenuItem(value: 'VIP', child: Text('VIP')),
@@ -1048,7 +1049,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             key: const Key('vehiclePassengerSeats'),
             value: _passengerSeats ?? defaultPassengerSeats(_vehicleType),
             decoration: InputDecoration(
-              labelText: 'Places passagers (sans compter le chauffeur)',
+              labelText: tr('Places passagers (sans compter le chauffeur)'),
               helperText: _vehicleType == 'FAMILIALE'
                   ? 'Familiale : 5 à 8 places. Vous recevez aussi les courses Standard.'
                   : _vehicleType == 'TRICYCLE'
@@ -1071,7 +1072,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             controller: _cargoVolume,
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
-              labelText: 'Volume utile (m³)',
+              labelText: tr('Volume utile (m³)'),
               suffixText: 'm³',
               helperText: 'Espace de chargement de votre ${switch (_vehicleType) { 'CAMION' => 'camion', 'TRIPOTEUR' => 'tripoteur', _ => 'utilitaire' }} '
                   '(${cargoVolumeRange(_vehicleType)!.min} à ${cargoVolumeRange(_vehicleType)!.max} m³). '
@@ -1081,21 +1082,21 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           ),
         ],
         const SizedBox(height: _fieldGap),
-        _kycTextField(controller: _plate, label: 'Plaque d\'immatriculation'),
+        _kycTextField(controller: _plate, label: tr('Plaque d\'immatriculation')),
         const SizedBox(height: _fieldGap),
-        _kycTextField(controller: _make, label: 'Marque'),
+        _kycTextField(controller: _make, label: tr('Marque')),
         const SizedBox(height: _fieldGap),
-        _kycTextField(controller: _model, label: 'Modèle'),
+        _kycTextField(controller: _model, label: tr('Modèle')),
         const SizedBox(height: _fieldGap),
-        _kycTextField(controller: _color, label: 'Couleur (optionnel)'),
+        _kycTextField(controller: _color, label: tr('Couleur (optionnel)')),
         const SizedBox(height: _fieldGap),
-        _datePickerField(controller: _insuranceExpiry, label: 'Assurance expire le'),
-        _datePickerField(controller: _inspectionExpiry, label: 'Visite technique expire le'),
-        _datePickerField(controller: _fiscalStickerExpiry, label: 'Vignette fiscale expire le'),
+        _datePickerField(controller: _insuranceExpiry, label: tr('Assurance expire le')),
+        _datePickerField(controller: _inspectionExpiry, label: tr('Visite technique expire le')),
+        _datePickerField(controller: _fiscalStickerExpiry, label: tr('Vignette fiscale expire le')),
         if (_isEditingDossier) ...[
           const SizedBox(height: 8),
-          const Text(
-            'En cas de changement, renvoyez les photos assurance, visite technique et vignette fiscale.',
+          Text(
+            tr('En cas de changement, renvoyez les photos assurance, visite technique et vignette fiscale.'),
             style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
           ),
         ],
@@ -1105,8 +1106,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Avant, arrière, côté, intérieur… La première photo est la photo principale.',
+        Text(
+          tr('Avant, arrière, côté, intérieur… La première photo est la photo principale.'),
           style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
         ),
         const SizedBox(height: 12),
@@ -1119,12 +1120,12 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: MovaColors.violet.withValues(alpha: 0.2)),
             ),
-            child: const Column(
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.camera_alt_outlined, color: MovaColors.violet, size: 32),
                 SizedBox(height: 4),
-                Text('Au moins une photo — vue latérale ou 3/4', style: TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
+                Text(tr('Au moins une photo — vue latérale ou 3/4'), style: TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
               ],
             ),
           )
@@ -1159,7 +1160,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(color: MovaColors.violet, borderRadius: BorderRadius.circular(6)),
-                          child: const Text('Principale', style: TextStyle(color: Colors.white, fontSize: 10)),
+                          child: Text(tr('Principale'), style: TextStyle(color: Colors.white, fontSize: 10)),
                         ),
                       ),
                     Positioned(
@@ -1169,8 +1170,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                         icon: const Icon(Icons.more_vert, color: Colors.white, size: 20),
                         onSelected: (action) => action == 'main' ? _makeMainVehiclePhoto(i) : _removeVehiclePhoto(i),
                         itemBuilder: (_) => [
-                          if (i > 0) const PopupMenuItem(value: 'main', child: Text('Mettre en premier')),
-                          const PopupMenuItem(value: 'remove', child: Text('Retirer')),
+                          if (i > 0) PopupMenuItem(value: 'main', child: Text(tr('Mettre en premier'))),
+                          PopupMenuItem(value: 'remove', child: Text(tr('Retirer'))),
                         ],
                       ),
                     ),
@@ -1200,7 +1201,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   Widget _stepCompliance() {
     return _stepScroll(
       children: [
-        const Text('Sécurité & conformité', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(tr('Sécurité & conformité'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 16),
         _docButton('CRIMINAL_RECORD', 'Casier judiciaire (recommandé)'),
         const SizedBox(height: 20),
@@ -1208,14 +1209,14 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           value: _trainingCompleted,
           onChanged: (v) => setState(() => _trainingCompleted = v ?? false),
           contentPadding: const EdgeInsets.symmetric(vertical: 4),
-          title: const Text('J\'ai suivi la formation sécurité SENGA (utilisation app, règles route)'),
+          title: Text(tr('J\'ai suivi la formation sécurité SENGA (utilisation app, règles route)')),
           controlAffinity: ListTileControlAffinity.leading,
         ),
         CheckboxListTile(
           value: _charterAccepted,
           onChanged: (v) => setState(() => _charterAccepted = v ?? false),
           contentPadding: const EdgeInsets.symmetric(vertical: 4),
-          title: const Text('J\'accepte la charte de bonne conduite SENGA'),
+          title: Text(tr('J\'accepte la charte de bonne conduite SENGA')),
           controlAffinity: ListTileControlAffinity.leading,
         ),
         CheckboxListTile(
@@ -1225,7 +1226,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             _persistCguAccepted();
           },
           contentPadding: const EdgeInsets.symmetric(vertical: 4),
-          title: const Text('J\'accepte les Conditions Générales d\'Utilisation (CGU) SENGA'),
+          title: Text(tr('J\'accepte les Conditions Générales d\'Utilisation (CGU) SENGA')),
           subtitle: GestureDetector(
             onTap: () {
               Navigator.of(context).push(
@@ -1238,8 +1239,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                 ),
               );
             },
-            child: const Text(
-              'Lire les CGU',
+            child: Text(
+              tr('Lire les CGU'),
               style: TextStyle(
                 color: MovaColors.violet,
                 decoration: TextDecoration.underline,
@@ -1255,13 +1256,13 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   Widget _stepPayout() {
     return _stepScroll(
       children: [
-        const Text('Informations financières', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(tr('Informations financières'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
           value: _payoutProvider,
-          decoration: const InputDecoration(labelText: 'Mobile Money'),
-          items: const [
-            DropdownMenuItem(value: 'ORANGE_MONEY', child: Text('Orange Money')),
+          decoration: InputDecoration(labelText: tr('Mobile Money')),
+          items: [
+            DropdownMenuItem(value: 'ORANGE_MONEY', child: Text(tr('Orange Money'))),
             DropdownMenuItem(value: 'MPESA', child: Text('M-Pesa')),
             DropdownMenuItem(value: 'AIRTEL_MONEY', child: Text('Airtel Money')),
           ],
@@ -1270,7 +1271,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         const SizedBox(height: _fieldGap),
         _kycTextField(
           controller: _payoutPhone,
-          label: 'Numéro de retrait (+243…)',
+          label: tr('Numéro de retrait (+243…)'),
           keyboardType: TextInputType.phone,
         ),
       ],
@@ -1281,13 +1282,13 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     final kycStatus = _state?['profile']?['kycStatus']?.toString() ?? 'PENDING';
     return _stepScroll(
       children: [
-        const Text('Activation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(tr('Activation'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 16),
         MovaCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Récapitulatif', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(tr('Récapitulatif'), style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
               Text('Identifiant : ${_state?['publicId'] ?? '—'}'),
               const SizedBox(height: 6),
@@ -1298,8 +1299,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           ),
         ),
         const SizedBox(height: 20),
-        const Text(
-          'Après validation par l\'équipe SENGA, vous recevrez un code PIN à 6 chiffres pour activer votre compte et accepter des courses.',
+        Text(
+          tr('Après validation par l\'équipe SENGA, vous recevrez un code PIN à 6 chiffres pour activer votre compte et accepter des courses.'),
           style: TextStyle(color: MovaColors.textSecondary),
         ),
       ],
@@ -1325,15 +1326,15 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             const SizedBox(height: 6),
             const LinearProgressIndicator(minHeight: 2),
             const SizedBox(height: 4),
-            const Text(
-              'Lecture du document… les champs vont se remplir.',
+            Text(
+              tr('Lecture du document… les champs vont se remplir.'),
               style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
             ),
           ] else if (!done && kScannableDocTypes.contains(type))
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: 4),
               child: Text(
-                'Les champs de cette étape seront remplis automatiquement à partir de la photo.',
+                tr('Les champs de cette étape seront remplis automatiquement à partir de la photo.'),
                 style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
               ),
             ),

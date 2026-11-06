@@ -1,3 +1,4 @@
+import '../../core/i18n/i18n.dart';
 import 'assistant_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,32 +25,32 @@ class DriverHelpScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MovaScreen(
-      title: 'Aide Chauffeur',
+      title: tr('Aide Chauffeur'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Ressources pour les chauffeurs et livreurs SENGA en RDC.',
+          Text(
+            tr('Ressources pour les chauffeurs et livreurs SENGA en RDC.'),
             style: TextStyle(color: MovaColors.textSecondary, height: 1.4),
           ),
           const SizedBox(height: 16),
           ListTile(
             leading: const Icon(Icons.smart_toy_outlined, color: MovaColors.green),
-            title: const Text('Assistant SENGA (IA)', style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: const Text('Une question sur l\'app ? Réponse immédiate, dans votre langue'),
+            title: Text(tr('Assistant SENGA (IA)'), style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(tr('Une question sur l\'app ? Réponse immédiate, dans votre langue')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _open(context, const AssistantScreen()),
           ),
           ListTile(
             leading: const Icon(Icons.menu_book_outlined, color: MovaColors.violet),
-            title: const Text('Manuel utilisateur', style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: const Text('En ligne, courses, dossier, PIN, revenus'),
+            title: Text(tr('Manuel utilisateur'), style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(tr('En ligne, courses, dossier, PIN, revenus')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _open(
               context,
-              const ManualScreen(
-                title: 'Manuel chauffeur',
-                subtitle: 'Guide SENGA Driver — simple et court',
+              ManualScreen(
+                title: tr('Manuel chauffeur'),
+                subtitle: tr('Guide SENGA Driver — simple et court'),
                 chapters: kDriverManualChapters,
                 showFullManual: false,
               ),
@@ -57,22 +58,22 @@ class DriverHelpScreen extends ConsumerWidget {
           ),
           ListTile(
             leading: const Icon(Icons.person_outline, color: MovaColors.violet),
-            title: const Text('Compte et connexion', style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: const Text('Lier Google ou un numéro +243 — un seul compte chauffeur'),
+            title: Text(tr('Compte et connexion'), style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(tr('Lier Google ou un numéro +243 — un seul compte chauffeur')),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => _open(context, const ProfileScreen(title: 'Compte et connexion')),
+            onTap: () => _open(context, ProfileScreen(title: tr('Compte et connexion'))),
           ),
           ListTile(
             leading: const Icon(Icons.notifications_outlined, color: MovaColors.orange),
-            title: const Text('Notifications', style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: const Text('Mute et choix du son des missions'),
+            title: Text(tr('Notifications'), style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(tr('Mute et choix du son des missions')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _open(context, const DriverNotificationSettingsScreen()),
           ),
           ListTile(
             leading: const Icon(Icons.place_outlined, color: MovaColors.green),
-            title: const Text('Nommer un lieu', style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: const Text('Chez Mama X, pin GPS — ou marché / hôpital à valider'),
+            title: Text(tr('Nommer un lieu'), style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(tr('Chez Mama X, pin GPS — ou marché / hôpital à valider')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _open(context, const SuggestPlaceScreen()),
           ),
@@ -84,14 +85,14 @@ class DriverHelpScreen extends ConsumerWidget {
           ),
           ListTile(
             leading: const Icon(Icons.support_agent_outlined, color: MovaColors.orange),
-            title: const Text('Contacter le support', style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: const Text('Coordonnées publiées par AfriSoft'),
+            title: Text(tr('Contacter le support'), style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(tr('Coordonnées publiées par AfriSoft')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _open(context, const ContactSupportScreen()),
           ),
           ListTile(
             leading: const Icon(Icons.gavel_outlined, color: MovaColors.midnight),
-            title: const Text('CGU & Confidentialité', style: TextStyle(fontWeight: FontWeight.w600)),
+            title: Text(tr('CGU & Confidentialité'), style: TextStyle(fontWeight: FontWeight.w600)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _open(
               context,
@@ -108,13 +109,13 @@ class DriverHelpScreen extends ConsumerWidget {
               final confirm = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  title: const Text('Déconnexion'),
-                  content: const Text('Voulez-vous vous déconnecter de SENGA Driver ?'),
+                  title: Text(tr('Déconnexion')),
+                  content: Text(tr('Voulez-vous vous déconnecter de SENGA Driver ?')),
                   actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Déconnexion', style: TextStyle(color: MovaColors.orange)),
+                      child: Text(tr('Déconnexion'), style: TextStyle(color: MovaColors.orange)),
                     ),
                   ],
                 ),
@@ -124,7 +125,7 @@ class DriverHelpScreen extends ConsumerWidget {
               }
             },
             icon: const Icon(Icons.logout, color: MovaColors.orange),
-            label: const Text('Se déconnecter', style: TextStyle(color: MovaColors.orange)),
+            label: Text(tr('Se déconnecter'), style: TextStyle(color: MovaColors.orange)),
           ),
         ],
       ),

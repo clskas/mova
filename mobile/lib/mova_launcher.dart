@@ -1,3 +1,4 @@
+import 'core/i18n/i18n.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -39,6 +40,7 @@ Future<void> runMovaPassengerApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppFlavor.current = MovaAppFlavor.passenger;
   ErrorReporter.install();
+  await loadAppLanguage();
   await SyncQueue.init();
   await PassengerAlertService.init();
   await ChatAlertService.init();
@@ -55,6 +57,7 @@ Future<void> runMovaDriverApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppFlavor.current = MovaAppFlavor.driver;
   ErrorReporter.install();
+  await loadAppLanguage();
   await SyncQueue.init();
   await DriverPushService.registerBackgroundHandlerEarly();
   await DriverJobAlertService.init();

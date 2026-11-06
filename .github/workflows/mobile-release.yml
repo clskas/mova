@@ -57,6 +57,11 @@ on:
         required: false
         type: boolean
         default: false
+      asc_apps:
+        description: "iOS - apps a soumettre avec asc_submit_only : passenger,driver (defaut), passenger ou driver."
+        required: false
+        type: string
+        default: "passenger,driver"
       asc_build_number:
         description: "iOS â€” CFBundleVersion / build number Ã  prÃ©fÃ©rer (ex. 119). Vide = dernier build VALID."
         required: false
@@ -890,6 +895,7 @@ jobs:
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
           ASC_BUILD_NUMBER: ${{ inputs.asc_build_number }}
+          ASC_APPS: ${{ inputs.asc_apps || 'passenger,driver' }}
           ASC_SUBMIT: 'true'
           # Cancel WAITING_FOR_REVIEW so we can attach the new TestFlight build.
           ASC_REPLACE_IN_REVIEW: 'true'

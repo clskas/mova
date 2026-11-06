@@ -12,6 +12,7 @@ import {
   SELFIE_ID_MATCH_PROMPT,
   SELFIE_VISION_PROMPT,
   verifySelfieBuffer,
+  vehiclePhotoList,
   type KycOcrStatus as SharedKycOcrStatus,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -24,6 +25,14 @@ import {
   type OcrProviderName,
   type OcrProviderReading,
 } from './ocr-providers';
+import {
+  claudeAvailable,
+  claudeJson,
+  SELFIE_SCHEMA,
+  VEHICLE_PHOTO_SCHEMA,
+  vehiclePhotoPrompt,
+  vehiclePhotoVerdict,
+} from './claude-json';
 import { extractDocumentFieldsWithClaude, isScannableDocument } from './document-fields';
 
 const OCR_PROVIDER_LABELS: Record<OcrProviderName, string> = {
@@ -86,10 +95,12 @@ export class OcrService {
 
     const aiEnabled = process.env.AI_ENABLED === 'true';
     const apiKey = process.env.OPENAI_API_KEY?.trim();
-    if (aiEnabled && apiKey) {
+    if (aiEnabled && (claudeAvailable() || apiKey)) {
       try {
-        const dataUrl = `data:${fetched.contentType};base64,${fetched.buffer.toString('base64')}`;
-        const vision = await this.callSelfieVision(apiKey, dataUrl);
+        const vision = claudeAvailable()
+          ? await this.claudeSelfieVision(fetched)
+          : await this.callSelfieVision(apiKey!, `data:${fetched.contentType};base64,${fetched.buffer.toString('base64')}`);
+        if (!vision) throw new Error('selfie vision: no answer');
         if (vision.looksLikeDocumentScan || !vision.isLiveSelfie || !vision.faceVisible) {
           return {
             ok: false,
@@ -332,6 +343,53 @@ export class OcrService {
     const fetched = await this.fetchImageBuffer(url);
     if (!fetched) return null;
     return `data:${fetched.contentType};base64,${fetched.buffer.toString('base64')}`;
+  }
+
+  /** Liveness only (one real face, not a scan or a screen): Claude does not compare faces. */
+  private async claudeSelfieVision(image: OcrImage) {
+    const out = await claudeJson({ images: [image], prompt: SELFIE_VISION_PROMPT, schema: SELFIE_SCHEMA as unknown as Record<string, unknown> });
+    return out ? parseSelfieVisionResponse(JSON.stringify(out)) : null;
+  }
+
+  scheduleVehiclePhotoCheck(userId: string): void {
+    void this.checkVehiclePhotos(userId).catch((err) => {
+      this.logger.warn(`Vehicle photo check failed for ${userId}: ${err instanceof Error ? err.message.slice(0, 200) : err}`);
+    });
+  }
+
+  /**
+   * Claude compares the vehicle photos (5 max) with what the driver declared and stores a
+   * verdict for the admin (OK / À VÉRIFIER / PROBLÈME). The admin still decides.
+   */
+  async checkVehiclePhotos(userId: string) {
+    if (!claudeAvailable()) return { available: false as const, message: 'Vérification IA désactivée (AI_ENABLED / ANTHROPIC_API_KEY).' };
+    const profile = await this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
+    const vehicle = profile?.vehicles.find((v) => v.isActive) ?? profile?.vehicles[0];
+    if (!vehicle) return { available: true as const, message: 'Aucun véhicule enregistré.' };
+    const urls = vehiclePhotoList(vehicle).slice(0, 5);
+    if (urls.length === 0) return { available: true as const, message: 'Aucune photo du véhicule.' };
+    const images = (await Promise.all(urls.map((u) => this.fetchImageBuffer(u)))).filter((x): x is OcrImage => !!x);
+    if (images.length === 0) return { available: true as const, message: 'Photos du véhicule illisibles.' };
+    const result = await claudeJson({
+      images,
+      prompt: vehiclePhotoPrompt({
+        type: vehicle.type,
+        plateNumber: vehicle.plateNumber,
+        make: vehicle.make,
+        model: vehicle.model,
+        passengerSeats: vehicle.passengerSeats,
+        cargoVolumeM3: vehicle.cargoVolumeM3,
+      }),
+      schema: VEHICLE_PHOTO_SCHEMA as unknown as Record<string, unknown>,
+    });
+    const photoCheck = {
+      ...(result ?? {}),
+      verdict: vehiclePhotoVerdict(result),
+      photosChecked: images.length,
+      checkedAt: new Date().toISOString(),
+    };
+    await this.prisma.vehicle.update({ where: { id: vehicle.id }, data: { photoCheck: photoCheck as Prisma.InputJsonValue } });
+    return { available: true as const, vehicleId: vehicle.id, photoCheck };
   }
 
   private async callSelfieVision(apiKey: string, dataUrl: string) {

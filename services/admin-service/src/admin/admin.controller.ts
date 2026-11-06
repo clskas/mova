@@ -373,6 +373,13 @@ export class AdminController {
     return this.adminService.setDriverVehicleSeats(userId, dto.passengerSeats ?? null, resolveManagedCityScope(req.user));
   }
 
+  @Post('drivers/:userId/vehicle-photo-check')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: "Vérifier les photos du véhicule avec Claude (verdict pour l'admin)" })
+  checkVehiclePhotos(@Param('userId') userId: string, @Request() req: { user: AdminJwtUser }) {
+    return this.adminService.checkDriverVehiclePhotos(userId, resolveManagedCityScope(req.user));
+  }
+
   @Patch('drivers/:userId/vehicle-cargo-volume')
   @RequirePermissions(AdminPermission.KYC_WRITE)
   @ApiOperation({ summary: 'Corriger le volume utile (m³) du véhicule actif (utilitaire ou camion)' })

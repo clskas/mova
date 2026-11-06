@@ -26,6 +26,7 @@ import {
 } from "@/lib/api";
 import { downloadCsv } from "@/lib/export-csv";
 import { useAdmin } from "@/components/AdminProvider";
+import { VehiclePhotoCheckCard } from "@/components/VehiclePhotoCheckCard";
 import { AuthenticatedMedia, resolveMediaUrl } from "@/components/AuthenticatedMedia";
 import { PeriodFilterBar } from "@/components/PeriodFilterBar";
 import { MetricCard } from "@/components/dashboard/MetricCard";
@@ -1268,6 +1269,12 @@ export default function ChauffeursPage() {
                     fallback="Photo de l'engin non fournie — demandez une mise à jour au chauffeur."
                   />
                 )}
+                <VehiclePhotoCheckCard
+                  key={`${selectedId}-${selectedVehicle.photoCheck?.checkedAt ?? "none"}`}
+                  userId={selectedId!}
+                  check={selectedVehicle.photoCheck}
+                  canRun={canSetVehicleType}
+                />
                 {canSetVehicleType && (
                   <label className="block space-y-1">
                     <span className="text-xs font-medium">Type d&apos;engin à enregistrer</span>

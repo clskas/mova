@@ -161,6 +161,7 @@ La trace se construit au fur et à mesure du déplacement. En cas de faible rés
 
 ## 15. Aide et support
 
+- **Assistant SENGA (IA)** : dans **Aide**, posez votre question par écrit, en français, lingala, swahili ou anglais, et recevez une réponse immédiate tirée de ce manuel. Pour un litige, un paiement ou une urgence, contactez le support humain.
 - **WhatsApp :** +243 900 000 000
 - **E-mail :** support@mova.cd
 - Consultez les CGU et la politique de confidentialité dans **Aide & Manuel**.

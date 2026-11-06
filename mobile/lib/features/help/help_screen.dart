@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/auth/session.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
+import 'assistant_screen.dart';
 import 'contact_support_screen.dart';
 import 'faq_screen.dart';
 import 'help_config.dart';
@@ -70,6 +71,13 @@ class HelpScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
+          _HelpLink(
+            icon: Icons.smart_toy_outlined,
+            iconColor: MovaColors.green,
+            title: 'Assistant SENGA (IA)',
+            subtitle: 'Posez votre question : réponse immédiate, en français, lingala, swahili ou anglais',
+            onTap: () => _open(context, const AssistantScreen()),
+          ),
           _HelpLink(
             icon: Icons.workspace_premium_outlined,
             iconColor: MovaColors.violet,

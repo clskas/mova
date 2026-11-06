@@ -1,3 +1,4 @@
+import 'assistant_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/auth/session.dart';
@@ -32,6 +33,13 @@ class DriverHelpScreen extends ConsumerWidget {
             style: TextStyle(color: MovaColors.textSecondary, height: 1.4),
           ),
           const SizedBox(height: 16),
+          ListTile(
+            leading: const Icon(Icons.smart_toy_outlined, color: MovaColors.green),
+            title: const Text('Assistant SENGA (IA)', style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: const Text('Une question sur l\'app ? Réponse immédiate, dans votre langue'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _open(context, const AssistantScreen()),
+          ),
           ListTile(
             leading: const Icon(Icons.menu_book_outlined, color: MovaColors.violet),
             title: const Text('Manuel utilisateur', style: TextStyle(fontWeight: FontWeight.w600)),

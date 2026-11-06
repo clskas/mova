@@ -117,4 +117,6 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
 
 ## Support
 
+- **Assistant SENGA (IA)** : dans **Aide**, posez votre question (en ligne, dossier, PIN, revenus…) dans votre langue et recevez une réponse immédiate tirée de ce manuel. Pour un litige, un paiement ou une urgence, contactez le support humain.
+
 WhatsApp +243 900 000 000 — support@mova.cd

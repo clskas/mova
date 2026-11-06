@@ -24,6 +24,7 @@ import {
   type OcrProviderName,
   type OcrProviderReading,
 } from './ocr-providers';
+import { extractDocumentFieldsWithClaude, isScannableDocument } from './document-fields';
 
 const OCR_PROVIDER_LABELS: Record<OcrProviderName, string> = {
   claude: 'Claude',
@@ -433,6 +434,49 @@ export class OcrService {
       confidence: parsed.confidence,
       notes: parsed.notes,
     };
+  }
+
+  /**
+   * Pre-fill: read the driver's latest document of this type and return the fields found.
+   * Never blocks onboarding: unavailable / unreadable just returns no field.
+   */
+  async scanDocumentFields(userId: string, type: string): Promise<{
+    available: boolean;
+    readable: boolean;
+    fields: Record<string, string>;
+    message?: string;
+  }> {
+    const unavailable = {
+      available: false,
+      readable: false,
+      fields: {},
+      message: 'Lecture automatique indisponible — remplissez les champs vous-même.',
+    };
+    if (!isScannableDocument(type)) return { ...unavailable, message: 'Ce document ne se lit pas automatiquement.' };
+    if (process.env.AI_ENABLED !== 'true' || !process.env.ANTHROPIC_API_KEY?.trim()) return unavailable;
+    const doc = await this.prisma.kycDocument.findFirst({ where: { userId, type }, orderBy: { createdAt: 'desc' } });
+    if (!doc) return { ...unavailable, message: "Envoyez d'abord la photo du document." };
+    const image = await this.fetchImageBuffer(doc.url);
+    if (!image) return unavailable;
+    try {
+      const result = await extractDocumentFieldsWithClaude(image, type);
+      await this.prisma.kycDocument.update({
+        where: { id: doc.id },
+        data: { extractedFields: result.fields as Prisma.InputJsonValue },
+      });
+      if (!result.readable || Object.keys(result.fields).length === 0) {
+        return {
+          available: true,
+          readable: false,
+          fields: {},
+          message: 'Document illisible — reprenez une photo nette et bien cadrée, ou remplissez les champs vous-même.',
+        };
+      }
+      return { available: true, readable: true, fields: result.fields };
+    } catch (err) {
+      this.logger.warn(`Document scan failed for ${doc.id}: ${err instanceof Error ? err.message.slice(0, 200) : err}`);
+      return unavailable;
+    }
   }
 
   private async readWithProvider(provider: OcrProviderName, image: OcrImage): Promise<OcrProviderReading> {

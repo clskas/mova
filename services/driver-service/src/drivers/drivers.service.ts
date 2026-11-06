@@ -380,6 +380,16 @@ export class DriversService {
     return { cleared, reassigned, keptKinshasa };
   }
 
+  async scanDocument(userId: string, type: string) {
+    let docType: string;
+    try {
+      docType = normalizeKycDocumentType(type);
+    } catch {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Type de document KYC invalide.');
+    }
+    return this.ocrService.scanDocumentFields(userId, docType);
+  }
+
   async uploadKyc(userId: string, type: string, url: string) {
     let docType: string;
     try {
@@ -496,6 +506,7 @@ export class DriversService {
     ocrNotes?: string | null;
     ocrCheckedAt?: Date | null;
     ocrProviderResults?: unknown;
+    extractedFields?: unknown;
     id?: string;
   } | null) {
     if (!doc) return null;
@@ -508,6 +519,8 @@ export class DriversService {
       notes: doc.ocrNotes ?? null,
       checkedAt: doc.ocrCheckedAt ?? null,
       providers: Array.isArray(doc.ocrProviderResults) ? doc.ocrProviderResults : [],
+      extractedFields:
+        doc.extractedFields && typeof doc.extractedFields === 'object' ? doc.extractedFields : null,
     };
   }
 

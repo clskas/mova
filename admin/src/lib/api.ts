@@ -256,6 +256,8 @@ export type AdminDriverDetail = AdminDriver & {
           notes?: string;
           error?: string;
         }[];
+        /** Fields read from the document to pre-fill onboarding (name, numbers, dates…). */
+        extractedFields?: Record<string, string> | null;
       } | null;
     }[];
     requiredComplete?: boolean;

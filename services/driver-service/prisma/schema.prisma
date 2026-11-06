@@ -125,6 +125,8 @@ model KycDocument {
   ocrCheckedAt       DateTime?
   /// Per-engine readings (Claude, Document AI, OpenAI) for the admin comparison.
   ocrProviderResults Json?
+  /// Fields read from the document to pre-fill onboarding (name, numbers, dates…).
+  extractedFields    Json?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 

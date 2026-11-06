@@ -20,6 +20,7 @@ import '../chat/delivery_chat_screen.dart';
 import 'delivery_live_tracking.dart';
 import 'delivery_payment_state.dart';
 import 'widgets/delivery_tracking_map.dart';
+import '../../core/i18n/i18n.dart';
 
 class FoodTrackingScreen extends ConsumerStatefulWidget {
   const FoodTrackingScreen({
@@ -198,7 +199,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Réception confirmée. Le livreur est payé.')),
+          SnackBar(content: Text(tr('Réception confirmée. Le livreur est payé.'))),
         );
         await _load(silent: true);
       case Failure(:final error):
@@ -229,7 +230,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
             return AlertDialog(
               scrollable: true,
               insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              title: const Text('Noter le restaurant'),
+              title: Text(tr('Noter le restaurant')),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -262,9 +263,9 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                     enabled: !submitting,
                     maxLines: 3,
                     onChanged: (v) => comment = v,
-                    decoration: const InputDecoration(
-                      labelText: 'Commentaire (optionnel)',
-                      hintText: 'Votre avis…',
+                    decoration: InputDecoration(
+                      labelText: tr('Commentaire (optionnel)'),
+                      hintText: tr('Votre avis…'),
                       isDense: true,
                     ),
                   ),
@@ -280,7 +281,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
               actions: [
                 TextButton(
                   onPressed: submitting ? null : () => Navigator.pop(ctx, false),
-                  child: const Text('Plus tard'),
+                  child: Text(tr('Plus tard')),
                 ),
                 ElevatedButton(
                   onPressed: submitting
@@ -303,7 +304,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                           }
                           setState(() => submitting = false);
                         },
-                  child: submitting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Envoyer'),
+                  child: submitting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : Text(tr('Envoyer')),
                 ),
               ],
             );
@@ -378,14 +379,14 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Annuler la commande ?'),
-        content: const Text(
-          'Vous pouvez annuler tant que le livreur n\'est pas en route. '
-          'Si vous avez déjà payé, le remboursement est automatique.',
+        title: Text(tr('Annuler la commande ?')),
+        content: Text(
+          tr('Vous pouvez annuler tant que le livreur n\'est pas en route. '
+          'Si vous avez déjà payé, le remboursement est automatique.'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui, annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Oui, annuler'))),
         ],
       ),
     );
@@ -427,7 +428,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
     final pin = _delivery?['deliveryPin']?.toString();
 
     return MovaScreen(
-      title: 'Suivi commande',
+      title: tr('Suivi commande'),
       scrollable: false,
       padding: EdgeInsets.zero,
       actions: [
@@ -493,10 +494,10 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                             !deliveryIsPaid(_delivery) &&
                             !_escrowPaymentDue &&
                             !deliveryIsCod(_delivery)) ...[
-                          const MovaCard(
+                          MovaCard(
                             child: Text(
-                              'Commande envoyée. Le restaurant doit d\'abord accepter. '
-                              'Vous paierez uniquement après son acceptation (délai 15 min).',
+                              tr('Commande envoyée. Le restaurant doit d\'abord accepter. '
+                              'Vous paierez uniquement après son acceptation (délai 15 min).'),
                               style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -505,28 +506,28 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                         if (deliveryIsCod(_delivery) &&
                             !_cashSettlementDue &&
                             !deliveryIsPaid(_delivery)) ...[
-                          const MovaCard(
+                          MovaCard(
                             child: Text(
-                              'Commande non garantie (espèces). Paiement à la livraison — SENGA ne bloque pas les fonds.',
+                              tr('Commande non garantie (espèces). Paiement à la livraison — SENGA ne bloque pas les fonds.'),
                               style: TextStyle(fontSize: 13),
                             ),
                           ),
                           const SizedBox(height: 12),
                         ],
                         if (_escrowPaymentDue && !deliveryIsPaid(_delivery)) ...[
-                          const MovaCard(
+                          MovaCard(
                             child: Text(
-                              'Le restaurant a accepté votre commande. '
-                              'Payez maintenant pour lancer la préparation (délai 15 min, sinon annulation).',
+                              tr('Le restaurant a accepté votre commande. '
+                              'Payez maintenant pour lancer la préparation (délai 15 min, sinon annulation).'),
                               style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
                           const SizedBox(height: 12),
                         ],
                         if (_cashSettlementDue && !deliveryIsPaid(_delivery)) ...[
-                          const MovaCard(
+                          MovaCard(
                             child: Text(
-                              'Commande livrée. Payez le livreur en espèces (ou via l\'app) et communiquez-lui le PIN affiché.',
+                              tr('Commande livrée. Payez le livreur en espèces (ou via l\'app) et communiquez-lui le PIN affiché.'),
                               style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -556,7 +557,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                         ],
                         if (_canConfirmReceipt) ...[
                           MovaButton(
-                            label: 'J\'ai reçu ma commande',
+                            label: tr('J\'ai reçu ma commande'),
                             onPressed: _confirmReceipt,
                           ),
                           const SizedBox(height: 12),
@@ -612,7 +613,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        Text('Statuts', style: Theme.of(context).textTheme.titleSmall),
+                        Text(tr('Statuts'), style: Theme.of(context).textTheme.titleSmall),
                         const SizedBox(height: 12),
                         ..._timeline.map((step) {
                           final done = step['done'] == true;
@@ -654,7 +655,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                     children: [
                       if (_canChatRestaurant) ...[
                         MovaButton(
-                          label: 'Contacter le restaurant',
+                          label: tr('Contacter le restaurant'),
                           isSecondary: true,
                           icon: Icons.storefront_outlined,
                           onPressed: () {
@@ -701,7 +702,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                       ],
                       if (_canCancel)
                         MovaButton(
-                          label: 'Annuler la commande',
+                          label: tr('Annuler la commande'),
                           isSecondary: true,
                           isLoading: _cancelling,
                           icon: Icons.cancel_outlined,
@@ -717,7 +718,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                         const SizedBox(height: 8),
                       ],
                       MovaButton(
-                        label: 'Retour à l\'accueil',
+                        label: tr('Retour à l\'accueil'),
                         isSecondary: true,
                         icon: Icons.home_outlined,
                         onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),

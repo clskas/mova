@@ -13,6 +13,7 @@ import '../../core/widgets/mova_widgets.dart';
 import 'call_ring_service.dart';
 import 'chat_receipt.dart';
 import 'delivery_voice_call_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 class RideChatMessage {
   RideChatMessage({
@@ -284,7 +285,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
       scrollable: false,
       actions: [
         IconButton(
-          tooltip: 'Appel SENGA',
+          tooltip: tr('Appel SENGA'),
           icon: const Icon(Icons.call_outlined),
           onPressed: _openVoiceCall,
         ),
@@ -313,13 +314,13 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
                   ),
                   TextButton(
                     onPressed: () => _connectSocket(forceReconnect: true),
-                    child: const Text('Réessayer'),
+                    child: Text(tr('Réessayer')),
                   ),
                 ],
               ),
             ),
           if (_loadingHistory)
-            const Padding(
+            Padding(
               padding: EdgeInsets.all(8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -330,15 +331,15 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2, color: MovaColors.violet),
                   ),
                   SizedBox(width: 8),
-                  Text('Chargement des messages…', style: TextStyle(color: MovaColors.textSecondary)),
+                  Text(tr('Chargement des messages…'), style: TextStyle(color: MovaColors.textSecondary)),
                 ],
               ),
             ),
           Expanded(
             child: _messages.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
-                      'Échangez avec votre chauffeur ou passager pendant la course.',
+                      tr('Échangez avec votre chauffeur ou passager pendant la course.'),
                       textAlign: TextAlign.center,
                       style: TextStyle(color: MovaColors.textSecondary),
                     ),
@@ -365,8 +366,8 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
               Expanded(
                 child: TextField(
                   controller: _controller,
-                  decoration: const InputDecoration(
-                    hintText: 'Votre message…',
+                  decoration: InputDecoration(
+                    hintText: tr('Votre message…'),
                     isDense: true,
                   ),
                   textInputAction: TextInputAction.send,

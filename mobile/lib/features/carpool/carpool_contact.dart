@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/mova_colors.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Affiche le téléphone conducteur (masqué ou complet) et lance un appel si possible.
 Future<void> showCarpoolContact(BuildContext context, {String? contactPhone}) async {
   final phone = contactPhone?.trim();
   if (phone == null || phone.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Numéro conducteur indisponible pour le moment.')),
+      SnackBar(content: Text(tr('Numéro conducteur indisponible pour le moment.'))),
     );
     return;
   }
@@ -25,7 +26,7 @@ Future<void> showCarpoolContact(BuildContext context, {String? contactPhone}) as
   showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Contacter le conducteur'),
+      title: Text(tr('Contacter le conducteur')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,9 +60,9 @@ Future<void> showCarpoolContact(BuildContext context, {String? contactPhone}) as
               final uri = Uri.parse('tel:$phone');
               if (await canLaunchUrl(uri)) await launchUrl(uri);
             },
-            child: const Text('Appeler'),
+            child: Text(tr('Appeler')),
           ),
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Fermer'))),
       ],
     ),
   );

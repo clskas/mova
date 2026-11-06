@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/config/market_config.dart';
 import '../../../core/theme/mova_colors.dart';
+import '../../../core/i18n/i18n.dart';
 
 enum CashDialogResult { confirmed, disputed, dismissed }
 
@@ -87,16 +88,16 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
     final sure = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cash non reçu ?'),
-        content: const Text(
-          'Le passager sera notifié et bloqué pour de nouvelles courses jusqu’à résolution. '
-          'N’utilisez ceci que si vous n’avez vraiment pas reçu les espèces.',
+        title: Text(tr('Cash non reçu ?')),
+        content: Text(
+          tr('Le passager sera notifié et bloqué pour de nouvelles courses jusqu’à résolution. '
+          'N’utilisez ceci que si vous n’avez vraiment pas reçu les espèces.'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Confirmer litige'),
+            child: Text(tr('Confirmer litige')),
           ),
         ],
       ),
@@ -130,7 +131,7 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
         children: [
           if (widget.passengerTotalCdf != null && widget.passengerTotalCdf! > 0) ...[
             Text(
-              'Montant à encaisser',
+              tr('Montant à encaisser'),
               style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 4),
@@ -169,13 +170,13 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
           TextButton(
             onPressed: _submitting ? null : _dispute,
             child: Text(
-              'Cash non reçu',
+              tr('Cash non reçu'),
               style: TextStyle(color: Colors.red.shade700),
             ),
           ),
         TextButton(
           onPressed: _submitting ? null : () => Navigator.of(context).pop(CashDialogResult.dismissed),
-          child: const Text('Plus tard'),
+          child: Text(tr('Plus tard')),
         ),
         FilledButton(
           onPressed: _submitting ? null : _submit,
@@ -185,7 +186,7 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
-              : const Text('Cash reçu'),
+              : Text(tr('Cash reçu')),
         ),
       ],
     );

@@ -19,6 +19,7 @@ import '../rating/rating_screen.dart';
 import '../delivery/delivery_payment_state.dart';
 import '../passenger/passenger_alert_service.dart';
 import 'billing_util.dart';
+import '../../core/i18n/i18n.dart';
 
 class ReceiptScreen extends ConsumerStatefulWidget {
   const ReceiptScreen({
@@ -187,7 +188,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     setState(() => _actionLoading = false);
     if (bytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible de charger le document.')),
+        SnackBar(content: Text(tr('Impossible de charger le document.'))),
       );
       return;
     }
@@ -241,7 +242,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
         final escPos = data['escPosBase64']?.toString();
         if (escPos == null || escPos.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Impression thermique indisponible pour le moment.')),
+            SnackBar(content: Text(tr('Impression thermique indisponible pour le moment.'))),
           );
           return;
         }
@@ -249,7 +250,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           await BluetoothPrintService.instance.printEscPosBase64(escPos, context);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Ticket envoyé à l\'imprimante Bluetooth')),
+            SnackBar(content: Text(tr('Ticket envoyé à l\'imprimante Bluetooth'))),
           );
         } catch (e) {
           if (!mounted) return;
@@ -281,7 +282,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
       case Success(:final data):
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reçu partagé dans le chat')),
+          SnackBar(content: Text(tr('Reçu partagé dans le chat'))),
         );
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!context.mounted) return;
@@ -375,15 +376,15 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                             style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: MovaColors.green),
                           ),
                           const SizedBox(height: 12),
-                          const Text(
-                            'Paiement espèces en attente',
+                          Text(
+                            tr('Paiement espèces en attente'),
                             style: TextStyle(fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            'Remettez l\'argent au chauffeur. Il confirmera « Cash reçu » dans son application. '
+                          Text(
+                            tr('Remettez l\'argent au chauffeur. Il confirmera « Cash reçu » dans son application. '
                             'Vous pouvez déjà commander une nouvelle course : le paiement reste en attente '
-                            'jusqu\'à confirmation (ou clôture automatique sous 24 h si le chauffeur ne signale rien).',
+                            'jusqu\'à confirmation (ou clôture automatique sous 24 h si le chauffeur ne signale rien).'),
                             textAlign: TextAlign.center,
                             style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                           ),
@@ -392,16 +393,16 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                     ),
                     const SizedBox(height: 16),
                     MovaButton(
-                      label: 'J\'ai payé en espèces',
+                      label: tr('J\'ai payé en espèces'),
                       isSecondary: true,
                       onPressed: _claimCashPaid,
                     ),
                     const SizedBox(height: 8),
-                    MovaButton(label: 'Retour à l\'accueil', onPressed: _continue),
+                    MovaButton(label: tr('Retour à l\'accueil'), onPressed: _continue),
                     if (!_cashStillPending && widget.showRatingAfter && widget.rideId != null) ...[
                       const SizedBox(height: 8),
                       MovaButton(
-                        label: 'Noter le chauffeur',
+                        label: tr('Noter le chauffeur'),
                         isSecondary: true,
                         onPressed: () {
                           Navigator.pushReplacement(
@@ -422,7 +423,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('SENGA RDC', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: MovaColors.violet)),
+                          Text(tr('SENGA RDC'), style: Theme.of(context).textTheme.titleMedium?.copyWith(color: MovaColors.violet)),
                           const SizedBox(height: 4),
                           Text(docLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                           const SizedBox(height: 8),
@@ -475,28 +476,28 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                         OutlinedButton.icon(
                           onPressed: _actionLoading ? null : () => _printPdf(),
                           icon: const Icon(Icons.picture_as_pdf_outlined),
-                          label: const Text('PDF / Imprimer'),
+                          label: Text(tr('PDF / Imprimer')),
                         ),
                         OutlinedButton.icon(
                           onPressed: _actionLoading ? null : () => _printPdf(thermal: true),
                           icon: const Icon(Icons.receipt_long),
-                          label: const Text('Thermique 80 mm'),
+                          label: Text(tr('Thermique 80 mm')),
                         ),
                         OutlinedButton.icon(
                           onPressed: _actionLoading ? null : _printBluetooth,
                           icon: const Icon(Icons.bluetooth),
-                          label: const Text('Bluetooth ESC/POS'),
+                          label: Text(tr('Bluetooth ESC/POS')),
                         ),
                         OutlinedButton.icon(
                           onPressed: _actionLoading ? null : _sharePdf,
                           icon: const Icon(Icons.share_outlined),
-                          label: const Text('Partager'),
+                          label: Text(tr('Partager')),
                         ),
                         if (receiptSupportsChat(widget.referenceType))
                           OutlinedButton.icon(
                             onPressed: _actionLoading ? null : _shareChat,
                             icon: const Icon(Icons.chat_outlined),
-                            label: const Text('Chat'),
+                            label: Text(tr('Chat')),
                           ),
                       ],
                     ),
@@ -504,15 +505,15 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                     TextField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'E-mail',
-                        hintText: 'receipt@example.com',
+                      decoration: InputDecoration(
+                        labelText: tr('E-mail'),
+                        hintText: tr('receipt@example.com'),
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
                     ),
                     const SizedBox(height: 8),
                     MovaButton(
-                      label: 'Envoyer par e-mail',
+                      label: tr('Envoyer par e-mail'),
                       icon: Icons.send_outlined,
                       isLoading: _actionLoading,
                       onPressed: _actionLoading ? null : _sendEmail,

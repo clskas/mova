@@ -15,6 +15,7 @@ import '../auth/local_pin_setup_screen.dart';
 import '../auth/otp_sms_autofill.dart';
 import '../auth/pin_session.dart';
 import '../auth/widgets/six_digit_pin_field.dart';
+import '../../core/i18n/i18n.dart';
 
 const _linkedSnack = 'Compte lié. Vous pouvez vous connecter avec le téléphone, Google ou Apple.';
 
@@ -286,8 +287,8 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
           'Détacher $label ?',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Détacher')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Détacher'))),
         ],
       ),
     );
@@ -326,7 +327,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Compte et connexion',
+            tr('Compte et connexion'),
             style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
@@ -339,20 +340,20 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
           const SizedBox(height: 12),
           _Row(
             icon: Icons.phone_outlined,
-            label: 'Téléphone',
+            label: tr('Téléphone'),
             value: _hasPhone ? 'lié · $_phoneLabel' : 'non lié',
           ),
           const SizedBox(height: 8),
           _Row(
             icon: Icons.g_mobiledata,
-            label: 'Google',
+            label: tr('Google'),
             value: _googleLinked ? 'lié · $_emailLabel' : 'non lié',
           ),
           if (_showAppleLink) ...[
             const SizedBox(height: 8),
             _Row(
               icon: Icons.apple,
-              label: 'Apple',
+              label: tr('Apple'),
               value: _appleLinked ? 'lié' : 'non lié',
             ),
           ],
@@ -363,7 +364,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
           if (!_googleLinked) ...[
             const SizedBox(height: 16),
             MovaButton(
-              label: 'Lier Google',
+              label: tr('Lier Google'),
               icon: Icons.link,
               isSecondary: true,
               isLoading: _busy,
@@ -373,7 +374,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
           if (_showAppleLink && !_appleLinked) ...[
             const SizedBox(height: 12),
             MovaButton(
-              label: 'Lier Apple',
+              label: tr('Lier Apple'),
               icon: Icons.apple,
               isSecondary: true,
               isLoading: _busy,
@@ -386,9 +387,9 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
               controller: _phoneCtrl,
               keyboardType: TextInputType.phone,
               enabled: !_busy && !_otpSent,
-              decoration: const InputDecoration(
-                labelText: 'Lier un numéro',
-                hintText: '+243 8XX XXX XXX',
+              decoration: InputDecoration(
+                labelText: tr('Lier un numéro'),
+                hintText: tr('+243 8XX XXX XXX'),
                 prefixIcon: Icon(Icons.phone_outlined),
               ),
             ),
@@ -396,7 +397,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
               const SizedBox(height: 12),
               SixDigitPinField(
                 controller: _otpCtrl,
-                label: 'Code OTP reçu par SMS',
+                label: tr('Code OTP reçu par SMS'),
                 enabled: !_busy,
                 forOneTimeCode: true,
                 onCompleted: (_) {
@@ -419,13 +420,13 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
                         _otpSent = false;
                         _otpCtrl.clear();
                       }),
-                child: const Text('Changer de numéro'),
+                child: Text(tr('Changer de numéro')),
               ),
           ],
           if (linkedSocialAndPhone) ...[
             const SizedBox(height: 8),
-            const Text(
-              'Plusieurs méthodes liées. Un seul portefeuille.',
+            Text(
+              tr('Plusieurs méthodes liées. Un seul portefeuille.'),
               style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
             ),
             if (_canUnlinkGoogle)
@@ -433,7 +434,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
                 alignment: Alignment.centerLeft,
                 child: TextButton(
                   onPressed: _busy ? null : () => _unlink(kind: 'google'),
-                  child: const Text('Détacher Google'),
+                  child: Text(tr('Détacher Google')),
                 ),
               ),
             if (_canUnlinkApple)
@@ -441,7 +442,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
                 alignment: Alignment.centerLeft,
                 child: TextButton(
                   onPressed: _busy ? null : () => _unlink(kind: 'apple'),
-                  child: const Text('Détacher Apple'),
+                  child: Text(tr('Détacher Apple')),
                 ),
               ),
             if (_canUnlinkPhone)
@@ -449,7 +450,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
                 alignment: Alignment.centerLeft,
                 child: TextButton(
                   onPressed: _busy ? null : () => _unlink(kind: 'phone'),
-                  child: const Text('Détacher le numéro'),
+                  child: Text(tr('Détacher le numéro')),
                 ),
               ),
           ],
@@ -471,7 +472,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
                       );
                     },
               icon: const Icon(Icons.lock_outline, size: 18),
-              label: const Text('Créer un code PIN'),
+              label: Text(tr('Créer un code PIN')),
             ),
           ],
         ],

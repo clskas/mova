@@ -11,6 +11,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../chat/chat_alert_service.dart';
 import '../sos/notification_tap_router.dart';
 import '../sos/sos_alert_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Boîte de réception des notifications serveur (SOS, courses, chat…).
 class NotificationsInboxScreen extends ConsumerStatefulWidget {
@@ -137,7 +138,7 @@ class _NotificationsInboxScreenState extends ConsumerState<NotificationsInboxScr
           child: Text(body?.isNotEmpty == true ? body! : 'Aucun détail supplémentaire.'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Fermer'))),
         ],
       ),
     );
@@ -172,13 +173,13 @@ class _NotificationsInboxScreenState extends ConsumerState<NotificationsInboxScr
     final unread = _items.where((n) => n['read'] != true).length;
     // scrollable:false — ListView a besoin d’une hauteur bornée (sinon liste vide).
     return MovaScreen(
-      title: 'Notifications',
+      title: tr('Notifications'),
       scrollable: false,
       actions: [
         if (unread > 0)
           TextButton(
             onPressed: _markAllRead,
-            child: const Text('Tout lire'),
+            child: Text(tr('Tout lire')),
           ),
       ],
       child: _loading
@@ -186,9 +187,9 @@ class _NotificationsInboxScreenState extends ConsumerState<NotificationsInboxScr
           : _error != null
               ? MovaErrorBanner(message: _error!, onRetry: _load)
               : _items.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
-                        'Aucune notification pour le moment.',
+                        tr('Aucune notification pour le moment.'),
                         style: TextStyle(color: MovaColors.textSecondary),
                       ),
                     )
@@ -302,7 +303,7 @@ class _NotificationsBellButtonState extends ConsumerState<NotificationsBellButto
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      tooltip: 'Notifications',
+      tooltip: tr('Notifications'),
       onPressed: () async {
         await Navigator.push<void>(
           context,

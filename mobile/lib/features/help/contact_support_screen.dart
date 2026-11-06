@@ -7,6 +7,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'company_contact.dart';
+import '../../core/i18n/i18n.dart';
 
 class ContactSupportScreen extends ConsumerStatefulWidget {
   const ContactSupportScreen({super.key});
@@ -52,7 +53,7 @@ class _ContactSupportScreenState extends ConsumerState<ContactSupportScreen> {
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d\'ouvrir le lien')),
+        SnackBar(content: Text(tr('Impossible d\'ouvrir le lien'))),
       );
     }
   }
@@ -62,7 +63,7 @@ class _ContactSupportScreenState extends ConsumerState<ContactSupportScreen> {
     final theme = Theme.of(context);
 
     return MovaScreen(
-      title: 'Contacter le support',
+      title: tr('Contacter le support'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -75,7 +76,7 @@ class _ContactSupportScreenState extends ConsumerState<ContactSupportScreen> {
                     const Icon(Icons.support_agent, color: MovaColors.violet),
                     const SizedBox(width: 8),
                     Text(
-                      'Assistance SENGA',
+                      tr('Assistance SENGA'),
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -84,7 +85,7 @@ class _ContactSupportScreenState extends ConsumerState<ContactSupportScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Les coordonnées ci-dessous sont celles publiées par AfriSoft. Si la liste est vide, aucun contact n\'a encore été ajouté.',
+                  tr('Les coordonnées ci-dessous sont celles publiées par AfriSoft. Si la liste est vide, aucun contact n\'a encore été ajouté.'),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: MovaColors.textSecondary,
                     height: 1.4,
@@ -105,14 +106,14 @@ class _ContactSupportScreenState extends ConsumerState<ContactSupportScreen> {
                 children: [
                   Text(_error!, style: const TextStyle(color: MovaColors.textSecondary)),
                   const SizedBox(height: 8),
-                  TextButton(onPressed: _load, child: const Text('Réessayer')),
+                  TextButton(onPressed: _load, child: Text(tr('Réessayer'))),
                 ],
               ),
             )
           else if (_contacts.isEmpty)
-            const MovaCard(
+            MovaCard(
               child: Text(
-                'Aucun contact pour le moment.',
+                tr('Aucun contact pour le moment.'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: MovaColors.textSecondary, height: 1.4),
               ),
@@ -161,7 +162,7 @@ class _ContactCard extends StatelessWidget {
               _ContactTile(
                 icon: Icons.phone,
                 iconColor: MovaColors.green,
-                title: 'Téléphone',
+                title: tr('Téléphone'),
                 subtitle: contact.phone!,
                 onTap: () {
                   final uri = contact.telUri;
@@ -172,7 +173,7 @@ class _ContactCard extends StatelessWidget {
               _ContactTile(
                 icon: Icons.email_outlined,
                 iconColor: MovaColors.violet,
-                title: 'E-mail',
+                title: tr('E-mail'),
                 subtitle: contact.email!,
                 onTap: () {
                   final uri = contact.mailtoUri;
@@ -183,7 +184,7 @@ class _ContactCard extends StatelessWidget {
               _ContactTile(
                 icon: Icons.chat,
                 iconColor: const Color(0xFF25D366),
-                title: 'WhatsApp',
+                title: tr('WhatsApp'),
                 subtitle: contact.phone ?? 'WhatsApp',
                 onTap: () => onLaunch(Uri.parse(contact.whatsappUri!)),
               ),

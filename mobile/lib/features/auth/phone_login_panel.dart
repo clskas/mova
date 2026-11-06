@@ -16,6 +16,7 @@ import 'otp_sms_autofill.dart';
 import 'pin_session.dart';
 import 'widgets/pin_digit_pad.dart';
 import 'widgets/six_digit_pin_field.dart';
+import '../../core/i18n/i18n.dart';
 
 enum PhoneLoginStep { phone, pin, forgot, otp, googleOtp }
 
@@ -651,7 +652,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
                       _phoneController.clear();
                       setState(() => _error = null);
                     },
-              child: const Text('Utiliser un autre numéro'),
+              child: Text(tr('Utiliser un autre numéro')),
             ),
           ],
         ],
@@ -682,19 +683,19 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: _loading ? null : _openForgotOptions,
-              child: const Text('PIN oublié'),
+              child: Text(tr('PIN oublié')),
             ),
           ),
           TextButton(
             onPressed: _loading ? null : _backToPhone,
-            child: const Text('Ce n\'est pas moi'),
+            child: Text(tr('Ce n\'est pas moi')),
           ),
         ],
         if (_step == PhoneLoginStep.otp || _step == PhoneLoginStep.googleOtp) ...[
           const SizedBox(height: 16),
           if (_step == PhoneLoginStep.otp && _forgotPinRecovery) ...[
             Text(
-              'Un code SMS vous permet de vous reconnecter et de définir un nouveau PIN.',
+              tr('Un code SMS vous permet de vous reconnecter et de définir un nouveau PIN.'),
               textAlign: TextAlign.center,
               style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 13),
             ),
@@ -775,7 +776,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           const SizedBox(height: 8),
           TextButton(
             onPressed: _loading ? null : _backToPin,
-            child: const Text('Retour au PIN'),
+            child: Text(tr('Retour au PIN')),
           ),
         ],
         if (_step != PhoneLoginStep.phone && _step != PhoneLoginStep.pin && _step != PhoneLoginStep.forgot) ...[
@@ -793,7 +794,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
-                  'ou',
+                  tr('ou'),
                   style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 13),
                 ),
               ),
@@ -803,7 +804,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           if (_showAppleSignIn) ...[
             const SizedBox(height: 16),
             MovaButton(
-              label: 'Continuer avec Apple',
+              label: tr('Continuer avec Apple'),
               isSecondary: true,
               isLoading: _loading,
               onPressed: (_needsLegalAcceptance && !_legalAccepted) ? null : _loginWithApple,
@@ -813,7 +814,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           if (_showGoogleSignIn) ...[
             const SizedBox(height: 16),
             MovaButton(
-              label: 'Continuer avec Google',
+              label: tr('Continuer avec Google'),
               isSecondary: true,
               isLoading: _loading,
               onPressed: (_needsLegalAcceptance && !_legalAccepted) ? null : _loginWithGoogle,
@@ -882,18 +883,18 @@ class _LegalAcceptRow extends StatelessWidget {
                 ),
               ),
               Text(
-                ' et la ',
+                tr(' et la '),
                 style: TextStyle(fontSize: 13, color: MovaColors.textSecondary.withValues(alpha: 0.95)),
               ),
               GestureDetector(
                 onTap: () => _openLegal(
                   context,
-                  title: 'Confidentialité',
+                  title: tr('Confidentialité'),
                   asset: 'assets/legal/privacy_fr.md',
                   apiPath: '/public/privacy',
                 ),
-                child: const Text(
-                  'Politique de confidentialité',
+                child: Text(
+                  tr('Politique de confidentialité'),
                   style: TextStyle(
                     fontSize: 13,
                     color: MovaColors.violet,

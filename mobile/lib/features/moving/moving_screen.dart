@@ -24,6 +24,7 @@ import '../../widgets/promo_code_field.dart';
 import '../booking/widgets/mova_ride_map.dart';
 import '../history/history_detail_dialog.dart';
 import 'moving_tracking_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 const _volumeOptions = [
   ('STUDIO', 'Studio / chambre unique', '~4 m³ — pas de pièces supplémentaires'),
@@ -393,7 +394,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
     final urls = _uploadedPhotoUrls;
     if (urls.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Prenez d\'abord des photos de vos pièces et meubles.')),
+        SnackBar(content: Text(tr('Prenez d\'abord des photos de vos pièces et meubles.'))),
       );
       return;
     }
@@ -552,8 +553,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Indiquez le volume, le trajet et le type d\'engin. '
-            'L\'estimation inclut la distance, le volume (m³) et le type de camion.',
+            tr('Indiquez le volume, le trajet et le type d\'engin. '
+            'L\'estimation inclut la distance, le volume (m³) et le type de camion.'),
             style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 16),
@@ -575,7 +576,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                   city: autocompleteCity,
                   proximityLat: _pickup.latitude,
                   proximityLng: _pickup.longitude,
-                  label: 'Adresse de départ',
+                  label: tr('Adresse de départ'),
                   hint: 'Ma position ou nom du lieu',
                   prefixIcon: Icons.home_outlined,
                   onUserInput: _onPickupUserInput,
@@ -587,7 +588,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                 icon: _loadingGps
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.my_location),
-                tooltip: 'Ma position GPS',
+                tooltip: tr('Ma position GPS'),
               ),
             ],
           ),
@@ -598,7 +599,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             city: autocompleteCity,
             proximityLat: _pickup.latitude,
             proximityLng: _pickup.longitude,
-            label: 'Adresse d\'arrivée',
+            label: tr('Adresse d\'arrivée'),
             hint: 'Rechercher une commune, quartier…',
             prefixIcon: Icons.place_outlined,
             textInputAction: TextInputAction.done,
@@ -609,7 +610,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             onApply: (coords, label) => _setDropoffFromCoords(coords, label),
           ),
           const SizedBox(height: 16),
-          Text('Type de logement', style: theme.textTheme.titleSmall),
+          Text(tr('Type de logement'), style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
           ..._volumeOptions.map((v) {
             return RadioListTile<String>(
@@ -643,7 +644,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           ],
           if (_volume == 'OFFICE') ...[
             const SizedBox(height: 8),
-            Text('Nombre de postes / bureaux à déménager', style: theme.textTheme.titleSmall),
+            Text(tr('Nombre de postes / bureaux à déménager'), style: theme.textTheme.titleSmall),
             Slider(
               value: _officeDesks.toDouble(),
               min: 2,
@@ -664,10 +665,10 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 12),
-          Text('Type d\'engin', style: theme.textTheme.titleSmall),
+          Text(tr('Type d\'engin'), style: theme.textTheme.titleSmall),
           const SizedBox(height: 4),
           Text(
-            'Pré-sélection selon le volume — vous pouvez ajuster si vous avez des meubles encombrants.',
+            tr('Pré-sélection selon le volume — vous pouvez ajuster si vous avez des meubles encombrants.'),
             style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 8),
@@ -684,8 +685,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                         color: MovaColors.violet.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text(
-                        'Recommandé',
+                      child: Text(
+                        tr('Recommandé'),
                         style: TextStyle(fontSize: 11, color: MovaColors.violet, fontWeight: FontWeight.w600),
                       ),
                     ),
@@ -712,7 +713,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                 icon: _uploadingPhoto
                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.camera_alt_outlined),
-                label: const Text('Ajouter'),
+                label: Text(tr('Ajouter')),
               ),
             ],
           ),
@@ -742,7 +743,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                 icon: _aiEstimating
                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.auto_awesome_outlined),
-                label: const Text('Estimer le volume avec les photos (IA)'),
+                label: Text(tr('Estimer le volume avec les photos (IA)')),
               ),
             ),
           if (_aiVolumeM3 != null || _aiNote != null)
@@ -757,15 +758,15 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
               ),
             ),
           const SizedBox(height: 8),
-          Text('Meubles / cartons', style: theme.textTheme.titleSmall),
+          Text(tr('Meubles / cartons'), style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: _itemController,
-                  decoration: const InputDecoration(
-                    hintText: 'Ex: Canapé, Cartons x10…',
+                  decoration: InputDecoration(
+                    hintText: tr('Ex: Canapé, Cartons x10…'),
                     isDense: true,
                   ),
                   onSubmitted: (_) => _addItem(),
@@ -845,13 +846,13 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             Icon(Icons.inventory_2_outlined, size: 48, color: MovaColors.textSecondary.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(
-              'Aucune demande de déménagement',
+              tr('Aucune demande de déménagement'),
               textAlign: TextAlign.center,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             Text(
-              'Créez une nouvelle demande dans l\'onglet « Nouvelle demande ».',
+              tr('Créez une nouvelle demande dans l\'onglet « Nouvelle demande ».'),
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
             ),
@@ -907,7 +908,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Déménagement',
+      title: tr('Déménagement'),
       scrollable: false,
       child: Column(
         children: [

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/config/market_config.dart';
 import '../../../core/theme/mova_colors.dart';
+import '../../../core/i18n/i18n.dart';
 
 /// Fenêtre de confirmation PIN espèces (passager — livraisons & courses).
 Future<bool> showCashPinConfirmDialog(
@@ -15,7 +16,7 @@ Future<bool> showCashPinConfirmDialog(
     barrierDismissible: false,
     builder: (ctx) => AlertDialog(
       scrollable: true,
-      title: const Text('Paiement espèces'),
+      title: Text(tr('Paiement espèces')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -57,11 +58,11 @@ Future<bool> showCashPinConfirmDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Changer de mode'),
+          child: Text(tr('Changer de mode')),
         ),
         ElevatedButton(
           onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Confirmer le paiement'),
+          child: Text(tr('Confirmer le paiement')),
         ),
       ],
     ),

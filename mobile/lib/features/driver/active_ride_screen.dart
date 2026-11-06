@@ -25,6 +25,7 @@ import '../../core/services/cancel_eligibility.dart';
 import 'driver_job_alert_service.dart';
 import 'widgets/driver_cash_received_dialog.dart';
 import '../../core/location/location_permission.dart';
+import '../../core/i18n/i18n.dart';
 
 class ActiveRideScreen extends ConsumerStatefulWidget {
   const ActiveRideScreen({
@@ -376,7 +377,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     if (lat == null || lng == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Coordonnées GPS indisponibles pour la navigation')),
+          SnackBar(content: Text(tr('Coordonnées GPS indisponibles pour la navigation'))),
         );
       }
       return;
@@ -389,7 +390,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     );
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d\'ouvrir Google Maps')),
+        SnackBar(content: Text(tr('Impossible d\'ouvrir Google Maps'))),
       );
     }
   }
@@ -411,7 +412,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
               : 'Le passager sera notifié. Annulez seulement en cas de problème (sécurité, véhicule, etc.).',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(arrived ? 'Confirmer no-show' : 'Oui, annuler'),
@@ -456,8 +457,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         if (data['roundTripReturnStarted'] == true) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Aller terminé — démarrez le retour vers le point de départ.'),
+              SnackBar(
+                content: Text(tr('Aller terminé — démarrez le retour vers le point de départ.')),
               ),
             );
           }
@@ -568,7 +569,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
 
     if (_passengerCancelled || _isCancelledStatus) {
       return MovaScreen(
-        title: 'Course annulée',
+        title: tr('Course annulée'),
         scrollable: false,
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -578,20 +579,20 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
               const Spacer(),
               Icon(Icons.cancel_outlined, size: 72, color: MovaColors.red.withValues(alpha: 0.9)),
               const SizedBox(height: 20),
-              const Text(
-                'Le passager a annulé la course',
+              Text(
+                tr('Le passager a annulé la course'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 12),
               Text(
-                'Cette course n’est plus active. Vous pouvez reprendre les nouvelles demandes.',
+                tr('Cette course n’est plus active. Vous pouvez reprendre les nouvelles demandes.'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 15, color: MovaColors.textSecondary, height: 1.35),
               ),
               const Spacer(),
               MovaButton(
-                label: 'Retour à l’accueil',
+                label: tr('Retour à l’accueil'),
                 icon: Icons.home_outlined,
                 onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
               ),
@@ -622,7 +623,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         ),
         IconButton(
           icon: ChatBadgeIcon(kind: 'ride', threadId: _rideId),
-          tooltip: 'Chat passager',
+          tooltip: tr('Chat passager'),
           onPressed: () {
             Navigator.push(
               context,
@@ -659,7 +660,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Rendez-vous passager',
+                          tr('Rendez-vous passager'),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -676,7 +677,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                   ),
                   const SizedBox(height: 12),
                   MovaButton(
-                    label: 'Navigation vers le passager',
+                    label: tr('Navigation vers le passager'),
                     icon: Icons.directions,
                     onPressed: _openPickup,
                   ),
@@ -774,7 +775,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             children: [
               Expanded(
                 child: MovaButton(
-                  label: 'Appeler',
+                  label: tr('Appeler'),
                   isSecondary: true,
                   icon: Icons.phone,
                   onPressed: () {
@@ -793,7 +794,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: MovaButton(
-                  label: 'WhatsApp',
+                  label: tr('WhatsApp'),
                   isSecondary: true,
                   icon: Icons.chat,
                   onPressed: () {
@@ -809,7 +810,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
           ),
           const SizedBox(height: 8),
           MovaButton(
-            label: 'Appel SENGA',
+            label: tr('Appel SENGA'),
             isSecondary: true,
             icon: Icons.call_outlined,
             onPressed: _rideId.isEmpty ? null : _openVoiceCall,
@@ -832,7 +833,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             ),
             const SizedBox(height: 8),
             MovaButton(
-              label: 'Navigation prochain arrêt',
+              label: tr('Navigation prochain arrêt'),
               isSecondary: true,
               icon: Icons.navigation_outlined,
               onPressed: () => _openNavigation(toPickup: true),
@@ -860,14 +861,14 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                       const SizedBox(height: 8),
                       if (status == 'WAITING')
                         MovaButton(
-                          label: 'Prendre ce passager',
+                          label: tr('Prendre ce passager'),
                           icon: Icons.person_add_alt_1,
                           isLoading: _loading,
                           onPressed: _loading || bookingId.isEmpty ? null : () => _pickupShare(bookingId),
                         ),
                       if (status == 'PICKED_UP')
                         MovaButton(
-                          label: 'Déposer ce passager',
+                          label: tr('Déposer ce passager'),
                           icon: Icons.flag,
                           isLoading: _loading,
                           onPressed: _loading || bookingId.isEmpty ? null : () => _dropoffShare(bookingId),
@@ -879,7 +880,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             }),
             if (_status == 'DRIVER_ASSIGNED' || _status == 'ACCEPTED') ...[
               MovaButton(
-                label: 'Je suis arrivé (point de rencontre)',
+                label: tr('Je suis arrivé (point de rencontre)'),
                 icon: Icons.place,
                 isLoading: _loading,
                 onPressed: _loading ? null : () => _advanceStatus('ARRIVING'),
@@ -911,7 +912,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
           if (_status == 'COMPLETED') ...[
             const SizedBox(height: 12),
             MovaButton(
-              label: 'Nommer ce lieu',
+              label: tr('Nommer ce lieu'),
               isSecondary: true,
               icon: Icons.edit_location_alt_outlined,
               onPressed: () {
@@ -926,7 +927,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             ),
             const SizedBox(height: 12),
             MovaButton(
-              label: 'Chat avec le passager',
+              label: tr('Chat avec le passager'),
               isSecondary: true,
               icon: Icons.chat_bubble_outline,
               onPressed: () {
@@ -949,8 +950,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Total à encaisser (passager)',
+                      Text(
+                        tr('Total à encaisser (passager)'),
                         style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                       ),
                       const SizedBox(height: 4),
@@ -978,9 +979,9 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
               ],
               if (_cashDisputed) ...[
                 MovaCard(
-                  child: const Text(
-                    'Litige : espèces non reçues. Le passager a été notifié et ne peut plus commander tant que ce n’est pas réglé. '
-                    'Ce n’est pas une alerte SOS. Si vous avez finalement reçu l’argent, confirmez ci-dessous pour clôturer ce litige.',
+                  child: Text(
+                    tr('Litige : espèces non reçues. Le passager a été notifié et ne peut plus commander tant que ce n’est pas réglé. '
+                    'Ce n’est pas une alerte SOS. Si vous avez finalement reçu l’argent, confirmez ci-dessous pour clôturer ce litige.'),
                     style: TextStyle(fontSize: 13),
                   ),
                 ),
@@ -995,7 +996,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             ],
             const SizedBox(height: 12),
             MovaButton(
-              label: 'Retour au tableau de bord',
+              label: tr('Retour au tableau de bord'),
               isSecondary: true,
               icon: Icons.home_outlined,
               onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
@@ -1012,9 +1013,9 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     if (_status != 'COMPLETED' || _isPaid) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Cette course n’attend plus d’encaissement espèces (annulée ou déjà réglée).',
+              tr('Cette course n’attend plus d’encaissement espèces (annulée ou déjà réglée).'),
             ),
           ),
         );
@@ -1042,7 +1043,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             return status == 'PENDING' || method == 'CASH';
           }).toList();
           if (pending.isEmpty) {
-            return (ok: false, message: 'Aucun paiement espèces Pool en attente.');
+            return (ok: false, message: tr('Aucun paiement espèces Pool en attente.'));
           }
           for (final p in pending) {
             final bookingId = (p['bookingId'] ?? p['id'])?.toString() ?? '';
@@ -1077,8 +1078,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       _skipCashAutoOpen = true;
       setState(() => _ride = {..._ride, 'cashDisputed': true});
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Litige espèces non reçues enregistré — le passager a été notifié'),
+        SnackBar(
+          content: Text(tr('Litige espèces non reçues enregistré — le passager a été notifié')),
         ),
       );
       await _refreshRide();

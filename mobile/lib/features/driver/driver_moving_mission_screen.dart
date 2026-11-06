@@ -10,6 +10,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../history/history_detail_dialog.dart';
 import '../../core/safety/sos_helper.dart';
 import 'widgets/driver_cash_received_dialog.dart';
+import '../../core/i18n/i18n.dart';
 
 class DriverMovingMissionScreen extends ConsumerStatefulWidget {
   const DriverMovingMissionScreen({
@@ -130,13 +131,13 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
     if (!mounted) return;
     if (dialogResult == CashDialogResult.disputed) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Litige enregistré — le client a été notifié')),
+        SnackBar(content: Text(tr('Litige enregistré — le client a été notifié'))),
       );
       return;
     }
     if (dialogResult != CashDialogResult.confirmed) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Paiement espèces confirmé')),
+      SnackBar(content: Text(tr('Paiement espèces confirmé'))),
     );
     Navigator.pop(context, true);
   }
@@ -147,7 +148,7 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
     if (lat == null || lng == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Coordonnées GPS indisponibles pour la navigation')),
+          SnackBar(content: Text(tr('Coordonnées GPS indisponibles pour la navigation'))),
         );
       }
       return;
@@ -158,7 +159,7 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
     );
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d\'ouvrir Google Maps')),
+        SnackBar(content: Text(tr('Impossible d\'ouvrir Google Maps'))),
       );
     }
   }
@@ -174,8 +175,8 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
   @override
   Widget build(BuildContext context) {
     if (_loading && _moving == null) {
-      return const MovaScreen(
-        title: 'Mission déménagement',
+      return MovaScreen(
+        title: tr('Mission déménagement'),
         scrollable: false,
         child: Center(child: CircularProgressIndicator(color: MovaColors.violet)),
       );
@@ -186,7 +187,7 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
     final volume = _moving?['volumeM3'] ?? widget.initialMission?['volumeM3'];
 
     return MovaScreen(
-      title: 'Mission déménagement',
+      title: tr('Mission déménagement'),
       scrollable: false,
       actions: [
         sosAppBarButton(
@@ -221,10 +222,10 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text('Départ', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  Text(tr('Départ'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                   Text(pickup, style: const TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
-                  Text('Arrivée', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  Text(tr('Arrivée'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                   Text(dropoff, style: const TextStyle(fontWeight: FontWeight.w600)),
                   if (volume != null) ...[
                     const SizedBox(height: 8),
@@ -242,7 +243,7 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Suivi', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(tr('Suivi'), style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   ..._timeline.map((step) {
                     final done = step['done'] == true;
@@ -275,7 +276,7 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
             ],
             if (_status == 'ASSIGNED')
               MovaButton(
-                label: 'Démarrer le déménagement',
+                label: tr('Démarrer le déménagement'),
                 icon: Icons.play_arrow,
                 isLoading: _saving,
                 onPressed: _saving
@@ -284,7 +285,7 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
               ),
             if (_status == 'IN_PROGRESS')
               MovaButton(
-                label: 'Terminer le déménagement',
+                label: tr('Terminer le déménagement'),
                 icon: Icons.check,
                 isLoading: _saving,
                 onPressed: _saving
@@ -294,7 +295,7 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
             if (_status == 'COMPLETED') ...[
               const SizedBox(height: 8),
               MovaButton(
-                label: 'Cash reçu',
+                label: tr('Cash reçu'),
                 isSecondary: true,
                 icon: Icons.payments_outlined,
                 onPressed: _saving ? null : _confirmCash,

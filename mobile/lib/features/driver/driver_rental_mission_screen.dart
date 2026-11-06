@@ -10,6 +10,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/safety/sos_helper.dart';
+import '../../core/i18n/i18n.dart';
 
 List<Map<String, dynamic>> rentalTimelineSteps(String? status) {
   const steps = [
@@ -116,7 +117,7 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
     if (!await launchUrl(uri)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impossible d\'ouvrir l\'appel')),
+          SnackBar(content: Text(tr('Impossible d\'ouvrir l\'appel'))),
         );
       }
     }
@@ -137,8 +138,8 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
   @override
   Widget build(BuildContext context) {
     if (_loading && _inquiry == null) {
-      return const MovaScreen(
-        title: 'Mission location',
+      return MovaScreen(
+        title: tr('Mission location'),
         scrollable: false,
         child: Center(child: CircularProgressIndicator(color: MovaColors.violet)),
       );
@@ -160,7 +161,7 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
     final steps = rentalTimelineSteps(_status);
 
     return MovaScreen(
-      title: 'Mission location',
+      title: tr('Mission location'),
       scrollable: false,
       actions: [
         sosAppBarButton(
@@ -196,11 +197,11 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
                     Text('Période : $period'),
                   ],
                   const SizedBox(height: 8),
-                  Text('Lieu', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  Text(tr('Lieu'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                   Text(pickup, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 3, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 8),
                   MovaButton(
-                    label: 'Navigation vers le lieu',
+                    label: tr('Navigation vers le lieu'),
                     icon: Icons.directions,
                     isSecondary: true,
                     onPressed: () => MapsLauncher.openAddressSearch(pickup),
@@ -216,7 +217,7 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
                   if (contactPhone != null && contactPhone.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     MovaButton(
-                      label: 'Appeler le passager',
+                      label: tr('Appeler le passager'),
                       icon: Icons.phone,
                       onPressed: () => _callPhone(contactPhone),
                     ),
@@ -233,7 +234,7 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Étapes', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(tr('Étapes'), style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   ...steps.map((step) {
                     final done = step['done'] == true;
@@ -258,7 +259,7 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
             const SizedBox(height: 12),
             if (_status == 'CONFIRMED')
               MovaButton(
-                label: 'Remise effectuée → En cours',
+                label: tr('Remise effectuée → En cours'),
                 icon: Icons.directions_car,
                 isLoading: _saving,
                 onPressed: _saving
@@ -267,7 +268,7 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
               ),
             if (_status == 'IN_PROGRESS')
               MovaButton(
-                label: 'Véhicule rendu',
+                label: tr('Véhicule rendu'),
                 icon: Icons.check,
                 isLoading: _saving,
                 onPressed: _saving

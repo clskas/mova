@@ -20,6 +20,7 @@ import '../chat/delivery_chat_screen.dart';
 import 'delivery_live_tracking.dart';
 import 'delivery_payment_state.dart';
 import 'widgets/delivery_tracking_map.dart';
+import '../../core/i18n/i18n.dart';
 
 class ParcelTrackingScreen extends ConsumerStatefulWidget {
   const ParcelTrackingScreen({super.key, required this.parcelId});
@@ -182,7 +183,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Réception confirmée. Le livreur est payé.')),
+          SnackBar(content: Text(tr('Réception confirmée. Le livreur est payé.'))),
         );
         await _load(silent: true);
       case Failure(:final error):
@@ -258,11 +259,11 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Annuler la livraison ?'),
-        content: const Text('La livraison sera annulée si le coursier n\'a pas encore pris en charge le colis.'),
+        title: Text(tr('Annuler la livraison ?')),
+        content: Text(tr('La livraison sera annulée si le coursier n\'a pas encore pris en charge le colis.')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui, annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Oui, annuler'))),
         ],
       ),
     );
@@ -304,7 +305,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
     final pin = _delivery?['deliveryPin']?.toString();
 
     return MovaScreen(
-      title: 'Suivi colis',
+      title: tr('Suivi colis'),
       scrollable: false,
       padding: EdgeInsets.zero,
       actions: [
@@ -320,7 +321,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                       MovaErrorBanner(message: _error!, onRetry: _load),
                       const SizedBox(height: 16),
                       MovaButton(
-                        label: 'Retour',
+                        label: tr('Retour'),
                         isSecondary: true,
                         icon: Icons.arrow_back,
                         onPressed: () => Navigator.pop(context),
@@ -379,18 +380,18 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                               const SizedBox(height: 12),
                             ],
                             if (_escrowPaymentDue && !deliveryIsPaid(_delivery)) ...[
-                              const MovaCard(
+                              MovaCard(
                                 child: Text(
-                                  'Payez maintenant pour sécuriser le montant. Aucun livreur n\'est contacté avant paiement.',
+                                  tr('Payez maintenant pour sécuriser le montant. Aucun livreur n\'est contacté avant paiement.'),
                                   style: TextStyle(fontWeight: FontWeight.w600),
                                 ),
                               ),
                               const SizedBox(height: 12),
                             ],
                             if (_cashSettlementDue && !deliveryIsPaid(_delivery)) ...[
-                              const MovaCard(
+                              MovaCard(
                                 child: Text(
-                                  'Colis livré. Payez le livreur en espèces (ou via l\'app) et communiquez-lui le PIN affiché.',
+                                  tr('Colis livré. Payez le livreur en espèces (ou via l\'app) et communiquez-lui le PIN affiché.'),
                                   style: TextStyle(fontWeight: FontWeight.w600),
                                 ),
                               ),
@@ -419,9 +420,9 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                               const SizedBox(height: 12),
                             ],
                             if (deliveryIsCod(_delivery) && !_cashSettlementDue && !deliveryIsPaid(_delivery)) ...[
-                              const MovaCard(
+                              MovaCard(
                                 child: Text(
-                                  'Livraison non garantie (espèces). SENGA ne bloque pas les fonds — paiement à la remise.',
+                                  tr('Livraison non garantie (espèces). SENGA ne bloque pas les fonds — paiement à la remise.'),
                                   style: TextStyle(fontSize: 13),
                                 ),
                               ),
@@ -429,7 +430,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                             ],
                             if (_canConfirmReceipt) ...[
                               MovaButton(
-                                label: 'J\'ai reçu le colis',
+                                label: tr('J\'ai reçu le colis'),
                                 onPressed: _confirmReceipt,
                               ),
                               const SizedBox(height: 12),
@@ -486,7 +487,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                               ),
                             ],
                             const SizedBox(height: 20),
-                            Text('Statuts', style: Theme.of(context).textTheme.titleSmall),
+                            Text(tr('Statuts'), style: Theme.of(context).textTheme.titleSmall),
                             const SizedBox(height: 12),
                             ..._timeline.map((map) {
                               final done = map['done'] == true;
@@ -554,7 +555,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                           ],
                           if (_canCancel)
                             MovaButton(
-                              label: 'Annuler la livraison',
+                              label: tr('Annuler la livraison'),
                               isSecondary: true,
                               isLoading: _cancelling,
                               icon: Icons.cancel_outlined,
@@ -570,7 +571,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                             const SizedBox(height: 8),
                           ],
                           MovaButton(
-                            label: 'Retour à l\'accueil',
+                            label: tr('Retour à l\'accueil'),
                             isSecondary: true,
                             icon: Icons.home_outlined,
                             onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),

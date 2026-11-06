@@ -14,6 +14,7 @@ import '../../core/error/user_friendly_error.dart';
 import '../../core/widgets/offline_shell.dart';
 import '../../core/wallet/wallet_movements.dart';
 import '../../core/wallet/mobile_money_prompt.dart';
+import '../../core/i18n/i18n.dart';
 
 int _readCdf(dynamic value) {
   if (value is int) return value;
@@ -240,7 +241,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   Future<void> _showWithdrawSheet({bool resumeOtp = false}) async {
     if (_balance < 2300) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Solde insuffisant — montant minimum : 2 300 FC')),
+        SnackBar(content: Text(tr('Solde insuffisant — montant minimum : 2 300 FC'))),
       );
       return;
     }
@@ -464,14 +465,14 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Portefeuille',
+      title: tr('Portefeuille'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           MovaCard(
             child: Column(
               children: [
-                const Text('Solde disponible'),
+                Text(tr('Solde disponible')),
                 const SizedBox(height: 8),
                 Text(
                   _loading ? '…' : MarketConfig.formatCdf(_balance),
@@ -530,15 +531,15 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
             MovaCard(
               child: Column(
                 children: [
-                  const Text(
-                    'Confirmez sur votre téléphone',
+                  Text(
+                    tr('Confirmez sur votre téléphone'),
                     style: TextStyle(fontWeight: FontWeight.w600),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Validez ou annulez le PIN Mobile Money sur le téléphone. '
-                    'Ne relancez pas tout de suite si vous avez appuyé sur Annuler.',
+                  Text(
+                    tr('Validez ou annulez le PIN Mobile Money sur le téléphone. '
+                    'Ne relancez pas tout de suite si vous avez appuyé sur Annuler.'),
                     textAlign: TextAlign.center,
                     style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                   ),
@@ -559,14 +560,14 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                         );
                       }
                     },
-                    child: const Text('Annuler (PIN Cancel)'),
+                    child: Text(tr('Annuler (PIN Cancel)')),
                   ),
                 ],
               ),
             ),
           ],
           const SizedBox(height: 24),
-          Text('Recharger avec', style: Theme.of(context).textTheme.titleMedium),
+          Text(tr('Recharger avec'), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
           if (ref.read(apiClientProvider).isMockMode)
             MovaCard(
@@ -590,13 +591,13 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     child: const Icon(Icons.science_outlined, color: MovaColors.violet),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Recharge test (simulation)', style: TextStyle(fontWeight: FontWeight.w600)),
+                        Text(tr('Recharge test (simulation)'), style: TextStyle(fontWeight: FontWeight.w600)),
                         Text(
-                          '+50 000 FC instantanés (simulation hors production)',
+                          tr('+50 000 FC instantanés (simulation hors production)'),
                           style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                         ),
                       ],
@@ -607,10 +608,10 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               ),
             ),
           if (_topUpProviders.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(bottom: 8),
               child: Text(
-                'Aucun opérateur Mobile Money disponible pour la recharge.',
+                tr('Aucun opérateur Mobile Money disponible pour la recharge.'),
                 style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
               ),
             )
@@ -645,12 +646,12 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Historique', style: Theme.of(context).textTheme.titleMedium),
+              Text(tr('Historique'), style: Theme.of(context).textTheme.titleMedium),
               if (!_loading)
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: _loadWallet,
-                  tooltip: 'Actualiser',
+                  tooltip: tr('Actualiser'),
                 ),
             ],
           ),
@@ -686,10 +687,10 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               child: Center(child: CircularProgressIndicator()),
             )
           else if (_filteredTransactions.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Text(
-                'Aucune opération pour ce filtre',
+                tr('Aucune opération pour ce filtre'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: MovaColors.textSecondary),
               ),
@@ -949,7 +950,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Retirer vers Mobile Money',
+              tr('Retirer vers Mobile Money'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
@@ -958,13 +959,13 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Vous pouvez retirer une partie du solde (minimum : 2 300 FC). Le reste reste sur le portefeuille.',
+            Text(
+              tr('Vous pouvez retirer une partie du solde (minimum : 2 300 FC). Le reste reste sur le portefeuille.'),
               style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'SMS temporairement indisponibles : tous les clients confirment avec le code 000000 (en attendant les crédits SMS).',
+            Text(
+              tr('SMS temporairement indisponibles : tous les clients confirment avec le code 000000 (en attendant les crédits SMS).'),
               style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 16),
@@ -972,8 +973,8 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
               value: _providers.any((p) => p.id == _providerId)
                   ? _providerId
                   : (_providers.isNotEmpty ? _providers.first.id : _providerId),
-              decoration: const InputDecoration(
-                labelText: 'Opérateur',
+              decoration: InputDecoration(
+                labelText: tr('Opérateur'),
                 prefixIcon: Icon(Icons.account_balance_wallet_outlined),
               ),
               items: _providers
@@ -991,8 +992,8 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
               enabled: !_otpSent,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: 'Montant (FC)',
-                helperText: 'Minimum : 2 300 FC — pas besoin de vider tout le solde',
+                labelText: tr('Montant (FC)'),
+                helperText: tr('Minimum : 2 300 FC — pas besoin de vider tout le solde'),
                 prefixIcon: const Icon(Icons.payments_outlined),
                 suffixIcon: !_otpSent && widget.maxAmount >= 2300
                     ? TextButton(
@@ -1000,7 +1001,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
                           _amountController.text = '${widget.maxAmount}';
                           _formError = null;
                         }),
-                        child: const Text('Tout'),
+                        child: Text(tr('Tout')),
                       )
                     : null,
               ),
@@ -1010,8 +1011,8 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
               controller: _phoneController,
               enabled: !_otpSent,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Numéro Mobile Money',
+              decoration: InputDecoration(
+                labelText: tr('Numéro Mobile Money'),
                 prefixIcon: Icon(Icons.phone_outlined),
               ),
             ),
@@ -1029,8 +1030,8 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
               enabled: !_otpLoading,
               keyboardType: TextInputType.number,
               maxLength: 6,
-              decoration: const InputDecoration(
-                labelText: 'Code à 6 chiffres',
+              decoration: InputDecoration(
+                labelText: tr('Code à 6 chiffres'),
                 prefixIcon: Icon(Icons.pin_outlined),
                 counterText: '',
               ),
@@ -1046,7 +1047,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
                           _otpController.clear();
                           _formError = null;
                         }),
-                child: const Text('Renvoyer le code / modifier le numéro'),
+                child: Text(tr('Renvoyer le code / modifier le numéro')),
               ),
             if (_formError != null) ...[
               const SizedBox(height: 12),
@@ -1113,7 +1114,7 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
     final amount = int.tryParse(_amountController.text.trim()) ?? 0;
     if (amount < 2300) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Montant minimum : 2 300 FC')),
+        SnackBar(content: Text(tr('Montant minimum : 2 300 FC'))),
       );
       return;
     }
@@ -1159,7 +1160,7 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
               controller: _amountController,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: 'Montant (FC)',
+                labelText: tr('Montant (FC)'),
                 helperText: MarketConfig.minWalletAmountLabel,
                 prefixIcon: const Icon(Icons.payments_outlined),
               ),
@@ -1168,14 +1169,14 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
             TextField(
               controller: _phoneController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Numéro mobile money',
+              decoration: InputDecoration(
+                labelText: tr('Numéro mobile money'),
                 prefixIcon: Icon(Icons.phone_outlined),
               ),
             ),
             const SizedBox(height: 20),
             MovaButton(
-              label: 'Confirmer la recharge',
+              label: tr('Confirmer la recharge'),
               icon: Icons.check,
               onPressed: _confirm,
             ),

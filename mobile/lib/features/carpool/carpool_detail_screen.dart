@@ -14,6 +14,7 @@ import '../booking/payment_screen.dart';
 import '../booking/widgets/mova_ride_map.dart';
 import 'carpool_contact.dart';
 import 'carpool_join_confirmation_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 enum CarpoolViewerRole { guest, driver, passenger }
 
@@ -176,7 +177,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Trajet démarré')),
+          SnackBar(content: Text(tr('Trajet démarré'))),
         );
         _loadTrip();
       case Failure(:final error):
@@ -193,7 +194,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Trajet terminé — paiement en cours')),
+          SnackBar(content: Text(tr('Trajet terminé — paiement en cours'))),
         );
         _loadTrip();
       case Failure(:final error):
@@ -215,7 +216,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
       case Success():
         setState(() => _rated = true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Merci pour votre évaluation')),
+          SnackBar(content: Text(tr('Merci pour votre évaluation'))),
         );
       case Failure(:final error):
         setState(() => _error = error.message);
@@ -334,8 +335,8 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                             color: MovaColors.green.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Text(
-                            'KYC',
+                          child: Text(
+                            tr('KYC'),
                             style: TextStyle(color: MovaColors.green, fontSize: 11, fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -349,11 +350,11 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                         color: Colors.red.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
                           Icon(Icons.cancel_outlined, color: Colors.red, size: 20),
                           SizedBox(width: 8),
-                          Expanded(child: Text('Trajet annulé', style: TextStyle(color: Colors.red))),
+                          Expanded(child: Text(tr('Trajet annulé'), style: TextStyle(color: Colors.red))),
                         ],
                       ),
                     )
@@ -424,13 +425,13 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                             ),
                         ],
                         if (trip['ladiesOnly'] == true)
-                          const Padding(
+                          Padding(
                             padding: EdgeInsets.only(top: 8),
                             child: Row(
                               children: [
                                 Icon(Icons.female, size: 16, color: MovaColors.violet),
                                 SizedBox(width: 4),
-                                Text('Femmes uniquement'),
+                                Text(tr('Femmes uniquement')),
                               ],
                             ),
                           ),
@@ -439,7 +440,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                   ),
                   if ((trip['passengers'] as List?)?.isNotEmpty == true) ...[
                     const SizedBox(height: 16),
-                    Text('Passagers', style: Theme.of(context).textTheme.titleSmall),
+                    Text(tr('Passagers'), style: Theme.of(context).textTheme.titleSmall),
                     const SizedBox(height: 8),
                     ...((trip['passengers'] as List).cast<Map<String, dynamic>>()).map(
                       (p) => ListTile(
@@ -452,11 +453,11 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                   ],
                   if (_isDriver && (_canStart || _canComplete)) ...[
                     const SizedBox(height: 16),
-                    Text('Actions conducteur', style: Theme.of(context).textTheme.titleSmall),
+                    Text(tr('Actions conducteur'), style: Theme.of(context).textTheme.titleSmall),
                     const SizedBox(height: 8),
                     if (_canStart)
                       MovaButton(
-                        label: 'Démarrer le trajet',
+                        label: tr('Démarrer le trajet'),
                         icon: Icons.play_arrow,
                         isLoading: _actionLoading,
                         onPressed: _startTrip,
@@ -464,7 +465,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                     if (_canComplete) ...[
                       if (_canStart) const SizedBox(height: 8),
                       MovaButton(
-                        label: 'Terminer le trajet',
+                        label: tr('Terminer le trajet'),
                         icon: Icons.flag,
                         isLoading: _actionLoading,
                         onPressed: _completeTrip,
@@ -474,7 +475,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                   if (_canPay) ...[
                     const SizedBox(height: 16),
                     MovaButton(
-                      label: 'Payer ma place',
+                      label: tr('Payer ma place'),
                       icon: Icons.payment_outlined,
                       isLoading: _actionLoading,
                       onPressed: _openPayment,
@@ -482,7 +483,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                   ],
                   if (_canRate) ...[
                     const SizedBox(height: 16),
-                    Text('Évaluer le conducteur', style: Theme.of(context).textTheme.titleSmall),
+                    Text(tr('Évaluer le conducteur'), style: Theme.of(context).textTheme.titleSmall),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -501,27 +502,27 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                     TextField(
                       controller: _rateCommentController,
                       maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: 'Commentaire (optionnel)',
-                        hintText: 'Comment s\'est passé le trajet ?',
+                      decoration: InputDecoration(
+                        labelText: tr('Commentaire (optionnel)'),
+                        hintText: tr('Comment s\'est passé le trajet ?'),
                       ),
                     ),
                     const SizedBox(height: 8),
                     MovaButton(
-                      label: 'Envoyer l\'évaluation',
+                      label: tr('Envoyer l\'évaluation'),
                       icon: Icons.rate_review_outlined,
                       isLoading: _actionLoading,
                       onPressed: _rateTrip,
                     ),
                   ],
                   if (_rated)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.only(top: 16),
                       child: Row(
                         children: [
                           Icon(Icons.check_circle, color: MovaColors.green, size: 20),
                           SizedBox(width: 8),
-                          Text('Évaluation envoyée', style: TextStyle(color: MovaColors.green)),
+                          Text(tr('Évaluation envoyée'), style: TextStyle(color: MovaColors.green)),
                         ],
                       ),
                     ),
@@ -529,7 +530,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                   if (showBook) ...[
                     Row(
                       children: [
-                        const Text('Places :'),
+                        Text(tr('Places :')),
                         const SizedBox(width: 12),
                         DropdownButton<int>(
                           value: _bookSeats.clamp(1, seatsLeft),
@@ -542,7 +543,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                       ],
                     ),
                     MovaButton(
-                      label: 'Réserver',
+                      label: tr('Réserver'),
                       icon: Icons.event_seat,
                       isLoading: _actionLoading,
                       onPressed: _book,

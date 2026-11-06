@@ -13,6 +13,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../booking/payment_screen.dart';
 import '../billing/receipt_screen.dart';
 import '../chat/rental_chat_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 class RentalBookingDetailScreen extends ConsumerStatefulWidget {
   const RentalBookingDetailScreen({
@@ -89,7 +90,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
   Future<void> _callOwner(String? phone) async {
     if (phone == null || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Numéro propriétaire indisponible')),
+        SnackBar(content: Text(tr('Numéro propriétaire indisponible'))),
       );
       return;
     }
@@ -103,13 +104,13 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirmer la réception'),
-        content: const Text(
-          'Confirmez-vous avoir reçu le véhicule ? La location passera au statut « En cours ».',
+        title: Text(tr('Confirmer la réception')),
+        content: Text(
+          tr('Confirmez-vous avoir reçu le véhicule ? La location passera au statut « En cours ».'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui, j\'ai reçu le véhicule')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Oui, j\'ai reçu le véhicule'))),
         ],
       ),
     );
@@ -130,7 +131,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
           _error = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location démarrée — bon voyage !')),
+          SnackBar(content: Text(tr('Location démarrée — bon voyage !'))),
         );
       case Failure(:final error):
         setState(() => _error = error.message);
@@ -146,7 +147,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Réservation annulée')),
+          SnackBar(content: Text(tr('Réservation annulée'))),
         );
         Navigator.pop(context, true);
       case Failure(:final error):
@@ -194,12 +195,12 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
     final vehicle = b?['vehicle'] as Map<String, dynamic>?;
 
     if (_loading && b == null) {
-      return const MovaScreen(title: 'Réservation', child: Center(child: CircularProgressIndicator()));
+      return MovaScreen(title: tr('Réservation'), child: Center(child: CircularProgressIndicator()));
     }
 
     if (b == null) {
       return MovaScreen(
-        title: 'Réservation',
+        title: tr('Réservation'),
         child: MovaErrorBanner(message: _error ?? 'Réservation introuvable', onRetry: _loadBooking),
       );
     }
@@ -225,7 +226,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
     };
 
     return MovaScreen(
-      title: 'Ma location',
+      title: tr('Ma location'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -242,7 +243,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
           ),
           const SizedBox(height: 4),
           Text(
-            'Réservation à la journée/semaine — distincte des courses VTC instantanées.',
+            tr('Réservation à la journée/semaine — distincte des courses VTC instantanées.'),
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
           ),
@@ -301,7 +302,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
             ),
           ),
           const SizedBox(height: 20),
-          Text('Suivi de la réservation', style: theme.textTheme.titleSmall),
+          Text(tr('Suivi de la réservation'), style: theme.textTheme.titleSmall),
           const SizedBox(height: 12),
           _timeline(b['timeline'] as List?),
           if (b['nextStepHint'] != null) ...[
@@ -352,7 +353,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
                 );
               },
               icon: const Icon(Icons.chat_bubble_outline),
-              label: const Text('Contacter le loueur'),
+              label: Text(tr('Contacter le loueur')),
             ),
           ],
           if (escrowHeld && !isPaid && status != 'PAID') ...[
@@ -371,7 +372,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Prépayé — montant sécurisé jusqu\'au retour du véhicule.',
+                      tr('Prépayé — montant sécurisé jusqu\'au retour du véhicule.'),
                       style: theme.textTheme.bodySmall,
                     ),
                   ),
@@ -382,7 +383,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
           if (canConfirmHandover) ...[
             const SizedBox(height: 16),
             MovaButton(
-              label: 'J\'ai reçu le véhicule',
+              label: tr('J\'ai reçu le véhicule'),
               icon: Icons.key_outlined,
               onPressed: _actionLoading ? null : _confirmHandover,
             ),
@@ -410,7 +411,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
           if (isPaid) ...[
             const SizedBox(height: 16),
             MovaButton(
-              label: 'Voir le reçu',
+              label: tr('Voir le reçu'),
               icon: Icons.receipt_long_outlined,
               onPressed: () {
                 Navigator.push(
@@ -431,7 +432,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
           ],
           const SizedBox(height: 24),
           MovaButton(
-            label: 'Retour aux locations',
+            label: tr('Retour aux locations'),
             icon: Icons.directions_car_outlined,
             onPressed: () => Navigator.pop(context, true),
           ),
@@ -439,7 +440,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
           if (canCancel)
             TextButton(
               onPressed: _actionLoading ? null : _cancel,
-              child: const Text('Annuler la réservation'),
+              child: Text(tr('Annuler la réservation')),
             ),
         ],
       ),

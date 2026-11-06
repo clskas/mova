@@ -13,6 +13,7 @@ import '../../widgets/promo_code_field.dart';
 import 'rental_addons.dart';
 import 'rental_booking_detail_screen.dart';
 import 'rental_quote_estimator.dart';
+import '../../core/i18n/i18n.dart';
 
 class RentalDetailScreen extends ConsumerStatefulWidget {
   const RentalDetailScreen({
@@ -398,14 +399,14 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Aperçu du devis', style: TextStyle(fontWeight: FontWeight.w600)),
+          Text(tr('Aperçu du devis'), style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           ...lines,
           const Divider(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Sous-total'),
+              Text(tr('Sous-total')),
               Text(MarketConfig.formatCdf(estimate.subtotalCdf), style: const TextStyle(fontWeight: FontWeight.w600)),
             ],
           ),
@@ -413,7 +414,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Caution (restituée)', style: TextStyle(color: MovaColors.textSecondary, fontSize: 12)),
+              Text(tr('Caution (restituée)'), style: TextStyle(color: MovaColors.textSecondary, fontSize: 12)),
               Text(
                 MarketConfig.formatCdf(estimate.depositCdf),
                 style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
@@ -424,7 +425,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Total estimé', style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(tr('Total estimé'), style: TextStyle(fontWeight: FontWeight.w700)),
               Text(
                 MarketConfig.formatCdf(estimate.totalCdf),
                 style: const TextStyle(fontWeight: FontWeight.w700, color: MovaColors.green, fontSize: 18),
@@ -463,12 +464,12 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
     final v = _vehicle;
 
     if (_loading) {
-      return const MovaScreen(title: 'Détail véhicule', child: Center(child: CircularProgressIndicator()));
+      return MovaScreen(title: tr('Détail véhicule'), child: Center(child: CircularProgressIndicator()));
     }
 
     if (v == null) {
       return MovaScreen(
-        title: 'Détail véhicule',
+        title: tr('Détail véhicule'),
         child: MovaErrorBanner(message: _error ?? 'Véhicule introuvable', onRetry: _loadVehicle),
       );
     }
@@ -489,13 +490,13 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               color: MovaColors.violet.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Icon(Icons.date_range, size: 18, color: MovaColors.violet),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Location longue durée (jours/semaines) — pas une course VTC à la demande.',
+                    tr('Location longue durée (jours/semaines) — pas une course VTC à la demande.'),
                     style: TextStyle(fontSize: 12, color: MovaColors.violet),
                   ),
                 ),
@@ -560,8 +561,14 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
           ),
           if (_step == 0) ...[
             const SizedBox(height: 16),
+            if ((v['description']?.toString().trim() ?? '').isNotEmpty) ...[
+              Text(tr('Description'), style: theme.textTheme.titleSmall),
+              const SizedBox(height: 4),
+              Text(v['description'].toString().trim(), style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 12),
+            ],
             if (features.isNotEmpty) ...[
-              Text('Équipements', style: theme.textTheme.titleSmall),
+              Text(tr('Équipements'), style: theme.textTheme.titleSmall),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -570,14 +577,14 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               ),
             ],
             const SizedBox(height: 12),
-            Text('Politique d\'annulation', style: theme.textTheme.titleSmall),
+            Text(tr('Politique d\'annulation'), style: theme.textTheme.titleSmall),
             Text(
               v['cancellationPolicy']?.toString() ?? '',
               style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
             ),
             const SizedBox(height: 24),
             MovaButton(
-              label: 'Configurer la location',
+              label: tr('Configurer la location'),
               icon: Icons.tune_outlined,
               onPressed: () => setState(() {
                 _ensureRentalPeriod();
@@ -587,7 +594,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
           ],
           if (_step >= 1) ...[
             const Divider(height: 24),
-            Text('Dates', style: theme.textTheme.titleSmall),
+            Text(tr('Dates'), style: theme.textTheme.titleSmall),
             Row(
               children: [
                 Expanded(
@@ -596,7 +603,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Prise en charge', style: theme.textTheme.labelMedium),
+                        Text(tr('Prise en charge'), style: theme.textTheme.labelMedium),
                         Text(_formatRentalDateTime(_startDate)),
                       ],
                     ),
@@ -609,7 +616,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Retour', style: theme.textTheme.labelMedium),
+                        Text(tr('Retour'), style: theme.textTheme.labelMedium),
                         Text(_formatRentalDateTime(_endDate)),
                       ],
                     ),
@@ -620,7 +627,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               value: _pickupCity,
-              decoration: const InputDecoration(labelText: 'Ville de prise en charge'),
+              decoration: InputDecoration(labelText: tr('Ville de prise en charge')),
               items: ServiceAreas.cityNames
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                   .toList(),
@@ -640,7 +647,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: _returnCity,
-              decoration: const InputDecoration(labelText: 'Ville de retour'),
+              decoration: InputDecoration(labelText: tr('Ville de retour')),
               items: ServiceAreas.cityNames
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                   .toList(),
@@ -658,8 +665,8 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               width: double.infinity,
               child: SegmentedButton<String>(
                 segments: [
-                  const ButtonSegment(value: 'HOURLY', label: Text('Heure')),
-                  const ButtonSegment(value: 'DAILY', label: Text('Journée')),
+                  ButtonSegment(value: 'HOURLY', label: Text(tr('Heure'))),
+                  ButtonSegment(value: 'DAILY', label: Text(tr('Journée'))),
                   if (_weeklyEligible)
                     ButtonSegment(
                       value: 'WEEKLY',
@@ -682,7 +689,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.violet),
               ),
             const SizedBox(height: 12),
-            Text('Assurance', style: theme.textTheme.titleSmall),
+            Text(tr('Assurance'), style: theme.textTheme.titleSmall),
             ...['BASIC', 'STANDARD', 'PREMIUM'].map((tier) {
               final fee = preview?.insuranceFeeByTier[tier] ?? 0;
               return RadioListTile<String>(
@@ -702,7 +709,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 }),
               );
             }),
-            Text('Kilométrage', style: theme.textTheme.titleSmall),
+            Text(tr('Kilométrage'), style: theme.textTheme.titleSmall),
             SizedBox(
               width: double.infinity,
               child: SegmentedButton<String>(
@@ -729,7 +736,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  'Forfait limité inclus dans le tarif de base',
+                  tr('Forfait limité inclus dans le tarif de base'),
                   style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
                 ),
               ),
@@ -742,9 +749,9 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 ),
               ),
             const SizedBox(height: 8),
-            Text('Options', style: theme.textTheme.titleSmall),
+            Text(tr('Options'), style: theme.textTheme.titleSmall),
             CheckboxListTile(
-              title: const Text('Siège enfant'),
+              title: Text(tr('Siège enfant')),
               subtitle: _childSeat
                   ? Text(
                       '+${MarketConfig.formatCdf(RentalQuoteEstimator.addOnPrices['childSeat']!)}',
@@ -762,22 +769,22 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             if (_gpsBuiltIn)
               ListTile(
                 leading: const Icon(Icons.gps_fixed, color: MovaColors.green),
-                title: const Text('GPS'),
-                subtitle: const Text(
-                  'Inclus — équipement intégré au véhicule',
+                title: Text(tr('GPS')),
+                subtitle: Text(
+                  tr('Inclus — équipement intégré au véhicule'),
                   style: TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600),
                 ),
                 contentPadding: EdgeInsets.zero,
               )
             else
               CheckboxListTile(
-                title: const Text('GPS'),
+                title: Text(tr('GPS')),
                 subtitle: _gps
                     ? Text(
                         '+${MarketConfig.formatCdf(RentalQuoteEstimator.addOnPrices['gps']!)}',
                         style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600),
                       )
-                    : const Text('Boîtier portable ou service navigation'),
+                    : Text(tr('Boîtier portable ou service navigation')),
                 value: _gps,
                 onChanged: (v) => setState(() {
                   _gps = v ?? false;
@@ -787,7 +794,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
             CheckboxListTile(
-              title: const Text('Conducteur supplémentaire'),
+              title: Text(tr('Conducteur supplémentaire')),
               subtitle: _extraDriver
                   ? Text(
                       '+${MarketConfig.formatCdf(RentalQuoteEstimator.addOnPrices['extraDriver']!)}',
@@ -803,23 +810,23 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               contentPadding: EdgeInsets.zero,
             ),
             const SizedBox(height: 8),
-            Text('Remise du véhicule', style: theme.textTheme.titleSmall),
+            Text(tr('Remise du véhicule'), style: theme.textTheme.titleSmall),
             RadioListTile<String>(
-              title: const Text('Je récupère le véhicule moi-même'),
+              title: Text(tr('Je récupère le véhicule moi-même')),
               value: 'SELF_PASSENGER',
               groupValue: _logisticsMode,
               onChanged: (v) => setState(() => _logisticsMode = v!),
               contentPadding: EdgeInsets.zero,
             ),
             RadioListTile<String>(
-              title: const Text('Mon chauffeur s\'occupe du transport'),
+              title: Text(tr('Mon chauffeur s\'occupe du transport')),
               value: 'PASSENGER_DRIVER',
               groupValue: _logisticsMode,
               onChanged: (v) => setState(() => _logisticsMode = v!),
               contentPadding: EdgeInsets.zero,
             ),
             RadioListTile<String>(
-              title: const Text('Livraison par un chauffeur SENGA'),
+              title: Text(tr('Livraison par un chauffeur SENGA')),
               value: 'MOVA_DRIVER',
               groupValue: _logisticsMode,
               onChanged: (v) => setState(() => _logisticsMode = v!),
@@ -828,31 +835,31 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             if (_logisticsMode == 'PASSENGER_DRIVER') ...[
               TextField(
                 controller: _passengerDriverNameController,
-                decoration: const InputDecoration(labelText: 'Nom du chauffeur (optionnel)'),
+                decoration: InputDecoration(labelText: tr('Nom du chauffeur (optionnel)')),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _passengerDriverPhoneController,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Téléphone du chauffeur *'),
+                decoration: InputDecoration(labelText: tr('Téléphone du chauffeur *')),
               ),
             ],
             if (_step == 2) ...[
               TextField(
                 controller: _pickupController,
-                decoration: const InputDecoration(labelText: 'Adresse de prise en charge'),
+                decoration: InputDecoration(labelText: tr('Adresse de prise en charge')),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Téléphone'),
+                decoration: InputDecoration(labelText: tr('Téléphone')),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _notesController,
                 maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Notes (optionnel)'),
+                decoration: InputDecoration(labelText: tr('Notes (optionnel)')),
               ),
             ],
             if (_quote != null) ...[
@@ -861,7 +868,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total estimé', style: theme.textTheme.titleSmall),
+                    Text(tr('Total estimé'), style: theme.textTheme.titleSmall),
                     Text(
                       MarketConfig.formatCdf(_quote!['totalCdf'] as int? ?? 0),
                       style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: MovaColors.green),

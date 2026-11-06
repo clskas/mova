@@ -7,6 +7,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'carpool_contact.dart';
+import '../../core/i18n/i18n.dart';
 
 class CarpoolJoinConfirmationScreen extends ConsumerStatefulWidget {
   const CarpoolJoinConfirmationScreen({
@@ -86,14 +87,14 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
     final departure = _formatDeparture(widget.departureAt);
 
     return MovaScreen(
-      title: 'Réservation confirmée',
+      title: tr('Réservation confirmée'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Icon(Icons.check_circle, color: MovaColors.green, size: 72),
           const SizedBox(height: 16),
-          const Text(
-            'Vous avez rejoint le trajet',
+          Text(
+            tr('Vous avez rejoint le trajet'),
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
@@ -129,7 +130,7 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
             MovaErrorBanner(message: _error!, onRetry: _loadTrip),
           ],
           const SizedBox(height: 20),
-          Text('Passagers', style: Theme.of(context).textTheme.titleSmall),
+          Text(tr('Passagers'), style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           if (_loading)
             const Padding(
@@ -137,8 +138,8 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
               child: Center(child: CircularProgressIndicator()),
             )
           else if (_passengers.isEmpty)
-            const Text(
-              'Vous êtes le premier passager inscrit.',
+            Text(
+              tr('Vous êtes le premier passager inscrit.'),
               style: TextStyle(color: MovaColors.textSecondary),
             )
           else
@@ -174,7 +175,7 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
           ),
           const SizedBox(height: 12),
           MovaButton(
-            label: 'Retour à l\'accueil',
+            label: tr('Retour à l\'accueil'),
             icon: Icons.home_outlined,
             onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
           ),

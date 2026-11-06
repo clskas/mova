@@ -12,6 +12,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Paiement de la dette espèces au guichet SENGA : code à 6 chiffres + QR pour validation admin.
 class CashDebtCashPaymentScreen extends ConsumerStatefulWidget {
@@ -113,7 +114,7 @@ class _CashDebtCashPaymentScreenState extends ConsumerState<CashDebtCashPaymentS
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Payer en espèces',
+      title: tr('Payer en espèces'),
       child: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -122,14 +123,14 @@ class _CashDebtCashPaymentScreenState extends ConsumerState<CashDebtCashPaymentS
                   children: [
                     MovaErrorBanner(message: _error!, onRetry: _createRequest),
                     const SizedBox(height: 16),
-                    MovaButton(label: 'Retour', isSecondary: true, onPressed: () => Navigator.pop(context)),
+                    MovaButton(label: tr('Retour'), isSecondary: true, onPressed: () => Navigator.pop(context)),
                   ],
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'Présentez ce code au guichet SENGA après avoir remis l\'argent en espèces.',
+                    Text(
+                      tr('Présentez ce code au guichet SENGA après avoir remis l\'argent en espèces.'),
                       style: TextStyle(color: MovaColors.textSecondary, height: 1.4),
                     ),
                     const SizedBox(height: 16),
@@ -187,24 +188,24 @@ class _CashDebtCashPaymentScreenState extends ConsumerState<CashDebtCashPaymentS
                             onPressed: () {
                               Clipboard.setData(ClipboardData(text: _code));
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Code copié')),
+                                SnackBar(content: Text(tr('Code copié'))),
                               );
                             },
                             icon: const Icon(Icons.copy, size: 18),
-                            label: const Text('Copier le code'),
+                            label: Text(tr('Copier le code')),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'En attente de validation par l\'équipe SENGA… Vous serez notifié dès que le paiement est confirmé.',
+                    Text(
+                      tr('En attente de validation par l\'équipe SENGA… Vous serez notifié dès que le paiement est confirmé.'),
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 13, color: MovaColors.textSecondary, height: 1.4),
                     ),
                     const SizedBox(height: 24),
                     MovaButton(
-                      label: 'Actualiser',
+                      label: tr('Actualiser'),
                       isSecondary: true,
                       onPressed: _checkStatus,
                     ),

@@ -7,6 +7,7 @@ import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../../core/safety/sos_helper.dart';
 import 'driver_onboarding_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 class KycScreen extends ConsumerWidget {
   const KycScreen({super.key});
@@ -33,7 +34,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     final desc = _descController.text.trim();
     if (desc.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Décrivez la situation')),
+        SnackBar(content: Text(tr('Décrivez la situation'))),
       );
       return;
     }
@@ -60,7 +61,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Incident signalé')),
+          SnackBar(content: Text(tr('Incident signalé'))),
         );
         Navigator.pop(context);
       case Failure(:final error):
@@ -79,15 +80,15 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Signaler un incident',
+      title: tr('Signaler un incident'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           DropdownButtonFormField<String>(
             value: _type,
-            decoration: const InputDecoration(labelText: 'Type'),
-            items: const [
-              DropdownMenuItem(value: 'SOS', child: Text('SOS — urgence')),
+            decoration: InputDecoration(labelText: tr('Type')),
+            items: [
+              DropdownMenuItem(value: 'SOS', child: Text(tr('SOS — urgence'))),
               DropdownMenuItem(value: 'ACCIDENT', child: Text('Accident')),
               DropdownMenuItem(value: 'HARASSMENT', child: Text('Harcèlement')),
               DropdownMenuItem(value: 'OTHER', child: Text('Autre')),
@@ -97,7 +98,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           if (_type == 'SOS') ...[
             const SizedBox(height: 8),
             Text(
-              'Urgence : votre position GPS sera envoyée à l\'équipe SENGA (SMS + admin).',
+              tr('Urgence : votre position GPS sera envoyée à l\'équipe SENGA (SMS + admin).'),
               style: TextStyle(fontSize: 13, color: MovaColors.red.withValues(alpha: 0.9)),
             ),
           ],
@@ -105,7 +106,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           TextField(
             controller: _descController,
             maxLines: 4,
-            decoration: const InputDecoration(labelText: 'Description'),
+            decoration: InputDecoration(labelText: tr('Description')),
           ),
           const SizedBox(height: 16),
           MovaButton(

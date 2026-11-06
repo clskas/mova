@@ -27,6 +27,7 @@ import '../../widgets/promo_code_field.dart';
 import '../booking/widgets/mova_ride_map.dart';
 import '../booking/payment_screen.dart';
 import 'parcel_tracking_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 const _weightCategories = [
   ('DOCUMENTS', 'Documents', 'Enveloppe, dossier'),
@@ -391,7 +392,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Prendre une photo'),
+              title: Text(tr('Prendre une photo')),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickPhoto(ImageSource.camera);
@@ -399,7 +400,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Galerie'),
+              title: Text(tr('Galerie')),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickPhoto(ImageSource.gallery);
@@ -408,7 +409,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
             if (_photoFile != null)
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: MovaColors.orange),
-                title: const Text('Supprimer la photo'),
+                title: Text(tr('Supprimer la photo')),
                 onTap: () {
                   Navigator.pop(ctx);
                   setState(() => _photoFile = null);
@@ -544,7 +545,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     final autocompleteCity = _autocompleteCity;
 
     return MovaScreen(
-      title: 'Livraison colis',
+      title: tr('Livraison colis'),
       scrollable: false,
       padding: EdgeInsets.zero,
       child: MovaMapFormLayout(
@@ -572,14 +573,14 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                     userCatalog: _userCatalog,
                     proximityLat: _pickup.latitude,
                     proximityLng: _pickup.longitude,
-                    label: 'Adresse d\'enlèvement',
+                    label: tr('Adresse d\'enlèvement'),
                     hint: 'Ma position ou nom du lieu',
                     prefixIcon: Icons.upload_outlined,
                     onUserInput: _onPickupUserInput,
                     onSelected: _selectPickupSuggestion,
                     suffixIcon: IconButton(
                       icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
-                      tooltip: 'Ma position',
+                      tooltip: tr('Ma position'),
                       onPressed: _loadingGps ? null : _useMyLocation,
                     ),
                   ),
@@ -590,7 +591,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                     city: autocompleteCity,
                     proximityLat: _pickup.latitude,
                     proximityLng: _pickup.longitude,
-                    label: 'Adresse de livraison',
+                    label: tr('Adresse de livraison'),
                     hint: 'Ex: Gombe, chez Mama X, ou pin sur la carte',
                     prefixIcon: Icons.place_outlined,
                     userCatalog: _userCatalog,
@@ -599,7 +600,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                     onSelected: _selectSuggestion,
                     suffixIcon: IconButton(
                       icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
-                      tooltip: 'Ma position',
+                      tooltip: tr('Ma position'),
                       onPressed: _loadingDropoffGps ? null : _useMyLocationForDropoff,
                     ),
                   ),
@@ -609,7 +610,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                     onApply: _setDropoffFromCoords,
                   ),
                   const SizedBox(height: 16),
-                  Text('Catégorie de poids', style: theme.textTheme.titleSmall),
+                  Text(tr('Catégorie de poids'), style: theme.textTheme.titleSmall),
                   const SizedBox(height: 4),
                   ..._weightCategories.map((cat) {
                     return RadioListTile<String>(

@@ -25,6 +25,7 @@ import '../delivery/delivery_payment_state.dart';
 import 'widgets/driver_cash_pin_dialog.dart';
 import 'widgets/driver_cash_received_dialog.dart';
 import '../../core/location/location_permission.dart';
+import '../../core/i18n/i18n.dart';
 
 class ActiveDeliveryScreen extends ConsumerStatefulWidget {
   const ActiveDeliveryScreen({
@@ -310,7 +311,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   Future<void> _completeErrandWithPurchase() async {
     if (_delivery['proofPhotoUrl'] == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ajoutez d\'abord une photo preuve d\'achat.')),
+        SnackBar(content: Text(tr('Ajoutez d\'abord une photo preuve d\'achat.'))),
       );
       return;
     }
@@ -323,8 +324,8 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     final api = ref.read(apiClientProvider);
     final pin = await DriverCashPinDialog.show(
       context,
-      title: 'PIN destinataire',
-      label: 'Code PIN du demandeur',
+      title: tr('PIN destinataire'),
+      label: tr('Code PIN du demandeur'),
       validate: (enteredPin) async {
         final result = await api.patch('/errands/$_deliveryId/driver-status', {
           'status': 'COMPLETED',
@@ -341,7 +342,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     await _refresh();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Courses terminées — fonds libérés après PIN')),
+      SnackBar(content: Text(tr('Courses terminées — fonds libérés après PIN'))),
     );
   }
 
@@ -368,7 +369,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
               _delivery = data['errand'] as Map<String, dynamic>? ?? data;
             });
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Photo preuve enregistrée')),
+              SnackBar(content: Text(tr('Photo preuve enregistrée'))),
             );
           case Failure(:final error):
             setState(() => _error = error.message);
@@ -390,8 +391,8 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       final api = ref.read(apiClientProvider);
       final pin = await DriverCashPinDialog.show(
         context,
-        title: 'Confirmer la livraison',
-        label: 'Code PIN du destinataire',
+        title: tr('Confirmer la livraison'),
+        label: tr('Code PIN du destinataire'),
         validate: (enteredPin) async {
           final result = await api.updateDeliveryStatus(
             _deliveryId,
@@ -409,7 +410,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       await _refresh();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Livraison terminée')),
+        SnackBar(content: Text(tr('Livraison terminée'))),
       );
       return;
     }
@@ -448,9 +449,9 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     if (!_awaitingCashConfirm) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Cette livraison n’attend plus d’encaissement espèces (annulée ou déjà réglée).',
+              tr('Cette livraison n’attend plus d’encaissement espèces (annulée ou déjà réglée).'),
             ),
           ),
         );
@@ -499,14 +500,14 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       _skipNextCashAutoOpen = true;
       setState(() => _delivery = {..._delivery, 'cashDisputed': true});
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Litige enregistré — le client a été notifié')),
+        SnackBar(content: Text(tr('Litige enregistré — le client a été notifié'))),
       );
       await _refresh();
       return;
     }
     if (dialogResult != CashDialogResult.confirmed) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Paiement espèces confirmé')),
+      SnackBar(content: Text(tr('Paiement espèces confirmé'))),
     );
     await _refresh();
     if (!auto && mounted) Navigator.pop(context, true);
@@ -575,7 +576,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     if (lat == null || lng == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Coordonnées GPS indisponibles pour la navigation')),
+          SnackBar(content: Text(tr('Coordonnées GPS indisponibles pour la navigation'))),
         );
       }
       return;
@@ -586,7 +587,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     );
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d\'ouvrir Google Maps')),
+        SnackBar(content: Text(tr('Impossible d\'ouvrir Google Maps'))),
       );
     }
   }
@@ -624,14 +625,14 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Livraison active',
+      title: tr('Livraison active'),
       scrollable: false,
       actions: [
         sosAppBarButton(
           onPressed: _deliveryId.isEmpty
               ? () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Livraison introuvable — réessayez')),
+                    SnackBar(content: Text(tr('Livraison introuvable — réessayez'))),
                   );
                 }
               : () => triggerSosAlert(
@@ -649,7 +650,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
             kind: _isErrand ? 'errand' : 'delivery',
             threadId: _deliveryId,
           ),
-          tooltip: 'Chat client',
+          tooltip: tr('Chat client'),
           onPressed: _deliveryId.isEmpty ? null : () => _openChat(peerLabel: 'Client'),
         ),
         IconButton(
@@ -753,7 +754,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           if (!_isErrand && (_status == 'IN_TRANSIT' || _status == 'PICKED_UP')) ...[
             const SizedBox(height: 8),
             MovaButton(
-              label: 'Destinataire injoignable',
+              label: tr('Destinataire injoignable'),
               isSecondary: true,
               icon: Icons.phone_disabled_outlined,
               onPressed: _loading ? null : _markUnreachable,
@@ -762,11 +763,11 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           if (_awaitingCashConfirm || _cashDisputed) ...[
             const SizedBox(height: 8),
             if (_cashDisputed)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(bottom: 8),
                 child: Text(
-                  'Litige : espèces non reçues (pas une alerte SOS). Le client a été notifié. '
-                  'Si vous avez finalement reçu l’argent, confirmez pour clôturer ce litige.',
+                  tr('Litige : espèces non reçues (pas une alerte SOS). Le client a été notifié. '
+                  'Si vous avez finalement reçu l’argent, confirmez pour clôturer ce litige.'),
                   style: TextStyle(fontSize: 13),
                 ),
               ),
@@ -793,7 +794,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           if (_isFood) ...[
             const SizedBox(height: 8),
             MovaButton(
-              label: 'Chat restaurant',
+              label: tr('Chat restaurant'),
               isSecondary: true,
               icon: Icons.storefront_outlined,
               onPressed: _deliveryId.isEmpty ? null : () => _openChat(peerLabel: _restaurantName),
@@ -802,7 +803,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           if (!_isErrand) ...[
             const SizedBox(height: 8),
             MovaButton(
-              label: 'Appel vocal',
+              label: tr('Appel vocal'),
               isSecondary: true,
               icon: Icons.call_outlined,
               onPressed: _deliveryId.isEmpty ? null : _openVoiceCall,
@@ -817,7 +818,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           ),
           const SizedBox(height: 8),
           MovaButton(
-            label: 'Actualiser',
+            label: tr('Actualiser'),
             isSecondary: true,
             icon: Icons.refresh,
             onPressed: _loading ? null : _refresh,
@@ -861,7 +862,7 @@ class _ErrandPurchaseTotalDialogState extends State<_ErrandPurchaseTotalDialog> 
   Widget build(BuildContext context) {
     return AlertDialog(
       scrollable: true,
-      title: const Text('Montant des achats'),
+      title: Text(tr('Montant des achats')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -871,8 +872,8 @@ class _ErrandPurchaseTotalDialogState extends State<_ErrandPurchaseTotalDialog> 
             keyboardType: TextInputType.number,
             autofocus: true,
             decoration: InputDecoration(
-              labelText: 'Total achats (CDF)',
-              hintText: '0 si aucun achat',
+              labelText: tr('Total achats (CDF)'),
+              hintText: tr('0 si aucun achat'),
               errorText: _error,
             ),
             onSubmitted: (_) => _submit(),
@@ -883,8 +884,8 @@ class _ErrandPurchaseTotalDialogState extends State<_ErrandPurchaseTotalDialog> 
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-        TextButton(onPressed: _submit, child: const Text('Valider')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('Annuler'))),
+        TextButton(onPressed: _submit, child: Text(tr('Valider'))),
       ],
     );
   }

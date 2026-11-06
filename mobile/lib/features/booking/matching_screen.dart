@@ -11,6 +11,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'tracking_screen.dart';
 import '../passenger/passenger_alert_service.dart';
+import '../../core/i18n/i18n.dart';
 
 class MatchingScreen extends ConsumerStatefulWidget {
   const MatchingScreen({
@@ -172,7 +173,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
 
   void _goToTracking() {
     PassengerAlertService.notify(
-      title: 'Chauffeur trouvé',
+      title: tr('Chauffeur trouvé'),
       body: 'Votre chauffeur est en route.',
     );
     Navigator.pushReplacement(
@@ -190,7 +191,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Annuler la course ?'),
+        title: Text(tr('Annuler la course ?')),
         content: Text(
           _cancelFeeLabel != null && _cancelFeeLabel!.isNotEmpty
               ? 'Annulation gratuite avant l\'arrivée du chauffeur. '
@@ -199,10 +200,10 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
                   'Des frais peuvent s\'appliquer après acceptation.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Oui, annuler'),
+            child: Text(tr('Oui, annuler')),
           ),
         ],
       ),
@@ -227,7 +228,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
         await _cancel();
       },
       child: MovaScreen(
-      title: 'Recherche',
+      title: tr('Recherche'),
       scrollable: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -308,8 +309,8 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
                     ),
                   ] else if (_searching && _attempt > 1) ...[
                     const SizedBox(height: 12),
-                    const Text(
-                      'Élargissement du rayon de recherche…',
+                    Text(
+                      tr('Élargissement du rayon de recherche…'),
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 13, color: MovaColors.orange),
                     ),
@@ -355,15 +356,15 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
               children: [
                 const SizedBox(height: 8),
                 MovaButton(
-                  label: 'Annuler la recherche',
+                  label: tr('Annuler la recherche'),
                   isSecondary: true,
                   isLoading: _cancelling,
                   icon: Icons.close,
                   onPressed: _searching && !_cancelling ? _cancel : null,
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  'Annulation gratuite avant acceptation du chauffeur.',
+                Text(
+                  tr('Annulation gratuite avant acceptation du chauffeur.'),
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

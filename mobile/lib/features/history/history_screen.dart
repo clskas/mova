@@ -16,6 +16,7 @@ import '../rating/rating_screen.dart';
 import '../../core/widgets/offline_shell.dart';
 import 'history_detail_dialog.dart';
 import '../billing/receipts_list_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -101,11 +102,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
                 Icon(Icons.local_taxi_outlined, size: 18, color: MovaColors.violet),
                 SizedBox(width: 6),
-                Text('Course taxi', style: TextStyle(fontWeight: FontWeight.w600)),
+                Text(tr('Course taxi'), style: TextStyle(fontWeight: FontWeight.w600)),
               ],
             ),
             const SizedBox(height: 4),
@@ -130,7 +131,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                 runSpacing: 8,
                 children: [
                   MovaButton(
-                    label: 'Commander à nouveau',
+                    label: tr('Commander à nouveau'),
                     isSecondary: true,
                     icon: Icons.replay,
                     onPressed: () {
@@ -147,7 +148,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                     },
                   ),
                   MovaButton(
-                    label: 'Noter le chauffeur',
+                    label: tr('Noter le chauffeur'),
                     isSecondary: true,
                     icon: Icons.star_outline,
                     onPressed: () {
@@ -240,11 +241,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
                 Icon(Icons.inventory_2_outlined, size: 18, color: MovaColors.green),
                 SizedBox(width: 6),
-                Text('Colis', style: TextStyle(fontWeight: FontWeight.w600)),
+                Text(tr('Colis'), style: TextStyle(fontWeight: FontWeight.w600)),
               ],
             ),
             const SizedBox(height: 4),
@@ -266,7 +267,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             if (_isActiveDelivery(item['status']?.toString())) ...[
               const SizedBox(height: 8),
               MovaButton(
-                label: 'Suivre la livraison',
+                label: tr('Suivre la livraison'),
                 isSecondary: true,
                 icon: Icons.map_outlined,
                 onPressed: () => _openParcelTracking(item),
@@ -275,7 +276,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             if ((item['status']?.toString() ?? '') == 'DELIVERED') ...[
               const SizedBox(height: 8),
               MovaButton(
-                label: 'Commander à nouveau',
+                label: tr('Commander à nouveau'),
                 isSecondary: true,
                 icon: Icons.replay,
                 onPressed: () {
@@ -307,11 +308,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
                 Icon(Icons.restaurant_outlined, size: 18, color: MovaColors.green),
                 SizedBox(width: 6),
-                Text('Repas', style: TextStyle(fontWeight: FontWeight.w600)),
+                Text(tr('Repas'), style: TextStyle(fontWeight: FontWeight.w600)),
               ],
             ),
             const SizedBox(height: 4),
@@ -339,7 +340,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             if ((item['status']?.toString() ?? '') == 'DELIVERED') ...[
               const SizedBox(height: 8),
               MovaButton(
-                label: 'Commander à nouveau',
+                label: tr('Commander à nouveau'),
                 isSecondary: true,
                 icon: Icons.replay,
                 onPressed: () {
@@ -372,11 +373,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
                 Icon(Icons.event_available_outlined, size: 18, color: MovaColors.violet),
                 SizedBox(width: 6),
-                Text('Réservation', style: TextStyle(fontWeight: FontWeight.w600)),
+                Text(tr('Réservation'), style: TextStyle(fontWeight: FontWeight.w600)),
               ],
             ),
             const SizedBox(height: 4),
@@ -415,11 +416,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
                 Icon(Icons.local_shipping_outlined, size: 18, color: MovaColors.midnight),
                 SizedBox(width: 6),
-                Text('Déménagement', style: TextStyle(fontWeight: FontWeight.w600)),
+                Text(tr('Déménagement'), style: TextStyle(fontWeight: FontWeight.w600)),
               ],
             ),
             const SizedBox(height: 4),
@@ -453,11 +454,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
                 Icon(Icons.shopping_bag_outlined, size: 18, color: MovaColors.orange),
                 SizedBox(width: 6),
-                Text('Courses', style: TextStyle(fontWeight: FontWeight.w600)),
+                Text(tr('Courses'), style: TextStyle(fontWeight: FontWeight.w600)),
               ],
             ),
             const SizedBox(height: 4),
@@ -550,10 +551,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Historique',
+      title: tr('Historique'),
       actions: [
         IconButton(
-          tooltip: 'Mes reçus',
+          tooltip: tr('Mes reçus'),
           icon: const Icon(Icons.receipt_long_outlined),
           onPressed: () => Navigator.push(
             context,

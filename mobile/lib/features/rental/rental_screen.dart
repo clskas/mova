@@ -14,6 +14,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'rental_booking_detail_screen.dart';
 import 'rental_detail_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 enum _RentalStep { search, compare }
 
@@ -400,16 +401,16 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   Widget _compareTable() {
     final compared = _vehicles.where((v) => _compareIds.contains(v['id']?.toString())).toList();
     if (compared.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.all(24),
-        child: Text('Sélectionnez jusqu\'à 3 véhicules pour comparer.', textAlign: TextAlign.center),
+        child: Text(tr('Sélectionnez jusqu\'à 3 véhicules pour comparer.'), textAlign: TextAlign.center),
       );
     }
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
         columns: [
-          const DataColumn(label: Text('Critère')),
+          DataColumn(label: Text(tr('Critère'))),
           ...compared.map((v) => DataColumn(label: Text(v['name']?.toString() ?? '', overflow: TextOverflow.ellipsis))),
         ],
         rows: [
@@ -501,13 +502,13 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
               color: MovaColors.violet.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Icon(Icons.info_outline, size: 18, color: MovaColors.violet),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Louez un véhicule pour plusieurs jours. Pour un trajet immédiat, utilisez « Commander une course ».',
+                    tr('Louez un véhicule pour plusieurs jours. Pour un trajet immédiat, utilisez « Commander une course ».'),
                     style: TextStyle(fontSize: 12, color: MovaColors.violet),
                   ),
                 ),
@@ -515,7 +516,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
             ),
           ),
           Text(
-            'Louez un véhicule à l\'heure, à la journée ou à la semaine.',
+            tr('Louez un véhicule à l\'heure, à la journée ou à la semaine.'),
             style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -527,7 +528,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Prise en charge', style: theme.textTheme.labelMedium),
+                      Text(tr('Prise en charge'), style: theme.textTheme.labelMedium),
                       Text(_formatDate(_startDate)),
                     ],
                   ),
@@ -540,7 +541,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Retour', style: theme.textTheme.labelMedium),
+                      Text(tr('Retour'), style: theme.textTheme.labelMedium),
                       Text(_formatDate(_endDate)),
                     ],
                   ),
@@ -555,7 +556,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
               Expanded(
                 child: DropdownButtonFormField<String>(
                   value: ServiceAreas.cityNames.contains(_city) ? _city : ServiceAreas.cityNames.first,
-                  decoration: const InputDecoration(labelText: 'Ville', isDense: true),
+                  decoration: InputDecoration(labelText: tr('Ville'), isDense: true),
                   items: ServiceAreas.cityNames
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                       .toList(),
@@ -577,7 +578,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.my_location, size: 18),
-                  label: const Text('Ma position', style: TextStyle(fontSize: 12)),
+                  label: Text(tr('Ma position'), style: TextStyle(fontSize: 12)),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: MovaColors.violet,
                     side: const BorderSide(color: MovaColors.violet),
@@ -614,7 +615,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
           const SizedBox(height: 8),
           DropdownButtonFormField<String?>(
             value: _fuel.isEmpty ? null : _fuel,
-            decoration: const InputDecoration(labelText: 'Carburant', isDense: true),
+            decoration: InputDecoration(labelText: tr('Carburant'), isDense: true),
             items: _fuelOptions
                 .map((f) => DropdownMenuItem<String?>(value: f.$1.isEmpty ? null : f.$1, child: Text(f.$2)))
                 .toList(),
@@ -632,8 +633,8 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                   child: TextField(
                     controller: _minPriceController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Prix min (CDF/j)',
+                    decoration: InputDecoration(
+                      labelText: tr('Prix min (CDF/j)'),
                       isDense: true,
                     ),
                   ),
@@ -643,8 +644,8 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                   child: TextField(
                     controller: _maxPriceController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Prix max (CDF/j)',
+                    decoration: InputDecoration(
+                      labelText: tr('Prix max (CDF/j)'),
                       isDense: true,
                     ),
                   ),
@@ -654,9 +655,9 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: _transmission.isEmpty ? null : _transmission,
-                    decoration: const InputDecoration(labelText: 'Transmission', isDense: true),
-                    items: const [
-                      DropdownMenuItem(value: 'AUTO', child: Text('Automatique')),
+                    decoration: InputDecoration(labelText: tr('Transmission'), isDense: true),
+                    items: [
+                      DropdownMenuItem(value: 'AUTO', child: Text(tr('Automatique'))),
                       DropdownMenuItem(value: 'MANUAL', child: Text('Manuelle')),
                     ],
                     onChanged: (v) {
@@ -669,9 +670,9 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: _sortBy,
-                    decoration: const InputDecoration(labelText: 'Tri', isDense: true),
-                    items: const [
-                      DropdownMenuItem(value: 'price_asc', child: Text('Prix ↑')),
+                    decoration: InputDecoration(labelText: tr('Tri'), isDense: true),
+                    items: [
+                      DropdownMenuItem(value: 'price_asc', child: Text(tr('Prix ↑'))),
                       DropdownMenuItem(value: 'price_desc', child: Text('Prix ↓')),
                       DropdownMenuItem(value: 'rating', child: Text('Note')),
                       DropdownMenuItem(value: 'category', child: Text('Catégorie')),
@@ -690,9 +691,9 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       value: _transmission.isEmpty ? null : _transmission,
-                      decoration: const InputDecoration(labelText: 'Transmission', isDense: true),
-                      items: const [
-                        DropdownMenuItem(value: 'AUTO', child: Text('Automatique')),
+                      decoration: InputDecoration(labelText: tr('Transmission'), isDense: true),
+                      items: [
+                        DropdownMenuItem(value: 'AUTO', child: Text(tr('Automatique'))),
                         DropdownMenuItem(value: 'MANUAL', child: Text('Manuelle')),
                       ],
                       onChanged: (v) {
@@ -703,9 +704,9 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       value: _sortBy,
-                      decoration: const InputDecoration(labelText: 'Tri', isDense: true),
-                      items: const [
-                        DropdownMenuItem(value: 'price_asc', child: Text('Prix ↑')),
+                      decoration: InputDecoration(labelText: tr('Tri'), isDense: true),
+                      items: [
+                        DropdownMenuItem(value: 'price_asc', child: Text(tr('Prix ↑'))),
                         DropdownMenuItem(value: 'price_desc', child: Text('Prix ↓')),
                         DropdownMenuItem(value: 'rating', child: Text('Note')),
                         DropdownMenuItem(value: 'category', child: Text('Catégorie')),
@@ -738,7 +739,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
               ),
             ),
           MovaButton(
-            label: 'Rechercher',
+            label: tr('Rechercher'),
             icon: Icons.search,
             isLoading: _loading,
             onPressed: _loading ? null : _search,
@@ -770,7 +771,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                     style: const TextStyle(color: MovaColors.textSecondary),
                   ),
                   const SizedBox(height: 12),
-                  MovaButton(label: 'Réessayer', isSecondary: true, onPressed: _search),
+                  MovaButton(label: tr('Réessayer'), isSecondary: true, onPressed: _search),
                 ],
               ),
             )
@@ -785,7 +786,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                 onPressed: () => setState(() => _step = _RentalStep.search),
               ),
               Expanded(
-                child: Text('Comparaison', style: theme.textTheme.titleMedium, overflow: TextOverflow.ellipsis),
+                child: Text(tr('Comparaison'), style: theme.textTheme.titleMedium, overflow: TextOverflow.ellipsis),
               ),
             ],
           ),
@@ -812,12 +813,12 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
     if (_myRentals.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
+        children: [
           SizedBox(height: 48),
           Icon(Icons.event_busy, size: 48, color: MovaColors.textSecondary),
           SizedBox(height: 12),
           Text(
-            'Aucune réservation.\nParcourez le catalogue et réservez en quelques clics.',
+            tr('Aucune réservation.\nParcourez le catalogue et réservez en quelques clics.'),
             textAlign: TextAlign.center,
             style: TextStyle(color: MovaColors.textSecondary),
           ),
@@ -918,7 +919,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return MovaScreen(
-      title: 'Location véhicule',
+      title: tr('Location véhicule'),
       scrollable: false,
       child: Column(
         children: [

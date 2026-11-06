@@ -8,6 +8,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'subscription_plan_card.dart';
+import '../../core/i18n/i18n.dart';
 
 class SubscriptionsScreen extends ConsumerStatefulWidget {
   const SubscriptionsScreen({super.key});
@@ -131,7 +132,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
               ),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
@@ -140,7 +141,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Économisez sur chaque course',
+                        tr('Économisez sur chaque course'),
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                     ),
@@ -148,8 +149,8 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Réductions automatiques sur les frais de service SENGA, '
-                  'sans code promo à saisir. Idéal si vous utilisez SENGA plusieurs fois par semaine.',
+                  tr('Réductions automatiques sur les frais de service SENGA, '
+                  'sans code promo à saisir. Idéal si vous utilisez SENGA plusieurs fois par semaine.'),
                   style: TextStyle(color: MovaColors.textSecondary, height: 1.4, fontSize: 13),
                 ),
               ],
@@ -208,17 +209,17 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
             ),
           ],
           const SizedBox(height: 16),
-          const Text('Comparer les offres', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+          Text(tr('Comparer les offres'), style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
           const SizedBox(height: 4),
-          const Text(
-            'Les réductions s\'appliquent sur les frais SENGA (pas sur le panier restaurant ni les achats courses).',
+          Text(
+            tr('Les réductions s\'appliquent sur les frais SENGA (pas sur le panier restaurant ni les achats courses).'),
             style: TextStyle(color: MovaColors.textSecondary, fontSize: 12, height: 1.35),
           ),
           const SizedBox(height: 12),
           if (_loading)
             const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
           else if (_plans.isEmpty)
-            const Text('Aucun plan disponible pour le moment.', style: TextStyle(color: MovaColors.textSecondary))
+            Text(tr('Aucun plan disponible pour le moment.'), style: TextStyle(color: MovaColors.textSecondary))
           else
             ..._plans.map((plan) {
               final id = plan['id']?.toString() ?? '';
@@ -236,9 +237,9 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
               );
             }),
           const SizedBox(height: 8),
-          const Text(
-            'Le premier mois est débité immédiatement de votre portefeuille SENGA. '
-            'Rechargez votre solde avant de souscrire si nécessaire.',
+          Text(
+            tr('Le premier mois est débité immédiatement de votre portefeuille SENGA. '
+            'Rechargez votre solde avant de souscrire si nécessaire.'),
             style: TextStyle(color: MovaColors.textSecondary, fontSize: 11, height: 1.35),
             textAlign: TextAlign.center,
           ),

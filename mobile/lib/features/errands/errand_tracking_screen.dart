@@ -18,6 +18,7 @@ import '../chat/errand_chat_screen.dart';
 import '../delivery/delivery_live_tracking.dart';
 import '../delivery/delivery_payment_state.dart';
 import '../delivery/widgets/delivery_tracking_map.dart';
+import '../../core/i18n/i18n.dart';
 
 class ErrandTrackingScreen extends ConsumerStatefulWidget {
   const ErrandTrackingScreen({
@@ -170,7 +171,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Réception confirmée. Le livreur est payé.')),
+          SnackBar(content: Text(tr('Réception confirmée. Le livreur est payé.'))),
         );
         await _load(silent: true);
       case Failure(:final error):
@@ -225,13 +226,13 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(Icons.photo_camera_outlined, color: MovaColors.green, size: 20),
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Preuve d\'achat',
+                  tr('Preuve d\'achat'),
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -258,8 +259,8 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Photo prise par le livreur au commerce. Appuyez pour agrandir.',
+          Text(
+            tr('Photo prise par le livreur au commerce. Appuyez pour agrandir.'),
             style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
           ),
         ],
@@ -324,13 +325,13 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return AlertDialog(
-              title: const Text('Noter le livreur'),
+              title: Text(tr('Noter le livreur')),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text('Comment s\'est passée votre course & commissions ?'),
+                    Text(tr('Comment s\'est passée votre course & commissions ?')),
                     const SizedBox(height: 12),
                     MovaStarRating(
                       score: score,
@@ -342,9 +343,9 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                     enabled: !submitting,
                     maxLines: 3,
                     onChanged: (v) => comment = v,
-                    decoration: const InputDecoration(
-                      labelText: 'Commentaire (optionnel)',
-                      hintText: 'Votre avis…',
+                    decoration: InputDecoration(
+                      labelText: tr('Commentaire (optionnel)'),
+                      hintText: tr('Votre avis…'),
                       isDense: true,
                     ),
                   ),
@@ -358,7 +359,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
               actions: [
                 TextButton(
                   onPressed: submitting ? null : () => Navigator.pop(ctx, false),
-                  child: const Text('Plus tard'),
+                  child: Text(tr('Plus tard')),
                 ),
                 ElevatedButton(
                   onPressed: submitting
@@ -390,7 +391,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Envoyer'),
+                      : Text(tr('Envoyer')),
                 ),
               ],
             );
@@ -426,11 +427,11 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Annuler la course ?'),
-        content: const Text('Votre demande de courses sera annulée si le livreur n\'a pas encore commencé.'),
+        title: Text(tr('Annuler la course ?')),
+        content: Text(tr('Votre demande de courses sera annulée si le livreur n\'a pas encore commencé.')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui, annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Oui, annuler'))),
         ],
       ),
     );
@@ -488,7 +489,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
     final proofUrl = _order?['proofPhotoUrl']?.toString();
 
     return MovaScreen(
-      title: 'Suivi courses',
+      title: tr('Suivi courses'),
       scrollable: false,
       padding: EdgeInsets.zero,
       actions: [
@@ -504,7 +505,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                       MovaErrorBanner(message: _error!, onRetry: _load),
                       const SizedBox(height: 16),
                       MovaButton(
-                        label: 'Retour',
+                        label: tr('Retour'),
                         isSecondary: true,
                         icon: Icons.arrow_back,
                         onPressed: () => Navigator.pop(context),
@@ -567,18 +568,18 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                               const SizedBox(height: 12),
                             ],
                             if (_escrowPaymentDue && !deliveryIsPaid(_order)) ...[
-                              const MovaCard(
+                              MovaCard(
                                 child: Text(
-                                  'Payez maintenant pour sécuriser le budget et les frais. Aucun livreur n\'est contacté avant paiement.',
+                                  tr('Payez maintenant pour sécuriser le budget et les frais. Aucun livreur n\'est contacté avant paiement.'),
                                   style: TextStyle(fontWeight: FontWeight.w600),
                                 ),
                               ),
                               const SizedBox(height: 12),
                             ],
                             if (_cashSettlementDue && !deliveryIsPaid(_order)) ...[
-                              const MovaCard(
+                              MovaCard(
                                 child: Text(
-                                  'Courses terminées. Payez le livreur en espèces (ou via l\'app) et communiquez-lui le PIN affiché.',
+                                  tr('Courses terminées. Payez le livreur en espèces (ou via l\'app) et communiquez-lui le PIN affiché.'),
                                   style: TextStyle(fontWeight: FontWeight.w600),
                                 ),
                               ),
@@ -587,9 +588,9 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                             if (deliveryIsCod(_order) &&
                                 !_cashSettlementDue &&
                                 !deliveryIsPaid(_order)) ...[
-                              const MovaCard(
+                              MovaCard(
                                 child: Text(
-                                  'Course non garantie (espèces). Paiement à la remise — SENGA ne bloque pas les fonds.',
+                                  tr('Course non garantie (espèces). Paiement à la remise — SENGA ne bloque pas les fonds.'),
                                   style: TextStyle(fontSize: 13),
                                 ),
                               ),
@@ -619,7 +620,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                             ],
                             if (_canConfirmReceipt && _order?['payoutReleased'] != true) ...[
                               MovaButton(
-                                label: 'J\'ai reçu ma course',
+                                label: tr('J\'ai reçu ma course'),
                                 onPressed: _confirmReceipt,
                               ),
                               const SizedBox(height: 12),
@@ -682,7 +683,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            Text('Statuts', style: Theme.of(context).textTheme.titleSmall),
+                            Text(tr('Statuts'), style: Theme.of(context).textTheme.titleSmall),
                             const SizedBox(height: 12),
                             ..._timeline.map((step) {
                               final done = step['done'] == true;
@@ -711,9 +712,9 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                   children: [
                                     const Icon(Icons.verified_outlined, color: MovaColors.green),
                                     const SizedBox(width: 12),
-                                    const Expanded(
+                                    Expanded(
                                       child: Text(
-                                        'Livraison confirmée',
+                                        tr('Livraison confirmée'),
                                         style: TextStyle(fontWeight: FontWeight.w600),
                                       ),
                                     ),
@@ -733,7 +734,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                         children: [
                           if (_order?['driverId'] != null)
                             MovaButton(
-                              label: 'Contacter le livreur',
+                              label: tr('Contacter le livreur'),
                               isSecondary: true,
                               icon: Icons.chat_bubble_outline,
                               onPressed: () {
@@ -752,7 +753,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                           if (_order?['driverId'] != null) const SizedBox(height: 8),
                           if (_canCancel)
                             MovaButton(
-                              label: 'Annuler la course',
+                              label: tr('Annuler la course'),
                               isSecondary: true,
                               isLoading: _cancelling,
                               icon: Icons.cancel_outlined,
@@ -768,7 +769,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                             const SizedBox(height: 8),
                           ],
                           MovaButton(
-                            label: 'Retour à l\'accueil',
+                            label: tr('Retour à l\'accueil'),
                             isSecondary: true,
                             icon: Icons.home_outlined,
                             onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),

@@ -7,6 +7,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/i18n/i18n.dart';
 
 class SosEmergencyNumber {
   const SosEmergencyNumber({required this.label, required this.phone});
@@ -104,7 +105,7 @@ class _SosAlertScreenState extends State<SosAlertScreen> {
     final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     if (!ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d\'ouvrir le lien')),
+        SnackBar(content: Text(tr('Impossible d\'ouvrir le lien'))),
       );
     }
   }
@@ -120,7 +121,7 @@ class _SosAlertScreenState extends State<SosAlertScreen> {
         : 'Une urgence a été signalée sur SENGA.';
 
     return MovaScreen(
-      title: 'Alerte SOS',
+      title: tr('Alerte SOS'),
       scrollable: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -137,8 +138,8 @@ class _SosAlertScreenState extends State<SosAlertScreen> {
                         color: MovaColors.red,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text(
-                        'SOS',
+                      child: Text(
+                        tr('SOS'),
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
@@ -194,7 +195,7 @@ class _SosAlertScreenState extends State<SosAlertScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Intervenir',
+            tr('Intervenir'),
             style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
@@ -207,7 +208,7 @@ class _SosAlertScreenState extends State<SosAlertScreen> {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
-              label: const Text('Ouvrir la position sur Maps'),
+              label: Text(tr('Ouvrir la position sur Maps')),
             ),
           if (_hasGps) const SizedBox(height: 10),
           if (_loadingNumbers)
@@ -231,7 +232,7 @@ class _SosAlertScreenState extends State<SosAlertScreen> {
             OutlinedButton.icon(
               onPressed: () => _open(context, _adminLitigesUrl),
               icon: const Icon(Icons.admin_panel_settings_outlined),
-              label: const Text('Ouvrir Litiges (admin)'),
+              label: Text(tr('Ouvrir Litiges (admin)')),
             ),
           ],
           const SizedBox(height: 20),

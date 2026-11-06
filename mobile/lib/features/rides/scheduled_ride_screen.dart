@@ -22,6 +22,7 @@ import '../../widgets/promo_code_field.dart';
 import '../booking/payment_screen.dart';
 import '../booking/tracking_screen.dart';
 import '../history/history_detail_dialog.dart';
+import '../../core/i18n/i18n.dart';
 
 class ScheduledRideScreen extends ConsumerStatefulWidget {
   const ScheduledRideScreen({super.key});
@@ -313,7 +314,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Réservation planifiée'),
+        title: Text(tr('Réservation planifiée')),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -344,13 +345,13 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               ],
               if (live['status']?.toString() == 'CONFIRMED') ...[
                 const SizedBox(height: 8),
-                const Row(
+                Row(
                   children: [
                     Icon(Icons.check_circle_outline, size: 16, color: MovaColors.green),
                     SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Chauffeur assigné — vous serez notifié au démarrage.',
+                        tr('Chauffeur assigné — vous serez notifié au démarrage.'),
                         style: TextStyle(fontSize: 12, color: MovaColors.green),
                       ),
                     ),
@@ -358,13 +359,13 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                 ),
               ],
               const SizedBox(height: 12),
-              const Text(
-                'SENGA confirme la réservation et assigne un chauffeur avant l\'heure prévue. '
-                'Les mises à jour admin apparaissent ici automatiquement.',
+              Text(
+                tr('SENGA confirme la réservation et assigne un chauffeur avant l\'heure prévue. '
+                'Les mises à jour admin apparaissent ici automatiquement.'),
                 style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.35),
               ),
               const SizedBox(height: 12),
-              const Text('Suivi', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(tr('Suivi'), style: TextStyle(fontWeight: FontWeight.w600)),
               ...timeline.map((step) {
                 final done = step['done'] == true;
                 return Padding(
@@ -386,7 +387,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Fermer'))),
           if (status == 'IN_PROGRESS' &&
               (live['linkedRideId'] ?? live['rideId'])?.toString().isNotEmpty == true)
             FilledButton.icon(
@@ -404,7 +405,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                 );
               },
               icon: const Icon(Icons.map_outlined),
-              label: const Text('Suivre en direct'),
+              label: Text(tr('Suivre en direct')),
             ),
           if (status == 'COMPLETED' && id.isNotEmpty)
             FilledButton(
@@ -422,7 +423,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                   ),
                 );
               },
-              child: const Text('Payer'),
+              child: Text(tr('Payer')),
             ),
           if (id.isNotEmpty && CancelEligibility.scheduled(live))
             TextButton(
@@ -430,7 +431,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                 Navigator.pop(ctx);
                 _cancelScheduled(id, ride: live);
               },
-              child: const Text('Annuler'),
+              child: Text(tr('Annuler')),
             ),
         ],
       ),
@@ -455,14 +456,14 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Annuler la réservation ?'),
+        title: Text(tr('Annuler la réservation ?')),
         content: Text(
           warning ??
               'Votre réservation sera annulée. Aucun frais si plus de 24 h avant le départ.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui, annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Oui, annuler'))),
         ],
       ),
     );
@@ -584,7 +585,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
           showDialog<void>(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: const Text('Réservation confirmée'),
+              title: Text(tr('Réservation confirmée')),
               content: Text(
                 'Votre transport SENGA est réservé.\n\n'
                 'Référence : ${_shortRef(ride?['id']?.toString())}\n'
@@ -625,21 +626,21 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     final formattedDate = _formatDateTime(_scheduledAt);
 
     return MovaScreen(
-      title: 'Réservation planifiée',
+      title: tr('Réservation planifiée'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Réserver à l\'avance',
+            tr('Réserver à l\'avance'),
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
               color: MovaColors.midnight,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Programmez un trajet jusqu\'à 7 jours à l\'avance. '
-            'SENGA assigne un chauffeur avant l\'heure — rappels J-1 et H-1.',
+          Text(
+            tr('Programmez un trajet jusqu\'à 7 jours à l\'avance. '
+            'SENGA assigne un chauffeur avant l\'heure — rappels J-1 et H-1.'),
             style: TextStyle(color: MovaColors.textSecondary, height: 1.3),
           ),
           const SizedBox(height: 8),
@@ -650,15 +651,15 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: MovaColors.orange.withValues(alpha: 0.25)),
             ),
-            child: const Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(Icons.info_outline, size: 18, color: MovaColors.orange),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Annulation gratuite jusqu\'à 24 h avant le départ. '
-                    'Au-delà : 50 % du tarif estimé si un chauffeur est déjà assigné.',
+                    tr('Annulation gratuite jusqu\'à 24 h avant le départ. '
+                    'Au-delà : 50 % du tarif estimé si un chauffeur est déjà assigné.'),
                     style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.35),
                   ),
                 ),
@@ -672,7 +673,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               child: Center(child: CircularProgressIndicator()),
             )
           else if (_upcoming.isNotEmpty) ...[
-            Text('Mes réservations', style: theme.textTheme.titleSmall),
+            Text(tr('Mes réservations'), style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
             ..._upcoming.map((map) {
               final id = map['id']?.toString() ?? '';
@@ -736,7 +737,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                               );
                             },
                             icon: const Icon(Icons.map_outlined, size: 18),
-                            label: const Text('Suivre en direct'),
+                            label: Text(tr('Suivre en direct')),
                           ),
                         ),
                       if (id.isNotEmpty && CancelEligibility.scheduled(map))
@@ -745,7 +746,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                           child: TextButton.icon(
                             onPressed: _loading ? null : () => _cancelScheduled(id, ride: map),
                             icon: const Icon(Icons.cancel_outlined, size: 18),
-                            label: const Text('Annuler'),
+                            label: Text(tr('Annuler')),
                           ),
                         ),
                     ],
@@ -754,13 +755,13 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               );
             }),
             const Divider(height: 32),
-            Text('Nouvelle réservation transport', style: theme.textTheme.titleSmall),
+            Text(tr('Nouvelle réservation transport'), style: theme.textTheme.titleSmall),
             const SizedBox(height: 12),
           ] else ...[
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(bottom: 16),
               child: Text(
-                'Aucune réservation transport à venir.',
+                tr('Aucune réservation transport à venir.'),
                 style: TextStyle(color: MovaColors.textSecondary),
               ),
             ),
@@ -775,7 +776,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Date et heure de réservation', style: theme.textTheme.titleSmall),
+                      Text(tr('Date et heure de réservation'), style: theme.textTheme.titleSmall),
                       const SizedBox(height: 4),
                       Text(
                         formattedDate,
@@ -792,7 +793,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Réservation possible jusqu\'à J+7 · Rappel la veille (J-1)',
+            tr('Réservation possible jusqu\'à J+7 · Rappel la veille (J-1)'),
             style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 16),
@@ -825,8 +826,8 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
           TextField(
             controller: _destinationController,
             decoration: InputDecoration(
-              labelText: 'Destination',
-              hintText: 'Ex: Aéroport, Gombe…',
+              labelText: tr('Destination'),
+              hintText: tr('Ex: Aéroport, Gombe…'),
               prefixIcon: const Icon(Icons.place),
               suffixIcon: _loadingSuggestions
                   ? const Padding(
@@ -863,7 +864,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             onApply: _setDropoffFromCoords,
           ),
           const SizedBox(height: 16),
-          Text('Taxi ou moto', style: theme.textTheme.titleSmall),
+          Text(tr('Taxi ou moto'), style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
           VehicleCategoryChips(
             category: MarketConfig.vehicleCategory(_vehicleType),

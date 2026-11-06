@@ -17,6 +17,7 @@ import '../booking/tracking_screen.dart';
 import '../rating/rating_screen.dart';
 import '../billing/billing_util.dart';
 import '../billing/receipt_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 String historyStatusLabel(String? status) => switch (status) {
       'COMPLETED' => 'Terminé',
@@ -214,7 +215,7 @@ Future<void> showHistoryDetailDialog(
             ],
             if (timeline.isNotEmpty) ...[
               const SizedBox(height: 16),
-              const Text('Suivi', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(tr('Suivi'), style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               ...timeline.map((step) {
                 final done = step['done'] == true;
@@ -236,7 +237,7 @@ Future<void> showHistoryDetailDialog(
             ],
             if (photoUrls.isNotEmpty) ...[
               const SizedBox(height: 12),
-              const Text('Photos inventaire', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(tr('Photos inventaire'), style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               SizedBox(
                 height: 72,
@@ -266,7 +267,7 @@ Future<void> showHistoryDetailDialog(
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Fermer'))),
         if (type == 'RIDE' &&
             id.isNotEmpty &&
             item['paymentReady'] == true &&
@@ -285,7 +286,7 @@ Future<void> showHistoryDetailDialog(
                 ),
               );
             },
-            child: const Text('Payer la course'),
+            child: Text(tr('Payer la course')),
           ),
         if (type == 'RIDE' && status == 'COMPLETED' && id.isNotEmpty)
           TextButton(
@@ -304,7 +305,7 @@ Future<void> showHistoryDetailDialog(
                 ),
               );
             },
-            child: const Text('Commander à nouveau'),
+            child: Text(tr('Commander à nouveau')),
           ),
         if (status == 'COMPLETED' || status == 'DELIVERED')
           TextButton(
@@ -321,7 +322,7 @@ Future<void> showHistoryDetailDialog(
                     meta['deliveryAddress']?.toString(),
               );
             },
-            child: const Text('Nommer ce lieu'),
+            child: Text(tr('Nommer ce lieu')),
           ),
         if (type == 'RIDE' && status == 'COMPLETED' && id.isNotEmpty)
           TextButton(
@@ -332,7 +333,7 @@ Future<void> showHistoryDetailDialog(
                 MaterialPageRoute(builder: (_) => RatingScreen(rideId: id)),
               );
             },
-            child: const Text('Noter le chauffeur'),
+            child: Text(tr('Noter le chauffeur')),
           ),
         if (type == 'MOVING' && id.isNotEmpty)
           TextButton(
@@ -350,7 +351,7 @@ Future<void> showHistoryDetailDialog(
                 ),
               );
             },
-            child: const Text('Suivi complet'),
+            child: Text(tr('Suivi complet')),
           ),
         if (type == 'ERRAND' && id.isNotEmpty)
           TextButton(
@@ -377,7 +378,7 @@ Future<void> showHistoryDetailDialog(
                 ),
               );
             },
-            child: const Text('Suivi complet'),
+            child: Text(tr('Suivi complet')),
           ),
         if (type == 'MOVING' &&
             status == 'COMPLETED' &&
@@ -403,7 +404,7 @@ Future<void> showHistoryDetailDialog(
                 ),
               );
             },
-            child: const Text('Payer'),
+            child: Text(tr('Payer')),
           ),
         if (type == 'SCHEDULED')
           TextButton(
@@ -414,7 +415,7 @@ Future<void> showHistoryDetailDialog(
                 MaterialPageRoute(builder: (_) => const ScheduledRideScreen()),
               );
             },
-            child: const Text('Mes réservations'),
+            child: Text(tr('Mes réservations')),
           ),
         if (type == 'SCHEDULED' &&
             status == 'COMPLETED' &&
@@ -440,7 +441,7 @@ Future<void> showHistoryDetailDialog(
                 ),
               );
             },
-            child: const Text('Payer'),
+            child: Text(tr('Payer')),
           ),
         if (type == 'CARPOOL' &&
             status == 'COMPLETED' &&
@@ -468,7 +469,7 @@ Future<void> showHistoryDetailDialog(
                 ),
               );
             },
-            child: const Text('Payer'),
+            child: Text(tr('Payer')),
           ),
         if (type == 'RENTAL' &&
             status == 'RETURNED' &&
@@ -495,7 +496,7 @@ Future<void> showHistoryDetailDialog(
                 ),
               );
             },
-            child: const Text('Payer'),
+            child: Text(tr('Payer')),
           ),
         if (type == 'SCHEDULED' &&
             status == 'IN_PROGRESS' &&
@@ -514,7 +515,7 @@ Future<void> showHistoryDetailDialog(
                 ),
               );
             },
-            child: const Text('Suivre en direct'),
+            child: Text(tr('Suivre en direct')),
           ),
         if (historyItemHasReceipt(item))
           FilledButton.icon(
@@ -531,7 +532,7 @@ Future<void> showHistoryDetailDialog(
               }
             },
             icon: const Icon(Icons.receipt_long),
-            label: const Text('Voir le reçu'),
+            label: Text(tr('Voir le reçu')),
           ),
       ],
     ),

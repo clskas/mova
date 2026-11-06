@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/config/market_config.dart';
 import '../../../core/theme/mova_colors.dart';
+import '../../../core/i18n/i18n.dart';
 
 /// Résultat de validation du PIN côté API.
 typedef PinValidationResult = ({bool ok, String? message});
@@ -124,8 +125,8 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'À encaisser auprès du passager',
+                  Text(
+                    tr('À encaisser auprès du passager'),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -175,14 +176,14 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
       actions: [
         TextButton(
           onPressed: _submitting ? null : () => Navigator.pop(context),
-          child: const Text('Annuler'),
+          child: Text(tr('Annuler')),
         ),
         if (widget.validate == null)
           TextButton(
             onPressed: _submitting
                 ? null
                 : () => _submit(_controller.text.trim()),
-            child: const Text('Valider'),
+            child: Text(tr('Valider')),
           ),
       ],
     );

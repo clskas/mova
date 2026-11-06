@@ -8,6 +8,7 @@ import '../../core/api/api_client.dart';
 import '../../core/theme/mova_colors.dart';
 import 'call_ring_service.dart';
 import 'delivery_voice_call_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Overlay global : bouton Décrocher / Refuser quand un appel LiveKit arrive.
 class IncomingCallOverlay extends ConsumerWidget {
@@ -108,8 +109,8 @@ class _IncomingCallSheet extends StatelessWidget {
                 child: const Icon(Icons.call, size: 48, color: Colors.white),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Appel vocal SENGA',
+              Text(
+                tr('Appel vocal SENGA'),
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 22,
@@ -138,7 +139,7 @@ class _IncomingCallSheet extends StatelessWidget {
                       ),
                       onPressed: onDecline,
                       icon: const Icon(Icons.call_end),
-                      label: const Text('Refuser'),
+                      label: Text(tr('Refuser')),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -151,7 +152,7 @@ class _IncomingCallSheet extends StatelessWidget {
                       ),
                       onPressed: onAnswer,
                       icon: const Icon(Icons.call),
-                      label: const Text('Décrocher'),
+                      label: Text(tr('Décrocher')),
                     ),
                   ),
                 ],

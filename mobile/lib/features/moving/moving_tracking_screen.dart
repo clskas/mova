@@ -13,6 +13,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../booking/payment_screen.dart';
 import '../billing/cash_paid_claim_button.dart';
 import '../history/history_detail_dialog.dart';
+import '../../core/i18n/i18n.dart';
 
 class MovingTrackingScreen extends ConsumerStatefulWidget {
   const MovingTrackingScreen({
@@ -81,11 +82,11 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Annuler le déménagement ?'),
-        content: const Text('Votre demande sera annulée si l\'équipe n\'a pas encore commencé.'),
+        title: Text(tr('Annuler le déménagement ?')),
+        content: Text(tr('Votre demande sera annulée si l\'équipe n\'a pas encore commencé.')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui, annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Oui, annuler'))),
         ],
       ),
     );
@@ -98,7 +99,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Demande de déménagement annulée')),
+          SnackBar(content: Text(tr('Demande de déménagement annulée'))),
         );
         await _load(silent: true);
       case Failure(:final error):
@@ -184,7 +185,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
     final paymentReady = _request?['paymentReady'] == true;
 
     return MovaScreen(
-      title: 'Suivi déménagement',
+      title: tr('Suivi déménagement'),
       actions: [
         IconButton(icon: const Icon(Icons.refresh), onPressed: () => _load()),
       ],
@@ -240,15 +241,15 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                       ] else if (paymentReady && !isPaid) ...[
                         const SizedBox(height: 12),
                         MovaButton(
-                          label: 'Payer le déménagement',
+                          label: tr('Payer le déménagement'),
                           icon: Icons.payment,
                           onPressed: _openPayment,
                         ),
                       ],
                       const SizedBox(height: 8),
-                      const Text(
-                        'Un administrateur SENGA valide votre demande, assigne une équipe/camion, '
-                        'puis met à jour le statut. Vous voyez ici les changements en temps réel.',
+                      Text(
+                        tr('Un administrateur SENGA valide votre demande, assigne une équipe/camion, '
+                        'puis met à jour le statut. Vous voyez ici les changements en temps réel.'),
                         style: TextStyle(fontSize: 12, color: MovaColors.textSecondary, height: 1.35),
                       ),
                     ],
@@ -256,7 +257,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                 ),
                 if (_photoUrls.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  Text('Photos inventaire', style: Theme.of(context).textTheme.titleSmall),
+                  Text(tr('Photos inventaire'), style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
                   SizedBox(
                     height: 88,
@@ -283,7 +284,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                   ),
                 ],
                 const SizedBox(height: 20),
-                Text('Suivi', style: Theme.of(context).textTheme.titleSmall),
+                Text(tr('Suivi'), style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 12),
                 ..._timeline.map((step) {
                   final done = step['done'] == true;
@@ -305,7 +306,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                 if (CancelEligibility.moving(_request)) ...[
                   const SizedBox(height: 16),
                   MovaButton(
-                    label: 'Annuler la demande',
+                    label: tr('Annuler la demande'),
                     icon: Icons.cancel_outlined,
                     isLoading: _cancelling,
                     isSecondary: true,
@@ -314,7 +315,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                 ],
                 const SizedBox(height: 24),
                 MovaButton(
-                  label: 'Retour à l\'accueil',
+                  label: tr('Retour à l\'accueil'),
                   isSecondary: true,
                   icon: Icons.home_outlined,
                   onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),

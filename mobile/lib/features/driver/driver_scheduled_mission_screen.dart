@@ -10,6 +10,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../history/history_detail_dialog.dart';
 import '../../core/safety/sos_helper.dart';
 import 'widgets/driver_cash_received_dialog.dart';
+import '../../core/i18n/i18n.dart';
 
 class DriverScheduledMissionScreen extends ConsumerStatefulWidget {
   const DriverScheduledMissionScreen({
@@ -103,7 +104,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Candidature enregistrée pour ce créneau')),
+          SnackBar(content: Text(tr('Candidature enregistrée pour ce créneau'))),
         );
       case Failure(:final error):
         setState(() => _error = error.message);
@@ -143,13 +144,13 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
     if (!mounted) return;
     if (dialogResult == CashDialogResult.disputed) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Litige enregistré — le client a été notifié')),
+        SnackBar(content: Text(tr('Litige enregistré — le client a été notifié'))),
       );
       return;
     }
     if (dialogResult != CashDialogResult.confirmed) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Paiement espèces confirmé')),
+      SnackBar(content: Text(tr('Paiement espèces confirmé'))),
     );
     Navigator.pop(context, true);
   }
@@ -160,7 +161,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
     if (lat == null || lng == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Coordonnées GPS indisponibles pour la navigation')),
+          SnackBar(content: Text(tr('Coordonnées GPS indisponibles pour la navigation'))),
         );
       }
       return;
@@ -171,7 +172,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
     );
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d\'ouvrir Google Maps')),
+        SnackBar(content: Text(tr('Impossible d\'ouvrir Google Maps'))),
       );
     }
   }
@@ -190,8 +191,8 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
   @override
   Widget build(BuildContext context) {
     if (_loading && _ride == null) {
-      return const MovaScreen(
-        title: 'Mission planifiée',
+      return MovaScreen(
+        title: tr('Mission planifiée'),
         scrollable: false,
         child: Center(child: CircularProgressIndicator(color: MovaColors.violet)),
       );
@@ -203,7 +204,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
     final scheduledAt = _formatScheduledAt();
 
     return MovaScreen(
-      title: 'Mission planifiée',
+      title: tr('Mission planifiée'),
       scrollable: false,
       actions: [
         sosAppBarButton(
@@ -240,10 +241,10 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
                     Text('Date prévue : $scheduledAt'),
                   ],
                   const SizedBox(height: 12),
-                  Text('Départ', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  Text(tr('Départ'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                   Text(pickup, style: const TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
-                  Text('Arrivée', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  Text(tr('Arrivée'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                   Text(dropoff, style: const TextStyle(fontWeight: FontWeight.w600)),
                   if (vehicleType != null) ...[
                     const SizedBox(height: 8),
@@ -261,7 +262,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Suivi', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(tr('Suivi'), style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   ...scheduledTimelineSteps(_status).map((step) {
                     final done = step['done'] == true;
@@ -286,7 +287,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
             const SizedBox(height: 12),
             if (_status == 'SCHEDULED' && (_ride?['driverId'] == null) && widget.initialMission?['volunteered'] != true)
               MovaButton(
-                label: 'Me porter volontaire',
+                label: tr('Me porter volontaire'),
                 isSecondary: true,
                 icon: Icons.how_to_reg_outlined,
                 isLoading: _volunteering,
@@ -295,10 +296,10 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
             if (_status == 'SCHEDULED' && (_ride?['driverId'] == null) && widget.initialMission?['volunteered'] != true)
               const SizedBox(height: 8),
             if (widget.initialMission?['volunteered'] == true) ...[
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(bottom: 8),
                 child: Text(
-                  'Candidature enregistrée — SENGA vous notifiera si vous êtes assigné.',
+                  tr('Candidature enregistrée — SENGA vous notifiera si vous êtes assigné.'),
                   style: TextStyle(fontSize: 12, color: MovaColors.green),
                 ),
               ),
@@ -313,7 +314,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
             ],
             if (_canStart)
               MovaButton(
-                label: 'Démarrer la course',
+                label: tr('Démarrer la course'),
                 icon: Icons.play_arrow,
                 isLoading: _saving,
                 onPressed: _saving
@@ -322,7 +323,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
               ),
             if (_status == 'IN_PROGRESS')
               MovaButton(
-                label: 'Terminer la course',
+                label: tr('Terminer la course'),
                 icon: Icons.check,
                 isLoading: _saving,
                 onPressed: _saving
@@ -332,7 +333,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
             if (_status == 'COMPLETED') ...[
               const SizedBox(height: 8),
               MovaButton(
-                label: 'Cash reçu',
+                label: tr('Cash reçu'),
                 isSecondary: true,
                 icon: Icons.payments_outlined,
                 onPressed: _saving ? null : _confirmCash,

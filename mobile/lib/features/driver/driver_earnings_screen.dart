@@ -13,6 +13,7 @@ import 'cash_debt_cash_payment_screen.dart';
 import 'driver_onboarding_screen.dart';
 import '../../core/wallet/wallet_movements.dart';
 import '../wallet/wallet_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 enum _EarningsPeriod { today, week, month, custom }
 
@@ -225,10 +226,10 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
 
   Widget _walletMovementHistory() {
     if (_walletMovements.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
         child: Text(
-          'Aucune recharge ou retrait enregistré.',
+          tr('Aucune recharge ou retrait enregistré.'),
           style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
         ),
       );
@@ -358,8 +359,8 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     );
     if (settled == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Paiement espèces confirmé — dettes soldées'),
+        SnackBar(
+          content: Text(tr('Paiement espèces confirmé — dettes soldées')),
           backgroundColor: MovaColors.green,
         ),
       );
@@ -379,13 +380,13 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Régler les dettes espèces'),
+        title: Text(tr('Régler les dettes espèces')),
         content: Text(
           'SENGA débitera ${MarketConfig.formatCdf(total)} de votre portefeuille pour solder les encaissements cash à reverser.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Régler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Régler'))),
         ],
       ),
     );
@@ -498,7 +499,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Solde retirable', style: TextStyle(color: MovaColors.textSecondary, fontSize: 13)),
+          Text(tr('Solde retirable'), style: TextStyle(color: MovaColors.textSecondary, fontSize: 13)),
           const SizedBox(height: 6),
           Text(
             MarketConfig.formatCdf(balance),
@@ -506,7 +507,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Portefeuille (prépaiements wallet / Mobile Money)',
+            tr('Portefeuille (prépaiements wallet / Mobile Money)'),
             style: TextStyle(fontSize: 11, color: MovaColors.textSecondary.withValues(alpha: 0.9)),
           ),
           if (cashEarnings > 0) ...[
@@ -521,8 +522,8 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Gains espèces (non retirables)',
+                  Text(
+                    tr('Gains espèces (non retirables)'),
                     style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                   ),
                   const SizedBox(height: 4),
@@ -531,8 +532,8 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                     style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: MovaColors.orange),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
-                    'Argent encaissé en cash chez le client. Les commissions SENGA se règlent au guichet.',
+                  Text(
+                    tr('Argent encaissé en cash chez le client. Les commissions SENGA se règlent au guichet.'),
                     style: TextStyle(fontSize: 11, color: MovaColors.textSecondary),
                   ),
                 ],
@@ -563,7 +564,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text('Missions', style: TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
+                  Text(tr('Missions'), style: TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
                   const SizedBox(height: 4),
                   Text('$_periodCount', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                 ],
@@ -572,7 +573,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
           ),
           const SizedBox(height: 14),
           MovaButton(
-            label: 'Recharger le portefeuille',
+            label: tr('Recharger le portefeuille'),
             icon: Icons.add_card_outlined,
             onPressed: () async {
               await Navigator.of(context).push(
@@ -590,7 +591,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Vue d\'ensemble', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+        Text(tr('Vue d\'ensemble'), style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -645,19 +646,19 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       );
     }
     if (_period == _EarningsPeriod.custom && (_customFrom == null || _customTo == null)) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 16),
         child: Text(
-          'Choisissez une plage de dates pour afficher l\'historique.',
+          tr('Choisissez une plage de dates pour afficher l\'historique.'),
           style: TextStyle(color: MovaColors.textSecondary),
         ),
       );
     }
     if (items.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 16),
         child: Text(
-          'Aucune mission terminée sur cette période.',
+          tr('Aucune mission terminée sur cette période.'),
           style: TextStyle(color: MovaColors.textSecondary),
         ),
       );
@@ -665,7 +666,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Activité', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+        Text(tr('Activité'), style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
         const SizedBox(height: 8),
         ...items.map((item) {
           final when = item['completedAt']?.toString();
@@ -723,8 +724,8 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
             children: [
               const Icon(Icons.payments_outlined, color: MovaColors.orange),
               const SizedBox(width: 8),
-              const Expanded(
-                child: Text('Dettes espèces à reverser', style: TextStyle(fontWeight: FontWeight.bold)),
+              Expanded(
+                child: Text(tr('Dettes espèces à reverser'), style: TextStyle(fontWeight: FontWeight.bold)),
               ),
               Text(
                 MarketConfig.formatCdf(total),
@@ -734,14 +735,14 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
           ),
           const SizedBox(height: 12),
           MovaButton(
-            label: 'Régler depuis le portefeuille',
+            label: tr('Régler depuis le portefeuille'),
             icon: Icons.account_balance_wallet,
             isLoading: _settlingDebt,
             onPressed: _settlingDebt || _withdrawing ? null : _settleCashDebts,
           ),
           const SizedBox(height: 8),
           MovaButton(
-            label: 'Payer en espèces au guichet',
+            label: tr('Payer en espèces au guichet'),
             icon: Icons.payments_outlined,
             isSecondary: true,
             onPressed: _settlingDebt || _withdrawing ? null : _openCashDebtCashPayment,
@@ -754,7 +755,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Revenus',
+      title: tr('Revenus'),
       actions: [
         IconButton(icon: const Icon(Icons.refresh), onPressed: _loading || _withdrawing ? null : _load),
       ],
@@ -777,7 +778,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                       _periodChip('Semaine', _EarningsPeriod.week),
                       _periodChip('Mois', _EarningsPeriod.month),
                       ChoiceChip(
-                        label: const Text('Personnalisé'),
+                        label: Text(tr('Personnalisé')),
                         selected: _period == _EarningsPeriod.custom,
                         onSelected: _loading || _loadingActivity ? null : (_) => _pickCustomRange(),
                       ),
@@ -800,7 +801,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    labelText: 'Rechercher (adresse, référence…)',
+                    labelText: tr('Rechercher (adresse, référence…)'),
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
@@ -823,13 +824,13 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                 const SizedBox(height: 16),
                 _activityList(),
                 const Divider(height: 32),
-                const Text('Retrait Mobile Money', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(tr('Retrait Mobile Money'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
                 if (_payoutConfigured)
                   Text('Dossier : $_payoutLabel', style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13))
                 else
-                  const Text(
-                    'Indiquez ci-dessous le numéro Mobile Money qui recevra le retrait.',
+                  Text(
+                    tr('Indiquez ci-dessous le numéro Mobile Money qui recevra le retrait.'),
                     style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                   ),
                 const SizedBox(height: 12),
@@ -838,8 +839,8 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                     value: _mmChoices.any((c) => c.id == _withdrawProviderId)
                         ? _withdrawProviderId
                         : _mmChoices.first.id,
-                    decoration: const InputDecoration(
-                      labelText: 'Opérateur Mobile Money',
+                    decoration: InputDecoration(
+                      labelText: tr('Opérateur Mobile Money'),
                       prefixIcon: Icon(Icons.phone_android),
                     ),
                     items: _mmChoices
@@ -858,8 +859,8 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                   enabled: !_withdrawing,
                   keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
-                    labelText: 'Numéro de retrait',
-                    hintText: '08X XXX XXXX',
+                    labelText: tr('Numéro de retrait'),
+                    hintText: tr('08X XXX XXXX'),
                     helperText: _payoutConfigured
                         ? 'Laissez vide pour utiliser le numéro du dossier ($_payoutLabel)'
                         : 'Numéro qui recevra le Mobile Money',
@@ -873,7 +874,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                   enabled: !_withdrawing && _canWithdraw,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    labelText: 'Montant retrait (FC)',
+                    labelText: tr('Montant retrait (FC)'),
                     helperText: MarketConfig.minWalletAmountLabel,
                     prefixIcon: const Icon(Icons.payments_outlined),
                   ),
@@ -891,8 +892,8 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                   onPressed: _withdrawing ? null : (_canWithdraw ? _withdraw : null),
                 ),
                 const SizedBox(height: 24),
-                const Text(
-                  'Historique recharges & retraits',
+                Text(
+                  tr('Historique recharges & retraits'),
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 8),

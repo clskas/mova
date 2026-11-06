@@ -14,6 +14,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../billing/receipt_screen.dart';
 import '../../core/wallet/mobile_money_prompt.dart';
+import '../../core/i18n/i18n.dart';
 
 const _allPaymentMethods = [
   ('WALLET', 'Portefeuille SENGA', Icons.account_balance_wallet, MovaColors.violet),
@@ -208,8 +209,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final isErrand = widget.serviceType?.toUpperCase() == 'ERRAND';
     if (_escrowCollect) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Montant sécurisé. Le livreur peut partir — il sera payé après votre confirmation.'),
+        SnackBar(
+          content: Text(tr('Montant sécurisé. Le livreur peut partir — il sera payé après votre confirmation.')),
         ),
       );
       Navigator.pop(context, true);
@@ -217,7 +218,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
     if (!pendingCash && !isErrand) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Paiement effectué avec succès')),
+        SnackBar(content: Text(tr('Paiement effectué avec succès'))),
       );
     }
     Navigator.pushReplacement(
@@ -369,8 +370,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       case Success(:final data):
         if (_method == 'CASH' && data['pendingCash'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Paiement espèces en attente — remettez l\'argent au livreur.'),
+            SnackBar(
+              content: Text(tr('Paiement espèces en attente — remettez l\'argent au livreur.')),
             ),
           );
           await _goToReceipt(pendingCash: true);
@@ -407,14 +408,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Paiement',
+      title: tr('Paiement'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           MovaCard(
             child: Column(
               children: [
-                const Text('Montant à payer', style: TextStyle(color: MovaColors.textSecondary)),
+                Text(tr('Montant à payer'), style: TextStyle(color: MovaColors.textSecondary)),
                 const SizedBox(height: 8),
                 Text(
                   MarketConfig.formatCdf(_amountCdf),
@@ -427,7 +428,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 if (_needsPhone) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'Montant fixé par SENGA — sur votre téléphone Mobile Money, confirmez uniquement le PIN (ne saisissez pas un autre montant).',
+                    tr('Montant fixé par SENGA — sur votre téléphone Mobile Money, confirmez uniquement le PIN (ne saisissez pas un autre montant).'),
                     textAlign: TextAlign.center,
                     style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.95), fontSize: 12),
                   ),
@@ -443,8 +444,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   )
                 else if (_method == 'CASH') ...[
                   const SizedBox(height: 12),
-                  const Text(
-                    'Remettez l\'argent au chauffeur ou livreur. Il confirmera « Cash reçu » dans son app — aucun code à communiquer.',
+                  Text(
+                    tr('Remettez l\'argent au chauffeur ou livreur. Il confirmera « Cash reçu » dans son app — aucun code à communiquer.'),
                     textAlign: TextAlign.center,
                     style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                   ),
@@ -454,13 +455,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           ),
           const SizedBox(height: 20),
           if (_escrowCollect) ...[
-            const Text(
-              'Livraison garantie : le livreur ne part qu\'après ce paiement. Il n\'est payé qu\'à la réception (PIN).',
+            Text(
+              tr('Livraison garantie : le livreur ne part qu\'après ce paiement. Il n\'est payé qu\'à la réception (PIN).'),
               style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 12),
           ],
-          Text('Mode de paiement', style: Theme.of(context).textTheme.titleSmall),
+          Text(tr('Mode de paiement'), style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           ..._paymentMethods.where((m) => _cashAllowed || m.$1 != 'CASH').map((m) {
             final (id, label, icon, color) = m;
@@ -491,9 +492,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             TextField(
               controller: _phoneController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Numéro mobile money',
-                hintText: '+243XXXXXXXXX',
+              decoration: InputDecoration(
+                labelText: tr('Numéro mobile money'),
+                hintText: tr('+243XXXXXXXXX'),
                 prefixIcon: Icon(Icons.phone),
               ),
             ),
@@ -502,13 +503,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               MovaCard(
                 child: Column(
                   children: [
-                    const Text(
-                      'Paiement rapide par QR',
+                    Text(
+                      tr('Paiement rapide par QR'),
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Scannez ce code avec l\'app mobile money ou partagez la référence au guichet.',
+                    Text(
+                      tr('Scannez ce code avec l\'app mobile money ou partagez la référence au guichet.'),
                       textAlign: TextAlign.center,
                       style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                     ),
@@ -560,22 +561,22 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2.5),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Confirmez sur votre téléphone',
+                  Text(
+                    tr('Confirmez sur votre téléphone'),
                     style: TextStyle(fontWeight: FontWeight.w600),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Une demande Mobile Money a été envoyée. Validez avec votre PIN sur le téléphone ; '
-                    'nous confirmerons automatiquement.',
+                  Text(
+                    tr('Une demande Mobile Money a été envoyée. Validez avec votre PIN sur le téléphone ; '
+                    'nous confirmerons automatiquement.'),
                     textAlign: TextAlign.center,
                     style: TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: _cancelMobileMoneyWait,
-                    child: const Text('Annuler (PIN Cancel)'),
+                    child: Text(tr('Annuler (PIN Cancel)')),
                   ),
                 ],
               ),

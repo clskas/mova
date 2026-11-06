@@ -21,6 +21,7 @@ import '../../core/widgets/service_area_selector.dart';
 import '../booking/payment_screen.dart';
 import 'commerce_type.dart';
 import 'food_tracking_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 class FoodDeliveryScreen extends ConsumerStatefulWidget {
   const FoodDeliveryScreen({
@@ -212,7 +213,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           city: _deliveryCityName,
           proximityLat: _deliveryLat,
           proximityLng: _deliveryLng,
-          label: 'Adresse de livraison',
+          label: tr('Adresse de livraison'),
           hint: 'Ex: Gombe, chez Mama X, Bandal…',
           prefixIcon: Icons.delivery_dining,
           textInputAction: TextInputAction.done,
@@ -220,7 +221,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           onSelected: _onAddressSuggestionSelected,
           suffixIcon: IconButton(
             icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
-            tooltip: 'Ma position',
+            tooltip: tr('Ma position'),
             onPressed: _loadingGps ? null : _useMyLocationForDelivery,
           ),
         ),
@@ -457,14 +458,14 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Produit réservé aux adultes'),
-        content: const Text(
-          'Ce produit est réservé aux personnes de 18 ans et plus. '
-          'Confirmez-vous avoir au moins 18 ans ?',
+        title: Text(tr('Produit réservé aux adultes')),
+        content: Text(
+          tr('Ce produit est réservé aux personnes de 18 ans et plus. '
+          'Confirmez-vous avoir au moins 18 ans ?'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui, j\'ai 18+')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Oui, j\'ai 18+'))),
         ],
       ),
     );
@@ -479,22 +480,22 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return AlertDialog(
-              title: const Text('Ordonnance requise'),
+              title: Text(tr('Ordonnance requise')),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Ce produit nécessite une ordonnance valide. '
-                    'Vous devrez la présenter au magasin ou au livreur.',
+                  Text(
+                    tr('Ce produit nécessite une ordonnance valide. '
+                    'Vous devrez la présenter au magasin ou au livreur.'),
                   ),
                   const SizedBox(height: 12),
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     value: acknowledged,
                     onChanged: (v) => setDialogState(() => acknowledged = v == true),
-                    title: const Text(
-                      'Je confirme disposer d\'une ordonnance valide',
+                    title: Text(
+                      tr('Je confirme disposer d\'une ordonnance valide'),
                       style: TextStyle(fontSize: 14),
                     ),
                     controlAffinity: ListTileControlAffinity.leading,
@@ -502,10 +503,10 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                 ],
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
                 ElevatedButton(
                   onPressed: acknowledged ? () => Navigator.pop(ctx, true) : null,
-                  child: const Text('Continuer'),
+                  child: Text(tr('Continuer')),
                 ),
               ],
             );
@@ -583,7 +584,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                       ],
                       const SizedBox(height: 12),
                       if (sizes != null && sizes.isNotEmpty) ...[
-                        const Text('Taille', style: TextStyle(fontWeight: FontWeight.w600)),
+                        Text(tr('Taille'), style: TextStyle(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 6),
                         Wrap(
                           spacing: 8,
@@ -599,7 +600,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                         const SizedBox(height: 12),
                       ],
                       if (options.isNotEmpty) ...[
-                        const Text('Options / suppléments', style: TextStyle(fontWeight: FontWeight.w600)),
+                        Text(tr('Options / suppléments'), style: TextStyle(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 6),
                         ...options.map((o) {
                           final label = (o['label'] ?? o['name'])?.toString() ?? '';
@@ -621,7 +622,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                       ],
                       ElevatedButton(
                         onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Ajouter'),
+                        child: Text(tr('Ajouter')),
                       ),
                     ],
                   ),
@@ -765,8 +766,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                             ],
                             if (description.isNotEmpty) ...[
                               const SizedBox(height: 16),
-                              const Text(
-                                'Description',
+                              Text(
+                                tr('Description'),
                                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                               ),
                               const SizedBox(height: 6),
@@ -781,7 +782,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                             ],
                             if (showSizesOptions && sizes != null && sizes.isNotEmpty) ...[
                               const SizedBox(height: 16),
-                              const Text('Tailles disponibles', style: TextStyle(fontWeight: FontWeight.w600)),
+                              Text(tr('Tailles disponibles'), style: TextStyle(fontWeight: FontWeight.w600)),
                               const SizedBox(height: 8),
                               Wrap(
                                 spacing: 8,
@@ -793,7 +794,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                             ],
                             if (showSizesOptions && options.isNotEmpty) ...[
                               const SizedBox(height: 16),
-                              const Text('Options / suppléments', style: TextStyle(fontWeight: FontWeight.w600)),
+                              Text(tr('Options / suppléments'), style: TextStyle(fontWeight: FontWeight.w600)),
                               const SizedBox(height: 8),
                               ...options.map((o) {
                                 return Padding(
@@ -1301,7 +1302,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                 children: [
                   Flexible(
                     child: Text(
-                      'Filtres livraison',
+                      tr('Filtres livraison'),
                       style: Theme.of(context).textTheme.titleSmall,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1322,7 +1323,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
             if (_hasActiveRestaurantFilters)
               TextButton(
                 onPressed: _refreshing ? null : _resetRestaurantFilters,
-                child: const Text('Réinitialiser'),
+                child: Text(tr('Réinitialiser')),
               ),
           ],
         ),
@@ -1330,12 +1331,12 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         if (showCuisineFilter)
           DropdownButtonFormField<String?>(
             value: _filterCuisine.isEmpty ? null : _filterCuisine,
-            decoration: const InputDecoration(
-              labelText: 'Cuisine',
+            decoration: InputDecoration(
+              labelText: tr('Cuisine'),
               isDense: true,
             ),
             items: [
-              const DropdownMenuItem<String?>(value: null, child: Text('Toutes')),
+              DropdownMenuItem<String?>(value: null, child: Text(tr('Toutes'))),
               ...{
                 if (_filterCuisine.trim().isNotEmpty) _filterCuisine.trim(),
                 ..._restaurants
@@ -1632,8 +1633,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                     ].join(' · '),
                                     style: const TextStyle(fontSize: 11, color: MovaColors.orange),
                                   ),
-                                const Text(
-                                  'Voir le détail',
+                                Text(
+                                  tr('Voir le détail'),
                                   style: TextStyle(fontSize: 11, color: MovaColors.violet),
                                 ),
                               ],
@@ -1670,8 +1671,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           const SizedBox(height: 12),
           TextField(
             controller: _promoController,
-            decoration: const InputDecoration(
-              labelText: 'Code promo (optionnel)',
+            decoration: InputDecoration(
+              labelText: tr('Code promo (optionnel)'),
               prefixIcon: Icon(Icons.local_offer),
             ),
             onChanged: (_) => setState(() => _estimatedTotal = null),
@@ -1682,7 +1683,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
               children: [
                 Row(
                   children: [
-                    const Expanded(child: Text('Sous-total articles')),
+                    Expanded(child: Text(tr('Sous-total articles'))),
                     Flexible(
                       child: Text(
                         MarketConfig.formatCdf(_cartSubtotal),
@@ -1698,7 +1699,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Expanded(child: Text('Frais de livraison')),
+                        Expanded(child: Text(tr('Frais de livraison'))),
                         Flexible(
                           child: Text(
                             MarketConfig.formatCdf(_estimatedDeliveryFee!),
@@ -1712,7 +1713,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Expanded(child: Text('Réduction')),
+                        Expanded(child: Text(tr('Réduction'))),
                         Flexible(
                           child: Text(
                             '- ${MarketConfig.formatCdf(_estimatedDiscount!)}',
@@ -1726,8 +1727,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                   const Divider(height: 16),
                   Row(
                     children: [
-                      const Expanded(
-                        child: Text('Total estimé', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(
+                        child: Text(tr('Total estimé'), style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                       Flexible(
                         child: Text(
@@ -1758,14 +1759,14 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           const SizedBox(height: 12),
           if (_estimatedTotal == null)
             MovaButton(
-              label: 'Estimer la commande',
+              label: tr('Estimer la commande'),
               isLoading: _ordering,
               icon: Icons.calculate_outlined,
               onPressed: _estimateOrder,
             )
           else
             MovaButton(
-              label: 'Commander',
+              label: tr('Commander'),
               isLoading: _ordering,
               icon: Icons.shopping_bag_outlined,
               onPressed: _order,
@@ -1783,7 +1784,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     });
 
     return MovaScreen(
-      title: 'Livraison commerces',
+      title: tr('Livraison commerces'),
       child: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(

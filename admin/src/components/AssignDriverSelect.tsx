@@ -30,7 +30,7 @@ export function driverOptionLabel(d: AdminDriver) {
           ? " · Hors ligne"
           : "";
   const cargo = (d.vehicles ?? []).find(
-    (v) => v.isActive !== false && (v.type === "UTILITAIRE" || v.type === "CAMION"),
+    (v) => v.isActive !== false && (v.type === "UTILITAIRE" || v.type === "CAMION" || v.type === "TRIPOTEUR"),
   );
   const volume = cargo ? (cargo.cargoVolumeM3 != null ? ` · ${cargo.cargoVolumeM3} m³` : " · m³ non déclaré") : "";
   if (name && plate) return `${name} · ${plate}${volume}${duty}`;

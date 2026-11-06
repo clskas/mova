@@ -20,6 +20,8 @@ export const DELIVERY_ALERT_VEHICLE_TYPES: VehicleType[] = [
   VehicleType.FAMILIALE,
   VehicleType.UTILITAIRE,
   VehicleType.CAMION,
+  VehicleType.TRICYCLE,
+  VehicleType.TRIPOTEUR,
 ];
 
 const ALERT_TTL_SEC = 15 * 60;

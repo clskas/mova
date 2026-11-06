@@ -33,6 +33,10 @@ bool passengerCountFeatureEnabled(Object? features) =>
 bool familialeFeatureEnabled(Object? features) =>
     features is Map && features['familialeEnabled'] == true;
 
+/// Admin switch « gamme Tricycle » (tricycle à passagers). Off unless explicitly true.
+bool tricycleFeatureEnabled(Object? features) =>
+    features is Map && features['tricycleEnabled'] == true;
+
 /// Mirrors @mova/shared passenger-seats (driver excluded).
 const Map<String, int> kDefaultPassengerSeats = {
   'MOTO_TAXI': 1,
@@ -42,11 +46,16 @@ const Map<String, int> kDefaultPassengerSeats = {
   'FAMILIALE': 6,
   'UTILITAIRE': 2,
   'CAMION': 2,
+  'TRICYCLE': 3,
+  'TRIPOTEUR': 1,
 };
 const int kMaxRidePassengerCount = 8;
 
 /// Standard / Confort / VIP are 4-seat cars; 5+ passengers book the Familiale gamme.
 const int kCarPassengerLimit = 4;
+
+/// A passenger tricycle carries at most 3 people.
+const int kTricyclePassengerLimit = 3;
 
 /// Gammes limited to [kCarPassengerLimit] passengers.
 bool isFourSeatGamme(String vehicleType) =>
@@ -57,6 +66,8 @@ List<int> declarableSeats(String vehicleType) => switch (vehicleType) {
       'MOTO_TAXI' => const [1],
       'CAMION' => const [1, 2],
       'FAMILIALE' => const [5, 6, 7, 8],
+      'TRICYCLE' => const [1, 2, 3],
+      'TRIPOTEUR' => const [1],
       _ => const [1, 2, 3, 4, 5, 6, 7, 8],
     };
 
@@ -79,6 +90,7 @@ List<String> vehiclePhotosFrom(Map<String, dynamic>? vehicle) {
 ({int min, int max})? cargoVolumeRange(String vehicleType) => switch (vehicleType) {
       'UTILITAIRE' => (min: 1, max: 25),
       'CAMION' => (min: 5, max: 100),
+      'TRIPOTEUR' => (min: 1, max: 4),
       _ => null,
     };
 

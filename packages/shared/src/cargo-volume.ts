@@ -7,6 +7,7 @@ import { MOVING_ELIGIBLE_VEHICLE_TYPES, MovingVehicleCategoryValue, normalizeVeh
 export const CARGO_VOLUME_RANGE_M3: Partial<Record<VehicleTypeValue, { min: number; max: number }>> = {
   UTILITAIRE: { min: 1, max: 25 },
   CAMION: { min: 5, max: 100 },
+  TRIPOTEUR: { min: 1, max: 4 },
 };
 
 function typeOrNull(type: string | null | undefined): VehicleTypeValue | null {

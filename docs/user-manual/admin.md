@@ -113,6 +113,7 @@ Pour les véhicules **VIP**, **Confort** ou autres catégories réglementées :
 
 - **Activer le choix du nombre de passagers** : le passager indique combien de personnes voyagent ; seules les voitures avec assez de places reçoivent la course. Désactivé, chaque course compte pour 1 passager.
 - **Gamme Familiale (6–8 places)** : affiche la gamme dans l'app passager ; Standard, Confort et VIP sont alors limités à 4 personnes. N'activez qu'avec des véhicules Familiale validés. Tarif : **Tarifs → Familiale**.
+- **Gamme Tricycle (1–3 places)** : affiche la gamme Tricycle (tricycle à passagers) dans l'app passager. Activez-la ville par ville une fois assez de tricycles validés (10 à 20 conseillés). Tarif de départ ≈ Standard − 30 % : **Tarifs → Tricycle**. Les **tripoteurs** (marchandises) n'en dépendent pas : ils reçoivent colis, commissions et déménagements « camionnette » dès la validation de leur type d'engin.
 
 ## Opérations (lecture + mise à jour)
 

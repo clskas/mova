@@ -16,6 +16,8 @@ enum VehicleType {
   FAMILIALE
   UTILITAIRE
   CAMION
+  TRICYCLE
+  TRIPOTEUR
 }
 
 enum KycStatus {

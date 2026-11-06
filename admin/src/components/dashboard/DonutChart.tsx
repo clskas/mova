@@ -8,6 +8,8 @@ const VEHICLE_LABELS: Record<string, string> = {
   COMFORT: "Confort",
   VIP: "VIP",
   FAMILIALE: "Familiale",
+  TRICYCLE: "Tricycle",
+  TRIPOTEUR: "Tripoteur",
 };
 
 type DonutChartProps = {

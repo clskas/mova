@@ -40,10 +40,13 @@ const DEFAULT_PASSENGER_SEATS: Record<string, number> = {
   FAMILIALE: 6,
   UTILITAIRE: 2,
   CAMION: 2,
+  TRICYCLE: 3,
+  TRIPOTEUR: 1,
 };
 const CARGO_VOLUME_RANGE: Record<string, { min: number; max: number }> = {
   UTILITAIRE: { min: 1, max: 25 },
   CAMION: { min: 5, max: 100 },
+  TRIPOTEUR: { min: 1, max: 4 },
 };
 function vehicleCargoLabel(v: { type: string; cargoVolumeM3?: number | null }): string | null {
   if (!CARGO_VOLUME_RANGE[v.type]) return null;

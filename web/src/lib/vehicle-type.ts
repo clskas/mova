@@ -16,6 +16,10 @@ const ALIASES: Record<string, string> = {
   FAMILIALE: "FAMILIALE",
   XL: "FAMILIALE",
   VAN: "FAMILIALE",
+  // Tricycle à passagers: known for display; booked from the mobile app only.
+  TRICYCLE: "TRICYCLE",
+  KEKE: "TRICYCLE",
+  TUKTUK: "TRICYCLE",
 };
 
 export const VEHICLE_CATEGORIES = [

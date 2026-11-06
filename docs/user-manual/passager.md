@@ -32,7 +32,7 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 
 1. Appuyez sur **Taxi / Moto-taxi**.
 2. Indiquez votre destination (ex : Gombe, Limete, Masina).
-3. Choisissez le type de véhicule : Moto-taxi, Standard, Confort, VIP ou **Familiale** (6 à 8 places).
+3. Choisissez le type de véhicule : Moto-taxi, Standard, Confort, VIP, **Familiale** (6 à 8 places) ou **Tricycle** (tricycle à passagers, 3 places maximum, moins cher qu'une voiture — quand il est disponible dans votre ville).
    - En voiture, indiquez le **nombre de passagers** avec les boutons − et +. Standard, Confort et VIP : **4 passagers maximum**.
    - À partir de **5 passagers**, l'app passe automatiquement en **Familiale**. Le prix est par véhicule, pas par passager.
    - Seules les voitures qui ont assez de places reçoivent votre demande : avec 7 ou 8 passagers, l'attente peut être plus longue.

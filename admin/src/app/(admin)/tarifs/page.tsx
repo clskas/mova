@@ -63,6 +63,7 @@ const VEHICLE_LABELS: Record<string, string> = {
   COMFORT: "Confort",
   VIP: "VIP",
   FAMILIALE: "Familiale (6–8 places)",
+  TRICYCLE: "Tricycle (1–3 places)",
 };
 
 const DELIVERY_LABELS: Record<string, string> = {

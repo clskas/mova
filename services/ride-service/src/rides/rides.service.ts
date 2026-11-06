@@ -21,6 +21,7 @@ import {
   RideStatusSmsPayload,
   DriverJobAlertPayload,
   isFamilialeEnabled,
+  isTricycleEnabled,
   isPassengerCountEnabled,
   normalizeRidePassengerCount,
 } from '@mova/shared';
@@ -99,6 +100,12 @@ export class RidesService {
   private passengerCountEnabled(): boolean {
     const cfg = this.clientApps?.get();
     return cfg ? isPassengerCountEnabled(cfg) : false;
+  }
+
+  /** Gamme Tricycle: bookable only while its admin switch is on (drivers can register anyway). */
+  private tricycleEnabled(): boolean {
+    const cfg = this.clientApps?.get();
+    return cfg ? isTricycleEnabled(cfg) : false;
   }
 
   /** Gamme Familiale: bookable only while its admin switch is on (drivers can register anyway). */
@@ -251,6 +258,13 @@ export class RidesService {
     });
     if (active) throw new MovaHttpException(MovaErrorCode.RIDE_ALREADY_ACTIVE);
 
+    if (data.vehicleType === VehicleType.TRICYCLE && !this.tricycleEnabled()) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        "La gamme Tricycle n'est pas encore disponible. Choisissez Moto-taxi ou Standard.",
+      );
+    }
     if (data.vehicleType === VehicleType.FAMILIALE && !this.familialeEnabled()) {
       throw new MovaHttpException(
         MovaErrorCode.VALIDATION_ERROR,

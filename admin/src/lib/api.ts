@@ -2840,7 +2840,12 @@ export type ClientAppsConfig = {
     apps: Record<ClientAppId, boolean>;
   };
   passengerServices: Record<PassengerServiceId, boolean>;
-  features?: { sengaPlusVisible?: boolean; passengerCountEnabled?: boolean; familialeEnabled?: boolean };
+  features?: {
+    sengaPlusVisible?: boolean;
+    passengerCountEnabled?: boolean;
+    familialeEnabled?: boolean;
+    tricycleEnabled?: boolean;
+  };
   sosAlertUserIds?: string[];
   /** PASSENGER | DRIVER | PARTNER — audiences supplémentaires (push / in-app). */
   sosAlertAudiences?: Array<"PASSENGER" | "DRIVER" | "PARTNER">;

@@ -4,7 +4,7 @@ import {
   vehicleFitsPassengers,
   vehiclePassengerSeats,
 } from './passenger-seats';
-import { mergeClientAppsConfig, isFamilialeEnabled, isPassengerCountEnabled } from './client-apps-config';
+import { mergeClientAppsConfig, isFamilialeEnabled, isPassengerCountEnabled, isTricycleEnabled } from './client-apps-config';
 import { RIDE_PASSENGER_LIMIT_BY_TYPE } from './passenger-seats';
 
 describe('passenger seats', () => {
@@ -75,5 +75,20 @@ describe('passenger seats', () => {
     expect(isFamilialeEnabled(mergeClientAppsConfig({}))).toBe(false);
     expect(isFamilialeEnabled(mergeClientAppsConfig({ features: { familialeEnabled: true } }))).toBe(true);
     expect(mergeClientAppsConfig({ features: { familialeEnabled: true } }).features.passengerCountEnabled).toBe(false);
+  });
+});
+
+describe('tricycle seats and switch', () => {
+  it('seats 1 to 3 passengers, 3 by default; a tripoteur carries no group', () => {
+    expect(vehiclePassengerSeats('TRICYCLE', null)).toBe(3);
+    expect(normalizeDeclaredSeats('TRICYCLE', 4)).toBeNull();
+    expect(normalizeDeclaredSeats('TRICYCLE', 2)).toBe(2);
+    expect(vehicleFitsPassengers({ type: 'TRIPOTEUR' }, 2)).toBe(false);
+    expect(RIDE_PASSENGER_LIMIT_BY_TYPE.TRICYCLE).toBe(3);
+  });
+
+  it('keeps the Tricycle gamme off until the admin turns it on', () => {
+    expect(isTricycleEnabled(mergeClientAppsConfig({}))).toBe(false);
+    expect(isTricycleEnabled(mergeClientAppsConfig({ features: { tricycleEnabled: true } }))).toBe(true);
   });
 });

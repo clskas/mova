@@ -42,6 +42,7 @@ Voir [Admin — Niveaux d'accès par rôle](user-manual/admin.md#niveaux-daccès
 - **Gamme Familiale (6–8 places)** et **nombre de passagers** : Standard, Confort et VIP limités à 4, passage automatique en Familiale dès 5 (interrupteurs dans Services SENGA).
 - **Déménagements** : réservés aux utilitaires et camions ; le chauffeur déclare le **volume utile** (m³) ; les demandes sont **proposées automatiquement** aux chauffeurs éligibles, le premier qui accepte l'obtient.
 - **Photos** : jusqu'à **5 photos** pour l'engin du chauffeur et pour chaque véhicule de location ; galerie sur la fiche location côté passager.
+- **Tricycles** : nouveaux types d'engin **Tricycle passagers** (gamme Tricycle, 3 places, derrière un interrupteur) et **Tripoteur marchandises** (colis, commissions, déménagements camionnette, volume 1 à 4 m³).
 - **Bandeau de mise à jour** : s'affiche dès que le Play Store propose une version plus récente au téléphone (y compris aux testeurs internes).
 
 ## Nouveautés (juillet 2026)

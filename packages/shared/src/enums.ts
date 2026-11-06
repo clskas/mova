@@ -27,6 +27,10 @@ export enum VehicleType {
   FAMILIALE = 'FAMILIALE',
   UTILITAIRE = 'UTILITAIRE',
   CAMION = 'CAMION',
+  /** Tricycle à passagers (« kéké »), 1 à 3 places. */
+  TRICYCLE = 'TRICYCLE',
+  /** Tricycle à benne (marchandises, petits déménagements). */
+  TRIPOTEUR = 'TRIPOTEUR',
 }
 
 export enum RideStatus {

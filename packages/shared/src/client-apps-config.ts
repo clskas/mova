@@ -43,6 +43,11 @@ export type ClientAppsFeatures = {
    * at 4. Drivers can register Familiale vehicles either way.
    */
   familialeEnabled: boolean;
+  /**
+   * Gamme « Tricycle » (tricycle à passagers, 1–3 places) in the passenger app. Off = hidden
+   * and refused by the API. Drivers can register tricycles and tripoteurs either way.
+   */
+  tricycleEnabled: boolean;
 };
 
 /** Extra SOS recipient audiences beyond ops staff (push / in-app; SMS stays ops-only). */
@@ -138,7 +143,7 @@ export const DEFAULT_CLIENT_APPS_CONFIG: ClientAppsConfig = {
     },
   },
   passengerServices: defaultPassengerServices(),
-  features: { sengaPlusVisible: true, passengerCountEnabled: false, familialeEnabled: false },
+  features: { sengaPlusVisible: true, passengerCountEnabled: false, familialeEnabled: false, tricycleEnabled: false },
   sosAlertUserIds: [],
   sosAlertAudiences: [],
   sosEmergencyContacts: structuredClone(DEFAULT_SOS_EMERGENCY_CONTACTS),
@@ -246,6 +251,9 @@ export function mergeClientAppsConfig(raw: unknown): ClientAppsConfig {
     }
     if (typeof featuresSrc.familialeEnabled === 'boolean') {
       base.features.familialeEnabled = featuresSrc.familialeEnabled;
+    }
+    if (typeof featuresSrc.tricycleEnabled === 'boolean') {
+      base.features.tricycleEnabled = featuresSrc.tricycleEnabled;
     }
   }
 
@@ -423,6 +431,10 @@ export function isPassengerCountEnabled(config: ClientAppsConfig): boolean {
 
 export function isFamilialeEnabled(config: ClientAppsConfig): boolean {
   return config.features?.familialeEnabled === true;
+}
+
+export function isTricycleEnabled(config: ClientAppsConfig): boolean {
+  return config.features?.tricycleEnabled === true;
 }
 
 export function isSengaPlusVisible(config: ClientAppsConfig): boolean {

@@ -14,7 +14,7 @@ import { OpsService } from './ops.service';
 class ApproveKycDto {
   @ApiProperty() @IsBoolean() approved: boolean;
   @ApiProperty({ required: false }) @IsOptional() @IsString() notes?: string;
-  @ApiProperty({ required: false, enum: ['MOTO_TAXI', 'STANDARD', 'COMFORT', 'VIP', 'FAMILIALE', 'UTILITAIRE', 'CAMION'] })
+  @ApiProperty({ required: false, enum: ['MOTO_TAXI', 'STANDARD', 'COMFORT', 'VIP', 'FAMILIALE', 'UTILITAIRE', 'CAMION', 'TRICYCLE', 'TRIPOTEUR'] })
   @Transform(({ value }) => {
     if (value == null || value === '') return undefined;
     try {

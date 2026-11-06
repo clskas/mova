@@ -76,6 +76,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   int _passengerCount = 1;
   /// Admin switch « gamme Familiale » (6–8 places); hidden until confirmed on.
   bool _familialeEnabled = false;
+
+  /// Admin switch « gamme Tricycle » (tricycle à passagers, 1–3 places).
+  bool _tricycleEnabled = false;
   List<Map<String, dynamic>> _poiPlaces = [];
   String? _poiCategoryFilter;
   int _poiLoadGeneration = 0;
@@ -137,10 +140,17 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       final enabled = passengerCountFeatureEnabled(data['features']);
       final familiale = familialeFeatureEnabled(data['features']);
       final familialeChanged = familiale != _familialeEnabled;
-      if (enabled != _passengerCountEnabled || familialeChanged) {
+      final tricycle = tricycleFeatureEnabled(data['features']);
+      final tricycleChanged = tricycle != _tricycleEnabled;
+      if (enabled != _passengerCountEnabled || familialeChanged || tricycleChanged) {
         setState(() {
           _passengerCountEnabled = enabled;
           _familialeEnabled = familiale;
+          _tricycleEnabled = tricycle;
+          if (!tricycle && _vehicleType == 'TRICYCLE') {
+            _vehicleType = 'STANDARD';
+            _selectedEstimate = _estimateDetails['STANDARD'];
+          }
           if (!enabled) _passengerCount = 1;
           if (!familiale && _vehicleType == 'FAMILIALE') {
             _vehicleType = 'STANDARD';
@@ -148,7 +158,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           }
           if (_passengerCount > _passengerMax) _passengerCount = _passengerMax;
         });
-        if (familialeChanged && (_dropoff != null || _destinationController.text.trim().isNotEmpty)) {
+        if ((familialeChanged || tricycleChanged) && (_dropoff != null || _destinationController.text.trim().isNotEmpty)) {
           unawaited(_fetchAllEstimates());
         }
       }
@@ -158,10 +168,19 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   /// Familiale is offered for exclusive rides only (Pool books seats, not a vehicle).
   bool get _showFamiliale => _familialeEnabled && !_sharedPool;
 
-  /// Without Familiale every car is a 4-seat car.
-  int get _passengerMax => _showFamiliale ? kMaxRidePassengerCount : kCarPassengerLimit;
+  /// Tricycle is offered for exclusive rides only, like Familiale.
+  bool get _showTricycle => _tricycleEnabled && !_sharedPool;
+
+  /// A tricycle carries 3; without Familiale every car is a 4-seat car.
+  int get _passengerMax {
+    if (_vehicleType == 'TRICYCLE') return kTricyclePassengerLimit;
+    return _showFamiliale ? kMaxRidePassengerCount : kCarPassengerLimit;
+  }
 
   String? get _passengerNote {
+    if (_vehicleType == 'TRICYCLE' && _passengerCount >= kTricyclePassengerLimit) {
+      return 'Tricycle : 3 passagers maximum.';
+    }
     if (_vehicleType != 'FAMILIALE' || _passengerCount <= kCarPassengerLimit) return null;
     if (_passengerCount > defaultPassengerSeats('FAMILIALE')) {
       return 'Gamme Familiale : seuls les véhicules de $_passengerCount places recevront la course, '
@@ -583,7 +602,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       _error = null;
       _validationError = null;
       _estimates = {
-        for (final v in MarketConfig.bookableVehicleTypes(includeFamiliale: _showFamiliale))
+        for (final v in MarketConfig.bookableVehicleTypes(includeFamiliale: _showFamiliale, includeTricycle: _showTricycle))
           v.id: VehicleEstimate(vehicleType: v.id, loading: true),
       };
     });
@@ -603,7 +622,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       await api.checkHealth();
 
       final results = await Future.wait(
-        MarketConfig.bookableVehicleTypes(includeFamiliale: _showFamiliale).map((v) async {
+        MarketConfig.bookableVehicleTypes(includeFamiliale: _showFamiliale, includeTricycle: _showTricycle).map((v) async {
           final payload = _estimatePayload(v.id);
           final usePool = _sharedPool && MarketConfig.vehicleCategory(v.id) == 'TAXI';
           final result = usePool
@@ -653,15 +672,21 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   void _onVehicleSelected(String type) {
     final normalized = MarketConfig.normalizeVehicleType(type);
     final capped = isFourSeatGamme(normalized) && _passengerCount > kCarPassengerLimit;
+    final tricycleCapped = normalized == 'TRICYCLE' && _passengerCount > kTricyclePassengerLimit;
     setState(() {
       _vehicleType = normalized;
       _selectedEstimate = _estimateDetails[normalized];
       if (capped) _passengerCount = kCarPassengerLimit;
+      if (tricycleCapped) _passengerCount = kTricyclePassengerLimit;
     });
-    if (capped && mounted) {
+    if ((capped || tricycleCapped) && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Standard, Confort et VIP : 4 passagers maximum. Pour 5 à 8, choisissez Familiale.'),
+        SnackBar(
+          content: Text(
+            tricycleCapped
+                ? 'Tricycle : 3 passagers maximum.'
+                : 'Standard, Confort et VIP : 4 passagers maximum. Pour 5 à 8, choisissez Familiale.',
+          ),
         ),
       );
     }
@@ -943,7 +968,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                         setState(() {
                           _sharedPool = v;
                           if (v) _roundTrip = false;
-                          if (v && _vehicleType == 'FAMILIALE') {
+                          if (v && (_vehicleType == 'FAMILIALE' || _vehicleType == 'TRICYCLE')) {
                             _vehicleType = 'STANDARD';
                             _selectedEstimate = _estimateDetails['STANDARD'];
                           }
@@ -982,7 +1007,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       selected: _vehicleType,
                       estimates: _estimates,
                       onSelected: _onVehicleSelected,
-                      types: MarketConfig.vehicleTypesForCategory('TAXI', includeFamiliale: _showFamiliale),
+                      types: MarketConfig.vehicleTypesForCategory(
+                        'TAXI',
+                        includeFamiliale: _showFamiliale,
+                        includeTricycle: _showTricycle,
+                      ),
                     ),
                     if (_passengerCountEnabled && !_sharedPool) ...[
                       const SizedBox(height: 12),

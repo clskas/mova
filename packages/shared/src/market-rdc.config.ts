@@ -37,6 +37,7 @@ export const MARKET_RDC = {
     { id: 'COMFORT', label: 'Confort', mobileId: 'CONFORT', priority: 3 },
     { id: 'VIP', label: 'VIP', mobileId: 'VIP', priority: 4 },
     { id: 'FAMILIALE', label: 'Familiale', mobileId: 'FAMILIALE', priority: 5 },
+    { id: 'TRICYCLE', label: 'Tricycle', mobileId: 'TRICYCLE', priority: 6 },
   ] as const,
 
   /** Centre carte RDC — fallback technique uniquement (pas de ville imposée). */

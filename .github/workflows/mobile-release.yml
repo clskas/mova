@@ -93,7 +93,7 @@ jobs:
         inputs.asc_submit_only != true &&
         (inputs.promote_to_production == true ||
          (inputs.build_ios != true && inputs.upload_ios_testflight != true && inputs.submit_ios_app_store != true))))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     outputs:
       version_name: ${{ steps.playver.outputs.name }}
@@ -146,6 +146,13 @@ jobs:
           echo "ws=$WS" >> "$GITHUB_OUTPUT"
           echo "Using API_URL=$API"
           echo "Using WS_URL=$WS"
+
+      # ubuntu-latest moved to 26.04, whose default JDK (25) Gradle 8.14 cannot run.
+      # Pin the JDK the Android build was made for.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
       - uses: subosito/flutter-action@v2
         with:
@@ -342,7 +349,7 @@ jobs:
     # Toujours aprÃ¨s un build AAB rÃ©ussi (smokeâ†’main, tag v*, workflow_dispatch).
     # Skip uniquement si aucun secret Play n'est configurÃ©. Gate env: production-mobile.
     if: needs.build-android.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: production-mobile
     timeout-minutes: 30
     steps:
@@ -429,7 +436,7 @@ jobs:
       github.repository != 'afri-soft-com/mova' &&
       github.event_name == 'workflow_dispatch' &&
       inputs.promote_only == true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: production-mobile
     timeout-minutes: 20
     steps:
@@ -477,7 +484,7 @@ jobs:
       github.repository != 'afri-soft-com/mova' &&
       github.event_name == 'workflow_dispatch' &&
       inputs.complete_rollout == true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: production-mobile
     timeout-minutes: 20
     steps:
@@ -879,7 +886,7 @@ jobs:
       github.repository != 'afri-soft-com/mova' &&
       github.event_name == 'workflow_dispatch' &&
       inputs.asc_submit_only == true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: production-mobile
     timeout-minutes: 30
     steps:

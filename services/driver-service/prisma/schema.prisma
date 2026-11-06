@@ -119,6 +119,8 @@ model KycDocument {
   ocrConfidence      Float?
   ocrNotes           String?
   ocrCheckedAt       DateTime?
+  /// Per-engine readings (Claude, Document AI, OpenAI) for the admin comparison.
+  ocrProviderResults Json?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 

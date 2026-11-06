@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { KycOcrStatus } from '@prisma/client';
+import { KycOcrStatus, Prisma } from '@prisma/client';
 import {
   compareKycOcrExpiry,
   isKycOcrEligible,
@@ -16,6 +16,30 @@ import {
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { hostnameFromUrl, parseAllowedOcrMediaUrl, parseUploadsMediaPath } from './ocr-media-url';
+import {
+  configuredOcrProviders,
+  readExpiryWithClaude,
+  readExpiryWithDocumentAi,
+  type OcrImage,
+  type OcrProviderName,
+  type OcrProviderReading,
+} from './ocr-providers';
+
+const OCR_PROVIDER_LABELS: Record<OcrProviderName, string> = {
+  claude: 'Claude',
+  documentai: 'Google Document AI',
+  openai: 'OpenAI',
+};
+
+/** One engine's reading, stored for the admin side-by-side comparison. */
+export type OcrProviderResult = {
+  provider: OcrProviderName;
+  status: KycOcrStatus;
+  extractedExpiry: string | null;
+  confidence: number | null;
+  notes?: string;
+  error?: string;
+};
 
 const OCR_VISION_PROMPT = `Tu analyses une photo de document officiel (permis de conduire, assurance véhicule ou visite technique) en République Démocratique du Congo.
 
@@ -181,17 +205,18 @@ export class OcrService {
           : null;
 
       const aiEnabled = process.env.AI_ENABLED === 'true';
-      const apiKey = process.env.OPENAI_API_KEY?.trim();
-      if (!aiEnabled || !apiKey) {
+      const providers = configuredOcrProviders();
+      if (!aiEnabled || providers.length === 0) {
         return this.saveOcrResult(documentId, {
           status: KycOcrStatus.SKIPPED,
           profileExpiry,
-          notes: 'OCR désactivé — définir AI_ENABLED=true et OPENAI_API_KEY dans config/external-apis.env.',
+          notes:
+            'OCR désactivé — définir AI_ENABLED=true et au moins un moteur (ANTHROPIC_API_KEY, GOOGLE_DOCUMENT_AI_* ou OPENAI_API_KEY).',
         });
       }
 
-      const imageDataUrl = await this.fetchImageAsDataUrl(doc.url);
-      if (!imageDataUrl) {
+      const image = await this.fetchImageBuffer(doc.url);
+      if (!image) {
         return this.saveOcrResult(documentId, {
           status: KycOcrStatus.UNREADABLE,
           profileExpiry,
@@ -199,16 +224,36 @@ export class OcrService {
         });
       }
 
-      const vision = await this.callOpenAiVision(apiKey, imageDataUrl, profileExpiry);
-      const comparison = compareKycOcrExpiry(vision.expiryDate, profileExpiry);
-      const status = this.toPrismaOcrStatus(comparison.status);
+      // Every configured engine reads the document; the admin compares them side by side.
+      const settled = await Promise.allSettled(providers.map((p) => this.readWithProvider(p, image)));
+      const results: OcrProviderResult[] = providers.map((provider, i) => {
+        const outcome = settled[i];
+        if (outcome.status === 'rejected') {
+          const message = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+          this.logger.warn(`OCR ${provider} failed for ${documentId}: ${message.slice(0, 200)}`);
+          return { provider, status: KycOcrStatus.UNREADABLE, extractedExpiry: null, confidence: null, error: message.slice(0, 300) };
+        }
+        const reading = outcome.value;
+        const comparison = compareKycOcrExpiry(reading.expiryDate, profileExpiry);
+        return {
+          provider,
+          status: this.toPrismaOcrStatus(comparison.status),
+          extractedExpiry: reading.expiryDate ? reading.expiryDate.toISOString() : null,
+          confidence: reading.confidence,
+          notes: reading.notes ?? comparison.notes,
+        };
+      });
 
+      // Main verdict: first engine (in OCR_PROVIDERS order) that read a date, else the first answer.
+      const main = results.find((r) => r.extractedExpiry && !r.error) ?? results.find((r) => !r.error) ?? results[0];
+      const label = OCR_PROVIDER_LABELS[main.provider];
       return this.saveOcrResult(documentId, {
-        status,
-        extractedExpiry: vision.expiryDate,
+        status: main.status,
+        extractedExpiry: main.extractedExpiry ? new Date(main.extractedExpiry) : null,
         profileExpiry,
-        confidence: vision.confidence,
-        notes: vision.notes ?? comparison.notes,
+        confidence: main.confidence,
+        notes: [label, main.notes ?? main.error].filter(Boolean).join(' — '),
+        providerResults: results,
       });
     } finally {
       this.inFlight.delete(documentId);
@@ -390,6 +435,19 @@ export class OcrService {
     };
   }
 
+  private async readWithProvider(provider: OcrProviderName, image: OcrImage): Promise<OcrProviderReading> {
+    switch (provider) {
+      case 'claude':
+        return readExpiryWithClaude(image, OCR_VISION_PROMPT);
+      case 'documentai':
+        return readExpiryWithDocumentAi(image);
+      case 'openai': {
+        const dataUrl = `data:${image.contentType};base64,${image.buffer.toString('base64')}`;
+        return this.callOpenAiVision(process.env.OPENAI_API_KEY!.trim(), dataUrl, null);
+      }
+    }
+  }
+
   private saveOcrResult(
     documentId: string,
     data: {
@@ -398,6 +456,7 @@ export class OcrService {
       profileExpiry?: Date | null;
       confidence?: number | null;
       notes?: string;
+      providerResults?: OcrProviderResult[];
     },
   ) {
     return this.prisma.kycDocument.update({
@@ -408,6 +467,7 @@ export class OcrService {
         ocrProfileExpiry: data.profileExpiry ?? null,
         ocrConfidence: data.confidence ?? null,
         ocrNotes: data.notes ?? null,
+        ocrProviderResults: data.providerResults ? (data.providerResults as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
         ocrCheckedAt: new Date(),
       },
     });

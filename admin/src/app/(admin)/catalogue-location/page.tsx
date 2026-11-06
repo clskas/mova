@@ -425,6 +425,12 @@ export default function CatalogueLocationPage() {
                           {[v.make, v.model].filter(Boolean).join(" ")}
                         </span>
                       ) : null}
+                      {v.description ? (
+                        <details className="mt-1 text-xs text-gray-600 max-w-xs">
+                          <summary className="cursor-pointer text-[#6C63FF]">Annonce</summary>
+                          <p className="whitespace-pre-line mt-1">{v.description}</p>
+                        </details>
+                      ) : null}
                     </td>
                     <td className="p-3">{v.categoryLabel ?? v.category}</td>
                     <td className="p-3">{v.city ?? "—"}</td>

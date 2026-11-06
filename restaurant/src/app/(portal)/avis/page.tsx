@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchReviews, replyToReview } from "@/lib/api";
+import { draftReviewReply, fetchReviews, replyToReview } from "@/lib/api";
 import { toUserErrorMessage } from "@/lib/user-messages";
 
 export default function AvisPage() {
@@ -28,6 +28,22 @@ export default function AvisPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const [drafting, setDrafting] = useState<string | null>(null);
+
+  async function suggestReply(id: string) {
+    setDrafting(id);
+    setError(null);
+    try {
+      const res = await draftReviewReply(id);
+      if (res.available && res.reply) setDrafts((d) => ({ ...d, [id]: res.reply ?? "" }));
+      else setError(res.message ?? "Brouillon indisponible pour le moment.");
+    } catch (e) {
+      setError(toUserErrorMessage(e, "Brouillon impossible"));
+    } finally {
+      setDrafting(null);
+    }
+  }
 
   async function sendReply(id: string) {
     const reply = (drafts[id] ?? "").trim();
@@ -70,12 +86,23 @@ export default function AvisPage() {
               </p>
             ) : (
               <div className="flex flex-col sm:flex-row gap-2">
-                <input
+                <textarea
                   value={drafts[r.id] ?? ""}
                   onChange={(e) => setDrafts((d) => ({ ...d, [r.id]: e.target.value }))}
                   placeholder="Répondre au client…"
+                  rows={(drafts[r.id] ?? "").length > 80 ? 4 : 1}
+                  maxLength={1000}
                   className="flex-1 rounded-lg border px-3 py-2 text-sm"
                 />
+                <button
+                  type="button"
+                  disabled={drafting === r.id}
+                  onClick={() => void suggestReply(r.id)}
+                  title="Proposer une réponse (IA) — relisez-la avant d’envoyer"
+                  className="px-3 py-2 rounded-lg border text-sm disabled:opacity-40"
+                >
+                  {drafting === r.id ? "…" : "Suggérer (IA)"}
+                </button>
                 <button
                   type="button"
                   disabled={saving === r.id || !(drafts[r.id] ?? "").trim()}

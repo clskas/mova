@@ -36,6 +36,7 @@ import { navForRole, ROLE_LABELS, roleBadgeClass, canWriteSection, type NavItem 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/": MetricsIcon,
   "/a-traiter": IncidentsIcon,
+  "/analyses-ia": MetricsIcon,
   "/utilisateurs": UsersIcon,
   "/chauffeurs": DriversIcon,
   "/kyc": KycIcon,

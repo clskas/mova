@@ -772,6 +772,8 @@ model RentalVehicle {
   imageUrl             String?
   /// Up to 5 photos; the first one is mirrored in imageUrl.
   photoUrls            Json?
+  /// Listing text written by the partner (optionally drafted by Claude).
+  description          String?
   isActive             Boolean  @default(true)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

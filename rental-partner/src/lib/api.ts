@@ -95,6 +95,7 @@ export type PartnerVehicle = {
   features?: string[];
   imageUrl?: string | null;
   photoUrls?: string[] | null;
+  description?: string | null;
   isActive?: boolean;
   approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
   approvalStatusLabel?: string;
@@ -203,6 +204,19 @@ export function submitVehicle(data: Record<string, unknown>) {
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+/** Claude drafts the listing text from the form and its photos; the partner edits it. */
+export function describeVehicle(data: Record<string, unknown>) {
+  return apiFetch<{
+    available: boolean;
+    description?: string;
+    descriptionEn?: string;
+    highlights?: string[];
+    missing?: string[];
+    photosMatchVehicle?: boolean;
+    message?: string;
+  }>("/api/rental-partner/vehicles/describe", { method: "POST", body: JSON.stringify(data) });
 }
 
 export function updateVehicle(id: string, data: Record<string, unknown>) {

@@ -31,6 +31,7 @@ function vehicleToForm(v: PartnerVehicle): VehicleFormState {
     features: (v.features ?? []).join(", "),
     imageUrl: v.imageUrl ?? null,
     photoUrls: initialVehiclePhotos(v),
+    description: v.description ?? "",
   };
 }
 
@@ -102,7 +103,7 @@ function VehicleFormPageInner() {
         <h2 className="text-xl font-semibold mt-2">{isEdit ? "Modifier le véhicule" : "Inscrire un véhicule"}</h2>
         <p className="text-sm text-gray-500">
           {isEdit && isApproved
-            ? "Véhicule publié — vous pouvez ajuster tarifs, photo et équipements sans nouvelle validation."
+            ? "Véhicule publié — vous pouvez ajuster tarifs, photos, équipements et description sans nouvelle validation."
             : isEdit
               ? "Après modification, le dossier repasse en validation SENGA."
               : "Votre annonce sera visible après validation par l'équipe SENGA (catalogue admin)."}

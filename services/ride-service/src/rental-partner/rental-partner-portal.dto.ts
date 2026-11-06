@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 export class UpdateRentalBusinessDto {
   @ApiPropertyOptional() @IsOptional() @IsString() businessName?: string;
@@ -87,6 +87,12 @@ export class CreatePartnerVehicleDto {
   @IsOptional()
   @IsString()
   imageUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Texte de l’annonce (2000 caractères max)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
 
   @ApiPropertyOptional({ type: [String], description: 'Photos du véhicule (5 max) ; la première est la photo principale' })
   @IsOptional()

@@ -3,7 +3,7 @@
  * service holding the Anthropic key). Prompts and schemas live here, never in the
  * caller, so a caller cannot make Claude do something else.
  */
-export type AiVisionTask = 'RECEIPT' | 'MOVING_VOLUME';
+export type AiVisionTask = 'RECEIPT' | 'MOVING_VOLUME' | 'MENU' | 'RENTAL_LISTING';
 
 export const AI_VISION_TASKS: Record<
   AiVisionTask,
@@ -79,8 +79,153 @@ export const AI_VISION_TASKS: Record<
         'Reste prudent : c’est une estimation que le client pourra corriger.',
       ].join('\n'),
   },
+  MENU: {
+    maxImages: 3,
+    // Restaurant menu photos are uploaded through /restaurant/menu-photo.
+    uploadCategories: ['menu'],
+    schema: {
+      type: 'object',
+      properties: {
+        isMenu: { type: 'boolean', description: 'La photo montre bien un menu, une carte ou une liste de prix' },
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              priceCdf: { type: ['integer', 'null'], description: 'Prix en francs congolais ; null si absent ou en dollars' },
+              priceUsd: { type: ['number', 'null'] },
+              category: { type: ['string', 'null'], description: 'Rubrique du menu (Entrées, Plats, Boissons…)' },
+              description: { type: ['string', 'null'], description: 'Courte description si écrite sur le menu' },
+            },
+            required: ['name', 'priceCdf', 'priceUsd', 'category', 'description'],
+            additionalProperties: false,
+          },
+        },
+        notes: { type: 'string', description: 'Une phrase en français (lisibilité, prix manquants…)' },
+      },
+      required: ['isMenu', 'items', 'notes'],
+      additionalProperties: false,
+    },
+    prompt: () =>
+      [
+        'Tu lis la photo du menu d’un restaurant ou commerce partenaire de SENGA (RDC).',
+        'Recopie chaque plat ou article avec son prix, sa rubrique et sa description si elle est écrite. N’invente aucun plat ni prix.',
+        'Prix en francs congolais (FC, CDF) dans priceCdf ; en dollars dans priceUsd. Une ligne par article (au plus 80).',
+        'Si ce n’est pas un menu, mets isMenu à false et une liste vide.',
+      ].join('\n'),
+  },
+  RENTAL_LISTING: {
+    maxImages: 5,
+    // Rental vehicle photos are uploaded through /rental-partner/vehicle-photo.
+    uploadCategories: ['vehicles'],
+    schema: {
+      type: 'object',
+      properties: {
+        description: { type: 'string', description: 'Annonce en français, 3 à 6 phrases' },
+        descriptionEn: { type: 'string', description: 'Même annonce en anglais' },
+        highlights: { type: 'array', items: { type: 'string' }, description: '3 à 5 points forts courts' },
+        missing: { type: 'array', items: { type: 'string' }, description: 'Ce qui manque pour une bonne annonce (photos, informations), en français' },
+        photosMatchVehicle: { type: 'boolean', description: 'Les photos montrent bien le véhicule décrit' },
+      },
+      required: ['description', 'descriptionEn', 'highlights', 'missing', 'photosMatchVehicle'],
+      additionalProperties: false,
+    },
+    prompt: (ctx) =>
+      [
+        'Tu rédiges l’annonce d’un véhicule de location sur SENGA (RDC), pour des clients locaux et étrangers.',
+        `Informations du loueur : ${JSON.stringify(ctx.vehicle ?? {}).slice(0, 1500)}`,
+        'Appuie-toi uniquement sur ces informations et sur ce qui est visible sur les photos (état, intérieur, coffre…).',
+        'N’invente aucun équipement ni promesse (climatisation, assurance, kilométrage) qui ne soit ni déclaré ni visible.',
+        'Ton clair et professionnel, sans majuscules excessives ni emojis. Pas de prix ni de numéro de téléphone dans le texte.',
+      ].join('\n'),
+  },
 };
 
 export function isAiVisionTask(task: unknown): task is AiVisionTask {
-  return typeof task === 'string' && task in AI_VISION_TASKS;
+  return typeof task === 'string' && Object.prototype.hasOwnProperty.call(AI_VISION_TASKS, task);
+}
+
+/** Text-only tasks (no photos): admin analytics, daily summary, reply drafts. */
+export type AiTextTask = 'ANALYTICS_ANSWER' | 'DAILY_SUMMARY' | 'REPLY_DRAFT';
+
+const DATA_RULES =
+  'Réponds uniquement à partir des données fournies ; si elles ne permettent pas de répondre, dis-le et indique quelle donnée manque. ' +
+  'N’invente aucun chiffre. Montants en francs congolais (FC). Réponds en français.';
+
+export const AI_TEXT_TASKS: Record<
+  AiTextTask,
+  { schema: Record<string, unknown>; prompt: (ctx: Record<string, unknown>) => string; maxTokens: number }
+> = {
+  ANALYTICS_ANSWER: {
+    maxTokens: 3000,
+    schema: {
+      type: 'object',
+      properties: {
+        answer: { type: 'string', description: 'Réponse directe en 2 à 6 phrases' },
+        columns: { type: 'array', items: { type: 'string' }, description: 'En-têtes du tableau (vide si pas de tableau)' },
+        rows: { type: 'array', items: { type: 'array', items: { type: 'string' } }, description: 'Lignes du tableau, au plus 15' },
+        caveats: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['answer', 'columns', 'rows', 'caveats'],
+      additionalProperties: false,
+    },
+    prompt: (ctx) =>
+      [
+        'Tu es l’analyste de données de SENGA (VTC, livraisons, courses, déménagement, location en RDC).',
+        DATA_RULES,
+        `Période : ${String(ctx.period ?? '')}. Ville : ${String(ctx.city ?? 'toutes')}.`,
+        `Données (JSON) : ${String(ctx.data ?? '{}')}`,
+        `Question de l’administrateur : ${String(ctx.question ?? '').slice(0, 500)}`,
+        'Ajoute un tableau (columns + rows) seulement s’il aide ; sinon laisse-les vides.',
+      ].join('\n'),
+  },
+  DAILY_SUMMARY: {
+    maxTokens: 2500,
+    schema: {
+      type: 'object',
+      properties: {
+        headline: { type: 'string', description: 'Une phrase qui résume la journée' },
+        highlights: { type: 'array', items: { type: 'string' }, description: '3 à 6 chiffres clés commentés' },
+        alerts: { type: 'array', items: { type: 'string' }, description: 'Anomalies ou points à surveiller (peut être vide)' },
+        actions: { type: 'array', items: { type: 'string' }, description: 'Actions concrètes pour l’équipe (peut être vide)' },
+      },
+      required: ['headline', 'highlights', 'alerts', 'actions'],
+      additionalProperties: false,
+    },
+    prompt: (ctx) =>
+      [
+        'Tu rédiges le résumé quotidien de l’activité SENGA pour l’équipe d’exploitation.',
+        DATA_RULES,
+        'Compare la journée à la moyenne des 7 derniers jours quand c’est possible. Signale les baisses ou pics inhabituels.',
+        `Ville : ${String(ctx.city ?? 'toutes')}.`,
+        `Aujourd’hui (JSON) : ${String(ctx.today ?? '{}')}`,
+        `7 derniers jours (JSON) : ${String(ctx.week ?? '{}')}`,
+      ].join('\n'),
+  },
+  REPLY_DRAFT: {
+    maxTokens: 1200,
+    schema: {
+      type: 'object',
+      properties: {
+        reply: { type: 'string', description: 'Brouillon de réponse, prêt à être relu' },
+        tone: { type: 'string', enum: ['EXCUSES', 'EXPLICATION', 'REMERCIEMENT', 'FERME'] },
+        internalNote: { type: 'string', description: 'Conseil interne pour l’équipe (non envoyé au client)' },
+      },
+      required: ['reply', 'tone', 'internalNote'],
+      additionalProperties: false,
+    },
+    prompt: (ctx) =>
+      [
+        `Tu rédiges un brouillon de réponse au nom de ${String(ctx.signature ?? 'l’équipe SENGA')} ; un humain le relira avant envoi.`,
+        'Réponse courte (3 à 6 phrases), polie, empathique, sans promettre de remboursement, de compensation ni de sanction : ' +
+          'propose plutôt les prochaines étapes. Ne cite aucune donnée personnelle. Réponds dans la langue du message du client.',
+        `Contexte : ${String(ctx.kind ?? '')} ${String(ctx.subject ?? '').slice(0, 300)}`,
+        `Message du client : ${String(ctx.message ?? '').slice(0, 2000)}`,
+      ].join('\n'),
+  },
+};
+
+export function isAiTextTask(task: unknown): task is AiTextTask {
+  return typeof task === 'string' && Object.prototype.hasOwnProperty.call(AI_TEXT_TASKS, task);
 }

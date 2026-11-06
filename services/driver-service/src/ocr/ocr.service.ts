@@ -33,7 +33,7 @@ import {
   vehiclePhotoPrompt,
   vehiclePhotoVerdict,
 } from './claude-json';
-import { AI_VISION_TASKS, isAiVisionTask } from './ai-tasks';
+import { AI_TEXT_TASKS, AI_VISION_TASKS, isAiTextTask, isAiVisionTask } from './ai-tasks';
 import { extractDocumentFieldsWithClaude, isScannableDocument } from './document-fields';
 
 const OCR_PROVIDER_LABELS: Record<OcrProviderName, string> = {
@@ -361,6 +361,20 @@ export class OcrService {
   private async claudeSelfieVision(image: OcrImage) {
     const out = await claudeJson({ images: [image], prompt: SELFIE_VISION_PROMPT, schema: SELFIE_SCHEMA as unknown as Record<string, unknown> });
     return out ? parseSelfieVisionResponse(JSON.stringify(out)) : null;
+  }
+
+  /** Internal: a text-only task (analytics, daily summary, reply draft) for another service. */
+  async runTextTask(task: string, context: Record<string, unknown> = {}) {
+    if (!isAiTextTask(task)) return { available: false, result: null, message: 'Tâche IA inconnue.' };
+    if (!claudeAvailable()) return { available: false, result: null, message: 'IA désactivée.' };
+    const def = AI_TEXT_TASKS[task];
+    try {
+      const result = await claudeJson({ images: [], prompt: def.prompt(context), schema: def.schema, maxTokens: def.maxTokens });
+      return { available: true, result };
+    } catch (err) {
+      this.logger.warn(`AI text task ${task} failed: ${err instanceof Error ? err.message.slice(0, 200) : err}`);
+      return { available: false, result: null, message: 'IA momentanément indisponible.' };
+    }
   }
 
   /** Internal: a vision task (receipt, moving volume…) for another service. Null when AI is off or unreadable. */

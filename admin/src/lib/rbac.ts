@@ -209,6 +209,7 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Tableau de bord", short: "Accueil", section: "dashboard" },
   { href: "/a-traiter", label: "À traiter", short: "Inbox", section: "inbox" },
+  { href: "/analyses-ia", label: "Analyses IA", short: "IA", section: "dashboard" },
   { href: "/utilisateurs", label: "Utilisateurs", short: "Utilis.", section: "utilisateurs" },
   { href: "/chauffeurs", label: "Chauffeurs", short: "Chauff.", section: "chauffeurs" },
   { href: "/kyc", label: "KYC", short: "KYC", section: "kyc" },

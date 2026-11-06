@@ -1,3 +1,4 @@
+import { runAiVision } from '../common/ai-vision.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { PartnerKycStatus, RentalDepositStatus, RentalInquiryStatus, RentalLogisticsMode, RentalVehicleApprovalStatus } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, MOVA_EVENTS, serviceUrl } from '@mova/shared';
@@ -279,6 +280,45 @@ export class RentalPartnerPortalService {
       throw new MovaHttpException(MovaErrorCode.RENTAL_VEHICLE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return this.rental.updateVehicleForOwner(ownerUserId, id, dto);
+  }
+
+  /** Claude drafts the listing from the declared facts and the photos; the partner edits it. */
+  async describeVehicle(ownerUserId: string, dto: Partial<CreatePartnerVehicleDto>) {
+    const photos = [...(Array.isArray(dto.photoUrls) ? dto.photoUrls : []), ...(dto.imageUrl ? [dto.imageUrl] : [])]
+      .filter((u, i, all) => typeof u === 'string' && u.trim() && all.indexOf(u) === i)
+      .slice(0, 5);
+    if (!dto.name?.trim() && !dto.make?.trim()) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Indiquez au moins le nom ou la marque du véhicule.');
+    }
+    if (photos.length === 0) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ajoutez au moins une photo du véhicule.');
+    }
+    const vehicle = {
+      nom: dto.name,
+      marque: dto.make,
+      modele: dto.model,
+      annee: dto.year,
+      categorie: dto.category,
+      boite: dto.transmission === 'AUTO' ? 'automatique' : 'manuelle',
+      ville: dto.city,
+      places: dto.seats,
+      equipements: Array.isArray(dto.features) ? dto.features.slice(0, 20) : undefined,
+      notesDuLoueur: dto.description?.slice(0, 800),
+    };
+    const answer = await runAiVision('RENTAL_LISTING', photos, { vehicle });
+    const r = answer.result;
+    if (!answer.available || !r || typeof r.description !== 'string') {
+      return { available: false, message: answer.message ?? 'Rédaction automatique indisponible pour le moment.' };
+    }
+    const list = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, 6) : []);
+    return {
+      available: true,
+      description: r.description.trim().slice(0, 2000),
+      descriptionEn: typeof r.descriptionEn === 'string' ? r.descriptionEn.trim().slice(0, 2000) : '',
+      highlights: list(r.highlights),
+      missing: list(r.missing),
+      photosMatchVehicle: r.photosMatchVehicle !== false,
+    };
   }
 
   async uploadVehiclePhoto(ownerUserId: string, imageBase64: string, mimeType?: string) {

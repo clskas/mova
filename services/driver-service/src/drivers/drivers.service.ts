@@ -380,6 +380,11 @@ export class DriversService {
     return { cleared, reassigned, keptKinshasa };
   }
 
+  /** Internal: text-only AI task for another service (admin analytics, summaries, drafts). */
+  runAiTextTask(task: string, context: Record<string, unknown>) {
+    return this.ocrService.runTextTask(task, context);
+  }
+
   /** Internal: vision task for another service (ride: receipts, moving volume). */
   runAiVisionTask(task: string, imageUrls: unknown, context: Record<string, unknown>) {
     return this.ocrService.runVisionTask(task, imageUrls, context);

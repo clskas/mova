@@ -495,6 +495,7 @@ export class DriversService {
     ocrConfidence?: number | null;
     ocrNotes?: string | null;
     ocrCheckedAt?: Date | null;
+    ocrProviderResults?: unknown;
     id?: string;
   } | null) {
     if (!doc) return null;
@@ -506,6 +507,7 @@ export class DriversService {
       confidence: doc.ocrConfidence ?? null,
       notes: doc.ocrNotes ?? null,
       checkedAt: doc.ocrCheckedAt ?? null,
+      providers: Array.isArray(doc.ocrProviderResults) ? doc.ocrProviderResults : [],
     };
   }
 

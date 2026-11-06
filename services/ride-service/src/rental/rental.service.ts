@@ -2046,7 +2046,6 @@ export class RentalService {
       limitedMileageFeeCdf: number;
       imageUrl: string | null;
       photoUrls?: unknown;
-    photoUrls?: unknown;
       isActive: boolean;
     },
     patch: Record<string, unknown>,

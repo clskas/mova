@@ -1,7 +1,7 @@
 ﻿name: mova
 description: SENGA — Plateforme de mobilité RDC
 publish_to: 'none'
-version: 1.0.46+211
+version: 1.0.47+212
 
 environment:
   sdk: ^3.8.1

@@ -60,6 +60,20 @@ List<int> declarableSeats(String vehicleType) => switch (vehicleType) {
       _ => const [1, 2, 3, 4, 5, 6, 7, 8],
     };
 
+/// Largest number of vehicle photos (driver vehicle, rental vehicle).
+const kMaxVehiclePhotos = 5;
+
+/// Vehicle photos from an API map: `photoUrls`, or the legacy single `imageUrl`.
+List<String> vehiclePhotosFrom(Map<String, dynamic>? vehicle) {
+  final raw = vehicle?['photoUrls'];
+  if (raw is List) {
+    final list = raw.map((e) => e?.toString().trim() ?? '').where((u) => u.isNotEmpty).toSet().toList();
+    if (list.isNotEmpty) return list.take(kMaxVehiclePhotos).toList();
+  }
+  final single = vehicle?['imageUrl']?.toString().trim() ?? '';
+  return single.isEmpty ? <String>[] : [single];
+}
+
 /// Volume utile (m³) a utilitaire / camion may declare; null for other vehicles.
 /// Same ranges as @mova/shared CARGO_VOLUME_RANGE_M3.
 ({int min, int max})? cargoVolumeRange(String vehicleType) => switch (vehicleType) {

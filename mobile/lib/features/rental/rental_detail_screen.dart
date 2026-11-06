@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
+import '../../core/config/client_apps_config.dart';
 import '../../core/config/market_config.dart';
 import '../../core/location/service_areas.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/widgets/vehicle_photo_gallery.dart';
 import '../../widgets/promo_code_field.dart';
 import 'rental_addons.dart';
 import 'rental_booking_detail_screen.dart';
@@ -471,10 +473,6 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
       );
     }
 
-    final imageUrl = v['imageUrl']?.toString();
-    final resolvedImage = imageUrl != null && imageUrl.isNotEmpty
-        ? MarketConfig.resolveMediaUrl(imageUrl)
-        : null;
     final features = (v['features'] as List?)?.cast<String>() ?? [];
     final preview = _previewEstimate;
 
@@ -504,21 +502,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               ],
             ),
           ),
-          if (resolvedImage != null && resolvedImage.isNotEmpty)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                resolvedImage,
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  height: 180,
-                  color: MovaColors.violet.withValues(alpha: 0.15),
-                  child: const Icon(Icons.directions_car, size: 64, color: MovaColors.violet),
-                ),
-              ),
-            ),
+          VehiclePhotoGallery(photos: vehiclePhotosFrom(v)),
           const SizedBox(height: 12),
           Row(
             children: [

@@ -14,7 +14,8 @@ import {
   type RentalCatalogVehicle,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
-import { VehiclePhotoUpload, resolveMediaUrl } from "@/components/VehiclePhotoUpload";
+import { resolveMediaUrl } from "@/components/VehiclePhotoUpload";
+import { VehiclePhotosUpload, initialVehiclePhotos } from "@/components/VehiclePhotosUpload";
 import {
   BtnDanger,
   BtnGhost,
@@ -60,6 +61,7 @@ const EMPTY_FORM = {
   ownerBadge: "PRO",
   features: "",
   imageUrl: null as string | null,
+  photoUrls: [] as string[],
 };
 
 function formatCdf(n?: number) {
@@ -178,7 +180,10 @@ export default function CatalogueLocationPage() {
         return String(raw);
       })(),
       features,
-      imageUrl: (source as RentalCatalogVehicle).imageUrl ?? (source as typeof form).imageUrl ?? undefined,
+      ...(() => {
+        const photos = initialVehiclePhotos(source as { photoUrls?: string[] | null; imageUrl?: string | null });
+        return { imageUrl: photos[0] ?? undefined, photoUrls: photos };
+      })(),
       isActive: (source as RentalCatalogVehicle).isActive !== false,
     };
   }
@@ -338,9 +343,9 @@ export default function CatalogueLocationPage() {
               />
             </label>
             <div className="sm:col-span-2">
-              <VehiclePhotoUpload
-                value={form.imageUrl}
-                onChange={(url) => setForm({ ...form, imageUrl: url })}
+              <VehiclePhotosUpload
+                value={form.photoUrls}
+                onChange={(urls) => setForm({ ...form, photoUrls: urls, imageUrl: urls[0] ?? null })}
                 onError={setError}
               />
             </div>
@@ -601,9 +606,9 @@ export default function CatalogueLocationPage() {
                 }
               />
             </label>
-            <VehiclePhotoUpload
-              value={editTarget.imageUrl}
-              onChange={(url) => setEditTarget({ ...editTarget, imageUrl: url })}
+            <VehiclePhotosUpload
+              value={initialVehiclePhotos(editTarget)}
+              onChange={(urls) => setEditTarget({ ...editTarget, photoUrls: urls, imageUrl: urls[0] ?? null })}
               onError={setError}
             />
             <label className="flex items-center gap-2 text-sm">

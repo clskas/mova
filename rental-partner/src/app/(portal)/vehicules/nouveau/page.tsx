@@ -1,5 +1,7 @@
 "use client";
 
+import { initialVehiclePhotos } from "@/components/VehiclePhotosUpload";
+
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -28,6 +30,7 @@ function vehicleToForm(v: PartnerVehicle): VehicleFormState {
     ownerContactPhone: v.ownerContactPhone ?? "",
     features: (v.features ?? []).join(", "),
     imageUrl: v.imageUrl ?? null,
+    photoUrls: initialVehiclePhotos(v),
   };
 }
 

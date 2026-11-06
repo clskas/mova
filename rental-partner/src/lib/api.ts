@@ -94,6 +94,7 @@ export type PartnerVehicle = {
   ownerContactPhone?: string;
   features?: string[];
   imageUrl?: string | null;
+  photoUrls?: string[] | null;
   isActive?: boolean;
   approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
   approvalStatusLabel?: string;

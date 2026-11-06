@@ -32,7 +32,10 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 
 1. Appuyez sur **Taxi / Moto-taxi**.
 2. Indiquez votre destination (ex : Gombe, Limete, Masina).
-3. Choisissez le type de véhicule : Moto-taxi, Standard ou Confort.
+3. Choisissez le type de véhicule : Moto-taxi, Standard, Confort, VIP ou **Familiale** (6 à 8 places).
+   - En voiture, indiquez le **nombre de passagers** avec les boutons − et +. Standard, Confort et VIP : **4 passagers maximum**.
+   - À partir de **5 passagers**, l'app passe automatiquement en **Familiale**. Le prix est par véhicule, pas par passager.
+   - Seules les voitures qui ont assez de places reçoivent votre demande : avec 7 ou 8 passagers, l'attente peut être plus longue.
 4. Appuyez sur **Estimer le prix**, puis **Confirmer la course**.
 5. Suivez votre chauffeur en temps réel sur l'écran de suivi.
 6. Une **ligne bleue** sur la carte représente le trajet déjà parcouru (trace GPS), en plus de la position actuelle du chauffeur.
@@ -112,16 +115,19 @@ Sur **Taxi** (voiture uniquement, pas moto), activez le bascule **Partagé (Pool
 ## 9. Location véhicule
 
 1. Appuyez sur **Location véhicule**.
-2. Choisissez le type (voiture, SUV, minibus) et la durée.
+2. Choisissez le type (voiture, SUV, minibus) et la durée. Sur la fiche du véhicule, **faites glisser les photos** (jusqu'à 5) pour le voir sous tous les angles.
 3. Indiquez les dates et le lieu de prise en charge.
 4. Confirmez la réservation.
 
 ## 10. Déménagement
 
 1. Appuyez sur **Déménagement**.
-2. Décrivez le volume à transporter et les adresses de départ et d'arrivée.
-3. Sélectionnez camion et options de manutention si besoin.
-4. Estimez, confirmez et suivez l'intervention.
+2. Choisissez le **type de logement** (studio, appartement, maison, bureau) et le nombre de pièces : l'app estime le volume en m³.
+3. L'app propose l'**engin adapté** (camionnette, camion 15, 30 ou 50 m³) ; vous pouvez le changer.
+4. Indiquez les adresses de départ et d'arrivée, la **liste des objets** et des **photos** (facultatif) pour aider le chauffeur.
+5. Vérifiez le prix (trajet + frais fixes + volume × engin) et confirmez.
+6. Les chauffeurs **utilitaire ou camion** assez grands sont prévenus ; le **premier qui accepte** prend votre déménagement. Vous êtes notifié dès qu'un chauffeur est assigné.
+7. Vous pouvez **annuler** tant que le déménagement n'a pas commencé. À la fin, payez depuis l'app ou en espèces.
 
 ## 11. Wallet SENGA
 
@@ -156,6 +162,10 @@ La trace se construit au fur et à mesure du déplacement. En cas de faible rés
 - **WhatsApp :** +243 900 000 000
 - **E-mail :** support@mova.cd
 - Consultez les CGU et la politique de confidentialité dans **Aide & Manuel**.
+
+## 16. Mises à jour de l'application
+
+Quand une nouvelle version est disponible pour votre téléphone, un **bandeau « Mettre à jour »** s'affiche en haut de l'app. Appuyez dessus pour installer la mise à jour depuis le Play Store ou l'App Store. Les nouvelles versions sont parfois proposées progressivement : il est normal qu'un proche la reçoive avant vous.
 
 ## Paiements acceptés
 

@@ -1167,12 +1167,26 @@ export default function ChauffeursPage() {
                   Comparez la photo de l&apos;engin avec la catégorie (ex. refuser VIP si la photo montre une moto).
                   Vous pouvez corriger le type avant de valider. Le chauffeur ne peut pas passer en ligne tant que le type n&apos;est pas validé.
                 </p>
-                <AuthenticatedMedia
-                  url={selectedVehicle.imageUrl}
-                  alt="Photo engin"
-                  className="w-full max-w-xs h-36 object-cover rounded-lg border bg-white"
-                  fallback="Photo de l'engin non fournie — demandez une mise à jour au chauffeur."
-                />
+                {(selectedVehicle.photoUrls?.length ? selectedVehicle.photoUrls : [selectedVehicle.imageUrl]).length > 1 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-w-xl">
+                    {(selectedVehicle.photoUrls ?? []).map((url, i) => (
+                      <AuthenticatedMedia
+                        key={url}
+                        url={url}
+                        alt={`Photo engin ${i + 1}`}
+                        className="w-full h-28 object-cover rounded-lg border bg-white"
+                        fallback="Photo indisponible"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <AuthenticatedMedia
+                    url={selectedVehicle.imageUrl}
+                    alt="Photo engin"
+                    className="w-full max-w-xs h-36 object-cover rounded-lg border bg-white"
+                    fallback="Photo de l'engin non fournie — demandez une mise à jour au chauffeur."
+                  />
+                )}
                 {canSetVehicleType && (
                   <label className="block space-y-1">
                     <span className="text-xs font-medium">Type d&apos;engin à enregistrer</span>

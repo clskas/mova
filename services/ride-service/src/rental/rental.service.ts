@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, PartnerKycStatus, RentalInquiryStatus, RentalLogisticsMode, RentalVehicleApprovalStatus } from '@prisma/client';
-import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelRentalBooking, formatCdf, formatRentalRemaining, isRentalCancelBlockedByStatus, shouldChargeGpsAddOn, vehicleHasBuiltInGps, type RentalBookingEventKind } from '@mova/shared';
+import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelRentalBooking, formatCdf, formatRentalRemaining, isRentalCancelBlockedByStatus, shouldChargeGpsAddOn, vehicleHasBuiltInGps, type RentalBookingEventKind, resolveVehiclePhotos, vehiclePhotoList } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { fetchServicePaymentStatus } from '../common/payment-status.util';
@@ -475,6 +475,7 @@ export class RentalService {
     mileageUnlimited: boolean;
     limitedMileageFeeCdf: number;
     imageUrl: string | null;
+    photoUrls?: unknown;
   },
     unavailableIds?: Set<string>,
   ) {
@@ -504,6 +505,7 @@ export class RentalService {
       mileageUnlimited: row.mileageUnlimited,
       limitedMileageFeeCdf: row.limitedMileageFeeCdf,
       imageUrl: row.imageUrl ?? `https://placehold.co/600x400/6C63FF/white?text=${encodeURIComponent(row.name)}`,
+      photoUrls: vehiclePhotoList(row),
       isAvailable,
       availabilityLabel: isAvailable ? 'Disponible' : 'En location',
     };
@@ -1854,6 +1856,7 @@ export class RentalService {
     mileageUnlimited: boolean;
     limitedMileageFeeCdf: number;
     imageUrl: string | null;
+    photoUrls?: unknown;
     isActive: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -1948,7 +1951,7 @@ export class RentalService {
   async updateVehicleForOwner(ownerUserId: string, id: string, data: Record<string, unknown>) {
     const existing = await this.prisma.rentalVehicle.findFirst({ where: { id, ownerUserId } });
     if (!existing) throw new MovaHttpException(MovaErrorCode.RENTAL_VEHICLE_NOT_FOUND, HttpStatus.NOT_FOUND);
-    const payload = this.normalizeVehicleAdminPayload({ ...existing, ...data });
+    const payload = this.normalizeVehicleAdminPayload(this.withPhotoPatch({ ...existing, ...data }, data));
     const isApproved = existing.approvalStatus === RentalVehicleApprovalStatus.APPROVED;
     const updated = await this.prisma.rentalVehicle.update({
       where: { id },
@@ -1958,6 +1961,7 @@ export class RentalService {
             hourlyRateCdf: payload.hourlyRateCdf ?? null,
             depositCdf: payload.depositCdf,
             imageUrl: payload.imageUrl,
+            photoUrls: payload.photoUrls,
             features: payload.features,
           }
         : {
@@ -2041,6 +2045,8 @@ export class RentalService {
       mileageUnlimited: boolean;
       limitedMileageFeeCdf: number;
       imageUrl: string | null;
+      photoUrls?: unknown;
+    photoUrls?: unknown;
       isActive: boolean;
     },
     patch: Record<string, unknown>,
@@ -2068,8 +2074,10 @@ export class RentalService {
       mileageUnlimited: existing.mileageUnlimited,
       limitedMileageFeeCdf: existing.limitedMileageFeeCdf,
       imageUrl: existing.imageUrl,
+      photoUrls: existing.photoUrls,
       isActive: existing.isActive,
       ...patch,
+      ...('imageUrl' in patch && !('photoUrls' in patch) ? { photoUrls: undefined } : {}),
     };
   }
 
@@ -2121,6 +2129,12 @@ export class RentalService {
     return { id: updated.id, isActive: updated.isActive };
   }
 
+  /** Partner/admin patch with only imageUrl (older portal): it replaces the photo list. */
+  private withPhotoPatch(merged: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
+    if ('imageUrl' in patch && !('photoUrls' in patch)) return { ...merged, photoUrls: undefined };
+    return merged;
+  }
+
   private normalizeVehicleAdminPayload(data: Record<string, unknown>): Prisma.RentalVehicleCreateInput {
     const name = String(data.name ?? '').trim();
     if (!name) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Nom du véhicule requis.');
@@ -2159,7 +2173,13 @@ export class RentalService {
       mileageUnlimited: data.mileageUnlimited !== false,
       limitedMileageFeeCdf:
         data.limitedMileageFeeCdf != null ? Math.round(Number(data.limitedMileageFeeCdf)) : 15000,
-      imageUrl: data.imageUrl != null ? String(data.imageUrl) : undefined,
+      ...(() => {
+        const photos = resolveVehiclePhotos({
+          photoUrls: data.photoUrls,
+          imageUrl: data.imageUrl != null ? String(data.imageUrl) : null,
+        });
+        return { imageUrl: photos.imageUrl ?? undefined, photoUrls: photos.photoUrls };
+      })(),
       isActive: data.isActive !== false,
       ...(data.ownerUserId !== undefined
         ? { ownerUserId: data.ownerUserId ? String(data.ownerUserId) : null }

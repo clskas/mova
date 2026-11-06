@@ -1,3 +1,4 @@
+import '../../core/i18n/i18n.dart';
 import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
@@ -679,7 +680,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         final text = 'Je suis en course SENGA ($pickup → $dropoff). Suivi : $url';
         await Clipboard.setData(ClipboardData(text: text));
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lien de suivi copié dans le presse-papiers')),
+          SnackBar(content: Text(tr('Lien de suivi copié dans le presse-papiers'))),
         );
       case Failure():
         final pickup = _ride?['pickupAddress']?.toString() ?? 'Départ';
@@ -687,7 +688,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         final text = 'Je suis en course SENGA ($pickup → $dropoff). https://mova.cd/suivi/${widget.rideId}';
         await Clipboard.setData(ClipboardData(text: text));
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lien copié (mode secours)')),
+          SnackBar(content: Text(tr('Lien copié (mode secours)'))),
         );
     }
   }
@@ -723,15 +724,15 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Alerte SOS'),
-        content: const Text(
-          'SENGA transmettra votre position à l\'équipe support. En cas de danger immédiat, appelez aussi les secours locaux.',
+        title: Text(tr('Alerte SOS')),
+        content: Text(
+          tr('SENGA transmettra votre position à l\'équipe support. En cas de danger immédiat, appelez aussi les secours locaux.'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Envoyer SOS', style: TextStyle(color: MovaColors.red)),
+            child: Text(tr('Envoyer SOS'), style: TextStyle(color: MovaColors.red)),
           ),
         ],
       ),
@@ -750,7 +751,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Alerte SOS envoyée — l\'équipe SENGA a été notifiée')),
+          SnackBar(content: Text(tr('Alerte SOS envoyée — l\'équipe SENGA a été notifiée'))),
         );
       case Failure(:final error):
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
@@ -761,16 +762,16 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Annuler la course ?'),
-        content: const Text(
-          'Annulation gratuite avant l\'arrivée du chauffeur. '
-          'Des frais peuvent s\'appliquer après acceptation.',
+        title: Text(tr('Annuler la course ?')),
+        content: Text(
+          tr('Annulation gratuite avant l\'arrivée du chauffeur. '
+          'Des frais peuvent s\'appliquer après acceptation.'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Oui, annuler'),
+            child: Text(tr('Oui, annuler')),
           ),
         ],
       ),
@@ -801,19 +802,19 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   Widget build(BuildContext context) {
     if (_waitingDriver && !_loading) {
       return MovaScreen(
-        title: 'Suivi de course',
+        title: tr('Suivi de course'),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const CircularProgressIndicator(color: MovaColors.violet),
             const SizedBox(height: 16),
-            const Text(
-              'En attente d\'assignation du chauffeur…',
+            Text(
+              tr('En attente d\'assignation du chauffeur…'),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             MovaButton(
-              label: 'Actualiser',
+              label: tr('Actualiser'),
               isSecondary: true,
               icon: Icons.refresh,
               onPressed: _loadRide,
@@ -821,7 +822,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
             if (_canCancel) ...[
               const SizedBox(height: 12),
               MovaButton(
-                label: 'Annuler la course',
+                label: tr('Annuler la course'),
                 isSecondary: true,
                 icon: Icons.cancel_outlined,
                 isLoading: _cancelling,
@@ -846,18 +847,18 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final driverMapIcon = isMoto ? Icons.two_wheeler : Icons.local_taxi;
 
     return MovaScreen(
-      title: 'Suivi de course',
+      title: tr('Suivi de course'),
       scrollable: false,
       padding: EdgeInsets.zero,
       actions: [
         IconButton(
           icon: const Icon(Icons.emergency_share, color: MovaColors.red),
-          tooltip: 'SOS',
+          tooltip: tr('SOS'),
           onPressed: _triggerSos,
         ),
         IconButton(
           icon: const Icon(Icons.share_outlined),
-          tooltip: 'Partager',
+          tooltip: tr('Partager'),
           onPressed: _shareTrip,
         ),
       ],
@@ -961,7 +962,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                       threadId: widget.rideId,
                                       color: MovaColors.violet,
                                     ),
-                                    tooltip: 'Chat',
+                                    tooltip: tr('Chat'),
                                     onPressed: () {
                                       Navigator.push(
                                         context,
@@ -977,17 +978,17 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.call_outlined, color: MovaColors.violet),
-                                    tooltip: 'Appel SENGA',
+                                    tooltip: tr('Appel SENGA'),
                                     onPressed: _openVoiceCall,
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.phone, color: MovaColors.green),
-                                    tooltip: 'Appeler / WhatsApp',
+                                    tooltip: tr('Appeler / WhatsApp'),
                                     onPressed: _callDriver,
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.chat, color: Color(0xFF25D366)),
-                                    tooltip: 'WhatsApp',
+                                    tooltip: tr('WhatsApp'),
                                     onPressed: () => launchWhatsApp(_driver?['phone']?.toString()),
                                   ),
                                 ],
@@ -1053,7 +1054,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                               ),
                             ],
                             const SizedBox(height: 16),
-                            Text('Statut', style: Theme.of(context).textTheme.titleSmall),
+                            Text(tr('Statut'), style: Theme.of(context).textTheme.titleSmall),
                             const SizedBox(height: 8),
                             ..._timelineSteps.map((step) {
                               final label = step['label']?.toString() ?? '';
@@ -1094,7 +1095,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                             if (_status.toUpperCase() == 'COMPLETED') ...[
                               const SizedBox(height: 8),
                               MovaButton(
-                                label: 'Nommer ce lieu',
+                                label: tr('Nommer ce lieu'),
                                 isSecondary: true,
                                 icon: Icons.edit_location_alt_outlined,
                                 onPressed: () {
@@ -1112,7 +1113,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                             ],
                             if (_canCancel)
                               MovaButton(
-                                label: 'Annuler la course',
+                                label: tr('Annuler la course'),
                                 isSecondary: true,
                                 icon: Icons.cancel_outlined,
                                 isLoading: _cancelling,
@@ -1121,7 +1122,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                             if (_needsPayment) ...[
                               const SizedBox(height: 8),
                               MovaButton(
-                                label: 'Payer la course',
+                                label: tr('Payer la course'),
                                 icon: Icons.payment_outlined,
                                 onPressed: _goToPayment,
                               ),

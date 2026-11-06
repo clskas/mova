@@ -1,3 +1,4 @@
+import '../../core/i18n/i18n.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -248,7 +249,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 : 'Un paiement est encore dû sur une course terminée. Réglez-le avant de commander.',
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Fermer'))),
             if (cashDispute)
               TextButton(
                 onPressed: () async {
@@ -266,7 +267,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     onClaimed: () {},
                   );
                 },
-                child: const Text('J\'ai payé en espèces'),
+                child: Text(tr('J\'ai payé en espèces')),
               ),
             FilledButton(
               onPressed: () {
@@ -281,7 +282,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   ),
                 );
               },
-              child: const Text('Payer maintenant'),
+              child: Text(tr('Payer maintenant')),
             ),
           ],
         ),
@@ -815,13 +816,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     final autocompleteCity = _autocompleteCity;
 
     return MovaScreen(
-      title: 'Taxi / Moto-taxi',
+      title: tr('Taxi / Moto-taxi'),
       scrollable: false,
       padding: EdgeInsets.zero,
       actions: [
         IconButton(
           icon: const Icon(Icons.add_location_alt_outlined),
-          tooltip: 'Suggérer un lieu',
+          tooltip: tr('Suggérer un lieu'),
           onPressed: () {
             Navigator.push(
               context,
@@ -868,7 +869,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 }),
                   ActionChip(
                     avatar: const Icon(Icons.add_location_alt_outlined, size: 18, color: MovaColors.green),
-                    label: const Text('Suggérer un lieu'),
+                    label: Text(tr('Suggérer un lieu')),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -899,14 +900,14 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               userCatalog: _userCatalog,
               proximityLat: _pickup.latitude,
               proximityLng: _pickup.longitude,
-              label: 'Départ',
+              label: tr('Départ'),
               hint: 'Point de prise en charge',
               prefixIcon: Icons.my_location,
               onUserInput: _onPickupUserInput,
               onSelected: _onPickupSuggestionSelected,
               suffixIcon: IconButton(
                 icon: const Icon(Icons.gps_fixed, color: MovaColors.violet),
-                tooltip: 'Ma position',
+                tooltip: tr('Ma position'),
                 onPressed: _loadingGps ? null : _useMyLocation,
               ),
             ),
@@ -918,7 +919,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               category: _poiCategoryFilter,
               proximityLat: _pickup.latitude,
               proximityLng: _pickup.longitude,
-              label: 'Destination',
+              label: tr('Destination'),
               hint: 'Ex: Goma, chez Mama X, ou pin sur la carte',
               prefixIcon: Icons.place,
               userCatalog: _userCatalog,
@@ -933,12 +934,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   const SizedBox(height: 12),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Aller-retour',
+                    title: Text(
+                      tr('Aller-retour'),
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    subtitle: const Text(
-                      'Même chauffeur : aller puis retour immédiat (tarif ≈ 2×)',
+                    subtitle: Text(
+                      tr('Même chauffeur : aller puis retour immédiat (tarif ≈ 2×)'),
                       style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                     ),
                     value: _roundTrip,
@@ -954,13 +955,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   if (_vehicleCategory == 'TAXI')
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Partagé (Pool)',
+                      title: Text(
+                        tr('Partagé (Pool)'),
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      subtitle: const Text(
-                        'Tarif réduit SENGA : trajet partagé avec d\'autres passagers. '
-                        'Le covoiturage planifié reste dans le menu Covoiturage.',
+                      subtitle: Text(
+                        tr('Tarif réduit SENGA : trajet partagé avec d\'autres passagers. '
+                        'Le covoiturage planifié reste dans le menu Covoiturage.'),
                         style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                       ),
                       value: _sharedPool,
@@ -983,7 +984,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       },
                     ),
                   const SizedBox(height: 8),
-                  Text('Taxi ou moto', style: theme.textTheme.titleSmall),
+                  Text(tr('Taxi ou moto'), style: theme.textTheme.titleSmall),
                   const SizedBox(height: 8),
                   VehicleCategoryChips(
                     category: _vehicleCategory,
@@ -1001,7 +1002,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     ),
                   if (_vehicleCategory == 'TAXI') ...[
                     const SizedBox(height: 12),
-                    Text('Gamme', style: theme.textTheme.titleSmall),
+                    Text(tr('Gamme'), style: theme.textTheme.titleSmall),
                     const SizedBox(height: 8),
                     VehicleSelector(
                       selected: _vehicleType,
@@ -1056,8 +1057,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                           ),
                           if (_roundTrip) ...[
                             const SizedBox(height: 4),
-                            const Text(
-                              'Aller + retour (même chauffeur)',
+                            Text(
+                              tr('Aller + retour (même chauffeur)'),
                               style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                             ),
                           ],
@@ -1168,14 +1169,14 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   const SizedBox(height: 16),
                   if (_selectedEstimate == null)
                     MovaButton(
-                      label: 'Estimer le prix',
+                      label: tr('Estimer le prix'),
                       isLoading: _loadingEstimate,
                       icon: Icons.calculate_outlined,
                       onPressed: _loadingEstimate ? null : _fetchAllEstimates,
                     )
                   else
                     MovaButton(
-                      label: 'Confirmer la course',
+                      label: tr('Confirmer la course'),
                       isLoading: _loadingConfirm,
                       icon: Icons.check_circle_outline,
                       onPressed: _loadingConfirm ? null : _confirmRide,

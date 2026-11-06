@@ -1,3 +1,4 @@
+import '../../core/i18n/i18n.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -341,7 +342,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       ..addAll(missions.map(DriverJobAlertService.missionKey).where((k) => k.length > 1));
     if (_missionAlertsSeeded && newMissions.isNotEmpty && mounted) {
       final message = DriverJobAlertService.messageForMissions(newMissions);
-      await DriverJobAlertService.notify(title: 'Mission assignée', body: message);
+      await DriverJobAlertService.notify(title: tr('Mission assignée'), body: message);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), duration: const Duration(seconds: 4)),
@@ -358,15 +359,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Accepter ce déménagement ?'),
+        title: Text(tr('Accepter ce déménagement ?')),
         content: Text(
           '${offer['pickupAddress'] ?? ''} → ${offer['dropoffAddress'] ?? ''}'
           '${volume != null ? '\n$volume m³ à transporter.' : ''}'
           '\n\nVérifiez que tout tient dans votre véhicule avant d\'accepter.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Accepter')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Accepter'))),
         ],
       ),
     );
@@ -476,8 +477,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         });
         if (previousKyc != 'APPROVED' && kycStatus == 'APPROVED' && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('KYC approuvé — saisissez votre code PIN d\'activation si demandé.'),
+            SnackBar(
+              content: Text(tr('KYC approuvé — saisissez votre code PIN d\'activation si demandé.')),
               backgroundColor: MovaColors.green,
             ),
           );
@@ -517,13 +518,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           scrollable: true,
-          title: const Text('Code PIN d\'activation'),
+          title: Text(tr('Code PIN d\'activation')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Entrez le code à 6 chiffres communiqué par SENGA après validation de votre dossier.',
+              Text(
+                tr('Entrez le code à 6 chiffres communiqué par SENGA après validation de votre dossier.'),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -539,7 +540,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             if (!force)
               TextButton(
                 onPressed: submitting ? null : () => Navigator.of(ctx, rootNavigator: true).pop(),
-                child: const Text('Plus tard'),
+                child: Text(tr('Plus tard')),
               ),
             TextButton(
               onPressed: submitting
@@ -567,7 +568,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           await _connectDriverCashInbox();
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Compte activé — vous pouvez passer en ligne.')),
+                              SnackBar(content: Text(tr('Compte activé — vous pouvez passer en ligne.'))),
                             );
                           }
                         case Failure(:final error):
@@ -577,7 +578,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     },
               child: submitting
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Activer'),
+                  : Text(tr('Activer')),
             ),
           ],
         ),
@@ -713,8 +714,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         // sans message. Snackbar seulement si aucun écran course/offre ouvert.
         if (!onThisOffer && !wasActive && mounted && !Navigator.of(context).canPop()) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Course annulée par le passager'),
+            SnackBar(
+              content: Text(tr('Course annulée par le passager')),
               duration: Duration(seconds: 3),
             ),
           );
@@ -1113,7 +1114,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       await _refreshRideOffers();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Livraison refusée')),
+          SnackBar(content: Text(tr('Livraison refusée'))),
         );
       }
     } else if (result case Failure(:final error)) {
@@ -1136,7 +1137,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       await _refreshRideOffers();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Course refusée')),
+          SnackBar(content: Text(tr('Course refusée'))),
         );
       }
     } else if (result case Failure(:final error)) {
@@ -1194,8 +1195,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       _dismissedOffers.add('ride:$id');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Course annulée par le passager'),
+          SnackBar(
+            content: Text(tr('Course annulée par le passager')),
             duration: Duration(seconds: 3),
           ),
         );
@@ -1528,7 +1529,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         const NotificationsBellButton(),
         IconButton(
           icon: const Icon(Icons.sos, color: MovaColors.red),
-          tooltip: 'Alerte SOS',
+          tooltip: tr('Alerte SOS'),
           onPressed: () => triggerSosAlert(
             ref,
             context,
@@ -1537,14 +1538,14 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         ),
         IconButton(
           icon: const Icon(Icons.account_balance_wallet_outlined),
-          tooltip: 'Revenus',
+          tooltip: tr('Revenus'),
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const EarningsScreen()),
           ),
         ),
         PopupMenuButton<_DriverMenuAction>(
-          tooltip: 'Menu',
+          tooltip: tr('Menu'),
           onSelected: (action) async {
             switch (action) {
               case _DriverMenuAction.earnings:
@@ -1582,7 +1583,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const ProfileScreen(title: 'Compte et connexion'),
+                    builder: (_) => ProfileScreen(title: tr('Compte et connexion')),
                   ),
                 );
               case _DriverMenuAction.help:
@@ -1599,11 +1600,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Déconnexion'),
-                    content: const Text('Voulez-vous vous déconnecter ?'),
+                    title: Text(tr('Déconnexion')),
+                    content: Text(tr('Voulez-vous vous déconnecter ?')),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Déconnexion')),
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
+                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Déconnexion'))),
                     ],
                   ),
                 );
@@ -1612,12 +1613,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                 }
             }
           },
-          itemBuilder: (context) => const [
+          itemBuilder: (context) => [
             PopupMenuItem(
               value: _DriverMenuAction.earnings,
               child: ListTile(
                 leading: Icon(Icons.account_balance_wallet_outlined),
-                title: Text('Revenus'),
+                title: Text(tr('Revenus')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -1802,7 +1803,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Attention : certains documents expirent bientôt. Pensez à les renouveler.',
+                      tr('Attention : certains documents expirent bientôt. Pensez à les renouveler.'),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1820,7 +1821,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Disponibilité'),
+                      Text(tr('Disponibilité')),
                       const SizedBox(height: 6),
                       Text(
                         _available ? 'En ligne' : 'Hors ligne',
@@ -1929,16 +1930,16 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Row(
+                  Row(
                     children: [
                       Icon(Icons.local_shipping_outlined, size: 18, color: MovaColors.orange),
                       SizedBox(width: 8),
-                      Text('Déménagements proposés', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text(tr('Déménagements proposés'), style: TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Ces déménagements tiennent dans votre véhicule. Le premier chauffeur qui accepte l\'obtient.',
+                  Text(
+                    tr('Ces déménagements tiennent dans votre véhicule. Le premier chauffeur qui accepte l\'obtient.'),
                     style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                   ),
                   ..._movingOffers.map((offer) {
@@ -1995,7 +1996,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                                         height: 16,
                                         child: CircularProgressIndicator(strokeWidth: 2),
                                       )
-                                    : const Text('Accepter'),
+                                    : Text(tr('Accepter')),
                               ),
                             ],
                           ),
@@ -2013,16 +2014,16 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Row(
+                  Row(
                     children: [
                       Icon(Icons.event_available, size: 18, color: MovaColors.orange),
                       SizedBox(width: 8),
-                      Text('Créneaux planifiés', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text(tr('Créneaux planifiés'), style: TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Candidature volontaire — SENGA assigne avant le départ.',
+                  Text(
+                    tr('Candidature volontaire — SENGA assigne avant le départ.'),
                     style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                   ),
                   const SizedBox(height: 12),
@@ -2088,11 +2089,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Row(
+                  Row(
                     children: [
                       Icon(Icons.assignment_ind, size: 18, color: MovaColors.violet),
                       SizedBox(width: 8),
-                      Text('Missions assignées', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text(tr('Missions assignées'), style: TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -2145,8 +2146,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                                     ),
                                     if (_missionIsActionable(m)) ...[
                                       const SizedBox(height: 4),
-                                      const Text(
-                                        'Appuyer pour gérer la mission',
+                                      Text(
+                                        tr('Appuyer pour gérer la mission'),
                                         style: TextStyle(fontSize: 11, color: MovaColors.green),
                                       ),
                                     ],
@@ -2171,7 +2172,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Revenus du jour'),
+                  Text(tr('Revenus du jour')),
                   const SizedBox(height: _cardLineGap),
                   Text(
                     MarketConfig.formatCdf(_earnings!['todayCdf'] as int? ?? 0),
@@ -2211,8 +2212,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Paiement espèces en attente',
+                        Text(
+                          tr('Paiement espèces en attente'),
                           style: TextStyle(fontWeight: FontWeight.bold, color: MovaColors.orange),
                         ),
                         const SizedBox(height: _cardLineGap),
@@ -2229,8 +2230,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           ),
                         ],
                         const SizedBox(height: 4),
-                        const Text(
-                          'Appuyez pour saisir le code PIN du passager',
+                        Text(
+                          tr('Appuyez pour saisir le code PIN du passager'),
                           style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                         ),
                       ],
@@ -2253,8 +2254,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Paiement livraison espèces',
+                        Text(
+                          tr('Paiement livraison espèces'),
                           style: TextStyle(fontWeight: FontWeight.bold, color: MovaColors.orange),
                         ),
                         const SizedBox(height: _cardLineGap),
@@ -2266,8 +2267,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
-                        const Text(
-                          'Appuyez pour saisir le code PIN du client',
+                        Text(
+                          tr('Appuyez pour saisir le code PIN du client'),
                           style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                         ),
                       ],
@@ -2296,7 +2297,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Course active', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(tr('Course active'), style: TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: _cardLineGap),
                         Text(
                           _activeRide!['pickupAddress']?.toString() ?? '',
@@ -2326,7 +2327,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Livraison active', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(tr('Livraison active'), style: TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: _cardLineGap),
                         Text(
                           _activeDelivery!['pickupAddress']?.toString() ?? '',
@@ -2403,7 +2404,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                               ),
                             IconButton(
                               icon: const Icon(Icons.close, color: MovaColors.error, size: 20),
-                              tooltip: 'Refuser',
+                              tooltip: tr('Refuser'),
                               onPressed: () => _rejectRideOffer(offer),
                             ),
                             const Icon(Icons.chevron_right, size: 20),
@@ -2516,7 +2517,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                             if (!assigned)
                               IconButton(
                                 icon: const Icon(Icons.close, color: MovaColors.error, size: 20),
-                                tooltip: 'Refuser',
+                                tooltip: tr('Refuser'),
                                 onPressed: () => _rejectDeliveryOffer(offer),
                               ),
                             const Icon(Icons.chevron_right, size: 20),

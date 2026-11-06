@@ -1,3 +1,5 @@
+import '../../core/i18n/i18n.dart';
+import '../../core/i18n/language_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -162,6 +164,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const LanguagePickerCard(),
+                const SizedBox(height: 12),
                 if (_profile.isNotEmpty) ...[
                   AccountLinkCard(profile: _profile, onChanged: _load),
                   const SizedBox(height: 12),
@@ -183,15 +187,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Identité (optionnelle)',
+                                  tr('Identité (optionnelle)'),
                                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                         fontWeight: FontWeight.bold,
                                       ),
                                 ),
                                 const SizedBox(height: 4),
-                                const Text(
-                                  'Vous pouvez utiliser SENGA avec votre numéro seul. '
-                                  'Ajoutez votre nom pour personnaliser l\'accueil et le chat.',
+                                Text(
+                                  tr('Vous pouvez utiliser SENGA avec votre numéro seul. '
+                                  'Ajoutez votre nom pour personnaliser l\'accueil et le chat.'),
                                   style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                                 ),
                               ],
@@ -202,7 +206,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       if (_phone != null && _phone!.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Text(
-                          'Téléphone (connexion)',
+                          tr('Téléphone (connexion)'),
                           style: Theme.of(context).textTheme.labelMedium?.copyWith(
                                 color: MovaColors.textSecondary,
                               ),
@@ -232,8 +236,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: MovaColors.violet.withValues(alpha: 0.25)),
                     ),
-                    child: const Text(
-                      'Modifications possibles hors ligne — envoyées au serveur à la reconnexion.',
+                    child: Text(
+                      tr('Modifications possibles hors ligne — envoyées au serveur à la reconnexion.'),
                       style: TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                     ),
                   ),
@@ -246,8 +250,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 TextField(
                   controller: _firstName,
                   textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: 'Prénom (optionnel)',
+                  decoration: InputDecoration(
+                    labelText: tr('Prénom (optionnel)'),
                     prefixIcon: Icon(Icons.badge_outlined),
                   ),
                 ),
@@ -255,8 +259,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 TextField(
                   controller: _lastName,
                   textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: 'Nom (optionnel)',
+                  decoration: InputDecoration(
+                    labelText: tr('Nom (optionnel)'),
                     prefixIcon: Icon(Icons.badge_outlined),
                   ),
                 ),
@@ -264,15 +268,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 TextField(
                   controller: _email,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'E-mail (optionnel)',
-                    hintText: 'pour reçus et support',
+                  decoration: InputDecoration(
+                    labelText: tr('E-mail (optionnel)'),
+                    hintText: tr('pour reçus et support'),
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
                 ),
                 const SizedBox(height: 24),
                 MovaButton(
-                  label: 'Enregistrer',
+                  label: tr('Enregistrer'),
                   icon: Icons.save_outlined,
                   isLoading: _saving,
                   onPressed: _saving ? null : _save,

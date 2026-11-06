@@ -1,3 +1,4 @@
+import '../../core/i18n/i18n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -322,11 +323,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         const NotificationsBellButton(),
         IconButton(
           icon: const Icon(Icons.person_outline),
-          tooltip: 'Mon profil',
+          tooltip: tr('Mon profil'),
           onPressed: () => _openProfile(context),
         ),
         PopupMenuButton<_HomeMenuAction>(
-          tooltip: 'Plus',
+          tooltip: tr('Plus'),
           onSelected: (action) async {
             switch (action) {
               case _HomeMenuAction.notifications:
@@ -343,11 +344,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Déconnexion'),
-                    content: const Text('Voulez-vous vous déconnecter de SENGA ?'),
+                    title: Text(tr('Déconnexion')),
+                    content: Text(tr('Voulez-vous vous déconnecter de SENGA ?')),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Déconnexion')),
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
+                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Déconnexion'))),
                     ],
                   ),
                 );
@@ -357,11 +358,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             }
           },
           itemBuilder: (context) => [
-            const PopupMenuItem(
+            PopupMenuItem(
               value: _HomeMenuAction.notifications,
               child: ListTile(
                 leading: Icon(Icons.notifications_outlined),
-                title: Text('Notifications'),
+                title: Text(tr('Notifications')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -385,29 +386,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   visualDensity: VisualDensity.compact,
                 ),
               ),
-            const PopupMenuItem(
+            PopupMenuItem(
               value: _HomeMenuAction.history,
               child: ListTile(
                 leading: Icon(Icons.history),
-                title: Text('Historique'),
+                title: Text(tr('Historique')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
             ),
-            const PopupMenuItem(
+            PopupMenuItem(
               value: _HomeMenuAction.help,
               child: ListTile(
                 leading: Icon(Icons.help_outline),
-                title: Text('Aide'),
+                title: Text(tr('Aide')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
             ),
-            const PopupMenuItem(
+            PopupMenuItem(
               value: _HomeMenuAction.logout,
               child: ListTile(
                 leading: Icon(Icons.logout),
-                title: Text('Déconnexion'),
+                title: Text(tr('Déconnexion')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -429,11 +430,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         },
         backgroundColor: MovaColors.white,
         indicatorColor: MovaColors.violet.withValues(alpha: 0.15),
-        destinations: const [
+        destinations: [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home, color: MovaColors.violet),
-            label: 'Accueil',
+            label: tr('Accueil'),
           ),
           NavigationDestination(
             icon: Icon(Icons.history_outlined),
@@ -469,14 +470,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (suspended)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(bottom: 12),
               child: Card(
                 color: Color(0xFFFFF3E0),
                 child: Padding(
                   padding: EdgeInsets.all(12),
                   child: Text(
-                    'Compte suspendu — contactez le support SENGA.',
+                    tr('Compte suspendu — contactez le support SENGA.'),
                     style: TextStyle(color: MovaColors.orange, fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -501,8 +502,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Course en cours',
+                              Text(
+                                tr('Course en cours'),
                                 style: TextStyle(
                                   color: MovaColors.white,
                                   fontWeight: FontWeight.bold,
@@ -524,8 +525,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                             color: MovaColors.white,
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Text(
-                            'Reprendre',
+                          child: Text(
+                            tr('Reprendre'),
                             style: TextStyle(
                               color: MovaColors.violet,
                               fontWeight: FontWeight.w600,
@@ -558,8 +559,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Courses en cours',
+                              Text(
+                                tr('Courses en cours'),
                                 style: TextStyle(
                                   color: MovaColors.white,
                                   fontWeight: FontWeight.bold,
@@ -581,8 +582,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                             color: MovaColors.white,
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Text(
-                            'Reprendre',
+                          child: Text(
+                            tr('Reprendre'),
                             style: TextStyle(
                               color: MovaColors.green,
                               fontWeight: FontWeight.w600,
@@ -615,8 +616,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Livraison en cours',
+                              Text(
+                                tr('Livraison en cours'),
                                 style: TextStyle(
                                   color: MovaColors.white,
                                   fontWeight: FontWeight.bold,
@@ -638,8 +639,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                             color: MovaColors.white,
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Text(
-                            'Reprendre',
+                          child: Text(
+                            tr('Reprendre'),
                             style: TextStyle(
                               color: MovaColors.orange,
                               fontWeight: FontWeight.w600,
@@ -698,8 +699,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           icon: PassengerServiceIcon.taxi(size: compactCards ? 52 : 58),
                           brandedIcon: true,
                           iconColor: MovaColors.violet,
-                          title: 'Taxi / Moto-taxi',
-                          subtitle: 'Course immédiate partout en RDC',
+                          title: tr('Taxi / Moto-taxi'),
+                          subtitle: tr('Course immédiate partout en RDC'),
                           onTap: () => _open(context, const BookingScreen()),
                           compact: compactCards,
                         ),
@@ -708,8 +709,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           icon: PassengerServiceIcon.delivery(size: compactCards ? 52 : 58),
                           brandedIcon: true,
                           iconColor: MovaColors.green,
-                          title: 'Livraisons',
-                          subtitle: 'Repas, colis, express et plus',
+                          title: tr('Livraisons'),
+                          subtitle: tr('Repas, colis, express et plus'),
                           onTap: () => _open(context, const DeliveryHubScreen()),
                           compact: compactCards,
                         ),
@@ -718,8 +719,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           icon: PassengerServiceIcon.scheduled(size: compactCards ? 52 : 58),
                           brandedIcon: true,
                           iconColor: MovaColors.violet,
-                          title: 'Réservation planifiée',
-                          subtitle: 'Programmez votre trajet à l\'avance',
+                          title: tr('Réservation planifiée'),
+                          subtitle: tr('Programmez votre trajet à l\'avance'),
                           onTap: () => _open(context, const ScheduledRideScreen()),
                           compact: compactCards,
                         ),
@@ -728,8 +729,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           icon: PassengerServiceIcon.carpool(size: compactCards ? 52 : 58),
                           brandedIcon: true,
                           iconColor: MovaColors.midnight,
-                          title: 'Covoiturage',
-                          subtitle: 'Partagez un trajet, économisez',
+                          title: tr('Covoiturage'),
+                          subtitle: tr('Partagez un trajet, économisez'),
                           onTap: () => _open(context, const CarpoolScreen()),
                           compact: compactCards,
                         ),
@@ -738,8 +739,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           icon: PassengerServiceIcon.rental(size: compactCards ? 52 : 58),
                           brandedIcon: true,
                           iconColor: MovaColors.violet,
-                          title: 'Location véhicule',
-                          subtitle: 'Voiture, SUV ou minibus',
+                          title: tr('Location véhicule'),
+                          subtitle: tr('Voiture, SUV ou minibus'),
                           onTap: () => _open(context, const RentalScreen()),
                           compact: compactCards,
                         ),
@@ -748,8 +749,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           icon: PassengerServiceIcon.moving(size: compactCards ? 52 : 58),
                           brandedIcon: true,
                           iconColor: MovaColors.midnight,
-                          title: 'Déménagement',
-                          subtitle: 'Camion et manutention',
+                          title: tr('Déménagement'),
+                          subtitle: tr('Camion et manutention'),
                           onTap: () => _open(context, const MovingScreen()),
                           compact: compactCards,
                         ),
@@ -757,16 +758,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                         ServiceCard(
                           icon: MovaServiceIcon.wallet(color: MovaColors.midnight),
                           iconColor: MovaColors.midnight,
-                          title: 'Wallet SENGA',
-                          subtitle: 'Solde, recharge et paiements',
+                          title: tr('Wallet SENGA'),
+                          subtitle: tr('Solde, recharge et paiements'),
                           onTap: () => _open(context, const WalletScreen()),
                           compact: compactCards,
                         ),
                       ServiceCard(
                         icon: MovaServiceIcon.history(color: MovaColors.orange),
                         iconColor: MovaColors.orange,
-                        title: 'Historique',
-                        subtitle: 'Vos courses et transactions',
+                        title: tr('Historique'),
+                        subtitle: tr('Vos courses et transactions'),
                         onTap: () => _open(context, const HistoryScreen()),
                         compact: compactCards,
                       ),

@@ -1,3 +1,4 @@
+import '../../core/i18n/i18n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/auth/session.dart';
@@ -51,7 +52,7 @@ class HelpScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Aide & Manuel',
+                        tr('Aide & Manuel'),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: MovaColors.midnight,
@@ -59,7 +60,7 @@ class HelpScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Documentation, FAQ et support — Kinshasa, RDC',
+                        tr('Documentation, FAQ et support — Kinshasa, RDC'),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: MovaColors.textSecondary,
                         ),
@@ -74,36 +75,36 @@ class HelpScreen extends ConsumerWidget {
           _HelpLink(
             icon: Icons.smart_toy_outlined,
             iconColor: MovaColors.green,
-            title: 'Assistant SENGA (IA)',
-            subtitle: 'Posez votre question : réponse immédiate, en français, lingala, swahili ou anglais',
+            title: tr('Assistant SENGA (IA)'),
+            subtitle: tr('Posez votre question : réponse immédiate, en français, lingala, swahili ou anglais'),
             onTap: () => _open(context, const AssistantScreen()),
           ),
           _HelpLink(
             icon: Icons.workspace_premium_outlined,
             iconColor: MovaColors.violet,
             title: 'SENGA Plus',
-            subtitle: 'Abonnements passager — réduction de frais',
+            subtitle: tr('Abonnements passager — réduction de frais'),
             onTap: () => _open(context, const SubscriptionsScreen()),
           ),
           _HelpLink(
             icon: Icons.place_outlined,
             iconColor: MovaColors.green,
-            title: 'Nommer un lieu',
-            subtitle: 'Chez Mama X, pin GPS — ou marché / hôpital à valider',
+            title: tr('Nommer un lieu'),
+            subtitle: tr('Chez Mama X, pin GPS — ou marché / hôpital à valider'),
             onTap: () => _open(context, const SuggestPlaceScreen()),
           ),
           _HelpLink(
             icon: Icons.person_outline,
             iconColor: MovaColors.violet,
-            title: 'Connexion',
-            subtitle: 'Optionnel : lier Google ou votre numéro +243',
+            title: tr('Connexion'),
+            subtitle: tr('Optionnel : lier Google ou votre numéro +243'),
             onTap: () => _open(context, const ProfileScreen()),
           ),
           _HelpLink(
             icon: Icons.menu_book_outlined,
             iconColor: MovaColors.violet,
-            title: 'Manuel utilisateur',
-            subtitle: 'Courses, pin carte, portefeuille, livraisons, PIN',
+            title: tr('Manuel utilisateur'),
+            subtitle: tr('Courses, pin carte, portefeuille, livraisons, PIN'),
             onTap: () => _open(context, const ManualScreen()),
           ),
           _HelpLink(
@@ -116,8 +117,8 @@ class HelpScreen extends ConsumerWidget {
           _HelpLink(
             icon: Icons.support_agent_outlined,
             iconColor: MovaColors.orange,
-            title: 'Contacter le support',
-            subtitle: 'Coordonnées publiées par AfriSoft',
+            title: tr('Contacter le support'),
+            subtitle: tr('Coordonnées publiées par AfriSoft'),
             onTap: () => _open(context, const ContactSupportScreen()),
           ),
           const Padding(
@@ -125,15 +126,15 @@ class HelpScreen extends ConsumerWidget {
             child: Divider(),
           ),
           Text(
-            'Documents légaux',
+            tr('Documents légaux'),
             style: theme.textTheme.labelLarge?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 4),
           _HelpLink(
             icon: Icons.gavel_outlined,
             iconColor: MovaColors.midnight,
-            title: 'Conditions d\'utilisation',
-            subtitle: 'CGU SENGA RDC',
+            title: tr('Conditions d\'utilisation'),
+            subtitle: tr('CGU SENGA RDC'),
             onTap: () => _open(
               context,
               const LegalScreen(
@@ -146,12 +147,12 @@ class HelpScreen extends ConsumerWidget {
           _HelpLink(
             icon: Icons.privacy_tip_outlined,
             iconColor: MovaColors.midnight,
-            title: 'Politique de confidentialité',
-            subtitle: 'Protection de vos données',
+            title: tr('Politique de confidentialité'),
+            subtitle: tr('Protection de vos données'),
             onTap: () => _open(
               context,
-              const LegalScreen(
-                title: 'Confidentialité',
+              LegalScreen(
+                title: tr('Confidentialité'),
                 asset: 'assets/legal/privacy_fr.md',
                 apiPath: '/public/privacy',
               ),
@@ -163,13 +164,13 @@ class HelpScreen extends ConsumerWidget {
               final confirm = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  title: const Text('Déconnexion'),
-                  content: const Text('Voulez-vous vous déconnecter de SENGA ?'),
+                  title: Text(tr('Déconnexion')),
+                  content: Text(tr('Voulez-vous vous déconnecter de SENGA ?')),
                   actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Déconnexion', style: TextStyle(color: MovaColors.orange)),
+                      child: Text(tr('Déconnexion'), style: TextStyle(color: MovaColors.orange)),
                     ),
                   ],
                 ),
@@ -179,7 +180,7 @@ class HelpScreen extends ConsumerWidget {
               }
             },
             icon: const Icon(Icons.logout, color: MovaColors.orange),
-            label: const Text('Se déconnecter', style: TextStyle(color: MovaColors.orange)),
+            label: Text(tr('Se déconnecter'), style: TextStyle(color: MovaColors.orange)),
           ),
         ],
       ),

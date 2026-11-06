@@ -1,3 +1,4 @@
+import { AssistantModule } from './assistant/assistant.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { RedisModule } from '@mova/shared';
@@ -8,6 +9,6 @@ import { IncidentsModule } from './incidents/incidents.module';
 import { InternalModule } from './internal/internal.module';
 import { AuthModule } from './auth/auth.module';
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, HealthModule, AuthModule, DriversModule, IncidentsModule, InternalModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, HealthModule, AuthModule, DriversModule, IncidentsModule, InternalModule, AssistantModule],
 })
 export class AppModule {}

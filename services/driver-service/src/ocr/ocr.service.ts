@@ -33,6 +33,7 @@ import {
   vehiclePhotoPrompt,
   vehiclePhotoVerdict,
 } from './claude-json';
+import { AI_VISION_TASKS, isAiVisionTask } from './ai-tasks';
 import { extractDocumentFieldsWithClaude, isScannableDocument } from './document-fields';
 
 const OCR_PROVIDER_LABELS: Record<OcrProviderName, string> = {
@@ -305,23 +306,34 @@ export class OcrService {
    * KYC media is stored under ride-service; public GET /uploads/kyc requires JWT,
    * so inter-service selfie verification must use the internal route + API key.
    */
-  private async fetchImageBuffer(url: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+  /**
+   * Only files from SENGA's own uploads (ride-service internal route). Used for images whose
+   * URL came from another service or a client, so the request can never reach another host.
+   */
+  async fetchUploadedImage(url: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+    const upload = parseUploadsMediaPath(url);
+    if (!upload || !/^[a-z]+$/.test(upload.category) || !/^[\w-][\w.-]*$/.test(upload.filename)) return null;
     try {
-      const upload = parseUploadsMediaPath(url);
-      if (upload) {
-        const absolute = serviceUrl('ride', `/internal/uploads/${upload.category}/${upload.filename}`);
-        const res = await fetch(absolute, {
-          headers: { 'x-internal-api-key': resolveInternalApiKey() },
-          redirect: 'error',
-        });
-        if (!res.ok) {
-          this.logger.warn(`Selfie/OCR media fetch ${res.status} via ride internal: ${upload.category}/${upload.filename}`);
-          return null;
-        }
-        const buffer = Buffer.from(await res.arrayBuffer());
-        const contentType = res.headers.get('content-type') ?? 'image/jpeg';
-        return { buffer, contentType };
+      const res = await fetch(
+        serviceUrl('ride', `/internal/uploads/${encodeURIComponent(upload.category)}/${encodeURIComponent(upload.filename)}`),
+        { headers: { 'x-internal-api-key': resolveInternalApiKey() }, redirect: 'error' },
+      );
+      if (!res.ok) {
+        this.logger.warn(`Selfie/OCR media fetch ${res.status} via ride internal: ${upload.category}/${upload.filename}`);
+        return null;
       }
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const contentType = res.headers.get('content-type') ?? 'image/jpeg';
+      return { buffer, contentType };
+    } catch (err) {
+      this.logger.warn(`Uploaded media fetch failed: ${err instanceof Error ? err.message : err}`);
+      return null;
+    }
+  }
+
+  async fetchImageBuffer(url: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+    try {
+      if (parseUploadsMediaPath(url)) return await this.fetchUploadedImage(url);
 
       const absolute = this.resolveMediaUrl(url);
       if (!absolute) return null;
@@ -349,6 +361,27 @@ export class OcrService {
   private async claudeSelfieVision(image: OcrImage) {
     const out = await claudeJson({ images: [image], prompt: SELFIE_VISION_PROMPT, schema: SELFIE_SCHEMA as unknown as Record<string, unknown> });
     return out ? parseSelfieVisionResponse(JSON.stringify(out)) : null;
+  }
+
+  /** Internal: a vision task (receipt, moving volume…) for another service. Null when AI is off or unreadable. */
+  async runVisionTask(task: string, imageUrls: unknown, context: Record<string, unknown> = {}) {
+    if (!isAiVisionTask(task)) return { available: false, result: null, message: 'Tâche IA inconnue.' };
+    if (!claudeAvailable()) return { available: false, result: null, message: 'IA désactivée.' };
+    const def = AI_VISION_TASKS[task];
+    // Only this task's own upload folder: never KYC documents or other users' files.
+    const urls = (Array.isArray(imageUrls) ? imageUrls : [])
+      .filter((u): u is string => typeof u === 'string')
+      .filter((u) => def.uploadCategories.includes(parseUploadsMediaPath(u)?.category ?? ''))
+      .slice(0, def.maxImages);
+    const images = (await Promise.all(urls.map((u) => this.fetchUploadedImage(u)))).filter((x): x is OcrImage => !!x);
+    if (images.length === 0) return { available: true, result: null, message: 'Photos illisibles.' };
+    try {
+      const result = await claudeJson({ images, prompt: def.prompt(context), schema: def.schema });
+      return { available: true, result };
+    } catch (err) {
+      this.logger.warn(`AI task ${task} failed: ${err instanceof Error ? err.message.slice(0, 200) : err}`);
+      return { available: false, result: null, message: 'IA momentanément indisponible.' };
+    }
   }
 
   scheduleVehiclePhotoCheck(userId: string): void {

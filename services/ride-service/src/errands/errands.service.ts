@@ -1,3 +1,4 @@
+import { receiptVerdict, runAiVision } from '../common/ai-vision.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, ErrandCategory, ErrandOrder, ErrandOrderStatus, Prisma, TrackingReferenceType, VehicleType } from '@prisma/client';
 import { INTERNAL_API_KEY, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateTripDurationMin, resolveCityFromCoords, serviceUrl } from '@mova/shared';
@@ -421,6 +422,7 @@ export class ErrandsService {
       totalPriceCdf,
       completionPin: order.completionPin,
       proofPhotoUrl: order.proofPhotoUrl,
+      receiptCheck: order.receiptCheck ?? null,
       pickupAddress: order.pickupAddress,
       pickupLat: order.pickupLat,
       pickupLng: order.pickupLng,
@@ -823,6 +825,7 @@ export class ErrandsService {
       }
     }
     const updated = await this.prisma.errandOrder.update({ where: { id }, data: updates });
+    if (status === ErrandOrderStatus.COMPLETED && updated.proofPhotoUrl) this.scheduleReceiptCheck(updated.id);
     if (status === ErrandOrderStatus.COMPLETED && updated.guaranteed && !updated.payoutReleasedAt) {
       await releaseEscrowPayout('ERRAND', id).catch(() => undefined);
       await this.prisma.errandOrder.update({ where: { id }, data: { payoutReleasedAt: new Date() } });
@@ -852,7 +855,24 @@ export class ErrandsService {
       where: { id },
       data: { proofPhotoUrl: proofPhotoUrl.trim() },
     });
+    this.scheduleReceiptCheck(updated.id);
     return this.formatErrand(updated);
+  }
+
+  /** Claude reads the receipt photo; the verdict helps the client and the admin, it never blocks payment. */
+  scheduleReceiptCheck(id: string): void {
+    void this.checkReceipt(id).catch(() => undefined);
+  }
+
+  async checkReceipt(id: string) {
+    const order = await this.prisma.errandOrder.findUnique({ where: { id } });
+    if (!order?.proofPhotoUrl) return null;
+    const answer = await runAiVision('RECEIPT', [order.proofPhotoUrl], { expectedItems: order.description });
+    if (!answer.available) return null;
+    const { verdict, reasons } = receiptVerdict(answer.result, order.purchaseTotalCdf, order.budgetCdf);
+    const receiptCheck = { ...(answer.result ?? {}), verdict, reasons, checkedAt: new Date().toISOString() };
+    await this.prisma.errandOrder.update({ where: { id }, data: { receiptCheck: receiptCheck as Prisma.InputJsonValue } });
+    return receiptCheck;
   }
 
   async listForAdmin(opts: {

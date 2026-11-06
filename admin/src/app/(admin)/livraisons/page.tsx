@@ -381,6 +381,7 @@ export default function LivraisonsPage() {
               <p><span className="text-gray-500">Articles:</span> {selected.description}</p>
             )}
             <p><span className="text-gray-500">Statut actuel:</span> <StatusBadge status={selected.status} /></p>
+            {selected.type === "ERRAND" && <ErrandReceiptBlock detail={deliveryDetail ?? selected} />}
             {selected.passengerName && (
               <ContactBlock title="Passager" name={selected.passengerName} phone={selected.passengerPhone} />
             )}
@@ -485,6 +486,45 @@ export default function LivraisonsPage() {
         danger
         loading={saving}
       />
+    </div>
+  );
+}
+
+const RECEIPT_VERDICT_STYLE: Record<string, { label: string; className: string }> = {
+  OK: { label: "Ticket conforme", className: "bg-green-50 text-green-800 border-green-200" },
+  A_VERIFIER: { label: "Ticket à vérifier", className: "bg-amber-50 text-amber-800 border-amber-200" },
+  ECART: { label: "Écart sur le ticket", className: "bg-red-50 text-red-800 border-red-200" },
+};
+
+/** Proof photo of the purchases and Claude's reading of the receipt (indicative, never blocks payment). */
+function ErrandReceiptBlock({ detail }: { detail: DeliveryOverview }) {
+  const check = detail.receiptCheck;
+  const style = check?.verdict ? RECEIPT_VERDICT_STYLE[check.verdict] : undefined;
+  if (!detail.proofPhotoUrl && !check) return null;
+  return (
+    <div className="rounded border border-gray-200 p-2 space-y-1">
+      <p className="font-medium">Ticket d&apos;achat</p>
+      {detail.proofPhotoUrl && (
+        <a href={detail.proofPhotoUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">
+          Voir la photo du ticket
+        </a>
+      )}
+      <p className="text-gray-600">
+        Déclaré par le coursier : {detail.purchaseTotalCdf != null ? `${detail.purchaseTotalCdf} FC` : "—"}
+        {detail.budgetCdf ? ` · Budget client : ${detail.budgetCdf} FC` : ""}
+      </p>
+      {check ? (
+        <div className={`rounded border px-2 py-1 ${style?.className ?? "bg-gray-50 border-gray-200"}`}>
+          <p className="font-medium">
+            IA : {style?.label ?? check.verdict} {check.totalCdf != null ? `— total lu ${check.totalCdf} FC` : ""}
+          </p>
+          {check.merchant && <p>Commerçant : {check.merchant}{check.date ? ` (${check.date})` : ""}</p>}
+          {(check.reasons ?? []).map((r) => <p key={r}>• {r}</p>)}
+          {check.notes && <p className="text-xs opacity-80">{check.notes}</p>}
+        </div>
+      ) : (
+        <p className="text-xs text-gray-500">Lecture IA du ticket pas encore disponible.</p>
+      )}
     </div>
   );
 }

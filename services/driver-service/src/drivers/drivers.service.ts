@@ -380,6 +380,11 @@ export class DriversService {
     return { cleared, reassigned, keptKinshasa };
   }
 
+  /** Internal: vision task for another service (ride: receipts, moving volume). */
+  runAiVisionTask(task: string, imageUrls: unknown, context: Record<string, unknown>) {
+    return this.ocrService.runVisionTask(task, imageUrls, context);
+  }
+
   /** Admin: ask Claude to re-check the active vehicle's photos now. */
   checkVehiclePhotos(userId: string) {
     return this.ocrService.checkVehiclePhotos(userId);

@@ -35,6 +35,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   Map<String, dynamic>? _state;
   String? _uploadingDoc;
   List<String> _vehiclePhotos = [];
+  String? _scanningDoc;
+  final Set<String> _autoFilled = {};
 
   final _firstName = TextEditingController();
   final _lastName = TextEditingController();
@@ -615,6 +617,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label enregistré')));
             }
+            if (kScannableDocTypes.contains(type)) await _scanAndPrefill(type);
           case Failure(:final error):
             setState(() {
               _uploadingDoc = null;
@@ -628,6 +631,49 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         });
     }
   }
+
+  /// Reads the document just sent (IA) and fills the fields still empty. Never blocks:
+  /// if reading is unavailable the driver simply types the fields.
+  Future<void> _scanAndPrefill(String type) async {
+    if (!mounted) return;
+    setState(() => _scanningDoc = type);
+    final result = await ref.read(apiClientProvider).post('/drivers/onboarding/scan', {'type': type});
+    if (!mounted) return;
+    setState(() => _scanningDoc = null);
+    switch (result) {
+      case Success(:final data):
+        final raw = data['fields'];
+        final fields = raw is Map ? raw.map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')) : <String, String>{};
+        final filled = applyScannedFields(type, fields, _prefillTargets());
+        if (filled.isNotEmpty) {
+          setState(() => _autoFilled.addAll(filled));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Rempli automatiquement : ${filled.join(', ')}. Vérifiez avant de continuer.')),
+          );
+        } else if (data['message'] != null) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'].toString())));
+        }
+      case Failure():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lecture automatique indisponible — remplissez les champs vous-même.')),
+        );
+    }
+  }
+
+  Map<String, TextEditingController> _prefillTargets() => {
+        'firstName': _firstName,
+        'lastName': _lastName,
+        'idNumber': _idNumber,
+        'licenseNumber': _licenseNumber,
+        'DRIVERS_LICENSE.expiryDate': _licenseExpiry,
+        'VEHICLE_INSURANCE.expiryDate': _insuranceExpiry,
+        'TECHNICAL_INSPECTION.expiryDate': _inspectionExpiry,
+        'FISCAL_STICKER.expiryDate': _fiscalStickerExpiry,
+        'plateNumber': _plate,
+        'make': _make,
+        'model': _model,
+        'color': _color,
+      };
 
   bool _docUploaded(String type) {
     final checklist = _state?['kyc']?['checklist'] as List? ?? [];
@@ -1273,8 +1319,24 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             isSecondary: true,
             icon: done ? Icons.check_circle_outline : Icons.camera_alt,
             isLoading: _uploadingDoc == type,
-            onPressed: _uploadingDoc != null ? null : () => _uploadDoc(type, label),
+            onPressed: _uploadingDoc != null || _scanningDoc != null ? null : () => _uploadDoc(type, label),
           ),
+          if (_scanningDoc == type) ...[
+            const SizedBox(height: 6),
+            const LinearProgressIndicator(minHeight: 2),
+            const SizedBox(height: 4),
+            const Text(
+              'Lecture du document… les champs vont se remplir.',
+              style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+            ),
+          ] else if (!done && kScannableDocTypes.contains(type))
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                'Les champs de cette étape seront remplis automatiquement à partir de la photo.',
+                style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+              ),
+            ),
           if (notes != null && notes.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 6),

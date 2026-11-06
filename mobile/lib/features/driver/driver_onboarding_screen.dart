@@ -34,7 +34,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   String? _error;
   Map<String, dynamic>? _state;
   String? _uploadingDoc;
-  String? _vehicleImageUrl;
+  List<String> _vehiclePhotos = [];
 
   final _firstName = TextEditingController();
   final _lastName = TextEditingController();
@@ -265,8 +265,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         if (_plate.text.trim().isEmpty || _make.text.trim().isEmpty || _model.text.trim().isEmpty) {
           return 'Renseignez plaque, marque et modèle du véhicule.';
         }
-        if (!_isEditingDossier && (_vehicleImageUrl == null || _vehicleImageUrl!.isEmpty)) {
-          return 'Ajoutez une photo de votre véhicule.';
+        if (!_isEditingDossier && _vehiclePhotos.isEmpty) {
+          return 'Ajoutez au moins une photo de votre véhicule.';
         }
         return validateCargoVolume(_vehicleType, _cargoVolume.text);
       case 3:
@@ -309,7 +309,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     _passengerSeats = vehicle?['passengerSeatsDeclared'] == true && seats is num ? seats.toInt() : null;
     final cargo = vehicle?['cargoVolumeM3'];
     _cargoVolume.text = cargo is num ? cargo.toInt().toString() : '';
-    _vehicleImageUrl = vehicle?['imageUrl']?.toString();
+    _vehiclePhotos = vehiclePhotosFrom(vehicle);
     _charterAccepted = profile?['charterAcceptedAt'] != null;
     _trainingCompleted = profile?['trainingCompletedAt'] != null;
     _isEditingDossier = profile?['onboardingCompleted'] == true;
@@ -425,14 +425,29 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       if (_vehicleType != 'MOTO_TAXI' && _passengerSeats != null) 'vehiclePassengerSeats': _passengerSeats,
       if (cargoVolumeRange(_vehicleType) != null && int.tryParse(_cargoVolume.text.trim()) != null)
         'vehicleCargoVolumeM3': int.parse(_cargoVolume.text.trim()),
-      if (_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty) 'vehicleImageUrl': _vehicleImageUrl,
+      if (_vehiclePhotos.isNotEmpty) 'vehiclePhotoUrls': _vehiclePhotos,
       if (_insuranceExpiry.text.trim().isNotEmpty) 'insuranceExpiry': _insuranceExpiry.text.trim(),
       if (_inspectionExpiry.text.trim().isNotEmpty) 'technicalInspectionExpiry': _inspectionExpiry.text.trim(),
       if (_fiscalStickerExpiry.text.trim().isNotEmpty) 'fiscalStickerExpiry': _fiscalStickerExpiry.text.trim(),
     }));
   }
 
+  /// Saves the whole photo list (5 max); the first one is the main photo.
+  Future<bool> _saveVehiclePhotos(List<String> photos) async {
+    final result = await ref.read(apiClientProvider).patch('/drivers/onboarding', {'vehiclePhotoUrls': photos});
+    if (!mounted) return false;
+    switch (result) {
+      case Success():
+        setState(() => _vehiclePhotos = photos);
+        return true;
+      case Failure(:final error):
+        setState(() => _error = error.message);
+        return false;
+    }
+  }
+
   Future<void> _uploadVehiclePhoto() async {
+    if (_vehiclePhotos.length >= kMaxVehiclePhotos) return;
     await _persistOnboardingStep();
     final source = await _pickDocSource();
     if (source == null || !mounted) return;
@@ -446,37 +461,24 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       _uploadingDoc = 'VEHICLE_PHOTO';
       _error = null;
     });
-    final api = ref.read(apiClientProvider);
-    final upload = await api.uploadVehiclePhoto(File(file.path));
+    final upload = await ref.read(apiClientProvider).uploadVehiclePhoto(File(file.path));
     if (!mounted) return;
     switch (upload) {
       case Success(:final data):
-        final url = data;
-        if (url.isEmpty) {
+        if (data.isEmpty) {
           setState(() {
             _uploadingDoc = null;
             _error = 'Échec envoi photo — réessayez.';
           });
           return;
         }
-        final result = await api.patch('/drivers/onboarding', {'vehicleImageUrl': url});
+        final saved = await _saveVehiclePhotos([..._vehiclePhotos, data].take(kMaxVehiclePhotos).toList());
         if (!mounted) return;
-        switch (result) {
-          case Success():
-            setState(() {
-              _uploadingDoc = null;
-              _vehicleImageUrl = url;
-            });
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Photo du véhicule enregistrée')),
-              );
-            }
-          case Failure(:final error):
-            setState(() {
-              _uploadingDoc = null;
-              _error = error.message;
-            });
+        setState(() => _uploadingDoc = null);
+        if (saved) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Photo ${_vehiclePhotos.length}/$kMaxVehiclePhotos enregistrée')),
+          );
         }
       case Failure(:final error):
         setState(() {
@@ -484,6 +486,18 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           _error = error.message;
         });
     }
+  }
+
+  Future<void> _removeVehiclePhoto(int index) async {
+    final next = [..._vehiclePhotos]..removeAt(index);
+    await _saveVehiclePhotos(next);
+  }
+
+  Future<void> _makeMainVehiclePhoto(int index) async {
+    if (index == 0) return;
+    final next = [..._vehiclePhotos];
+    final picked = next.removeAt(index);
+    await _saveVehiclePhotos([picked, ...next]);
   }
 
   Future<void> _savePayout() async {
@@ -1034,24 +1048,17 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           ),
         ],
         const SizedBox(height: 12),
-        const Text('Photo de l\'engin', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+        Text(
+          'Photos de l\'engin (${_vehiclePhotos.length}/$kMaxVehiclePhotos)',
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Avant, arrière, côté, intérieur… La première photo est la photo principale.',
+          style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+        ),
         const SizedBox(height: 12),
-        if (_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              MarketConfig.resolveMediaUrl(_vehicleImageUrl!),
-              height: 160,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                height: 120,
-                color: MovaColors.violet.withValues(alpha: 0.1),
-                child: const Icon(Icons.directions_car, size: 48, color: MovaColors.violet),
-              ),
-            ),
-          )
-        else
+        if (_vehiclePhotos.isEmpty)
           Container(
             height: 120,
             width: double.infinity,
@@ -1065,18 +1072,70 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
               children: [
                 Icon(Icons.camera_alt_outlined, color: MovaColors.violet, size: 32),
                 SizedBox(height: 4),
-                Text('Photo requise — vue latérale ou 3/4', style: TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
+                Text('Au moins une photo — vue latérale ou 3/4', style: TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
               ],
             ),
+          )
+        else
+          GridView.count(
+            key: const Key('vehiclePhotosGrid'),
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            children: [
+              for (var i = 0; i < _vehiclePhotos.length; i++)
+                Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        MarketConfig.resolveMediaUrl(_vehiclePhotos[i]),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: MovaColors.violet.withValues(alpha: 0.1),
+                          child: const Icon(Icons.directions_car, color: MovaColors.violet),
+                        ),
+                      ),
+                    ),
+                    if (i == 0)
+                      Positioned(
+                        left: 4,
+                        top: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: MovaColors.violet, borderRadius: BorderRadius.circular(6)),
+                          child: const Text('Principale', style: TextStyle(color: Colors.white, fontSize: 10)),
+                        ),
+                      ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, color: Colors.white, size: 20),
+                        onSelected: (action) => action == 'main' ? _makeMainVehiclePhoto(i) : _removeVehiclePhoto(i),
+                        itemBuilder: (_) => [
+                          if (i > 0) const PopupMenuItem(value: 'main', child: Text('Mettre en premier')),
+                          const PopupMenuItem(value: 'remove', child: Text('Retirer')),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+            ],
           ),
         const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: _uploadingDoc == 'VEHICLE_PHOTO' ? null : _uploadVehiclePhoto,
-          icon: _uploadingDoc == 'VEHICLE_PHOTO'
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.photo_camera_outlined),
-          label: Text(_vehicleImageUrl != null && _vehicleImageUrl!.isNotEmpty ? 'Changer la photo' : 'Prendre une photo'),
-        ),
+        if (_vehiclePhotos.length < kMaxVehiclePhotos)
+          OutlinedButton.icon(
+            key: const Key('addVehiclePhoto'),
+            onPressed: _uploadingDoc == 'VEHICLE_PHOTO' ? null : _uploadVehiclePhoto,
+            icon: _uploadingDoc == 'VEHICLE_PHOTO'
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.photo_camera_outlined),
+            label: Text(_vehiclePhotos.isEmpty ? 'Prendre une photo' : 'Ajouter une photo'),
+          ),
         const SizedBox(height: 20),
         _docButton('VEHICLE_REGISTRATION', 'Carte rose (optionnel)'),
         _docButton('VEHICLE_INSURANCE', 'Assurance'),

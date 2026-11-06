@@ -44,7 +44,8 @@ const CHAPTERS = [
     title: "Véhicules",
     steps: [
       "Après validation, ouvrez Véhicules.",
-      "Ajoutez chaque voiture avec ses papiers et une photo.",
+      "Ajoutez chaque voiture avec ses papiers et jusqu'à 5 photos (avant, arrière, côté, intérieur).",
+      "La première photo est la photo principale ; « Mettre en premier » la change.",
       "SENGA vérifie le véhicule avant qu'il apparaisse aux clients.",
     ],
   },

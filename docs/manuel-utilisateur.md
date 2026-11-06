@@ -37,6 +37,13 @@ Voir [Admin — Niveaux d'accès par rôle](user-manual/admin.md#niveaux-daccès
 - **Course Partagée (Pool)** : taxi à la demande multi-passagers (équivalent Uber Pool), distinct du **Covoiturage** planifié (BlaBlaCar). Voir [passager §2.1](user-manual/passager.md) et [chauffeur — Course Pool](user-manual/chauffeur.md).
 - **Retraits** : seul le solde retirable (hors gains cash, hors fonds bloqués) est versable en Mobile Money.
 
+## Nouveautés (novembre 2026)
+
+- **Gamme Familiale (6–8 places)** et **nombre de passagers** : Standard, Confort et VIP limités à 4, passage automatique en Familiale dès 5 (interrupteurs dans Services SENGA).
+- **Déménagements** : réservés aux utilitaires et camions ; le chauffeur déclare le **volume utile** (m³) ; les demandes sont **proposées automatiquement** aux chauffeurs éligibles, le premier qui accepte l'obtient.
+- **Photos** : jusqu'à **5 photos** pour l'engin du chauffeur et pour chaque véhicule de location ; galerie sur la fiche location côté passager.
+- **Bandeau de mise à jour** : s'affiche dès que le Play Store propose une version plus récente au téléphone (y compris aux testeurs internes).
+
 ## Nouveautés (juillet 2026)
 
 - **Seuil dette espèces chauffeurs** (admin → Portefeuille) : blocage des notifications de courses si la dette cash dépasse le seuil ; règlement depuis Revenus chauffeur.

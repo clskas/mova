@@ -766,6 +766,8 @@ model RentalVehicle {
   mileageUnlimited     Boolean  @default(true)
   limitedMileageFeeCdf Int      @default(15000)
   imageUrl             String?
+  /// Up to 5 photos; the first one is mirrored in imageUrl.
+  photoUrls            Json?
   isActive             Boolean  @default(true)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class UpdateRentalBusinessDto {
   @ApiPropertyOptional() @IsOptional() @IsString() businessName?: string;
@@ -87,6 +87,13 @@ export class CreatePartnerVehicleDto {
   @IsOptional()
   @IsString()
   imageUrl?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Photos du véhicule (5 max) ; la première est la photo principale' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  photoUrls?: string[];
 }
 
 export class UploadPartnerVehiclePhotoDto {

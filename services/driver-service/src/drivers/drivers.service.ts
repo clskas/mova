@@ -31,6 +31,8 @@ import {
   type DocumentsReminder,
   normalizeDeclaredCargoVolume,
   normalizeDeclaredSeats,
+  resolveVehiclePhotos,
+  vehiclePhotoList,
   vehicleFitsPassengers,
   vehiclePassengerSeats,
 } from '@mova/shared';
@@ -601,6 +603,7 @@ export class DriversService {
             plateNumber: vehicle.plateNumber,
             color: vehicle.color,
             imageUrl: vehicle.imageUrl,
+            photoUrls: vehiclePhotoList(vehicle),
             passengerSeats: vehiclePassengerSeats(vehicle.type, vehicle.passengerSeats),
             passengerSeatsDeclared: vehicle.passengerSeats != null,
             cargoVolumeM3: vehicle.cargoVolumeM3,
@@ -657,6 +660,7 @@ export class DriversService {
       dto.vehicleType ||
       dto.vehicleColor ||
       dto.vehicleImageUrl ||
+      dto.vehiclePhotoUrls !== undefined ||
       dto.vehiclePassengerSeats !== undefined ||
       dto.vehicleCargoVolumeM3 !== undefined
     ) {
@@ -691,7 +695,14 @@ export class DriversService {
         } else if (dto.vehicleType !== undefined && vehicle.cargoVolumeM3 != null) {
           if (normalizeDeclaredCargoVolume(dto.vehicleType, vehicle.cargoVolumeM3) == null) cargoVolumeM3 = null;
         }
-        const typeOrPhotoChanged = dto.vehicleType !== undefined || dto.vehicleImageUrl !== undefined;
+        // A list of photos (new app) wins; a single photo (older app) becomes a list of one.
+        const photos =
+          dto.vehiclePhotoUrls !== undefined
+            ? resolveVehiclePhotos({ photoUrls: dto.vehiclePhotoUrls })
+            : dto.vehicleImageUrl !== undefined
+              ? resolveVehiclePhotos({ imageUrl: dto.vehicleImageUrl })
+              : undefined;
+        const typeOrPhotoChanged = dto.vehicleType !== undefined || photos !== undefined;
         await this.prisma.vehicle.update({
           where: { id: vehicle.id },
           data: {
@@ -700,7 +711,7 @@ export class DriversService {
             ...(dto.vehicleModel !== undefined ? { model: dto.vehicleModel } : {}),
             ...(dto.vehicleType !== undefined ? { type: dto.vehicleType } : {}),
             ...(dto.vehicleColor !== undefined ? { color: dto.vehicleColor } : {}),
-            ...(dto.vehicleImageUrl !== undefined ? { imageUrl: dto.vehicleImageUrl } : {}),
+            ...(photos ? { imageUrl: photos.imageUrl, photoUrls: photos.photoUrls } : {}),
             ...(passengerSeats !== undefined ? { passengerSeats } : {}),
             ...(cargoVolumeM3 !== undefined ? { cargoVolumeM3 } : {}),
             ...(typeOrPhotoChanged
@@ -1763,6 +1774,7 @@ export class DriversService {
             plateNumber: vehicle.plateNumber,
             color: vehicle.color,
             imageUrl: vehicle.imageUrl,
+            photoUrls: vehiclePhotoList(vehicle),
             passengerSeats: vehiclePassengerSeats(vehicle.type, vehicle.passengerSeats),
             passengerSeatsDeclared: vehicle.passengerSeats != null,
             cargoVolumeM3: vehicle.cargoVolumeM3,

@@ -16,6 +16,6 @@ Portail web du partenaire location (loueur entreprise ou particulier).
 
 ## Exploitation
 
-- **Véhicules** : ajouter chaque voiture (papiers + photo) après validation du dossier.
+- **Véhicules** : ajouter chaque voiture (papiers + **jusqu'à 5 photos**) après validation du dossier. La première photo est la **photo principale** affichée dans la liste ; *Mettre en premier* change la photo principale. Les clients font défiler toutes les photos sur la fiche du véhicule.
 - **Réservations** : confirmer ou refuser.
 - **Revenus** : gains en CDF.

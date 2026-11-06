@@ -1,6 +1,6 @@
 "use client";
 
-import { VehiclePhotoUpload } from "@/components/VehiclePhotoUpload";
+import { VehiclePhotosUpload } from "@/components/VehiclePhotosUpload";
 import { MOVA_CITIES } from "@/lib/mova-cities";
 
 export type VehicleFormState = {
@@ -18,6 +18,7 @@ export type VehicleFormState = {
   ownerContactPhone: string;
   features: string;
   imageUrl: string | null;
+  photoUrls: string[];
 };
 
 export const EMPTY_VEHICLE_FORM: VehicleFormState = {
@@ -35,6 +36,7 @@ export const EMPTY_VEHICLE_FORM: VehicleFormState = {
   ownerContactPhone: "",
   features: "",
   imageUrl: null,
+  photoUrls: [],
 };
 
 const CATEGORIES = [
@@ -170,7 +172,11 @@ export function VehicleForm({ form, onChange, onSubmit, saving, error, submitLab
           placeholder="Climatisation, GPS, Diesel"
         />
       </label>
-      <VehiclePhotoUpload value={form.imageUrl} onChange={(url) => onChange({ ...form, imageUrl: url })} onError={onPhotoError} />
+      <VehiclePhotosUpload
+        value={form.photoUrls}
+        onChange={(urls) => onChange({ ...form, photoUrls: urls, imageUrl: urls[0] ?? null })}
+        onError={onPhotoError}
+      />
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         type="submit"
@@ -202,6 +208,7 @@ export function vehicleFormPayload(form: VehicleFormState) {
     ownerName: form.ownerName.trim() || undefined,
     ownerContactPhone: form.ownerContactPhone.trim() || undefined,
     features,
-    imageUrl: form.imageUrl ?? undefined,
+    imageUrl: form.photoUrls[0] ?? form.imageUrl ?? undefined,
+    photoUrls: form.photoUrls,
   };
 }

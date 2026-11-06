@@ -45,8 +45,8 @@ Source technique : `admin/src/lib/rbac.ts`.
 | **Livraisons** | Colis, repas, courses & commissions (ERRAND) ; trace GPS ; assignation chauffeur |
 | **Planifiées** | Réservations à venir |
 | **Locations** | Demandes de location véhicule |
-| **Catalogue location** | Véhicules proposés à la location (photos, tarifs journaliers) |
-| **Déménagements** | Demandes passagers — statut et annulation |
+| **Catalogue location** | Véhicules proposés à la location (jusqu'à 5 photos, tarifs journaliers) |
+| **Déménagements** | Demandes passagers — proposées automatiquement aux chauffeurs utilitaire/camion éligibles ; assignation manuelle, statut et annulation |
 | **Covoiturage** | Trajets publiés — statut et annulation |
 | **Litiges** | Gestion des incidents |
 | **Tarifs** | Grilles, majorations, commissions plateforme, codes promo |
@@ -105,6 +105,14 @@ Pour les véhicules **VIP**, **Confort** ou autres catégories réglementées :
 1. **Chauffeurs → Détail** → section véhicule.
 2. **Approuver** ou **Rejeter** le type d'engin. Le **SUPER_ADMIN**, l'**ADMIN** et l'**admin ville** peuvent aussi corriger la catégorie (Moto-taxi, Standard, Confort, VIP) avant de valider. L'admin ville ne le fait que pour un chauffeur de sa ville.
 3. Tant que le type n'est pas **APPROVED**, le chauffeur ne peut pas recevoir de missions (`canOperate` bloqué).
+4. La fiche montre **toutes les photos de l'engin** (jusqu'à 5) : vérifiez qu'elles correspondent à la catégorie et au volume déclarés.
+5. **Places passagers** : corrigez le nombre si besoin, ou revenez à la valeur par défaut de la catégorie.
+6. **Volume utile** (utilitaire 1 à 25 m³, camion 5 à 100 m³) : corrigez-le ou effacez-le. Seuls les déménagements qui tiennent dans ce volume sont proposés au chauffeur ; un volume non déclaré reste accepté mais doit être vérifié à la main.
+
+### Services SENGA — nombre de passagers et gamme Familiale
+
+- **Activer le choix du nombre de passagers** : le passager indique combien de personnes voyagent ; seules les voitures avec assez de places reçoivent la course. Désactivé, chaque course compte pour 1 passager.
+- **Gamme Familiale (6–8 places)** : affiche la gamme dans l'app passager ; Standard, Confort et VIP sont alors limités à 4 personnes. N'activez qu'avec des véhicules Familiale validés. Tarif : **Tarifs → Familiale**.
 
 ## Opérations (lecture + mise à jour)
 
@@ -112,7 +120,8 @@ Les modules **Locations**, **Déménagements**, **Covoiturage** et **Livraisons*
 
 - **Consulter** la liste et ouvrir le **Détail**
 - **Modifier le statut** (ex. PENDING → ASSIGNED → COMPLETED)
-- **Assigner un chauffeur** (livraisons ERRAND)
+- **Assigner un chauffeur** (livraisons ERRAND, déménagements)
+- **Déménagements** : à la création, la demande est proposée aux chauffeurs **en ligne** de la même ville dont l'engin convient (camionnette/15 m³ : utilitaire ou camion ; 30/50 m³ : camion) et dont le volume déclaré suffit. Le premier qui accepte l'obtient. Si personne n'accepte, assignez à la main : la liste ne montre que les chauffeurs éligibles, avec leur volume en m³.
 - **Annuler** une demande en cours
 
 Il n'est pas nécessaire de **créer** ces enregistrements depuis l'admin : ils proviennent des passagers/chauffeurs.

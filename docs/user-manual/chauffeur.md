@@ -15,7 +15,12 @@ La **ville SENGA** sur l'accueil est détectée via GPS à l'ouverture (modifiab
 1. Complétez votre **KYC** (permis, carte rose, photo). Les pièces sont **optionnelles** tant que l’admin n’a pas activé « exiger des documents pour les jobs ».
 2. Attendez l’**approbation KYC** par l’équipe SENGA.
 3. Vous recevez un **PIN d’activation à 6 chiffres** (SMS / e-mail). À la première connexion app, saisissez ce PIN — il n’est **pas** lié au dépôt des pièces.
-4. Si votre véhicule est **VIP** ou **Confort**, l’admin doit aussi **valider le type d’engin** avant que vous puissiez travailler.
+4. À l'étape **Véhicule**, renseignez :
+   - le **type** (Moto-taxi, Standard, Confort, VIP, **Familiale 6 à 8 places**, Utilitaire, Camion), la plaque, la marque et le modèle ;
+   - jusqu'à **5 photos de l'engin** (avant, arrière, côté, intérieur…). La première est la **photo principale** : menu ⋮ sur une photo → *Mettre en premier* ou *Retirer* ;
+   - le nombre de **places passagers** (sans compter le chauffeur) : vous ne recevez pas les groupes plus grands que vos places ;
+   - pour un **utilitaire** (1 à 25 m³) ou un **camion** (5 à 100 m³), le **volume utile** de chargement : vous ne recevez que les déménagements qui y tiennent.
+   L’admin doit **valider le type d’engin** (photos à l'appui) avant que vous puissiez travailler.
 5. Activez **En ligne** depuis l’écran principal.
 6. Acceptez ou refusez courses, livraisons colis/repas et réservations planifiées.
 7. Utilisez la **navigation** vers le passager ou le point de livraison.
@@ -54,7 +59,18 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
 | Planifiée | Trajet confirmé à l'avance (J+7 max) — rappels, auto-assignation, course GPS au démarrage |
 | Courses & commissions | Achats pour le compte du passager — **photo preuve** obligatoire avant clôture |
 | Covoiturage | Publier un trajet partagé planifié (KYC approuvé) depuis **Publier un covoiturage** |
-| Déménagement | Mission assignée — mise à jour des statuts depuis l'app |
+| Déménagement | Utilitaire ou camion uniquement — proposé automatiquement si votre volume suffit, ou assigné par SENGA |
+
+## Déménagements (utilitaire et camion)
+
+1. Quand un client demande un déménagement dans votre ville, vous recevez une notification **« Nouveau déménagement »** si votre véhicule convient :
+   - camionnette ou camion 15 m³ : **utilitaire ou camion** ;
+   - camion 30 ou 50 m³ : **camion** ;
+   - et votre **volume utile** déclaré doit être au moins égal au volume du déménagement.
+2. Sur l'accueil, la carte **« Déménagements proposés »** montre le trajet, le volume, les objets et votre **gain net**.
+3. Appuyez sur **Accepter** : le **premier chauffeur** qui accepte obtient la mission. Si un autre a été plus rapide, l'app vous l'indique.
+4. Ouvrez la mission, appuyez sur **Démarrer** sur place (le client ne peut plus annuler), puis **Terminer** à l'arrivée.
+5. SENGA peut aussi vous **assigner** un déménagement directement depuis l'administration.
 
 ## Blocages fréquents
 

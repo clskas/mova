@@ -175,6 +175,8 @@ export type AdminDriver = {
     typeApprovalStatus?: string;
     typeApprovalNotes?: string | null;
     typeApprovedAt?: string | null;
+    /** Up to 5 photos; the first one is imageUrl. */
+    photoUrls?: string[] | null;
     /** Declared passenger seats; null = category default. */
     passengerSeats?: number | null;
     /** Volume utile (m³) of a utilitaire / camion; null = not declared. */
@@ -1837,6 +1839,7 @@ export type RentalCatalogVehicle = {
   mileageUnlimited?: boolean;
   limitedMileageFeeCdf?: number;
   imageUrl?: string | null;
+  photoUrls?: string[] | null;
   isActive?: boolean;
   approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   approvalStatusLabel?: string;

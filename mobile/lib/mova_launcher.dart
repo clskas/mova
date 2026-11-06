@@ -39,6 +39,7 @@ void _wireCallRingSocketHooks() {
 Future<void> runMovaPassengerApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppFlavor.current = MovaAppFlavor.passenger;
+  movaAppHomeBuilder = () => const AuthSessionGate(role: AuthSessionRole.passenger);
   ErrorReporter.install();
   await loadAppLanguage();
   await SyncQueue.init();
@@ -56,6 +57,7 @@ Future<void> runMovaPassengerApp() async {
 Future<void> runMovaDriverApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppFlavor.current = MovaAppFlavor.driver;
+  movaAppHomeBuilder = () => const AuthSessionGate(role: AuthSessionRole.driver);
   ErrorReporter.install();
   await loadAppLanguage();
   await SyncQueue.init();

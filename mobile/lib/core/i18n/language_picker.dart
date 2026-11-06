@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../features/auth/auth_session_gate.dart';
-import '../config/app_version.dart';
 import '../navigation/mova_navigator.dart';
 import '../theme/mova_colors.dart';
 import '../widgets/mova_widgets.dart';
@@ -15,12 +13,10 @@ class LanguagePickerCard extends StatelessWidget {
     if (code == appLanguage.value) return;
     await setAppLanguage(code);
     // Rebuild every screen in the new language: back to the app's home.
+    final home = movaAppHomeBuilder;
+    if (home == null) return;
     movaNavigatorKey.currentState?.pushAndRemoveUntil(
-      MaterialPageRoute<void>(
-        builder: (_) => AuthSessionGate(
-          role: AppFlavor.isDriver ? AuthSessionRole.driver : AuthSessionRole.passenger,
-        ),
-      ),
+      MaterialPageRoute<void>(builder: (_) => home()),
       (_) => false,
     );
   }

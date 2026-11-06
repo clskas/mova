@@ -243,6 +243,15 @@ export type AdminDriverDetail = AdminDriver & {
         confidence?: number | null;
         notes?: string | null;
         checkedAt?: string | null;
+        /** Per-engine readings (Claude, Google Document AI, OpenAI), for comparison. */
+        providers?: {
+          provider: string;
+          status?: string;
+          extractedExpiry?: string | null;
+          confidence?: number | null;
+          notes?: string;
+          error?: string;
+        }[];
       } | null;
     }[];
     requiredComplete?: boolean;

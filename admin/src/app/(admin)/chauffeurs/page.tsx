@@ -151,6 +151,12 @@ function ocrStatusClass(status?: string | null): string {
   }
 }
 
+const OCR_PROVIDER_LABELS: Record<string, string> = {
+  claude: "Claude",
+  documentai: "Google Document AI",
+  openai: "OpenAI",
+};
+
 function formatOcrDate(value?: string | null): string | null {
   if (!value) return null;
   const d = new Date(value);
@@ -169,6 +175,34 @@ function OcrBadge({ ocr }: { ocr?: KycOcrInfo | null }) {
       {profile && <p>Date profil : {profile}</p>}
       {ocr.confidence != null && <p>Confiance : {Math.round(ocr.confidence * 100)} %</p>}
       {ocr.notes && <p>{ocr.notes}</p>}
+      {(ocr.providers?.length ?? 0) > 1 && (
+        <table className="w-full mt-1 border-t border-current/20 text-[11px]">
+          <thead>
+            <tr className="text-left opacity-70">
+              <th className="py-1 pr-2 font-normal">Moteur</th>
+              <th className="py-1 pr-2 font-normal">Date lue</th>
+              <th className="py-1 pr-2 font-normal">Confiance</th>
+              <th className="py-1 font-normal">Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ocr.providers!.map((p) => (
+              <tr key={p.provider} className="align-top">
+                <td className="py-0.5 pr-2 font-medium">{OCR_PROVIDER_LABELS[p.provider] ?? p.provider}</td>
+                <td className="py-0.5 pr-2">{formatOcrDate(p.extractedExpiry) ?? "—"}</td>
+                <td className="py-0.5 pr-2">{p.confidence != null ? `${Math.round(p.confidence * 100)} %` : "—"}</td>
+                <td className="py-0.5" title={p.error ?? p.notes ?? ""}>
+                  {p.error ? "Erreur" : ocrStatusLabel(p.status)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {(ocr.providers?.length ?? 0) > 1 &&
+        new Set(ocr.providers!.map((p) => p.extractedExpiry?.slice(0, 10) ?? "")).size > 1 && (
+          <p className="font-medium">⚠ Les moteurs ne lisent pas la même date : vérifiez le document à l&apos;œil.</p>
+        )}
       {ocr.checkedAt && (
         <p className="opacity-70">Analysé le {new Date(ocr.checkedAt).toLocaleString("fr-FR")}</p>
       )}

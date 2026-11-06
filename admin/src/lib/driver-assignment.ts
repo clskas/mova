@@ -1,6 +1,8 @@
 import type { AdminDriver } from "./api";
 
 const CARGO_VEHICLE_TYPES = new Set(["STANDARD", "COMFORT", "VIP", "FAMILIALE", "UTILITAIRE", "CAMION"]);
+/** Gros colis : voitures, utilitaires, camions et tricycles (pas la logistique location). */
+const PARCEL_VEHICLE_TYPES = new Set(Array.from(CARGO_VEHICLE_TYPES).concat(["TRICYCLE", "TRIPOTEUR"]));
 
 function activeVehicleTypes(driver: AdminDriver): string[] {
   return (driver.vehicles ?? [])
@@ -16,7 +18,7 @@ export function driverHasCargoVehicle(driver: AdminDriver): boolean {
 
 /** Même règle que le serveur (@mova/shared MOVING_ELIGIBLE_VEHICLE_TYPES). */
 const MOVING_VEHICLE_TYPES: Record<string, readonly string[]> = {
-  CAMIONNETTE: ["UTILITAIRE", "CAMION"],
+  CAMIONNETTE: ["UTILITAIRE", "CAMION", "TRIPOTEUR"],
   CAMION_15M3: ["UTILITAIRE", "CAMION"],
   CAMION_30M3: ["CAMION"],
   CAMION_50M3: ["CAMION"],
@@ -53,7 +55,7 @@ export function filterDriversForParcel(
 ): AdminDriver[] {
   const cat = (weightCategory ?? "SMALL").toUpperCase();
   if (cat !== "MEDIUM" && cat !== "LARGE") return drivers;
-  return drivers.filter((d) => driverHasCargoVehicle(d));
+  return drivers.filter((d) => activeVehicleTypes(d).some((t) => PARCEL_VEHICLE_TYPES.has(t)));
 }
 
 /** Ordre assignation : dispo → en course → hors ligne. */
@@ -90,6 +92,9 @@ export function filterDriversForRideVehicle(
     }
     if (rideType === "FAMILIALE") {
       return types.includes("FAMILIALE");
+    }
+    if (rideType === "TRICYCLE") {
+      return types.includes("TRICYCLE");
     }
     return true;
   });

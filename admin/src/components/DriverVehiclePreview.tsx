@@ -12,6 +12,8 @@ const VEHICLE_TYPE_LABELS: Record<string, string> = {
   FAMILIALE: "Familiale",
   UTILITAIRE: "Utilitaire",
   CAMION: "Camion",
+  TRICYCLE: "Tricycle passagers",
+  TRIPOTEUR: "Tripoteur",
 };
 
 export function activeDriverVehicle(driver?: AdminDriver | null) {

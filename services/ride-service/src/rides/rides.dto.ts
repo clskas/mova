@@ -14,7 +14,7 @@ export class EstimateRideDto {
   @ApiProperty() @IsNumber() pickupLng: number;
   @ApiProperty() @IsNumber() dropoffLat: number;
   @ApiProperty() @IsNumber() dropoffLng: number;
-  @ApiProperty({ enum: ['MOTO', 'MOTO_TAXI', 'STANDARD', 'TAXI', 'CONFORT', 'COMFORT', 'VIP', 'FAMILIALE'] })
+  @ApiProperty({ enum: ['MOTO', 'MOTO_TAXI', 'STANDARD', 'TAXI', 'CONFORT', 'COMFORT', 'VIP', 'FAMILIALE', 'TRICYCLE'] })
   @Transform(({ value }) => toVehicleType(value))
   @IsEnum(VehicleType)
   vehicleType: VehicleType;
@@ -61,7 +61,7 @@ export class CancelRideDto {
 export class NearbyVehiclesQueryDto {
   @ApiProperty() @Type(() => Number) @IsNumber() lat: number;
   @ApiProperty() @Type(() => Number) @IsNumber() lng: number;
-  @ApiProperty({ enum: ['MOTO', 'MOTO_TAXI', 'STANDARD', 'TAXI', 'CONFORT', 'COMFORT', 'VIP', 'FAMILIALE'] })
+  @ApiProperty({ enum: ['MOTO', 'MOTO_TAXI', 'STANDARD', 'TAXI', 'CONFORT', 'COMFORT', 'VIP', 'FAMILIALE', 'TRICYCLE'] })
   @Transform(({ value }) => toVehicleType(value))
   @IsEnum(VehicleType)
   vehicleType: VehicleType;

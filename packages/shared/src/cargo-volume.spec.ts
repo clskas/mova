@@ -39,3 +39,12 @@ describe('vehicleFitsMove', () => {
     expect(vehicleFitsMove({ type: 'CAMION', cargoVolumeM3: 10 }, 'CAMION_50M3')).toBe(true);
   });
 });
+
+describe('tripoteur cargo volume', () => {
+  it('accepts 1 to 4 m³', () => {
+    expect(normalizeDeclaredCargoVolume('TRIPOTEUR', 3)).toBe(3);
+    expect(normalizeDeclaredCargoVolume('TRIPOTEUR', 5)).toBeNull();
+    expect(vehicleFitsMove({ type: 'TRIPOTEUR', cargoVolumeM3: 4 }, 'CAMIONNETTE', 4)).toBe(true);
+    expect(vehicleFitsMove({ type: 'TRIPOTEUR', cargoVolumeM3: 2 }, 'CAMIONNETTE', 4)).toBe(false);
+  });
+});

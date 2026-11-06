@@ -204,6 +204,7 @@ class MarketConfig {
     VehicleTypeOption(id: 'COMFORT', label: 'Confort', icon: '✨'),
     VehicleTypeOption(id: 'VIP', label: 'VIP', icon: '👑'),
     VehicleTypeOption(id: 'FAMILIALE', label: 'Familiale', icon: '🚐'),
+    VehicleTypeOption(id: 'TRICYCLE', label: 'Tricycle', icon: '🛺'),
   ];
 
   static const vehicleCategories = [
@@ -230,6 +231,12 @@ class MarketConfig {
     'XL': 'FAMILIALE',
     'VAN': 'FAMILIALE',
     'MINIVAN': 'FAMILIALE',
+    'TRICYCLE': 'TRICYCLE',
+    'KEKE': 'TRICYCLE',
+    'TUKTUK': 'TRICYCLE',
+    'TUK_TUK': 'TRICYCLE',
+    'BAJAJ': 'TRICYCLE',
+    'TRIPOTEUR': 'TRIPOTEUR',
   };
 
   /// Alias UI / contrat mobile → enum Prisma ride-service (`MOTO_TAXI`, `COMFORT`, …).
@@ -249,19 +256,31 @@ class MarketConfig {
   static String defaultTypeForCategory(String category) =>
       category.toUpperCase() == 'MOTO' ? 'MOTO_TAXI' : 'STANDARD';
 
-  /// Gammes for a category. Familiale (6–8 places) only when its admin switch is on.
-  static List<VehicleTypeOption> vehicleTypesForCategory(String category, {bool includeFamiliale = false}) {
+  /// Gammes behind an admin switch: Familiale (6–8 places) and Tricycle (1–3 places).
+  static bool _gammeShown(String id, {required bool includeFamiliale, required bool includeTricycle}) =>
+      (includeFamiliale || id != 'FAMILIALE') && (includeTricycle || id != 'TRICYCLE');
+
+  /// Gammes for a category. Familiale and Tricycle only when their admin switch is on.
+  static List<VehicleTypeOption> vehicleTypesForCategory(
+    String category, {
+    bool includeFamiliale = false,
+    bool includeTricycle = false,
+  }) {
     if (category.toUpperCase() == 'MOTO') {
       return vehicleTypes.where((v) => v.id == 'MOTO_TAXI').toList();
     }
     return vehicleTypes
-        .where((v) => v.id != 'MOTO_TAXI' && (includeFamiliale || v.id != 'FAMILIALE'))
+        .where((v) =>
+            v.id != 'MOTO_TAXI' &&
+            _gammeShown(v.id, includeFamiliale: includeFamiliale, includeTricycle: includeTricycle))
         .toList();
   }
 
   /// Every gamme the passenger can book right now (estimates are fetched for these).
-  static List<VehicleTypeOption> bookableVehicleTypes({bool includeFamiliale = false}) =>
-      vehicleTypes.where((v) => includeFamiliale || v.id != 'FAMILIALE').toList();
+  static List<VehicleTypeOption> bookableVehicleTypes({bool includeFamiliale = false, bool includeTricycle = false}) =>
+      vehicleTypes
+          .where((v) => _gammeShown(v.id, includeFamiliale: includeFamiliale, includeTricycle: includeTricycle))
+          .toList();
 
   /// Véhicules chauffeur compatibles avec une course (même règle stricte que le backend).
   static List<String> driverVehicleTypesForRide(String rideType) {
@@ -277,6 +296,8 @@ class MarketConfig {
         return const ['VIP'];
       case 'FAMILIALE':
         return const ['FAMILIALE'];
+      case 'TRICYCLE':
+        return const ['TRICYCLE'];
       default:
         return const [];
     }

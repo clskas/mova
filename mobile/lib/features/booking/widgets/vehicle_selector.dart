@@ -87,6 +87,7 @@ class VehicleSelector extends StatelessWidget {
             'MOTO_TAXI' => MovaColors.green,
             'VIP' => MovaColors.orange,
             'FAMILIALE' => MovaColors.green,
+            'TRICYCLE' => MovaColors.orange,
             _ => MovaColors.violet,
           };
 

@@ -9,7 +9,7 @@ export type MobileRideStatus =
   | 'COMPLETED'
   | 'CANCELLED';
 
-export type MobileVehicleType = 'MOTO' | 'STANDARD' | 'CONFORT' | 'VIP' | 'FAMILIALE';
+export type MobileVehicleType = 'MOTO' | 'STANDARD' | 'CONFORT' | 'VIP' | 'FAMILIALE' | 'TRICYCLE';
 
 export type VehicleTypeValue =
   | 'MOTO_TAXI'
@@ -18,7 +18,9 @@ export type VehicleTypeValue =
   | 'VIP'
   | 'FAMILIALE'
   | 'UTILITAIRE'
-  | 'CAMION';
+  | 'CAMION'
+  | 'TRICYCLE'
+  | 'TRIPOTEUR';
 export type RideStatusValue =
   | 'REQUESTED'
   | 'SEARCHING'
@@ -50,6 +52,13 @@ const VEHICLE_ALIASES: Record<string, VehicleTypeValue> = {
   MONOSPACE: 'FAMILIALE',
   UTILITAIRE: 'UTILITAIRE',
   CAMION: 'CAMION',
+  TRICYCLE: 'TRICYCLE',
+  KEKE: 'TRICYCLE',
+  TUKTUK: 'TRICYCLE',
+  TUK_TUK: 'TRICYCLE',
+  BAJAJ: 'TRICYCLE',
+  TRIPOTEUR: 'TRIPOTEUR',
+  CARGO_TRICYCLE: 'TRIPOTEUR',
 };
 
 export function normalizeVehicleType(input: string): VehicleTypeValue {
@@ -81,8 +90,11 @@ export function toMobileVehicleType(type: VehicleTypeValue): MobileVehicleType {
       return 'VIP';
     case 'FAMILIALE':
       return 'FAMILIALE';
+    case 'TRICYCLE':
+      return 'TRICYCLE';
     case 'UTILITAIRE':
     case 'CAMION':
+    case 'TRIPOTEUR':
       return 'STANDARD';
     default:
       return 'STANDARD';
@@ -104,8 +116,12 @@ export function rideTypesDriverCanServe(driverVehicleTypes: VehicleTypeValue[]):
         types.add('FAMILIALE');
         types.add('STANDARD');
         break;
+      case 'TRICYCLE':
+        types.add('TRICYCLE');
+        break;
       case 'UTILITAIRE':
       case 'CAMION':
+      case 'TRIPOTEUR':
         break;
     }
   }
@@ -128,6 +144,7 @@ export function driverVehicleTypesForRide(rideType: VehicleTypeValue | string): 
     case 'COMFORT':
     case 'VIP':
     case 'FAMILIALE':
+    case 'TRICYCLE':
       return [normalized];
     default:
       return [];
@@ -153,7 +170,9 @@ export function driverEligibleForParcelWeight(
       t === 'VIP' ||
       t === 'FAMILIALE' ||
       t === 'UTILITAIRE' ||
-      t === 'CAMION',
+      t === 'CAMION' ||
+      t === 'TRICYCLE' ||
+      t === 'TRIPOTEUR',
   );
   const hasMoto = types.includes('MOTO_TAXI');
   const cat = (weightCategory ?? 'SMALL').toUpperCase();
@@ -184,7 +203,7 @@ export function driverEligibleForRide(
  * un camion.
  */
 export const MOVING_ELIGIBLE_VEHICLE_TYPES: Record<MovingVehicleCategoryValue, readonly VehicleTypeValue[]> = {
-  CAMIONNETTE: ['UTILITAIRE', 'CAMION'],
+  CAMIONNETTE: ['UTILITAIRE', 'CAMION', 'TRIPOTEUR'],
   CAMION_15M3: ['UTILITAIRE', 'CAMION'],
   CAMION_30M3: ['CAMION'],
   CAMION_50M3: ['CAMION'],

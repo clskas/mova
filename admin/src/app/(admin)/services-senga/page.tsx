@@ -89,6 +89,15 @@ export default function ServicesSengaPage() {
     setOk(null);
   }
 
+  function toggleTricycle() {
+    if (!config || !canEditSengaPlus) return;
+    setConfig({
+      ...config,
+      features: { ...config.features, tricycleEnabled: config.features?.tricycleEnabled !== true },
+    });
+    setOk(null);
+  }
+
   async function save() {
     if (!config || (!canEditServices && !canEditSengaPlus)) return;
     setSaving(true);
@@ -102,6 +111,7 @@ export default function ServicesSengaPage() {
           sengaPlusVisible: config.features?.sengaPlusVisible !== false,
           passengerCountEnabled: config.features?.passengerCountEnabled === true,
           familialeEnabled: config.features?.familialeEnabled === true,
+          tricycleEnabled: config.features?.tricycleEnabled === true,
         };
       }
       const next = await updateClientAppsConfig(patch);
@@ -127,6 +137,7 @@ export default function ServicesSengaPage() {
   const sengaPlusOn = config.features?.sengaPlusVisible !== false;
   const passengerCountOn = config.features?.passengerCountEnabled === true;
   const familialeOn = config.features?.familialeEnabled === true;
+  const tricycleOn = config.features?.tricycleEnabled === true;
 
   return (
     <div className="p-4 space-y-6 max-w-xl">
@@ -185,6 +196,22 @@ export default function ServicesSengaPage() {
             checked={familialeOn}
             disabled={!canEditSengaPlus || saving}
             onChange={toggleFamiliale}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3">
+          <span className="text-sm text-slate-800">
+            <span className="font-medium block">Gamme Tricycle (tricycle à passagers, 1–3 places)</span>
+            <span className="text-xs text-slate-500">
+              Affiche la gamme Tricycle dans l&apos;app passager (3 passagers maximum). N&apos;activez qu&apos;une fois
+              assez de tricycles validés dans la ville (Chauffeurs → type d&apos;engin). Tarif : Tarifs → Tricycle.
+              Les tripoteurs (marchandises) reçoivent colis et petits déménagements sans cet interrupteur.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={tricycleOn}
+            disabled={!canEditSengaPlus || saving}
+            onChange={toggleTricycle}
           />
         </label>
       </section>

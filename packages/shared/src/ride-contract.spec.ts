@@ -97,3 +97,22 @@ describe('driverEligibleForMoving', () => {
     expect(driverEligibleForMoving(['STANDARD', 'CAMION'], 'CAMION_50M3')).toBe(true);
   });
 });
+
+describe('tricycle and tripoteur', () => {
+  it('normalizes the local names', () => {
+    expect(normalizeVehicleType('keke')).toBe('TRICYCLE');
+    expect(normalizeVehicleType('tuk-tuk')).toBe('TRICYCLE');
+    expect(normalizeVehicleType('Tripoteur')).toBe('TRIPOTEUR');
+  });
+
+  it('sends Tricycle rides to tricycles only, never to tripoteurs', () => {
+    expect(driverVehicleTypesForRide('TRICYCLE')).toEqual(['TRICYCLE']);
+    expect(driverVehicleTypesForRide('STANDARD')).not.toContain('TRICYCLE');
+  });
+
+  it('lets a tripoteur take a camionnette move but not a truck move', () => {
+    expect(driverEligibleForMoving(['TRIPOTEUR'], 'CAMIONNETTE')).toBe(true);
+    expect(driverEligibleForMoving(['TRIPOTEUR'], 'CAMION_15M3')).toBe(false);
+    expect(driverEligibleForMoving(['TRICYCLE'], 'CAMIONNETTE')).toBe(false);
+  });
+});

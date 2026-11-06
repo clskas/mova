@@ -422,7 +422,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       'vehicleModel': _model.text.trim(),
       'vehicleType': _vehicleType,
       'vehicleColor': _color.text.trim(),
-      if (_vehicleType != 'MOTO_TAXI' && _passengerSeats != null) 'vehiclePassengerSeats': _passengerSeats,
+      if (_vehicleType != 'MOTO_TAXI' && _vehicleType != 'TRIPOTEUR' && _passengerSeats != null)
+        'vehiclePassengerSeats': _passengerSeats,
       if (cargoVolumeRange(_vehicleType) != null && int.tryParse(_cargoVolume.text.trim()) != null)
         'vehicleCargoVolumeM3': int.parse(_cargoVolume.text.trim()),
       if (_vehiclePhotos.isNotEmpty) 'vehiclePhotoUrls': _vehiclePhotos,
@@ -982,17 +983,20 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             DropdownMenuItem(value: 'FAMILIALE', child: Text('Familiale (6 à 8 places)')),
             DropdownMenuItem(value: 'UTILITAIRE', child: Text('Utilitaire')),
             DropdownMenuItem(value: 'CAMION', child: Text('Camion')),
+            DropdownMenuItem(value: 'TRICYCLE', child: Text('Tricycle passagers (1 à 3 places)')),
+            DropdownMenuItem(value: 'TRIPOTEUR', child: Text('Tripoteur marchandises')),
           ],
           onChanged: (v) => setState(() {
             _vehicleType = v ?? 'STANDARD';
             // Drop a declaration the new category does not allow (e.g. 4 seats → Familiale).
             if (_vehicleType == 'MOTO_TAXI' ||
+                _vehicleType == 'TRIPOTEUR' ||
                 (_passengerSeats != null && !declarableSeats(_vehicleType).contains(_passengerSeats))) {
               _passengerSeats = null;
             }
           }),
         ),
-        if (_vehicleType != 'MOTO_TAXI') ...[
+        if (_vehicleType != 'MOTO_TAXI' && _vehicleType != 'TRIPOTEUR') ...[
           const SizedBox(height: _fieldGap),
           DropdownButtonFormField<int>(
             key: const Key('vehiclePassengerSeats'),
@@ -1001,6 +1005,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
               labelText: 'Places passagers (sans compter le chauffeur)',
               helperText: _vehicleType == 'FAMILIALE'
                   ? 'Familiale : 5 à 8 places. Vous recevez aussi les courses Standard.'
+                  : _vehicleType == 'TRICYCLE'
+                      ? 'Tricycle : 1 à 3 places. Vous recevez les courses de la gamme Tricycle et des petits colis.'
                   : 'Les groupes plus grands que vos places ne vous seront pas proposés. '
                       '6 places ou plus ? Choisissez la catégorie Familiale.',
               helperMaxLines: 3,
@@ -1021,7 +1027,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             decoration: InputDecoration(
               labelText: 'Volume utile (m³)',
               suffixText: 'm³',
-              helperText: 'Espace de chargement de votre ${_vehicleType == 'CAMION' ? 'camion' : 'utilitaire'} '
+              helperText: 'Espace de chargement de votre ${switch (_vehicleType) { 'CAMION' => 'camion', 'TRIPOTEUR' => 'tripoteur', _ => 'utilitaire' }} '
                   '(${cargoVolumeRange(_vehicleType)!.min} à ${cargoVolumeRange(_vehicleType)!.max} m³). '
                   'Vous ne recevrez que les déménagements qui y tiennent. SENGA le vérifie avec la photo.',
               helperMaxLines: 4,

@@ -16,10 +16,12 @@ La **ville SENGA** sur l'accueil est détectée via GPS à l'ouverture (modifiab
 2. Attendez l’**approbation KYC** par l’équipe SENGA.
 3. Vous recevez un **PIN d’activation à 6 chiffres** (SMS / e-mail). À la première connexion app, saisissez ce PIN — il n’est **pas** lié au dépôt des pièces.
 4. À l'étape **Véhicule**, renseignez :
-   - le **type** (Moto-taxi, Standard, Confort, VIP, **Familiale 6 à 8 places**, Utilitaire, Camion), la plaque, la marque et le modèle ;
+   - le **type** (Moto-taxi, Standard, Confort, VIP, **Familiale 6 à 8 places**, Utilitaire, Camion, **Tricycle passagers**, **Tripoteur marchandises**), la plaque, la marque et le modèle ;
+     - **Tricycle passagers** (« kéké ») : 1 à 3 places, courses de la gamme Tricycle et petits colis ;
+     - **Tripoteur marchandises** : colis, courses & commissions et petits déménagements (camionnette), avec un volume utile de 1 à 4 m³ ;
    - jusqu'à **5 photos de l'engin** (avant, arrière, côté, intérieur…). La première est la **photo principale** : menu ⋮ sur une photo → *Mettre en premier* ou *Retirer* ;
    - le nombre de **places passagers** (sans compter le chauffeur) : vous ne recevez pas les groupes plus grands que vos places ;
-   - pour un **utilitaire** (1 à 25 m³) ou un **camion** (5 à 100 m³), le **volume utile** de chargement : vous ne recevez que les déménagements qui y tiennent.
+   - pour un **utilitaire** (1 à 25 m³), un **camion** (5 à 100 m³) ou un **tripoteur** (1 à 4 m³), le **volume utile** de chargement : vous ne recevez que les déménagements qui y tiennent.
    L’admin doit **valider le type d’engin** (photos à l'appui) avant que vous puissiez travailler.
 5. Activez **En ligne** depuis l’écran principal.
 6. Acceptez ou refusez courses, livraisons colis/repas et réservations planifiées.
@@ -64,7 +66,8 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
 ## Déménagements (utilitaire et camion)
 
 1. Quand un client demande un déménagement dans votre ville, vous recevez une notification **« Nouveau déménagement »** si votre véhicule convient :
-   - camionnette ou camion 15 m³ : **utilitaire ou camion** ;
+   - camionnette : **utilitaire, camion ou tripoteur** ;
+   - camion 15 m³ : **utilitaire ou camion** ;
    - camion 30 ou 50 m³ : **camion** ;
    - et votre **volume utile** déclaré doit être au moins égal au volume du déménagement.
 2. Sur l'accueil, la carte **« Déménagements proposés »** montre le trajet, le volume, les objets et votre **gain net**.

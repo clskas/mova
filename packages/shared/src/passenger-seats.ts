@@ -12,6 +12,8 @@ export const DEFAULT_VEHICLE_PASSENGER_SEATS: Record<VehicleTypeValue, number> =
   FAMILIALE: 6,
   UTILITAIRE: 2,
   CAMION: 2,
+  TRICYCLE: 3,
+  TRIPOTEUR: 1,
 };
 
 /** Upper bound a driver may declare (minibus-style cars are registered as STANDARD). */
@@ -23,6 +25,8 @@ export const MAX_VEHICLE_PASSENGER_SEATS: Record<VehicleTypeValue, number> = {
   FAMILIALE: 8,
   UTILITAIRE: 8,
   CAMION: 2,
+  TRICYCLE: 3,
+  TRIPOTEUR: 1,
 };
 
 /** Smallest declaration accepted (a Familiale vehicle carries at least 5). */
@@ -44,6 +48,7 @@ export const RIDE_PASSENGER_LIMIT_BY_TYPE: Partial<Record<VehicleTypeValue, numb
   COMFORT: 4,
   VIP: 4,
   FAMILIALE: 8,
+  TRICYCLE: 3,
 };
 
 function typeOrNull(type: string | null | undefined): VehicleTypeValue | null {

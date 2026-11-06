@@ -24,6 +24,8 @@ export const VEHICLE_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: "FAMILIALE", label: "Familiale (6–8 places)" },
   { value: "UTILITAIRE", label: "Utilitaire" },
   { value: "CAMION", label: "Camion" },
+  { value: "TRICYCLE", label: "Tricycle passagers (1–3 places)" },
+  { value: "TRIPOTEUR", label: "Tripoteur marchandises" },
 ];
 
 export const VEHICLE_TYPE_LABELS: Record<string, string> = Object.fromEntries(

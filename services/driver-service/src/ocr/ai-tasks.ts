@@ -7,10 +7,12 @@ export type AiVisionTask = 'RECEIPT' | 'MOVING_VOLUME';
 
 export const AI_VISION_TASKS: Record<
   AiVisionTask,
-  { maxImages: number; schema: Record<string, unknown>; prompt: (ctx: Record<string, unknown>) => string }
+  { maxImages: number; uploadCategories: string[]; schema: Record<string, unknown>; prompt: (ctx: Record<string, unknown>) => string }
 > = {
   RECEIPT: {
     maxImages: 2,
+    // Proof photos are uploaded through /uploads/parcel-photo.
+    uploadCategories: ['parcels'],
     schema: {
       type: 'object',
       properties: {
@@ -47,6 +49,7 @@ export const AI_VISION_TASKS: Record<
   },
   MOVING_VOLUME: {
     maxImages: 6,
+    uploadCategories: ['moving'],
     schema: {
       type: 'object',
       properties: {

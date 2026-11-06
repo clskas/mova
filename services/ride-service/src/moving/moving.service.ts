@@ -1,3 +1,4 @@
+import { runAiVision } from '../common/ai-vision.util';
 import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { CommissionServiceType, MovingRequestStatus, MovingVehicleCategory, SurchargeType, VehicleType } from '@prisma/client';
 import {
@@ -71,6 +72,28 @@ export class MovingService {
 
   private async vehicleCategoryLabel(category: MovingVehicleCategory): Promise<string> {
     return this.movingVehiclePricing.getLabel(category);
+  }
+
+  /** Claude lists the furniture on the photos and estimates the volume; the client can still change it. */
+  async estimateVolumeFromPhotos(photoUrls: string[]) {
+    const urls = (Array.isArray(photoUrls) ? photoUrls : []).filter((u) => typeof u === 'string' && u.trim()).slice(0, 6);
+    if (urls.length === 0) {
+      return { available: false, message: 'Ajoutez au moins une photo de vos pièces.' };
+    }
+    const answer = await runAiVision('MOVING_VOLUME', urls);
+    const r = answer.result;
+    if (!answer.available || !r || typeof r.estimatedVolumeM3 !== 'number') {
+      return { available: false, message: answer.message ?? 'Estimation automatique indisponible — choisissez le logement vous-même.' };
+    }
+    const volume = Math.min(80, Math.max(1, Math.round(r.estimatedVolumeM3)));
+    return {
+      available: true,
+      estimatedVolumeM3: volume,
+      recommendedCategory: r.recommendedCategory,
+      items: Array.isArray(r.items) ? r.items : [],
+      confidence: r.confidence,
+      notes: r.notes,
+    };
   }
 
   async estimate(dto: EstimateMovingDto, redeemPromo = false) {

@@ -33,6 +33,7 @@ import {
   vehiclePhotoPrompt,
   vehiclePhotoVerdict,
 } from './claude-json';
+import { AI_VISION_TASKS, isAiVisionTask } from './ai-tasks';
 import { extractDocumentFieldsWithClaude, isScannableDocument } from './document-fields';
 
 const OCR_PROVIDER_LABELS: Record<OcrProviderName, string> = {
@@ -305,7 +306,7 @@ export class OcrService {
    * KYC media is stored under ride-service; public GET /uploads/kyc requires JWT,
    * so inter-service selfie verification must use the internal route + API key.
    */
-  private async fetchImageBuffer(url: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+  async fetchImageBuffer(url: string): Promise<{ buffer: Buffer; contentType: string } | null> {
     try {
       const upload = parseUploadsMediaPath(url);
       if (upload) {
@@ -349,6 +350,23 @@ export class OcrService {
   private async claudeSelfieVision(image: OcrImage) {
     const out = await claudeJson({ images: [image], prompt: SELFIE_VISION_PROMPT, schema: SELFIE_SCHEMA as unknown as Record<string, unknown> });
     return out ? parseSelfieVisionResponse(JSON.stringify(out)) : null;
+  }
+
+  /** Internal: a vision task (receipt, moving volume…) for another service. Null when AI is off or unreadable. */
+  async runVisionTask(task: string, imageUrls: unknown, context: Record<string, unknown> = {}) {
+    if (!isAiVisionTask(task)) return { available: false, result: null, message: 'Tâche IA inconnue.' };
+    if (!claudeAvailable()) return { available: false, result: null, message: 'IA désactivée.' };
+    const def = AI_VISION_TASKS[task];
+    const urls = (Array.isArray(imageUrls) ? imageUrls : []).filter((u): u is string => typeof u === 'string').slice(0, def.maxImages);
+    const images = (await Promise.all(urls.map((u) => this.fetchImageBuffer(u)))).filter((x): x is OcrImage => !!x);
+    if (images.length === 0) return { available: true, result: null, message: 'Photos illisibles.' };
+    try {
+      const result = await claudeJson({ images, prompt: def.prompt(context), schema: def.schema });
+      return { available: true, result };
+    } catch (err) {
+      this.logger.warn(`AI task ${task} failed: ${err instanceof Error ? err.message.slice(0, 200) : err}`);
+      return { available: false, result: null, message: 'IA momentanément indisponible.' };
+    }
   }
 
   scheduleVehiclePhotoCheck(userId: string): void {

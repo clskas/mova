@@ -344,6 +344,18 @@ export type DeliveryOverview = {
   dropoffAddress?: string;
   restaurantName?: string;
   description?: string;
+  proofPhotoUrl?: string | null;
+  purchaseTotalCdf?: number | null;
+  budgetCdf?: number | null;
+  receiptCheck?: {
+    verdict?: "OK" | "A_VERIFIER" | "ECART";
+    reasons?: string[];
+    totalCdf?: number | null;
+    merchant?: string | null;
+    date?: string | null;
+    notes?: string;
+    checkedAt?: string;
+  } | null;
   weightCategory?: string;
   priceCdf?: number;
   createdAt?: string;

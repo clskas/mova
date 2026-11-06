@@ -11,6 +11,12 @@ import { MovingService } from './moving.service';
 export class MovingController {
   constructor(private movingService: MovingService) {}
 
+  @Post('estimate-volume')
+  @ApiOperation({ summary: 'Estimer le volume (m³) à partir des photos des pièces (IA)' })
+  estimateVolume(@Body() body: { photoUrls?: string[] }) {
+    return this.movingService.estimateVolumeFromPhotos(body?.photoUrls ?? []);
+  }
+
   @Post('estimate')
   @ApiOperation({ summary: 'Estimer déménagement (volume + distance, CDF)' })
   estimate(@Body() dto: EstimateMovingDto) {

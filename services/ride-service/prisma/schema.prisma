@@ -645,6 +645,8 @@ model ErrandOrder {
   estimatedPurchaseCdf Int?
   finalPriceCdf     Int?
   proofPhotoUrl     String?
+  /// Claude reading of the purchase receipt (total, items) and verdict vs declared total / budget.
+  receiptCheck      Json?
   completionPin     String?
   pickupAddress     String
   pickupLat         Float

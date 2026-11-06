@@ -82,6 +82,10 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
   bool _loadingGps = false;
 
   bool _uploadingPhoto = false;
+  /// Volume proposed by the AI from the photos; overrides the housing estimate until the housing changes.
+  int? _aiVolumeM3;
+  String? _aiNote;
+  bool _aiEstimating = false;
   int? _estimatedPrice;
   Map<String, dynamic>? _estimateBreakdown;
   double? _distanceKm;
@@ -304,6 +308,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
   }
 
   int _volumeM3() {
+    final ai = _aiVolumeM3;
+    if (ai != null) return ai;
     return switch (_volume) {
       'STUDIO' => 4,
       'APARTMENT' => (8 + (_rooms - 1) * 3).clamp(8, 35),
@@ -315,6 +321,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
 
   void _onHousingTypeChanged(String volume) {
     _volume = volume;
+    _aiVolumeM3 = null;
+    _aiNote = null;
     switch (volume) {
       case 'STUDIO':
         _rooms = 1;
@@ -379,6 +387,47 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           SnackBar(content: Text('Photo non envoyée : ${error.message}')),
         );
     }
+  }
+
+  Future<void> _estimateVolumeWithAi() async {
+    final urls = _uploadedPhotoUrls;
+    if (urls.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Prenez d\'abord des photos de vos pièces et meubles.')),
+      );
+      return;
+    }
+    setState(() => _aiEstimating = true);
+    final api = ref.read(apiClientProvider);
+    await api.checkHealth();
+    final result = await api.post('/moving/estimate-volume', {'photoUrls': urls});
+    if (!mounted) return;
+    setState(() {
+      _aiEstimating = false;
+      switch (result) {
+        case Success(:final data):
+          final volume = (data['estimatedVolumeM3'] as num?)?.round();
+          if (data['available'] == true && volume != null && volume > 0) {
+            _aiVolumeM3 = volume;
+            _vehicleCategory = recommendedVehicleForVolume(volume);
+            _aiNote = data['notes']?.toString();
+            if (_items.isEmpty && data['items'] is List) {
+              for (final item in (data['items'] as List).whereType<Map>().take(15)) {
+                final name = item['name']?.toString().trim() ?? '';
+                if (name.isEmpty) continue;
+                final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+                _items.add(qty > 1 ? '$name x$qty' : name);
+              }
+            }
+            _estimatedPrice = null;
+            _estimateBreakdown = null;
+          } else {
+            _aiNote = data['message']?.toString() ?? 'Estimation automatique indisponible.';
+          }
+        case Failure(:final error):
+          _aiNote = 'Estimation automatique indisponible : ${error.message}';
+      }
+    });
   }
 
   List<String> get _uploadedPhotoUrls =>
@@ -683,6 +732,28 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                     _estimateBreakdown = null;
                   }),
                 ),
+              ),
+            ),
+          if (_photos.isNotEmpty)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: (_aiEstimating || _uploadingPhoto) ? null : _estimateVolumeWithAi,
+                icon: _aiEstimating
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.auto_awesome_outlined),
+                label: const Text('Estimer le volume avec les photos (IA)'),
+              ),
+            ),
+          if (_aiVolumeM3 != null || _aiNote != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                [
+                  if (_aiVolumeM3 != null) 'Volume estimé par l\'IA : $_aiVolumeM3 m³ (modifiable en changeant le logement).',
+                  if (_aiNote != null && _aiNote!.isNotEmpty) _aiNote!,
+                ].join('\n'),
+                style: theme.textTheme.bodySmall,
               ),
             ),
           const SizedBox(height: 8),

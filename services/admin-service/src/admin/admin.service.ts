@@ -1077,6 +1077,10 @@ export class AdminService {
       body: JSON.stringify({ passengerSeats }),
     });
   }
+  async checkDriverVehiclePhotos(userId: string, managedCity?: string | null) {
+    await this.getDriver(userId, managedCity);
+    return this.proxy('driver', `/internal/drivers/${userId}/vehicle-photo-check`, { method: 'POST' });
+  }
   async setDriverVehicleCargoVolume(userId: string, cargoVolumeM3: number | null, managedCity?: string | null) {
     await this.getDriver(userId, managedCity);
     return this.proxy('driver', `/internal/drivers/${userId}/vehicle-cargo-volume`, {

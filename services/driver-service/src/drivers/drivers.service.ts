@@ -380,6 +380,11 @@ export class DriversService {
     return { cleared, reassigned, keptKinshasa };
   }
 
+  /** Admin: ask Claude to re-check the active vehicle's photos now. */
+  checkVehiclePhotos(userId: string) {
+    return this.ocrService.checkVehiclePhotos(userId);
+  }
+
   async uploadKyc(userId: string, type: string, url: string) {
     let docType: string;
     try {
@@ -606,6 +611,7 @@ export class DriversService {
             color: vehicle.color,
             imageUrl: vehicle.imageUrl,
             photoUrls: vehiclePhotoList(vehicle),
+            photoCheck: vehicle.photoCheck ?? null,
             passengerSeats: vehiclePassengerSeats(vehicle.type, vehicle.passengerSeats),
             passengerSeatsDeclared: vehicle.passengerSeats != null,
             cargoVolumeM3: vehicle.cargoVolumeM3,
@@ -721,6 +727,8 @@ export class DriversService {
               : {}),
           },
         });
+        // New photos or type: Claude re-checks the photos for the admin (async, never blocks).
+        if (typeOrPhotoChanged) this.ocrService.scheduleVehiclePhotoCheck(userId);
         // Changing type/photo reopens admin review — take driver offline immediately.
         if (typeOrPhotoChanged) {
           await this.prisma.driverProfile.update({
@@ -1777,6 +1785,7 @@ export class DriversService {
             color: vehicle.color,
             imageUrl: vehicle.imageUrl,
             photoUrls: vehiclePhotoList(vehicle),
+            photoCheck: vehicle.photoCheck ?? null,
             passengerSeats: vehiclePassengerSeats(vehicle.type, vehicle.passengerSeats),
             passengerSeatsDeclared: vehicle.passengerSeats != null,
             cargoVolumeM3: vehicle.cargoVolumeM3,

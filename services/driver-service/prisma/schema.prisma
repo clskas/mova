@@ -95,6 +95,8 @@ model Vehicle {
   imageUrl           String?
   /// Up to 5 vehicle photos; the first one is mirrored in imageUrl.
   photoUrls          Json?
+  /// Claude check of the photos against the declaration (verdict, issues, checkedAt).
+  photoCheck         Json?
   /// Passenger seats (driver excluded). Null = category default (see @mova/shared passenger-seats).
   passengerSeats     Int?
   /// Volume utile (m³) of a utilitaire or camion. Null = not declared yet.

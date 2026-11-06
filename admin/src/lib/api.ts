@@ -177,6 +177,8 @@ export type AdminDriver = {
     typeApprovedAt?: string | null;
     /** Up to 5 photos; the first one is imageUrl. */
     photoUrls?: string[] | null;
+    /** Claude check of the vehicle photos (see VehiclePhotoCheck). */
+    photoCheck?: VehiclePhotoCheck | null;
     /** Declared passenger seats; null = category default. */
     passengerSeats?: number | null;
     /** Volume utile (m³) of a utilitaire / camion; null = not declared. */
@@ -2301,6 +2303,31 @@ export async function reviewDriverDocumentsRenewal(userId: string, approved: boo
     method: "PATCH",
     body: JSON.stringify({ approved, notes }),
   });
+}
+
+export type VehiclePhotoCheck = {
+  verdict?: "OK" | "A_VERIFIER" | "PROBLEME";
+  photosShowVehicle?: boolean;
+  sameVehicleOnAllPhotos?: boolean;
+  detectedType?: string;
+  matchesDeclaredType?: boolean;
+  plateVisible?: boolean;
+  plateText?: string | null;
+  plateMatchesDeclared?: boolean | null;
+  estimatedPassengerSeats?: number | null;
+  estimatedCargoVolumeM3?: number | null;
+  volumePlausible?: boolean | null;
+  issues?: string[];
+  confidence?: number;
+  notes?: string;
+  photosChecked?: number;
+  checkedAt?: string;
+};
+
+export async function checkDriverVehiclePhotos(
+  userId: string,
+): Promise<{ available?: boolean; message?: string; photoCheck?: VehiclePhotoCheck }> {
+  return apiFetch(`/api/admin/drivers/${userId}/vehicle-photo-check`, { method: "POST" });
 }
 
 export async function setDriverVehicleCargoVolume(userId: string, cargoVolumeM3: number | null) {

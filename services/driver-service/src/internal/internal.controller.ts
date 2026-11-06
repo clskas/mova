@@ -160,6 +160,10 @@ export class InternalController {
   setVehicleSeats(@Param('userId') userId: string, @Body() dto: VehicleSeatsDto) {
     return this.drivers.setVehiclePassengerSeats(userId, dto.passengerSeats ?? null);
   }
+  @Post('drivers/:userId/vehicle-photo-check')
+  checkVehiclePhotos(@Param('userId') userId: string) {
+    return this.drivers.checkVehiclePhotos(userId);
+  }
   @Patch('drivers/:userId/vehicle-cargo-volume')
   setVehicleCargoVolume(@Param('userId') userId: string, @Body() dto: VehicleCargoVolumeDto) {
     return this.drivers.setVehicleCargoVolume(userId, dto.cargoVolumeM3 ?? null);

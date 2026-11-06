@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch, formatDate, resolveIncident, type Incident } from "@/lib/api";
+import { apiFetch, draftSupportReply, formatDate, resolveIncident, type Incident } from "@/lib/api";
 import { SosIncidentMap, SosIncidentMapPlaceholder, googleMapsUrl } from "@/components/SosIncidentMap";
 import { useAdmin } from "@/components/AdminProvider";
 import {
@@ -178,11 +178,75 @@ export default function LitigesPage() {
                 {i.status === "OPEN" && canWrite("litiges") && (
                   <BtnPrimary onClick={() => resolve(i.id)}>Résoudre</BtnPrimary>
                 )}
+                {!isSos && i.description && <ReplyDraft incident={i} />}
               </Card>
             );
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/** « Brouillon de réponse (IA) » : texte proposé, à relire puis copier dans le canal de réponse. */
+function ReplyDraft({ incident }: { incident: Incident }) {
+  const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function generate() {
+    setBusy(true);
+    setNote(null);
+    try {
+      const res = await draftSupportReply({
+        kind: "Litige",
+        subject: incident.type ?? "",
+        message: incident.description ?? "",
+      });
+      if (res.available && res.reply) {
+        setDraft(res.reply);
+        setNote(res.internalNote ?? null);
+      } else {
+        setNote(res.message ?? "Brouillon indisponible pour le moment.");
+      }
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : "Brouillon impossible");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="w-full space-y-2">
+      <button
+        type="button"
+        onClick={() => void generate()}
+        disabled={busy}
+        className="text-xs rounded-lg border px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+      >
+        {busy ? "Rédaction…" : draft ? "Proposer une autre réponse (IA)" : "Brouillon de réponse (IA)"}
+      </button>
+      {draft != null && (
+        <div className="space-y-1">
+          <textarea
+            className="w-full rounded-xl border p-2 text-sm"
+            rows={4}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <button
+            type="button"
+            className="text-xs text-[#6C63FF] hover:underline"
+            onClick={() => {
+              void navigator.clipboard?.writeText(draft).then(() => setCopied(true));
+            }}
+          >
+            {copied ? "Copié ✓" : "Copier la réponse"}
+          </button>
+        </div>
+      )}
+      {note && <p className="text-xs text-gray-500">{note}</p>}
     </div>
   );
 }

@@ -365,6 +365,29 @@ export function fetchReviews(skip = 0, take = 30) {
   }>(`/api/restaurant/reviews?skip=${skip}&take=${take}`);
 }
 
+export type ScannedMenuItem = {
+  name: string;
+  unitPriceCdf: number | null;
+  priceUsd: number | null;
+  category: string | null;
+  description: string | null;
+};
+
+/** Claude reads photographed menus (photos already uploaded with uploadMenuPhoto). */
+export function scanMenuPhotos(photoUrls: string[]) {
+  return apiFetch<{ available: boolean; isMenu?: boolean; items: ScannedMenuItem[]; notes?: string; message?: string }>(
+    "/api/restaurant/menu/scan",
+    { method: "POST", body: JSON.stringify({ photoUrls }) },
+  );
+}
+
+/** AI draft for a review reply; the partner edits it before sending. */
+export function draftReviewReply(id: string) {
+  return apiFetch<{ available: boolean; reply?: string; message?: string }>(`/api/restaurant/reviews/${id}/reply-draft`, {
+    method: "POST",
+  });
+}
+
 export function replyToReview(id: string, reply: string) {
   return apiFetch(`/api/restaurant/reviews/${id}/reply`, {
     method: "POST",

@@ -4,7 +4,7 @@ export type AiVisionAnswer = { available: boolean; result: Record<string, unknow
 
 /** Asks driver-service (which holds the Claude key) to run a fixed vision task. Never throws. */
 export async function runAiVision(
-  task: 'RECEIPT' | 'MOVING_VOLUME',
+  task: 'RECEIPT' | 'MOVING_VOLUME' | 'MENU' | 'RENTAL_LISTING',
   imageUrls: string[],
   context: Record<string, unknown> = {},
 ): Promise<AiVisionAnswer> {
@@ -20,6 +20,49 @@ export async function runAiVision(
   } catch {
     return { available: false, result: null, message: 'IA momentanément indisponible.' };
   }
+}
+
+/** Asks driver-service to run a fixed text-only task (reply draft…). Never throws. */
+export async function runAiText(
+  task: 'ANALYTICS_ANSWER' | 'DAILY_SUMMARY' | 'REPLY_DRAFT',
+  context: Record<string, unknown>,
+): Promise<AiVisionAnswer> {
+  try {
+    const res = await fetch(serviceUrl('driver', '/internal/ai/text'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+      body: JSON.stringify({ task, context }),
+      signal: AbortSignal.timeout(90_000),
+    });
+    if (!res.ok) return { available: false, result: null, message: `IA indisponible (${res.status}).` };
+    return (await res.json()) as AiVisionAnswer;
+  } catch {
+    return { available: false, result: null, message: 'IA momentanément indisponible.' };
+  }
+}
+
+export type ScannedMenuItem = { name: string; unitPriceCdf: number | null; priceUsd: number | null; category: string | null; description: string | null };
+
+/** Keeps only usable menu lines from Claude's reading (names trimmed, prices positive integers). */
+export function cleanScannedMenu(result: Record<string, unknown> | null): ScannedMenuItem[] {
+  const rows = Array.isArray(result?.items) ? (result!.items as unknown[]) : [];
+  const out: ScannedMenuItem[] = [];
+  const seen = new Set<string>();
+  for (const raw of rows) {
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
+    const name = typeof r.name === 'string' ? r.name.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+    if (name.length < 2) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const cdf = typeof r.priceCdf === 'number' && r.priceCdf > 0 ? Math.round(r.priceCdf) : null;
+    const usd = typeof r.priceUsd === 'number' && r.priceUsd > 0 ? Math.round(r.priceUsd * 100) / 100 : null;
+    const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
+    out.push({ name, unitPriceCdf: cdf, priceUsd: usd, category: text(r.category, 60), description: text(r.description, 300) });
+    if (out.length >= 80) break;
+  }
+  return out;
 }
 
 /** Receipt total vs what the courier declared and the client's budget. */

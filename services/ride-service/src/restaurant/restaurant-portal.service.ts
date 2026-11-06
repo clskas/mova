@@ -20,6 +20,7 @@ import {
   sumTransactionAmounts,
 } from '../common/partner-wallet.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { cleanScannedMenu, runAiText, runAiVision } from '../common/ai-vision.util';
 import { formatParcelDelivery } from '../deliveries/parcel.util';
 import { DeliveriesService } from '../deliveries/deliveries.service';
 import { UploadsService } from '../uploads/uploads.service';
@@ -584,6 +585,47 @@ export class RestaurantPortalService {
       menuItems: catalog.items,
       catalog,
     };
+  }
+
+  /** Claude reads photographed menus; the partner reviews the lines before saving them. */
+  async scanMenuPhotos(ownerUserId: string, photoUrls: string[]) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    this.assertRestaurantKycApproved(restaurant);
+    const urls = (Array.isArray(photoUrls) ? photoUrls : []).filter((u) => typeof u === 'string' && u.trim()).slice(0, 3);
+    if (urls.length === 0) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ajoutez au moins une photo du menu.');
+    }
+    const answer = await runAiVision('MENU', urls);
+    if (!answer.available || !answer.result) {
+      return { available: false, items: [], message: answer.message ?? 'Lecture automatique indisponible — saisissez le menu à la main.' };
+    }
+    const items = cleanScannedMenu(answer.result);
+    return {
+      available: true,
+      isMenu: answer.result.isMenu !== false,
+      items,
+      notes: typeof answer.result.notes === 'string' ? answer.result.notes : '',
+    };
+  }
+
+  /** Draft reply to a customer review; the partner edits it and sends it with POST reviews/:id/reply. */
+  async draftReviewReply(ownerUserId: string, reviewId: string) {
+    const restaurant = await this.getRestaurantForOwner(ownerUserId);
+    const rating = await this.prisma.deliveryRating.findFirst({
+      where: { id: reviewId, delivery: { restaurantId: restaurant.id } },
+    });
+    if (!rating) throw new MovaHttpException(MovaErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, 'Avis introuvable.');
+    const answer = await runAiText('REPLY_DRAFT', {
+      kind: 'Avis client sur une commande',
+      subject: `note restaurant ${rating.restaurantScore ?? '?'}/5`,
+      message: rating.comment?.trim() || `(note ${rating.restaurantScore ?? '?'}/5 sans commentaire)`,
+      signature: restaurant.name,
+    });
+    const reply = answer.result && typeof answer.result.reply === 'string' ? answer.result.reply : null;
+    if (!answer.available || !reply) {
+      return { available: false, message: answer.message ?? 'Brouillon indisponible pour le moment.' };
+    }
+    return { available: true, reply, internalNote: answer.result?.internalNote ?? '' };
   }
 
   async uploadMenuPhoto(ownerUserId: string, imageBase64: string, mimeType?: string) {

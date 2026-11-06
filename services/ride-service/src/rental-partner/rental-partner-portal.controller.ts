@@ -189,6 +189,12 @@ export class RentalPartnerPortalController {
     return this.portal.deleteVehicle(req.user.id, id);
   }
 
+  @Post('vehicles/describe')
+  @ApiOperation({ summary: 'Rédiger l’annonce d’un véhicule à partir de ses infos et photos (IA), à relire' })
+  describe(@Request() req: { user: { id: string } }, @Body() dto: Partial<CreatePartnerVehicleDto>) {
+    return this.portal.describeVehicle(req.user.id, dto);
+  }
+
   @Post('vehicle-photo')
   @ApiOperation({ summary: 'Téléverser photo véhicule (base64)' })
   photo(@Request() req: { user: { id: string } }, @Body() dto: UploadPartnerVehiclePhotoDto) {

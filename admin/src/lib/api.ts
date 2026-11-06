@@ -920,6 +920,40 @@ export function toUserErrorMessage(
   return cleaned || fallback;
 }
 
+export type AiDailySummary = {
+  available: boolean;
+  headline?: string;
+  highlights?: string[];
+  alerts?: string[];
+  actions?: string[];
+  generatedAt?: string;
+  message?: string;
+};
+
+export type AiDataAnswer = {
+  available: boolean;
+  answer?: string;
+  columns?: string[];
+  rows?: string[][];
+  caveats?: string[];
+  message?: string;
+};
+
+export function fetchDailySummary(refresh = false) {
+  return apiFetch<AiDailySummary>(`/api/admin/ai/daily-summary${refresh ? "?refresh=1" : ""}`);
+}
+
+export function askDataQuestion(question: string, days: number) {
+  return apiFetch<AiDataAnswer>("/api/admin/ai/ask", { method: "POST", body: JSON.stringify({ question, days }) });
+}
+
+export function draftSupportReply(body: { kind: string; subject?: string; message: string }) {
+  return apiFetch<{ available: boolean; reply?: string; internalNote?: string; message?: string }>("/api/admin/ai/reply-draft", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
   const hasToken = Boolean(getToken());
@@ -1844,6 +1878,7 @@ export async function assignRentalDriver(id: string, driverId: string) {
 export type RentalCatalogVehicle = {
   id: string;
   name: string;
+  description?: string | null;
   make?: string;
   model?: string;
   year?: number;

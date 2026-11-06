@@ -26,7 +26,8 @@ export async function claudeJson(opts: {
       type: 'image' as const,
       source: { type: 'base64' as const, media_type: type, data: img.buffer.toString('base64') },
     }));
-  if (blocks.length === 0) return null;
+  // Photos were given but none is in a supported format: nothing to read.
+  if (opts.images.length > 0 && blocks.length === 0) return null;
   const client = new Anthropic(); // reads ANTHROPIC_API_KEY
   const response = await client.beta.messages.create({
     model: process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_CLAUDE_OCR_MODEL,

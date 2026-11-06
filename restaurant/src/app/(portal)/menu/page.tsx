@@ -15,6 +15,7 @@ import {
 import { toUserErrorMessage } from "@/lib/user-messages";
 import { ImageSourcePicker } from "@/components/ImageSourcePicker";
 import { NumberField } from "@/components/NumberField";
+import { MenuScanPanel } from "@/components/MenuScanPanel";
 
 const emptyDraft = (): MenuItem => ({
   name: "",
@@ -230,6 +231,16 @@ export default function MenuPage() {
           pour envoyer vos justificatifs.
         </div>
       )}
+
+      <MenuScanPanel
+        disabled={!canOperate || saving || loading}
+        existingNames={items.map((i) => i.name)}
+        onImport={(imported) => {
+          const nextItems = [...items, ...imported];
+          setItems(nextItems);
+          void persistItems(nextItems, `${imported.length} plat(s) ajouté(s) depuis la photo du menu.`);
+        }}
+      />
 
       <div className="bg-white rounded-2xl border p-5 space-y-4">
         <h3 className="font-semibold">{editIndex != null ? "Modifier le plat" : "Ajouter un plat"}</h3>

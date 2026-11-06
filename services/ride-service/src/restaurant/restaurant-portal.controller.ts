@@ -159,6 +159,12 @@ export class RestaurantPortalController {
     });
   }
 
+  @Post('reviews/:id/reply-draft')
+  @ApiOperation({ summary: 'Brouillon de réponse à un avis (IA), à relire avant envoi' })
+  reviewReplyDraft(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.portal.draftReviewReply(req.user.id, id);
+  }
+
   @Post('reviews/:id/reply')
   @ApiOperation({ summary: 'Répondre à un avis' })
   reviewReply(
@@ -352,6 +358,12 @@ export class RestaurantPortalController {
   @ApiOperation({ summary: 'Mettre à jour adresse et coordonnées GPS du restaurant' })
   location(@Request() req: { user: { id: string } }, @Body() dto: UpdateRestaurantLocationDto) {
     return this.portal.updateLocation(req.user.id, dto);
+  }
+
+  @Post('menu/scan')
+  @ApiOperation({ summary: 'Lire un menu photographié (IA) : propose les plats et prix à vérifier' })
+  scanMenu(@Request() req: { user: { id: string } }, @Body() body: { photoUrls?: string[] }) {
+    return this.portal.scanMenuPhotos(req.user.id, body?.photoUrls ?? []);
   }
 
   @Post('menu-photo')

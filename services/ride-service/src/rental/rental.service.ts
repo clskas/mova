@@ -476,6 +476,7 @@ export class RentalService {
     limitedMileageFeeCdf: number;
     imageUrl: string | null;
     photoUrls?: unknown;
+    description?: string | null;
   },
     unavailableIds?: Set<string>,
   ) {
@@ -506,6 +507,7 @@ export class RentalService {
       limitedMileageFeeCdf: row.limitedMileageFeeCdf,
       imageUrl: row.imageUrl ?? `https://placehold.co/600x400/6C63FF/white?text=${encodeURIComponent(row.name)}`,
       photoUrls: vehiclePhotoList(row),
+      description: row.description ?? null,
       isAvailable,
       availabilityLabel: isAvailable ? 'Disponible' : 'En location',
     };
@@ -1857,6 +1859,7 @@ export class RentalService {
     limitedMileageFeeCdf: number;
     imageUrl: string | null;
     photoUrls?: unknown;
+    description?: string | null;
     isActive: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -1962,6 +1965,7 @@ export class RentalService {
             depositCdf: payload.depositCdf,
             imageUrl: payload.imageUrl,
             photoUrls: payload.photoUrls,
+            description: payload.description,
             features: payload.features,
           }
         : {
@@ -2046,6 +2050,7 @@ export class RentalService {
       limitedMileageFeeCdf: number;
       imageUrl: string | null;
       photoUrls?: unknown;
+      description?: string | null;
       isActive: boolean;
     },
     patch: Record<string, unknown>,
@@ -2074,6 +2079,7 @@ export class RentalService {
       limitedMileageFeeCdf: existing.limitedMileageFeeCdf,
       imageUrl: existing.imageUrl,
       photoUrls: existing.photoUrls,
+      description: existing.description ?? null,
       isActive: existing.isActive,
       ...patch,
       ...('imageUrl' in patch && !('photoUrls' in patch) ? { photoUrls: undefined } : {}),
@@ -2169,6 +2175,12 @@ export class RentalService {
       ownerContactPhone: data.ownerContactPhone != null ? String(data.ownerContactPhone) : undefined,
       features: features ?? undefined,
       cancellationPolicy: data.cancellationPolicy != null ? String(data.cancellationPolicy) : undefined,
+      description:
+        data.description === null
+          ? null
+          : data.description != null
+            ? String(data.description).trim().slice(0, 2000) || null
+            : undefined,
       mileageUnlimited: data.mileageUnlimited !== false,
       limitedMileageFeeCdf:
         data.limitedMileageFeeCdf != null ? Math.round(Number(data.limitedMileageFeeCdf)) : 15000,

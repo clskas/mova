@@ -160,6 +160,11 @@ export class InternalController {
   setVehicleSeats(@Param('userId') userId: string, @Body() dto: VehicleSeatsDto) {
     return this.drivers.setVehiclePassengerSeats(userId, dto.passengerSeats ?? null);
   }
+  @Post('ai/text')
+  runAiText(@Body() body: { task?: string; context?: Record<string, unknown> }) {
+    return this.drivers.runAiTextTask(String(body?.task ?? ''), body?.context ?? {});
+  }
+
   @Post('ai/vision')
   runAiVision(@Body() body: { task?: string; imageUrls?: unknown; context?: Record<string, unknown> }) {
     return this.drivers.runAiVisionTask(String(body?.task ?? ''), body?.imageUrls, body?.context ?? {});

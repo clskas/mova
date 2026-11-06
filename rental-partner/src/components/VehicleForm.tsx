@@ -1,6 +1,7 @@
 "use client";
 
 import { VehiclePhotosUpload } from "@/components/VehiclePhotosUpload";
+import { ListingDescriptionField } from "@/components/ListingDescriptionField";
 import { MOVA_CITIES } from "@/lib/mova-cities";
 
 export type VehicleFormState = {
@@ -19,6 +20,7 @@ export type VehicleFormState = {
   features: string;
   imageUrl: string | null;
   photoUrls: string[];
+  description: string;
 };
 
 export const EMPTY_VEHICLE_FORM: VehicleFormState = {
@@ -37,6 +39,7 @@ export const EMPTY_VEHICLE_FORM: VehicleFormState = {
   features: "",
   imageUrl: null,
   photoUrls: [],
+  description: "",
 };
 
 const CATEGORIES = [
@@ -177,6 +180,11 @@ export function VehicleForm({ form, onChange, onSubmit, saving, error, submitLab
         onChange={(urls) => onChange({ ...form, photoUrls: urls, imageUrl: urls[0] ?? null })}
         onError={onPhotoError}
       />
+      <ListingDescriptionField
+        value={form.description}
+        onChange={(description) => onChange({ ...form, description })}
+        vehicle={() => vehicleFormPayload(form)}
+      />
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         type="submit"
@@ -210,5 +218,6 @@ export function vehicleFormPayload(form: VehicleFormState) {
     features,
     imageUrl: form.photoUrls[0] ?? form.imageUrl ?? undefined,
     photoUrls: form.photoUrls,
+    description: form.description.trim(),
   };
 }

@@ -82,7 +82,8 @@ export function commerceCopy(type: CommerceType): CommerceCopy {
       dossierBeforeCatalogStep:
         "Tant que le dossier n'est pas validé, vous ne pouvez pas vendre ni afficher le menu.",
       catalogAndOrdersTitle: "Menus et commandes",
-      addItemsStep: "Une fois le dossier validé, ajoutez vos plats dans Menu.",
+      addItemsStep:
+        "Une fois le dossier validé, ajoutez vos plats dans Menu — ou importez une photo de votre menu papier (IA), puis vérifiez les prix avant d'ajouter.",
       scopeMenuOnly: "Plats uniquement",
       scopeFullOrder: "Commande complète (plats + livraison)",
       chatSubtitle: "Messages visibles par client, livreur et restaurant",

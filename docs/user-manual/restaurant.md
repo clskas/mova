@@ -39,6 +39,10 @@ Après un changement de type, rechargez le portail : la navigation (Menu / Catal
 3. Optionnel : **tailles** (ex. Petite / Grande avec prix) et **groupes d’options** (ex. extras).
 4. Publiez pour que les articles apparaissent dans l’app passager.
 
+**Importer un menu papier (IA)** : dans **Menu**, bloc « Importer depuis une photo du menu (IA) », choisissez jusqu'à 3 photos du menu (de face, bien éclairé). Les plats et prix lus s'affichent dans un tableau : corrigez les noms et les prix, décochez ce que vous ne voulez pas, puis **Ajouter au menu**. Les lignes sans prix ne sont pas ajoutées. Si l'IA est indisponible, la saisie manuelle fonctionne comme avant.
+
+**Avis clients** : dans **Avis**, **Suggérer (IA)** propose une réponse polie ; relisez-la et modifiez-la avant **Répondre**.
+
 Le dossier KYC doit être validé avant de publier.
 
 ## Catalogue (supermarché, pharmacie, boutique)

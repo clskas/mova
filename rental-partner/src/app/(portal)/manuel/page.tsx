@@ -46,6 +46,7 @@ const CHAPTERS = [
       "Après validation, ouvrez Véhicules.",
       "Ajoutez chaque voiture avec ses papiers et jusqu'à 5 photos (avant, arrière, côté, intérieur).",
       "La première photo est la photo principale ; « Mettre en premier » la change.",
+      "« Rédiger avec l'IA » propose le texte de l'annonce à partir des infos et des photos : relisez-le avant d'enregistrer.",
       "SENGA vérifie le véhicule avant qu'il apparaisse aux clients.",
     ],
   },

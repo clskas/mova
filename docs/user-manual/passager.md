@@ -125,6 +125,7 @@ Sur **Taxi** (voiture uniquement, pas moto), activez le bascule **Partagé (Pool
 2. Choisissez le **type de logement** (studio, appartement, maison, bureau) et le nombre de pièces : l'app estime le volume en m³.
 3. L'app propose l'**engin adapté** (camionnette, camion 15, 30 ou 50 m³) ; vous pouvez le changer.
 4. Indiquez les adresses de départ et d'arrivée, la **liste des objets** et des **photos** (facultatif) pour aider le chauffeur.
+   - Après avoir pris des photos de vos pièces, appuyez sur **« Estimer le volume avec les photos (IA) »** : l'app propose le volume, l'engin et la liste des meubles. C'est une estimation : changez le type de logement pour revenir au calcul classique.
 5. Vérifiez le prix (trajet + frais fixes + volume × engin) et confirmez.
 6. Les chauffeurs **utilitaire ou camion** assez grands sont prévenus ; le **premier qui accepte** prend votre déménagement. Vous êtes notifié dès qu'un chauffeur est assigné.
 7. Vous pouvez **annuler** tant que le déménagement n'a pas commencé. À la fin, payez depuis l'app ou en espèces.

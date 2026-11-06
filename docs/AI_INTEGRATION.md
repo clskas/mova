@@ -25,18 +25,33 @@ config/external-apis.env
 
 Après modification : redémarrer les services Docker concernés (`docker compose up -d`).
 
-## État actuel
+## État actuel (novembre 2026)
 
-SENGA n’intègre pas encore de modèle IA en production. Les briques existantes facilitent l’ajout :
+L'IA de SENGA passe par **Claude (Anthropic)**, appelé **uniquement par `mova-driver`** (seul service qui détient `ANTHROPIC_API_KEY`). Les autres services l'utilisent par des routes internes à tâches fixes (`POST /internal/ai/vision`, `POST /internal/ai/text`) : les prompts restent côté serveur et chaque tâche photo ne lit que son propre dossier d'upload (jamais les documents KYC).
+
+| Fonction | Où | Tâche |
+|----------|----|-------|
+| Assistant support | App passager et chauffeur → Aide | `POST /api/assistant/chat` (40 messages / jour / personne, `ASSISTANT_DAILY_LIMIT`) |
+| Lecture KYC (dates d'expiration) + pré-remplissage | Onboarding chauffeur, admin Chauffeurs | Claude + Google Document AI côte à côte (`OCR_PROVIDERS`) |
+| Contrôle des photos de véhicule | Admin Chauffeurs | vision |
+| Ticket de caisse des courses | Admin Livraisons (verdict indicatif) | `RECEIPT` |
+| Volume de déménagement par photos | App passager → Déménagement | `MOVING_VOLUME` |
+| Menu par photo | Portail restaurant → Menu | `MENU` |
+| Réponse aux avis | Portail restaurant → Avis | `REPLY_DRAFT` |
+| Annonce de location | Portail loueur → Véhicule | `RENTAL_LISTING` |
+| Résumé du jour, questions sur les données | Admin → Analyses IA | `DAILY_SUMMARY`, `ANALYTICS_ANSWER` (chiffres agrégés, données personnelles retirées) |
+| Brouillon de réponse aux litiges | Admin → Litiges | `REPLY_DRAFT` |
+
+**Couper l'IA** : `AI_ENABLED=false` sur `mova-driver` (Render). Toutes les fonctions affichent alors un message et la saisie manuelle continue de fonctionner. Aucune décision n'est prise par l'IA seule : un humain relit toujours (menu, annonce, réponses, verdicts).
+
+Pistes restantes :
 
 | Domaine | Implémentation actuelle | Piste IA |
 |---------|-------------------------|----------|
-| OTP / SMS | Twilio (`auth-service`) | Twilio Verify déjà supporté |
 | Matching chauffeur | Score pondéré proximité/note (`driver-service`) | Optimisation ML sur historique |
 | Tarification | Règles CDF par ville (`ride-service`) | Pricing dynamique (surge) |
-| KYC | Upload documents + revue admin | OCR + détection fraude documentaire |
-| Support | FAQ in-app (`mobile/lib/features/help`) | Assistant conversationnel |
 | Géolocalisation | Mapbox, haversine, WebSocket `/tracking` | ETA prédictif |
+| Visage (selfie ↔ pièce d'identité) | Revue manuelle | Smile ID (Claude ne fait pas de reconnaissance faciale) |
 
 ## Cas d’usage recommandés (par priorité)
 

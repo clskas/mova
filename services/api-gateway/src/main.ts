@@ -28,8 +28,11 @@ async function bootstrap() {
   app.enableCors({ origin: resolveCorsOrigin(), credentials: true });
 
   const rideTarget = process.env.RIDE_SERVICE_URL ?? `http://localhost:${SERVICE_PORTS.ride}`;
-  const socketProxy = createProxyMiddleware({ target: rideTarget, changeOrigin: true, ws: true });
-  app.use('/socket.io', socketProxy);
+  // Mounted at the root with pathFilter so the /socket.io prefix is kept: app.use('/socket.io', …)
+  // stripped it from HTTP long-polling requests (ride-service answered 404), so clients that
+  // start with polling — the SENGA apps do — never connected. WebSocket upgrades already kept it.
+  const socketProxy = createProxyMiddleware({ target: rideTarget, changeOrigin: true, ws: true, pathFilter: '/socket.io' });
+  app.use(socketProxy);
 
   const server = app.getHttpServer();
   server.on('upgrade', (req: { url?: string }, socket: unknown, head: unknown) => {

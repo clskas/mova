@@ -114,3 +114,49 @@ String? passengerCountLabel(Object? raw) {
   if (n == null || n <= 1) return null;
   return '$n passagers';
 }
+
+/// KYC documents that pre-fill the driver onboarding form (read by the server IA).
+const kScannableDocTypes = {
+  'ID_PHOTO',
+  'DRIVERS_LICENSE',
+  'VEHICLE_REGISTRATION',
+  'VEHICLE_INSURANCE',
+  'TECHNICAL_INSPECTION',
+  'FISCAL_STICKER',
+};
+
+const _scannedFieldLabels = {
+  'firstName': 'prénom',
+  'lastName': 'nom',
+  'idNumber': 'n° de pièce',
+  'licenseNumber': 'n° de permis',
+  'expiryDate': "date d'expiration",
+  'plateNumber': 'plaque',
+  'make': 'marque',
+  'model': 'modèle',
+  'color': 'couleur',
+};
+
+/// Fills the controllers that are still empty with the fields read from a document.
+/// Expiry dates go to the controller of that document (`<TYPE>.expiryDate`).
+/// Returns the French labels of the fields filled. Never overwrites what the driver typed.
+List<String> applyScannedFields(
+  String docType,
+  Map<String, String> fields,
+  Map<String, dynamic> targets,
+) {
+  final filled = <String>[];
+  fields.forEach((field, value) {
+    final v = value.trim();
+    if (v.isEmpty) return;
+    final key = field == 'expiryDate' ? '$docType.expiryDate' : field;
+    final target = targets[key];
+    if (target == null) return;
+    final text = (target.text as String).trim();
+    if (text.isNotEmpty) return;
+    target.text = v;
+    final label = _scannedFieldLabels[field];
+    if (label != null) filled.add(label);
+  });
+  return filled;
+}

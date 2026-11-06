@@ -1,12 +1,13 @@
 import { Body, Controller, Get, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsNumber } from 'class-validator';
+import { IsBoolean, IsNumber, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DriversService } from './drivers.service';
 import { ActivationPinDto, DriverWithdrawDto, KycUploadDto, UpdateOnboardingDto } from './drivers.dto';
 
 class AvailabilityDto { @ApiProperty() @IsBoolean() isAvailable: boolean; }
+class ScanDocumentDto { @ApiProperty({ description: 'ID_PHOTO, DRIVERS_LICENSE, VEHICLE_REGISTRATION, …' }) @IsString() type: string; }
 class LocationDto { @ApiProperty() @IsNumber() lat: number; @ApiProperty() @IsNumber() lng: number; }
 
 @ApiTags('drivers')
@@ -41,6 +42,12 @@ export class DriversController {
   @ApiOperation({ summary: 'État du parcours d\'enregistrement chauffeur' })
   onboarding(@Request() req: { user: { id: string } }) {
     return this.driversService.getOnboarding(req.user.id);
+  }
+
+  @Post('onboarding/scan')
+  @ApiOperation({ summary: 'Lire le dernier document envoyé (IA) pour pré-remplir le formulaire' })
+  scanDocument(@Request() req: { user: { id: string } }, @Body() dto: ScanDocumentDto) {
+    return this.driversService.scanDocument(req.user.id, dto.type);
   }
 
   @Patch('onboarding')

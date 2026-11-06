@@ -160,6 +160,37 @@ const OCR_PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI",
 };
 
+const EXTRACTED_FIELD_LABELS: Record<string, string> = {
+  firstName: "Prénom",
+  lastName: "Nom",
+  idNumber: "N° pièce",
+  birthDate: "Naissance",
+  licenseNumber: "N° permis",
+  expiryDate: "Expiration",
+  categories: "Catégories",
+  plateNumber: "Plaque",
+  make: "Marque",
+  model: "Modèle",
+  color: "Couleur",
+};
+
+function normalizeName(value?: string | null): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "");
+}
+
+/** Name read on the ID differs from the name read on the driving licence. */
+function kycNameMismatch(checklist?: { type: string; ocr?: KycOcrInfo }[] | null): string | null {
+  const id = checklist?.find((i) => i.type === "ID_PHOTO")?.ocr?.extractedFields;
+  const lic = checklist?.find((i) => i.type === "DRIVERS_LICENSE")?.ocr?.extractedFields;
+  if (!id?.lastName || !lic?.lastName) return null;
+  if (normalizeName(id.lastName) === normalizeName(lic.lastName)) return null;
+  return `Nom lu sur la pièce d'identité (${id.lastName}) différent du nom lu sur le permis (${lic.lastName}).`;
+}
+
 function formatOcrDate(value?: string | null): string | null {
   if (!value) return null;
   const d = new Date(value);
@@ -178,6 +209,14 @@ function OcrBadge({ ocr }: { ocr?: KycOcrInfo | null }) {
       {profile && <p>Date profil : {profile}</p>}
       {ocr.confidence != null && <p>Confiance : {Math.round(ocr.confidence * 100)} %</p>}
       {ocr.notes && <p>{ocr.notes}</p>}
+      {ocr.extractedFields && Object.keys(ocr.extractedFields).length > 0 && (
+        <p>
+          <span className="opacity-70">Lu automatiquement : </span>
+          {Object.entries(ocr.extractedFields)
+            .map(([k, v]) => `${EXTRACTED_FIELD_LABELS[k] ?? k} ${k.endsWith("Date") ? formatOcrDate(v) ?? v : v}`)
+            .join(" · ")}
+        </p>
+      )}
       {(ocr.providers?.length ?? 0) > 1 && (
         <table className="w-full mt-1 border-t border-current/20 text-[11px]">
           <thead>
@@ -1109,6 +1148,11 @@ export default function ChauffeursPage() {
             {"kyc" in selected && selected.kyc?.checklist && selected.kyc.checklist.length > 0 && (
               <div>
                 <p className="text-sm font-medium mb-2">Documents KYC</p>
+                {kycNameMismatch(selected.kyc.checklist) && (
+                  <p className="mb-2 text-xs rounded-lg border border-amber-300 bg-amber-50 text-amber-900 px-3 py-2">
+                    ⚠ {kycNameMismatch(selected.kyc.checklist)} Vérifiez les documents avant de valider.
+                  </p>
+                )}
                 <ul className="text-sm space-y-1">
                   {selected.kyc.checklist.map((item) => (
                     <li key={item.type} className="bg-gray-50 rounded-lg px-3 py-2 space-y-1">

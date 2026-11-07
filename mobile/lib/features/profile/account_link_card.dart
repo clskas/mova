@@ -119,7 +119,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
         case Success(:final data):
           await _applyAuth(data);
           setState(() => _busy = false);
-          _snack(data['message']?.toString() ?? _linkedSnack);
+          _snack(data['message']?.toString() ?? tr(_linkedSnack));
           await widget.onChanged();
         case Failure(:final error):
           setState(() {
@@ -164,7 +164,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
         case Success(:final data):
           await _applyAuth(data);
           setState(() => _busy = false);
-          _snack(data['message']?.toString() ?? _linkedSnack);
+          _snack(data['message']?.toString() ?? tr(_linkedSnack));
           await widget.onChanged();
         case Failure(:final error):
           setState(() {
@@ -245,7 +245,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
         });
         _phoneCtrl.clear();
         _otpCtrl.clear();
-        _snack(data['message']?.toString() ?? _linkedSnack);
+        _snack(data['message']?.toString() ?? tr(_linkedSnack));
         await widget.onChanged();
         if (data['pinConfigured'] != true && mounted) {
           await Navigator.of(context).push(

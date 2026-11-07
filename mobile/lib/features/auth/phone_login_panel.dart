@@ -539,7 +539,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       MaterialPageRoute<void>(
         fullscreenDialog: true,
         builder: (routeContext) => LocalPinSetupScreen(
-          title: reset ? pinResetHeadingFr : connectionPinHeadingFr,
+          title: tr(reset ? pinResetHeadingFr : connectionPinHeadingFr),
           reset: reset,
           onCompleted: () async {
             if (Navigator.of(routeContext).canPop()) {

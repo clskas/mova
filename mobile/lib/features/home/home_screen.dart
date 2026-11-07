@@ -310,7 +310,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   String _welcomeGreeting(String userLabel) {
-    if (userLabel.isEmpty) return PassengerCopy.homeTagline;
+    if (userLabel.isEmpty) return tr(PassengerCopy.homeTagline);
     return '${_greeting()}, $userLabel 👋';
   }
 
@@ -661,7 +661,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           const SizedBox(height: 16),
           MovaWelcomeBanner(
             greeting: _welcomeGreeting(userLabel),
-            subtitle: userLabel.isNotEmpty ? PassengerCopy.homeTagline : '',
+            subtitle: userLabel.isNotEmpty ? tr(PassengerCopy.homeTagline) : '',
           ),
           if (_publicites.isNotEmpty) ...[
             const SizedBox(height: 12),

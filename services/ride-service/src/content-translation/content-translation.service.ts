@@ -32,19 +32,18 @@ export class ContentTranslationService implements OnModuleInit, OnModuleDestroy 
 
   private async warmUp() {
     try {
-      const [restaurants, vehicles, ads] = await Promise.all([
-        this.prisma.restaurant.findMany({
-          where: { isActive: true },
-          select: { name: true, cuisine: true, promotionLabel: true, menuItems: true },
-          take: 300,
-        }),
-        this.prisma.rentalVehicle.findMany({
-          where: { isActive: true },
-          select: { name: true, category: true, description: true, dailyRateCdf: true },
-          take: 500,
-        }),
-        this.prisma.publicite.findMany({ where: { isActive: true }, select: { titre: true, description: true }, take: 100 }),
-      ]);
+      // Sequential: the service shares a small pool of database connections.
+      const restaurants = await this.prisma.restaurant.findMany({
+        where: { isActive: true },
+        select: { name: true, cuisine: true, promotionLabel: true, menuItems: true },
+        take: 300,
+      });
+      const vehicles = await this.prisma.rentalVehicle.findMany({
+        where: { isActive: true },
+        select: { name: true, category: true, description: true, dailyRateCdf: true },
+        take: 500,
+      });
+      const ads = await this.prisma.publicite.findMany({ where: { isActive: true }, select: { titre: true, description: true }, take: 100 });
       const texts = [...collectContentTexts([restaurants, vehicles, ads])];
       if (texts.length === 0) return;
       const known = new Set(

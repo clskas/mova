@@ -35,8 +35,8 @@ class PassengerAlertService {
       await androidPlugin?.createNotificationChannel(
         AndroidNotificationChannel(
           _channelId,
-          _channelName,
-          description: 'Mises à jour de vos courses taxi et moto',
+          tr(_channelName),
+          description: tr('Mises à jour de vos courses taxi et moto'),
           importance: Importance.high,
           playSound: true,
           enableVibration: true,
@@ -64,10 +64,10 @@ class PassengerAlertService {
         id: id,
         title: title,
         body: body,
-        notificationDetails: const NotificationDetails(
+        notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,
-            _channelName,
+            tr(_channelName),
             importance: Importance.high,
             priority: Priority.high,
           ),

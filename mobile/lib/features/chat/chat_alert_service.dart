@@ -64,8 +64,8 @@ class ChatAlertService {
     await androidPlugin?.createNotificationChannel(
       AndroidNotificationChannel(
         _channelId,
-        _channelName,
-        description: 'Nouveaux messages passager / chauffeur / livreur',
+        tr(_channelName),
+        description: tr('Nouveaux messages passager / chauffeur / livreur'),
         importance: Importance.high,
         playSound: true,
         enableVibration: true,
@@ -277,7 +277,7 @@ class ChatAlertService {
         notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,
-            _channelName,
+            tr(_channelName),
             importance: Importance.high,
             priority: Priority.high,
             playSound: true,
@@ -325,7 +325,7 @@ class ChatAlertService {
         notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,
-            _channelName,
+            tr(_channelName),
             importance: Importance.high,
             priority: Priority.high,
             playSound: true,

@@ -148,7 +148,7 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
                             Text(
                               widget.reset
                                   ? tr('Obligatoire pour les prochaines connexions. 6 chiffres — évitez 123456 ou des chiffres identiques.')
-                                  : pinSetupHintFr,
+                                  : tr(pinSetupHintFr),
                               textAlign: TextAlign.center,
                               style: const TextStyle(color: MovaColors.textSecondary),
                             ),

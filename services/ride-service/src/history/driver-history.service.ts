@@ -49,24 +49,24 @@ export class DriverHistoryService {
     const take = Math.min(Math.max(limit, 1), 100);
     const createdAt = before && !Number.isNaN(before.getTime()) ? { lt: before } : undefined;
     const where = { driverId, ...(createdAt ? { createdAt } : {}) };
-    const [deliveries, errands, movings, scheduled, rentals, carpools] = await Promise.all([
-      this.prisma.delivery.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take,
-        include: { restaurant: { select: { name: true } }, events: { where: { event: 'ORDER_PLACED' }, take: 1 } },
-      }),
-      this.prisma.errandOrder.findMany({ where, orderBy: { createdAt: 'desc' }, take }),
-      this.prisma.movingRequest.findMany({ where, orderBy: { createdAt: 'desc' }, take }),
-      this.prisma.scheduledRide.findMany({ where: { ...where, rideId: null }, orderBy: { createdAt: 'desc' }, take }),
-      this.prisma.rentalInquiry.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take,
-        include: { vehicle: { select: { name: true } } },
-      }),
-      this.prisma.carpoolTrip.findMany({ where, orderBy: { createdAt: 'desc' }, take }),
-    ]);
+    // One query at a time: the service shares a small pool of database connections (9),
+    // and six parallel reads per screen opening can starve the other requests.
+    const deliveries = await this.prisma.delivery.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take,
+      include: { restaurant: { select: { name: true } }, events: { where: { event: 'ORDER_PLACED' }, take: 1 } },
+    });
+    const errands = await this.prisma.errandOrder.findMany({ where, orderBy: { createdAt: 'desc' }, take });
+    const movings = await this.prisma.movingRequest.findMany({ where, orderBy: { createdAt: 'desc' }, take });
+    const scheduled = await this.prisma.scheduledRide.findMany({ where: { ...where, rideId: null }, orderBy: { createdAt: 'desc' }, take });
+    const rentals = await this.prisma.rentalInquiry.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take,
+      include: { vehicle: { select: { name: true } } },
+    });
+    const carpools = await this.prisma.carpoolTrip.findMany({ where, orderBy: { createdAt: 'desc' }, take });
 
     const rules = new Map<CommissionServiceType, number>();
     const pct = async (t: DriverHistoryType) => {

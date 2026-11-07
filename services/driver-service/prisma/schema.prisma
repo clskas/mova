@@ -127,6 +127,8 @@ model KycDocument {
   ocrProviderResults Json?
   /// Fields read from the document to pre-fill onboarding (name, numbers, dates…).
   extractedFields    Json?
+  /// Signs of forgery seen by the AI (verdict RAS / A_VERIFIER / SUSPECT) — a hint for the admin.
+  forgeryCheck       Json?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 

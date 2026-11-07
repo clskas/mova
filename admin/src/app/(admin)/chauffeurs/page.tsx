@@ -192,6 +192,44 @@ function kycNameMismatch(checklist?: { type: string; ocr?: KycOcrInfo }[] | null
   return `Nom lu sur la pièce d'identité (${id.lastName}) différent du nom lu sur le permis (${lic.lastName}).`;
 }
 
+/** AI forgery-signs verdict on one document (a hint for the admin, never a proof). */
+function ForgeryBadge({ ocr }: { ocr?: KycOcrInfo | null }) {
+  const f = ocr?.forgeryCheck;
+  if (!f?.verdict) return null;
+  const style =
+    f.verdict === "SUSPECT"
+      ? "border-red-300 bg-red-50 text-red-900"
+      : f.verdict === "A_VERIFIER"
+        ? "border-amber-300 bg-amber-50 text-amber-900"
+        : "border-green-200 bg-green-50 text-green-900";
+  const title =
+    f.verdict === "SUSPECT"
+      ? "⚠ Falsification possible — vérifiez l'original"
+      : f.verdict === "A_VERIFIER"
+        ? "À vérifier de près"
+        : "Aucun signe de falsification vu";
+  const details = [
+    f.isExpectedDocument === false ? "Ce n'est pas le document attendu." : null,
+    f.photoOfScreen ? "Photo d'un écran." : null,
+    f.photocopyOrPrint ? "Photocopie ou impression." : null,
+    ...(f.signs ?? []),
+  ].filter(Boolean) as string[];
+  return (
+    <div className={`mt-2 rounded-lg border px-3 py-2 text-xs space-y-1 ${style}`} data-testid="forgery-badge">
+      <p className="font-medium">Contrôle anti-falsification (IA) : {title}</p>
+      {details.length > 0 && (
+        <ul className="list-disc pl-4">
+          {details.map((d) => (
+            <li key={d}>{d}</li>
+          ))}
+        </ul>
+      )}
+      {f.notes && <p>{f.notes}</p>}
+      <p className="opacity-70">Indication seulement : l&apos;IA ne peut pas prouver qu&apos;un document est authentique.</p>
+    </div>
+  );
+}
+
 function formatOcrDate(value?: string | null): string | null {
   if (!value) return null;
   const d = new Date(value);
@@ -984,6 +1022,20 @@ export default function ChauffeursPage() {
                 </p>
               )}
               <p><span className="text-gray-500">N° identité:</span> {detail?.idDocumentNumber ?? "—"}</p>
+              {(detail?.identityDuplicates?.idDocumentNumber.length ?? 0) +
+                (detail?.identityDuplicates?.licenseNumber.length ?? 0) >
+                0 && (
+                <p className="text-xs rounded-lg border border-red-300 bg-red-50 text-red-900 px-3 py-2">
+                  ⚠ Numéro déjà déclaré par un autre chauffeur
+                  {(detail?.identityDuplicates?.idDocumentNumber.length ?? 0) > 0 &&
+                    ` — pièce d'identité : ${detail!.identityDuplicates!.idDocumentNumber
+                      .map((d) => d.publicId ?? d.userId)
+                      .join(", ")}`}
+                  {(detail?.identityDuplicates?.licenseNumber.length ?? 0) > 0 &&
+                    ` — permis : ${detail!.identityDuplicates!.licenseNumber.map((d) => d.publicId ?? d.userId).join(", ")}`}
+                  . Même personne avec plusieurs comptes, ou papiers d&apos;une autre personne : vérifiez avant de valider.
+                </p>
+              )}
               {(() => {
                 const v = activeDriverVehicle(selected) ?? detail?.vehicle ?? null;
                 if (!v) return null;
@@ -1227,6 +1279,7 @@ export default function ChauffeursPage() {
                           )}
                         </>
                       )}
+                      {item.uploaded && <ForgeryBadge ocr={item.ocr} />}
                     </li>
                   ))}
                 </ul>

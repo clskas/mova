@@ -81,6 +81,8 @@ La carte se rafraîchit automatiquement toutes les 10 secondes tant que la missi
 
 Des champs OCR (nom, numéro permis…) peuvent apparaître si le service d’analyse de documents est activé.
 
+**Contrôle anti-falsification (IA)** : chaque document envoyé (pièce d'identité, permis, carte grise, assurance, contrôle technique, vignette) est examiné par l'IA. Sous le document, l'admin voit **Aucun signe vu**, **À vérifier de près** ou **Falsification possible**, avec les signes repérés (texte collé, polices différentes, photo d'écran, photocopie…). La fiche signale aussi un **numéro de pièce ou de permis déjà déclaré par un autre chauffeur**. Ce sont des indications : l'IA ne peut pas prouver qu'un document est authentique. En cas de doute, demandez l'original ou un appel vidéo avant de valider.
+
 ### Exiger des documents pour les jobs
 
 Dans **Règles plateforme** (SUPER_ADMIN, ADMIN, **CITY_ADMIN** — section documents uniquement pour l’admin ville) :

@@ -35,6 +35,7 @@ import {
 } from './claude-json';
 import { AI_TEXT_TASKS, AI_VISION_TASKS, isAiTextTask, isAiVisionTask } from './ai-tasks';
 import { extractDocumentFieldsWithClaude, isScannableDocument } from './document-fields';
+import { FORGERY_SCHEMA, forgeryPrompt, forgeryVerdict, isForgeryCheckType } from './document-forgery';
 
 const OCR_PROVIDER_LABELS: Record<OcrProviderName, string> = {
   claude: 'Claude',
@@ -71,6 +72,32 @@ export class OcrService {
     void this.analyzeDocument(documentId).catch((err) => {
       this.logger.warn(`OCR async failed for ${documentId}: ${err instanceof Error ? err.message : err}`);
     });
+    void this.checkDocumentForgery(documentId).catch((err) => {
+      this.logger.warn(`Forgery check failed for ${documentId}: ${err instanceof Error ? err.message : err}`);
+    });
+  }
+
+  /**
+   * Claude looks for signs of forgery on the document photo and stores a verdict for the admin
+   * (RAS / À VÉRIFIER / SUSPECT). A hint only: it cannot prove that a document is genuine.
+   */
+  async checkDocumentForgery(documentId: string) {
+    if (!claudeAvailable()) return null;
+    const doc = await this.prisma.kycDocument.findUnique({ where: { id: documentId } });
+    if (!doc || !isForgeryCheckType(doc.type)) return null;
+    const image = await this.fetchImageBuffer(doc.url);
+    if (!image) return null;
+    const result = await claudeJson({
+      images: [image],
+      prompt: forgeryPrompt(doc.type),
+      schema: FORGERY_SCHEMA as unknown as Record<string, unknown>,
+    });
+    const forgeryCheck = { ...(result ?? {}), verdict: forgeryVerdict(result), checkedAt: new Date().toISOString() };
+    await this.prisma.kycDocument.update({
+      where: { id: documentId },
+      data: { forgeryCheck: forgeryCheck as Prisma.InputJsonValue },
+    });
+    return forgeryCheck;
   }
 
   scheduleSelfieAnalysis(documentId: string): void {

@@ -498,6 +498,25 @@ export class AuthService {
     }
   }
 
+  /**
+   * Creates a user by phone; if a concurrent request created the same phone first
+   * (unique constraint P2002), returns the existing user instead of failing with a 500.
+   */
+  private async createUserTolerantToRace(
+    phone: string,
+    data: { phone: string; role: UserRole; status: UserStatus; firstName?: string; lastName?: string },
+  ): Promise<{ user: User; created: boolean }> {
+    try {
+      return { user: await this.prisma.user.create({ data }), created: true };
+    } catch (e) {
+      if ((e as { code?: string })?.code === 'P2002') {
+        const existing = await this.prisma.user.findUnique({ where: { phone } });
+        if (existing) return { user: existing, created: false };
+      }
+      throw e;
+    }
+  }
+
   async verifyOtp(phone: string, code: string, role?: UserRole, portal?: string, intendedRole?: string) {
     const requestedRole = this.resolveRequestedAuthRole(role, portal, intendedRole);
     const parsed = parseLoginHandle(phone);
@@ -521,24 +540,25 @@ export class AuthService {
       }
       if (requestedRole === UserRole.DRIVER) {
         const seedDemo = isSeedDemoPhone(normalized) && process.env.ALLOW_TEST_OTP === 'true';
-        user = await this.prisma.user.create({
-          data: {
-            phone: normalized,
-            role: UserRole.DRIVER,
-            status: seedDemo ? UserStatus.ACTIVE : UserStatus.PENDING_KYC,
-            ...(seedDemo ? { firstName: 'Alain', lastName: 'Kabeya' } : {}),
-          },
+        const driverResult = await this.createUserTolerantToRace(normalized, {
+          phone: normalized,
+          role: UserRole.DRIVER,
+          status: seedDemo ? UserStatus.ACTIVE : UserStatus.PENDING_KYC,
+          ...(seedDemo ? { firstName: 'Alain', lastName: 'Kabeya' } : {}),
         });
-        isNew = true;
-        await this.provisionUser(user.id, user.role);
-        if (seedDemo) {
-          await this.approveSeedDemoDriver(user.id);
-        }
-        try {
-          const payload: UserCreatedPayload = { userId: user.id, phone: user.phone ?? undefined, role: user.role };
-          await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
-        } catch (e) {
-          this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
+        user = driverResult.user;
+        if (driverResult.created) {
+          isNew = true;
+          await this.provisionUser(user.id, user.role);
+          if (seedDemo) {
+            await this.approveSeedDemoDriver(user.id);
+          }
+          try {
+            const payload: UserCreatedPayload = { userId: user.id, phone: user.phone ?? undefined, role: user.role };
+            await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
+          } catch (e) {
+            this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
+          }
         }
       } else if (isStaffAuthRole(requestedRole) || normalized === OWNER_SUPER_ADMIN_PHONE) {
         throw new MovaHttpException(
@@ -557,20 +577,21 @@ export class AuthService {
       const createdRole = isAllowedPartnerSelfRegisterRole(requestedRole)
         ? requestedRole!
         : UserRole.PASSENGER;
-      user = await this.prisma.user.create({
-        data: {
-          phone: normalized,
-          role: createdRole,
-          status: UserStatus.ACTIVE,
-        },
+      const result = await this.createUserTolerantToRace(normalized, {
+        phone: normalized,
+        role: createdRole,
+        status: UserStatus.ACTIVE,
       });
-      isNew = true;
-      await this.provisionUser(user.id, user.role);
-      try {
-        const payload: UserCreatedPayload = { userId: user.id, phone: user.phone ?? undefined, role: user.role };
-        await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
-      } catch (e) {
-        this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
+      user = result.user;
+      if (result.created) {
+        isNew = true;
+        await this.provisionUser(user.id, user.role);
+        try {
+          const payload: UserCreatedPayload = { userId: user.id, phone: user.phone ?? undefined, role: user.role };
+          await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
+        } catch (e) {
+          this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
+        }
       }
     }
     this.assertRoleAccess(user, requestedRole);

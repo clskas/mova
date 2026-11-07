@@ -155,6 +155,15 @@ describe('AuthService', () => {
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
+  it('reuses the existing user when a concurrent request already created the same phone (P2002)', async () => {
+    const existing = makeUser({ id: 'race-1', phone: '+243822222222', role: UserRole.PASSENGER, status: UserStatus.ACTIVE });
+    prisma.user.findUnique.mockResolvedValueOnce(null).mockResolvedValue(existing);
+    await seedHashedOtp('+243822222222', '847291');
+    prisma.user.create.mockRejectedValue(Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }));
+    const result = await service.verifyOtp('+243822222222', '847291', UserRole.PASSENGER);
+    expect(result.user.id).toBe('race-1');
+  });
+
   it('creates a pending DRIVER applicant on first driver-app OTP (not ACTIVE)', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     await seedHashedOtp('+243811111111', '847291');

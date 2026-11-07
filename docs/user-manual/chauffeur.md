@@ -115,6 +115,20 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
 3. Publiez le trajet — les passagers le réservent depuis l'app Passager.
 4. Gérez le trajet dans **Mes trajets** (démarrer, terminer, annuler).
 
+## Mes missions (historique)
+
+Menu ⋮ → **Historique missions** : toutes vos missions — courses taxi, livraisons colis / repas / express, courses & commissions, déménagements, courses planifiées, location (logistique) et covoiturage.
+
+- Filtres **Aujourd'hui**, **7 jours**, **Ce mois**, **Tout** avec le nombre de missions terminées et votre **gain net** sur la période.
+- Date et heure locales sur chaque ligne ; **Charger plus** pour les plus anciennes.
+- Touchez une mission : départ, arrivée, montant, **commission SENGA** et **gain net**. Pour une course payée en espèces pas encore confirmée : **Confirmer le paiement espèces**.
+
+## SOS et contacts d'urgence
+
+- Le bouton **SOS** (accueil et missions en cours) : **toucher** = confirmation, **maintenir 3 secondes** = envoi immédiat.
+- L'app montre si un agent a **pris en charge** l'alerte et partage votre position pendant 30 minutes. Sans Internet, elle propose un **SMS** à la permanence SENGA ou un **appel** aux secours.
+- Profil → **Contacts d'urgence** : jusqu'à 3 proches prévenus par SMS lors d'un SOS.
+
 ## Support
 
 - **Assistant SENGA (IA)** : dans **Aide**, posez votre question (en ligne, dossier, PIN, revenus…) dans votre langue et recevez une réponse immédiate tirée de ce manuel. Pour un litige, un paiement ou une urgence, contactez le support humain.

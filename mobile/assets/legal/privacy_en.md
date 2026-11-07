@@ -21,6 +21,7 @@ This policy explains what data we collect, why, for how long, and what your righ
 
 ### 2.2 Location data
 - Real-time GPS position **during** active rides, deliveries and trips
+- After a SOS alert, your position is shared with the SENGA team for 30 minutes (you can stop this sharing)
 - Departure, arrival and delivery addresses you enter
 
 ### 2.3 Transaction data
@@ -34,7 +35,12 @@ This policy explains what data we collect, why, for how long, and what your righ
 - ID photo
 - Availability status and earnings
 
-### 2.5 Technical data
+### 2.5 Emergency contacts (optional)
+- Name and phone number of up to 3 people, entered by you in your Profile
+- Used only to send them an SMS with your position when you raise a SOS alert
+- Deleted when you remove them or when your account is deleted. Let these people know before adding them.
+
+### 2.6 Technical data
 - Device identifier
 - Application version
 - Anonymised error logs

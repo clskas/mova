@@ -630,17 +630,17 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       actions: [
         sosAppBarButton(
           onPressed: _deliveryId.isEmpty
-              ? () {
+              ? ([bool skip = false]) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(tr('Livraison introuvable — réessayez'))),
                   );
                 }
-              : () => triggerSosAlert(
+              : ([bool skip = false]) => triggerSosAlert(
+                    skipConfirm: skip,
                     ref,
                     context,
-                    description: _isErrand
-                        ? trf('SOS chauffeur — courses {_deliveryId}', {'_deliveryId': _deliveryId})
-                        : trf('SOS chauffeur — livraison {_deliveryId}', {'_deliveryId': _deliveryId}),
+                    // French on purpose: read by the SENGA team.
+                    description: _isErrand ? 'SOS chauffeur — courses $_deliveryId' : 'SOS chauffeur — livraison $_deliveryId',
                     referenceType: _isErrand ? 'ERRAND' : 'DELIVERY',
                     referenceId: _deliveryId,
                   ),

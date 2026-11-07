@@ -609,7 +609,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       scrollable: false,
       actions: [
         sosAppBarButton(
-          onPressed: () => triggerSosAlert(
+          onPressed: ([bool skip = false]) => triggerSosAlert(
+            skipConfirm: skip,
             ref,
             context,
             description: 'SOS chauffeur — course $_rideId',

@@ -148,7 +148,33 @@ model Incident {
   /// Autre partie (chauffeur / livreur) quand le litige oppose deux comptes.
   counterpartyUserId String?
   isEmergency        Boolean      @default(false)
+  /// Ops agent who took the SOS / incident in charge.
+  acknowledgedAt     DateTime?
+  acknowledgedBy     String?
+  acknowledgedByName String?
+  /// SOS nobody took within 2 minutes: ops alerted again.
+  escalatedAt        DateTime?
+  resolvedAt         DateTime?
+  /// Positions sent after a SOS: [{ lat, lng, at }] (30 minutes, every ~15 s).
+  trail              Json?
+  lastLocationAt     DateTime?
+  /// Ops timeline: [{ at, by, text }].
+  notes              Json?
   createdAt          DateTime     @default(now())
 
+  @@index([userId, createdAt])
+  @@index([status, isEmergency, acknowledgedAt])
   @@map("incidents")
+}
+
+/// People a user wants told by SMS when they raise a SOS (max 3).
+model TrustedContact {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  phone     String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("trusted_contacts")
 }

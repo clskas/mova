@@ -165,7 +165,8 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
       scrollable: false,
       actions: [
         sosAppBarButton(
-          onPressed: () => triggerSosAlert(
+          onPressed: ([bool skip = false]) => triggerSosAlert(
+            skipConfirm: skip,
             ref,
             context,
             description: 'SOS chauffeur — location ${widget.inquiryId}',

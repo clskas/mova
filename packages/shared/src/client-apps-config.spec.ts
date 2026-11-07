@@ -85,3 +85,19 @@ describe('client-apps-config merge', () => {
     expect(cfg.sosEmergencyContacts[1].phone).toMatch(/^\+243/);
   });
 });
+
+describe('SOS SMS switches', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { mergeClientAppsConfig, normalizeSosSmsConfig, DEFAULT_SOS_SMS_CONFIG } = require('./client-apps-config');
+
+  it('defaults keep SOS SMS on and non-urgent incident SMS off', () => {
+    expect(mergeClientAppsConfig({}).sosSms).toEqual(DEFAULT_SOS_SMS_CONFIG);
+    expect(DEFAULT_SOS_SMS_CONFIG.toStaffForSos).toBe(true);
+    expect(DEFAULT_SOS_SMS_CONFIG.toStaffForIncidents).toBe(false);
+  });
+
+  it('keeps known switches and cleans the SMS number', () => {
+    const out = normalizeSosSmsConfig({ toStaffForSos: false, escalationSms: 'yes', sosSmsNumber: '+243 81 234-5678', extra: 1 });
+    expect(out).toEqual({ ...DEFAULT_SOS_SMS_CONFIG, toStaffForSos: false, sosSmsNumber: '+243812345678' });
+  });
+});

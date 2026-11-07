@@ -208,7 +208,8 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
       scrollable: false,
       actions: [
         sosAppBarButton(
-          onPressed: () => triggerSosAlert(
+          onPressed: ([bool skip = false]) => triggerSosAlert(
+            skipConfirm: skip,
             ref,
             context,
             description: 'SOS chauffeur — course planifiée ${widget.rideId}',

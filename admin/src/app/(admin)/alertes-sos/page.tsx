@@ -10,6 +10,7 @@ import {
   type SosEmergencyContact,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
+import { SosSmsSettings } from "@/components/SosSmsSettings";
 import { BtnPrimary, ErrorBanner, LoadingState, PageHeader } from "@/components/ui";
 
 const OPS_ROLES = new Set(["SUPER_ADMIN", "ADMIN", "SUPPORT", "CITY_ADMIN"]);
@@ -231,6 +232,8 @@ export default function SosAlertesPage() {
       {readOnly && (
         <p className="text-sm text-amber-700">Lecture seule — seuls les SuperAdmin peuvent modifier.</p>
       )}
+
+      {config && <SosSmsSettings config={config} readOnly={readOnly} onSaved={setConfig} />}
 
       <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 space-y-3">
         <div className="flex items-start justify-between gap-3">

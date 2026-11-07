@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch, draftSupportReply, formatDate, resolveIncident, type Incident } from "@/lib/api";
+import {
+  acknowledgeIncident,
+  addIncidentNote,
+  apiFetch,
+  draftSupportReply,
+  formatDate,
+  resolveIncident,
+  sosTrailMapsUrl,
+  type Incident,
+} from "@/lib/api";
 import { SosIncidentMap, SosIncidentMapPlaceholder, googleMapsUrl } from "@/components/SosIncidentMap";
 import { useAdmin } from "@/components/AdminProvider";
 import {
@@ -55,6 +64,15 @@ export default function LitigesPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function acknowledge(id: string) {
+    try {
+      await acknowledgeIncident(id);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec de la prise en charge");
+    }
+  }
 
   async function resolve(id: string) {
     try {
@@ -161,10 +179,35 @@ export default function LitigesPage() {
                       Ouvrir dans Google Maps ↗
                     </a>
                   )}
-                  <div className="flex gap-2 mt-2 items-center">
+                  <div className="flex gap-2 mt-2 items-center flex-wrap">
                     <StatusBadge status={i.status} />
                     <span className="text-xs text-gray-400">{formatDate(i.createdAt)}</span>
+                    {i.acknowledgedAt ? (
+                      <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-800">
+                        Pris en charge par {i.acknowledgedByName ?? "l’équipe"} · {formatDate(i.acknowledgedAt)}
+                      </span>
+                    ) : i.status === "OPEN" ? (
+                      <span className="text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-800">
+                        Personne ne l’a encore pris en charge
+                        {i.escalatedAt ? " — relance envoyée" : ""}
+                      </span>
+                    ) : null}
                   </div>
+                  {isSos && (i.trail?.length ?? 0) > 1 && (
+                    <p className="text-xs text-gray-600 mt-2">
+                      Suivi en direct : {i.trail!.length} positions
+                      {i.lastLocationAt ? ` · dernière ${formatDate(i.lastLocationAt)}` : ""} ·{" "}
+                      <a
+                        href={sosTrailMapsUrl(i.trail!) ?? "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#6C63FF] hover:underline"
+                      >
+                        Voir le trajet ↗
+                      </a>
+                    </p>
+                  )}
+                  <IncidentNotes incident={i} canWrite={canWrite("litiges")} onSaved={load} />
                 </div>
                 {isSos && (
                   <div className="w-full sm:w-72 shrink-0">
@@ -176,12 +219,66 @@ export default function LitigesPage() {
                   </div>
                 )}
                 {i.status === "OPEN" && canWrite("litiges") && (
-                  <BtnPrimary onClick={() => resolve(i.id)}>Résoudre</BtnPrimary>
+                  <div className="flex flex-col gap-2">
+                    {!i.acknowledgedAt && (
+                      <BtnPrimary onClick={() => acknowledge(i.id)}>Je prends en charge</BtnPrimary>
+                    )}
+                    <BtnPrimary onClick={() => resolve(i.id)}>Résoudre</BtnPrimary>
+                  </div>
                 )}
                 {!isSos && i.description && <ReplyDraft incident={i} />}
               </Card>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Suivi interne : qui a fait quoi (prise en charge, appels, résolution). */
+function IncidentNotes({ incident, canWrite, onSaved }: { incident: Incident; canWrite: boolean; onSaved: () => void }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const notes = incident.notes ?? [];
+  async function save() {
+    if (!text.trim()) return;
+    setBusy(true);
+    try {
+      await addIncidentNote(incident.id, text.trim());
+      setText("");
+      onSaved();
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="mt-2 space-y-1">
+      {notes.length > 0 && (
+        <ul className="text-xs text-gray-600 space-y-0.5">
+          {notes.slice(-6).map((n, idx) => (
+            <li key={idx}>
+              <span className="text-gray-400">{formatDate(n.at)}</span> · <b>{n.by}</b> : {n.text}
+            </li>
+          ))}
+        </ul>
+      )}
+      {canWrite && incident.status === "OPEN" && (
+        <div className="flex gap-2">
+          <input
+            className="flex-1 rounded-lg border px-2 py-1 text-xs"
+            placeholder="Ajouter une note (ex. appelé le passager, police prévenue)"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={busy || !text.trim()}
+            className="text-xs rounded-lg border px-2 py-1 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Ajouter
+          </button>
         </div>
       )}
     </div>

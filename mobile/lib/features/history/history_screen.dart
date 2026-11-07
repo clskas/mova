@@ -15,6 +15,7 @@ import '../booking/booking_screen.dart';
 import '../rating/rating_screen.dart';
 import '../../core/widgets/offline_shell.dart';
 import 'history_detail_dialog.dart';
+import 'history_format.dart';
 import '../billing/receipts_list_screen.dart';
 import '../../core/i18n/i18n.dart';
 
@@ -32,6 +33,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   bool _loading = true;
   bool _fromCache = false;
   DateTime? _lastSync;
+  bool _hasMore = false;
+  bool _loadingMore = false;
+  /// 'YYYY-MM' or null for every month.
+  String? _month;
 
   @override
   void initState() {
@@ -68,6 +73,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       _loading = false;
       if (historyResult case Success(:final data)) {
         _history = data['data'] as List? ?? [];
+        _hasMore = data['hasMore'] == true;
         _fromCache = data['cached'] == true;
         final syncedRaw = data['syncedAt']?.toString();
         _lastSync = syncedRaw != null
@@ -76,6 +82,80 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         if (!_fromCache) _lastSync = DateTime.now();
       }
     });
+  }
+
+  /// Older lines: everything before the oldest one already shown.
+  Future<void> _loadMore() async {
+    if (_loadingMore || _history.isEmpty) return;
+    final oldest = _history
+        .map((e) => DateTime.tryParse((e as Map)['createdAt']?.toString() ?? ''))
+        .whereType<DateTime>()
+        .fold<DateTime?>(null, (min, d) => min == null || d.isBefore(min) ? d : min);
+    if (oldest == null) return;
+    setState(() => _loadingMore = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.get('/history?limit=50&before=${Uri.encodeQueryComponent(oldest.toUtc().toIso8601String())}');
+    if (!mounted) return;
+    setState(() {
+      _loadingMore = false;
+      if (result case Success(:final data)) {
+        final seen = _history.map((e) => '${(e as Map)['type']}:${e['id']}').toSet();
+        final more = (data['data'] as List? ?? []).where((e) => seen.add('${(e as Map)['type']}:${e['id']}'));
+        _history = [..._history, ...more];
+        _hasMore = data['hasMore'] == true;
+      }
+    });
+  }
+
+  /// Lines of the chosen month (all months when none is chosen).
+  List<dynamic> get _visibleHistory =>
+      _month == null ? _history : _history.where((e) => historyMonthKey(e as Map<String, dynamic>) == _month).toList();
+
+  List<String> get _months {
+    final keys = _history.map((e) => historyMonthKey(e as Map<String, dynamic>)).whereType<String>().toSet().toList();
+    keys.sort((a, b) => b.compareTo(a));
+    return keys;
+  }
+
+  /// Lines of the open tab, before the month filter is shown.
+  List<dynamic> _tabItems(List<dynamic> source) {
+    bool isType(dynamic d, Set<String> t) => t.contains((d as Map)['type']);
+    return switch (_tabController.index) {
+      1 => source.where((d) => isType(d, {'PARCEL', 'EXPRESS'})).toList(),
+      2 => source.where((d) => isType(d, {'FOOD'})).toList(),
+      3 => source.where((d) => isType(d, {'SCHEDULED', 'RENTAL', 'CARPOOL'})).toList(),
+      _ => source.where((d) => isType(d, {'RIDE', 'ERRAND', 'MOVING'})).toList(),
+    };
+  }
+
+  Widget _summaryBar() {
+    final items = _tabItems(_visibleHistory);
+    final spent = items
+        .where((e) => (e as Map)['status']?.toString() != 'CANCELLED')
+        .fold<int>(0, (sum, e) => sum + (((e as Map)['priceCdf'] as num?)?.round() ?? 0));
+    final months = _months;
+    return Row(
+      children: [
+        Expanded(
+          child: DropdownButton<String?>(
+            key: const Key('historyMonth'),
+            isExpanded: true,
+            value: months.contains(_month) ? _month : null,
+            underline: const SizedBox.shrink(),
+            items: [
+              DropdownMenuItem<String?>(value: null, child: Text(tr('Tous les mois'))),
+              for (final m in months) DropdownMenuItem<String?>(value: m, child: Text(historyMonthLabel(m))),
+            ],
+            onChanged: (v) => setState(() => _month = v),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          trf('{count} · {total}', {'count': items.length, 'total': MarketConfig.formatCdf(spent)}),
+          style: const TextStyle(fontWeight: FontWeight.w600, color: MovaColors.violet),
+        ),
+      ],
+    );
   }
 
   String _statusLabel(String? status) => switch (status) {
@@ -107,6 +187,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                 Icon(Icons.local_taxi_outlined, size: 18, color: MovaColors.violet),
                 SizedBox(width: 6),
                 Text(tr('Course taxi'), style: TextStyle(fontWeight: FontWeight.w600)),
+                const Spacer(),
+                Text(historyDateLabel(item), style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
               ],
             ),
             const SizedBox(height: 4),
@@ -219,7 +301,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     if (type == 'RIDE') return _rideTile(item);
     if (type == 'PARCEL' || type == 'EXPRESS') return _parcelTile(item);
     if (type == 'FOOD') return _foodTile(item);
-    if (type == 'SCHEDULED') return _scheduledTile(item);
+    if (type == 'SCHEDULED' || type == 'RENTAL' || type == 'CARPOOL') return _scheduledTile(item);
     if (type == 'MOVING') return _movingTile(item);
     if (type == 'ERRAND') return _errandTile(item);
     return _rideTile(item);
@@ -246,6 +328,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                 Icon(Icons.inventory_2_outlined, size: 18, color: MovaColors.green),
                 SizedBox(width: 6),
                 Text(tr('Colis'), style: TextStyle(fontWeight: FontWeight.w600)),
+                const Spacer(),
+                Text(historyDateLabel(item), style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
               ],
             ),
             const SizedBox(height: 4),
@@ -313,6 +397,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                 Icon(Icons.restaurant_outlined, size: 18, color: MovaColors.green),
                 SizedBox(width: 6),
                 Text(tr('Repas'), style: TextStyle(fontWeight: FontWeight.w600)),
+                const Spacer(),
+                Text(historyDateLabel(item), style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
               ],
             ),
             const SizedBox(height: 4),
@@ -377,7 +463,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
               children: [
                 Icon(Icons.event_available_outlined, size: 18, color: MovaColors.violet),
                 SizedBox(width: 6),
-                Text(tr('Réservation'), style: TextStyle(fontWeight: FontWeight.w600)),
+                Text(
+                  switch (item['type']?.toString()) {
+                    'RENTAL' => tr('Location véhicule'),
+                    'CARPOOL' => tr('Covoiturage'),
+                    _ => tr('Réservation'),
+                  },
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const Spacer(),
+                Text(historyDateLabel(item), style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
               ],
             ),
             const SizedBox(height: 4),
@@ -388,7 +483,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
               overflow: TextOverflow.ellipsis,
             ),
             Text(
-              meta['scheduledAt']?.toString() ?? item['createdAt']?.toString() ?? '',
+              meta['endDate'] != null
+                  ? trf('Du {from} au {to}', {
+                      'from': formatHistoryDate(meta['startDate']?.toString()),
+                      'to': formatHistoryDate(meta['endDate']?.toString()),
+                    })
+                  : historyDateLabel(item),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -421,6 +521,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                 Icon(Icons.local_shipping_outlined, size: 18, color: MovaColors.midnight),
                 SizedBox(width: 6),
                 Text(tr('Déménagement'), style: TextStyle(fontWeight: FontWeight.w600)),
+                const Spacer(),
+                Text(historyDateLabel(item), style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
               ],
             ),
             const SizedBox(height: 4),
@@ -459,6 +561,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                 Icon(Icons.shopping_bag_outlined, size: 18, color: MovaColors.orange),
                 SizedBox(width: 6),
                 Text(tr('Courses'), style: TextStyle(fontWeight: FontWeight.w600)),
+                const Spacer(),
+                Text(historyDateLabel(item), style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary)),
               ],
             ),
             const SizedBox(height: 4),
@@ -508,15 +612,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       );
     }
 
-    final rides = _history.where((d) => (d as Map)['type'] == 'RIDE').toList();
-    final movings = _history.where((d) => (d as Map)['type'] == 'MOVING').toList();
-    final errands = _history.where((d) => (d as Map)['type'] == 'ERRAND').toList();
-    final parcels = _history.where((d) {
+    final source = _visibleHistory;
+    final rides = source.where((d) => (d as Map)['type'] == 'RIDE').toList();
+    final movings = source.where((d) => (d as Map)['type'] == 'MOVING').toList();
+    final errands = source.where((d) => (d as Map)['type'] == 'ERRAND').toList();
+    final parcels = source.where((d) {
       final t = (d as Map)['type'];
       return t == 'PARCEL' || t == 'EXPRESS';
     }).toList();
-    final meals = _history.where((d) => (d as Map)['type'] == 'FOOD').toList();
-    final scheduled = _history.where((d) => (d as Map)['type'] == 'SCHEDULED').toList();
+    final meals = source.where((d) => (d as Map)['type'] == 'FOOD').toList();
+    final scheduled = source.where((d) {
+      final t = (d as Map)['type'];
+      return t == 'SCHEDULED' || t == 'RENTAL' || t == 'CARPOOL';
+    }).toList();
 
     return AnimatedBuilder(
       animation: _tabController,
@@ -554,6 +662,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       title: tr('Historique'),
       actions: [
         IconButton(
+          tooltip: tr('Actualiser'),
+          icon: const Icon(Icons.refresh),
+          onPressed: _load,
+        ),
+        IconButton(
           tooltip: tr('Mes reçus'),
           icon: const Icon(Icons.receipt_long_outlined),
           onPressed: () => Navigator.push(
@@ -590,7 +703,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                 ),
               ),
             ),
+          if (!_loading && _history.isNotEmpty) _summaryBar(),
           _tabContent(),
+          if (_hasMore && !_loading)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 16),
+              child: MovaButton(
+                key: const Key('historyLoadMore'),
+                label: _loadingMore ? tr('Chargement…') : tr('Charger plus'),
+                isSecondary: true,
+                icon: Icons.expand_more,
+                onPressed: _loadingMore ? null : _loadMore,
+              ),
+            ),
         ],
       ),
     );

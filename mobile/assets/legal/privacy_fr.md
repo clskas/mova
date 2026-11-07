@@ -19,6 +19,7 @@ Cette politique explique quelles données nous collectons, pourquoi, comment lon
 
 ### 2.2 Données de localisation
 - Position GPS en temps réel **pendant** les courses, livraisons et trajets actifs
+- Après une alerte SOS, votre position est partagée avec l'équipe SENGA pendant 30 minutes (vous pouvez arrêter ce partage)
 - Adresses de départ, d'arrivée et de livraison saisies
 
 ### 2.3 Données transactionnelles
@@ -32,7 +33,12 @@ Cette politique explique quelles données nous collectons, pourquoi, comment lon
 - Photo d'identité
 - Statut de disponibilité et revenus
 
-### 2.5 Données techniques
+### 2.5 Contacts d'urgence (facultatif)
+- Nom et numéro de téléphone de 3 proches au plus, saisis par vous dans le Profil
+- Utilisés uniquement pour leur envoyer un SMS avec votre position quand vous déclenchez une alerte SOS
+- Supprimés quand vous les retirez ou quand votre compte est supprimé. Prévenez ces personnes avant de les ajouter.
+
+### 2.6 Données techniques
 - Identifiant de l'appareil
 - Version de l'application
 - Journaux d'erreurs anonymisés

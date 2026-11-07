@@ -2088,6 +2088,8 @@ class ApiClient {
   }) async {
     final refType = referenceType ?? (rideId != null ? 'RIDE' : null);
     final refId = referenceId ?? rideId;
+    // Never queued offline: a SOS that silently waits for the network is worse than an error,
+    // because the error lets the app offer SMS and emergency calls instead.
     return post('/incidents', {
       'type': 'SOS',
       'description': description,
@@ -2096,7 +2098,7 @@ class ApiClient {
       if (lng != null) 'lng': lng,
       if (refType != null) 'referenceType': refType,
       if (refId != null) 'referenceId': refId,
-    });
+    }, retries: 1, skipOffline: true);
   }
 
   Future<Result<Map<String, dynamic>>> getServicePaymentInfo(String referenceType, String referenceId) async {

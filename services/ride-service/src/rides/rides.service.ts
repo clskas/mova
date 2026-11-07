@@ -1100,10 +1100,12 @@ export class RidesService {
     });
   }
 
-  async getUserRides(userId: string, role: 'passenger' | 'driver') {
+  async getUserRides(userId: string, role: 'passenger' | 'driver', before?: Date) {
     const rideRule = role === 'driver' ? await this.commission.get(CommissionServiceType.RIDE) : null;
+    // Paging: rides older than [before] (the oldest one the app already shows).
+    const older = before && !Number.isNaN(before.getTime()) ? { createdAt: { lt: before } } : {};
     const rides = await this.prisma.ride.findMany({
-      where: role === 'passenger' ? { passengerId: userId } : { driverId: userId },
+      where: role === 'passenger' ? { ...older, passengerId: userId } : { ...older, driverId: userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: { sharePassengers: true },

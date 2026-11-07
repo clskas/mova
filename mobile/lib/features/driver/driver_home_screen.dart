@@ -1,3 +1,4 @@
+import '../../core/safety/sos_follow_up.dart';
 import '../../core/i18n/i18n.dart';
 import 'dart:async';
 
@@ -269,6 +270,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     await DriverJobAlertService.init();
     await DriverPushService.init(ref.read(apiClientProvider));
     unawaited(ref.read(apiClientProvider).syncLanguageToProfile());
+    unawaited(SosConfigCache.refresh(ref.read(apiClientProvider)));
     if (mounted) {
       setState(() => _bootstrapping = false);
       _startAssignmentsPolling();
@@ -1526,10 +1528,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       scrollable: false,
       actions: [
         const NotificationsBellButton(),
-        IconButton(
-          icon: const Icon(Icons.sos, color: MovaColors.red),
-          tooltip: tr('Alerte SOS'),
-          onPressed: () => triggerSosAlert(
+        sosAppBarButton(
+          icon: Icons.sos,
+          onPressed: ([bool skip = false]) => triggerSosAlert(
+            skipConfirm: skip,
             ref,
             context,
             description: 'SOS chauffeur — accueil',

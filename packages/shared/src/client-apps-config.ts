@@ -79,6 +79,31 @@ export const DEFAULT_SOS_EMERGENCY_CONTACTS: SosEmergencyContact[] = [
   },
 ];
 
+/**
+ * SMS sent for SOS and incidents (each SMS costs money). Super admin only.
+ * Push notifications and in-app alerts are always sent.
+ */
+export type SosSmsConfig = {
+  /** SMS to the ops team when a SOS is raised. */
+  toStaffForSos: boolean;
+  /** SMS to the ops team for non-urgent incidents (accident, harassment, other…). */
+  toStaffForIncidents: boolean;
+  /** SMS to the user's emergency contacts when they raise a SOS. */
+  toTrustedContacts: boolean;
+  /** SMS reminder to the ops team when nobody took a SOS within 2 minutes. */
+  escalationSms: boolean;
+  /** Number the app offers to text when a SOS cannot be sent over the Internet ('' = none). */
+  sosSmsNumber: string;
+};
+
+export const DEFAULT_SOS_SMS_CONFIG: SosSmsConfig = {
+  toStaffForSos: true,
+  toStaffForIncidents: false,
+  toTrustedContacts: true,
+  escalationSms: true,
+  sosSmsNumber: '',
+};
+
 export type ClientAppsConfig = {
   mobileMoney: MmVisibilityByApp;
   maintenance: MaintenanceConfig;
@@ -97,6 +122,8 @@ export type ClientAppsConfig = {
   sosAlertAudiences: SosAlertAudience[];
   /** Numéros à appeler depuis l’écran SOS (police, pompiers, 112, …). */
   sosEmergencyContacts: SosEmergencyContact[];
+  /** SOS / incident SMS switches (super admin). */
+  sosSms: SosSmsConfig;
 };
 
 export const DEFAULT_MAINTENANCE_MESSAGE_FR =
@@ -147,6 +174,7 @@ export const DEFAULT_CLIENT_APPS_CONFIG: ClientAppsConfig = {
   sosAlertUserIds: [],
   sosAlertAudiences: [],
   sosEmergencyContacts: structuredClone(DEFAULT_SOS_EMERGENCY_CONTACTS),
+  sosSms: { ...DEFAULT_SOS_SMS_CONFIG },
 };
 
 export const CLIENT_APP_LABELS_FR: Record<ClientAppId, string> = {
@@ -283,7 +311,23 @@ export function mergeClientAppsConfig(raw: unknown): ClientAppsConfig {
     base.sosEmergencyContacts = normalizeSosEmergencyContacts(sosContacts);
   }
 
+  base.sosSms = normalizeSosSmsConfig((src as { sosSms?: unknown }).sosSms, base.sosSms);
+
   return base;
+}
+
+/** Keeps known switches only; the SMS number is digits and + only. */
+export function normalizeSosSmsConfig(raw: unknown, fallback: SosSmsConfig = DEFAULT_SOS_SMS_CONFIG): SosSmsConfig {
+  const out = { ...fallback };
+  if (!raw || typeof raw !== 'object') return out;
+  const o = raw as Record<string, unknown>;
+  for (const k of ['toStaffForSos', 'toStaffForIncidents', 'toTrustedContacts', 'escalationSms'] as const) {
+    if (typeof o[k] === 'boolean') out[k] = o[k] as boolean;
+  }
+  if (typeof o.sosSmsNumber === 'string') {
+    out.sosSmsNumber = o.sosSmsNumber.replace(/[^\d+]/g, '').slice(0, 20);
+  }
+  return out;
 }
 
 function normalizePhoneDigits(raw: string): string {

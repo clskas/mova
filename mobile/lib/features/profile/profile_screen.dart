@@ -1,3 +1,4 @@
+import '../sos/trusted_contacts_screen.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/i18n/language_picker.dart';
 import 'package:flutter/material.dart';
@@ -170,6 +171,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   AccountLinkCard(profile: _profile, onChanged: _load),
                   const SizedBox(height: 12),
                 ],
+                MovaCard(
+                  key: const Key('trustedContactsEntry'),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TrustedContactsScreen()),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.contact_emergency_outlined, color: MovaColors.red),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(tr('Contacts d’urgence'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                            Text(
+                              tr('Prévenus par SMS si vous déclenchez un SOS'),
+                              style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 MovaCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

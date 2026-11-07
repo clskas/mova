@@ -116,8 +116,12 @@ export class RidesController {
 
   @Get('history')
   @ApiOperation({ summary: 'Historique courses passager/chauffeur' })
-  history(@Request() req: { user: { id: string } }, @Query('role') role?: string) {
-    return this.ridesService.getUserRides(req.user.id, role === 'driver' ? 'driver' : 'passenger');
+  history(@Request() req: { user: { id: string } }, @Query('role') role?: string, @Query('before') before?: string) {
+    return this.ridesService.getUserRides(
+      req.user.id,
+      role === 'driver' ? 'driver' : 'passenger',
+      before ? new Date(before) : undefined,
+    );
   }
 
   @Get('active')

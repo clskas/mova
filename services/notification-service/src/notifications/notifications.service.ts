@@ -9,6 +9,7 @@ import {
   DriverJobStopPayload,
   ErrandCreatedPayload,
   IncidentCreatedPayload,
+  IncidentUpdatePayload,
   PaymentCompletedPayload,
   RentalBookingPayload,
   RideCreatedPayload,
@@ -23,7 +24,12 @@ import { SmsService } from '../sms/sms.service';
 import { FcmPushService } from '../push/fcm-push.service';
 import { PushTokensService } from '../push/push-tokens.service';
 import { WebPushService } from '../push/web-push.service';
-import { fetchAuthUserBrief, fetchOpsStaffForAlerts } from '../common/user-lookup.util';
+import {
+  fetchAuthUserBrief,
+  fetchOpsStaffForAlerts,
+  fetchSosSmsConfig,
+  fetchTrustedContacts,
+} from '../common/user-lookup.util';
 
 @Injectable()
 export class NotificationsService implements OnModuleInit {
@@ -54,6 +60,9 @@ export class NotificationsService implements OnModuleInit {
       MOVA_EVENTS.SCHEDULED_REMINDER,
       MOVA_EVENTS.ERRAND_CREATED,
       MOVA_EVENTS.CHAT_MESSAGE,
+      MOVA_EVENTS.INCIDENT_ACKNOWLEDGED,
+      MOVA_EVENTS.INCIDENT_ESCALATED,
+      MOVA_EVENTS.INCIDENT_RESOLVED,
     ];
     this.redis.sub.subscribe(...channels, (err) => {
       if (err) {
@@ -80,6 +89,9 @@ export class NotificationsService implements OnModuleInit {
         if (channel === MOVA_EVENTS.SCHEDULED_REMINDER) await this.onScheduledReminder(data as ScheduledReminderPayload);
         if (channel === MOVA_EVENTS.ERRAND_CREATED) await this.onErrandCreated(data as ErrandCreatedPayload);
         if (channel === MOVA_EVENTS.CHAT_MESSAGE) await this.onChatMessage(data as ChatMessagePayload);
+        if (channel === MOVA_EVENTS.INCIDENT_ACKNOWLEDGED) await this.onIncidentAcknowledged(data as IncidentUpdatePayload);
+        if (channel === MOVA_EVENTS.INCIDENT_ESCALATED) await this.onIncidentEscalated(data as IncidentUpdatePayload);
+        if (channel === MOVA_EVENTS.INCIDENT_RESOLVED) await this.onIncidentResolved(data as IncidentUpdatePayload);
       } catch (e) {
         this.logger.error('Event handler error', e);
       }
@@ -269,6 +281,9 @@ export class NotificationsService implements OnModuleInit {
       ? `Alerte SOS SENGA — une urgence a été signalée. L'équipe support intervient.${maps}`
       : `Incident SENGA (${payload.type}).`;
 
+    // SMS cost money: the super admin decides which alerts also go by SMS.
+    const smsCfg = await fetchSosSmsConfig();
+    const smsToStaff = isSos ? smsCfg.toStaffForSos : smsCfg.toStaffForIncidents;
     const opsIds: string[] = [];
     const audienceDriverIds: string[] = [];
     const audiencePassengerIds: string[] = [];
@@ -285,11 +300,11 @@ export class NotificationsService implements OnModuleInit {
       if (forOps) {
         opsIds.push(s.id);
         // SMS réservé aux agents ops (jamais de SMS de masse audiences).
-        if (isSos && s.phone) {
-          const smsResult = await this.sms.sendMessage(
-            s.phone,
-            `SENGA SOS — ${payload.type}${payload.rideId ? ` course ${payload.rideId.slice(0, 8)}` : ''}.${maps}`.slice(0, 160),
-          );
+        if (smsToStaff && s.phone) {
+          const smsText = isSos
+            ? `SENGA SOS — ${payload.type}${payload.rideId ? ` course ${payload.rideId.slice(0, 8)}` : ''}.${maps}`
+            : `SENGA incident ${payload.type}${payload.rideId ? ` course ${payload.rideId.slice(0, 8)}` : ''} — Litiges admin.`;
+          const smsResult = await this.sms.sendMessage(s.phone, smsText.slice(0, 160));
           if (smsResult?.success) smsSent += 1;
         }
       } else {
@@ -352,12 +367,94 @@ export class NotificationsService implements OnModuleInit {
       });
     }
 
+    // The user's emergency contacts (set in the app) get an SMS for a SOS.
+    let contactsSms = 0;
+    if (isSos && smsCfg.toTrustedContacts) {
+      contactsSms = await this.smsTrustedContacts(payload, maps);
+    }
+
     this.logger.warn(
-      `incident.created ${payload.incidentId} type=${payload.type} emergency=${isSos} ` +
+      `incident.created ${payload.incidentId} type=${payload.type} emergency=${isSos} contactsSms=${contactsSms} ` +
         `ops=${opsIds.length} sms=${smsSent} fcmOps=${fcmOps} ` +
         `audDrv=${audienceDriverIds.length}/${fcmDrivers} audPax=${audiencePassengerIds.length}/${fcmPassengers} ` +
         `partners=${partnerRestaurantIds.length + partnerRentalIds.length}`,
     );
+  }
+
+  private async smsTrustedContacts(payload: IncidentCreatedPayload, maps: string): Promise<number> {
+    const contacts = await fetchTrustedContacts(payload.userId);
+    if (contacts.length === 0) return 0;
+    const user = await fetchAuthUserBrief(payload.userId);
+    const who = user?.name || user?.phone || 'Un proche';
+    let sent = 0;
+    for (const c of contacts) {
+      const text =
+        `SENGA SOS : ${who} a déclenché une alerte et vous a désigné comme contact d'urgence.${maps ? ` Position :${maps}.` : ''}` +
+        ` L'équipe SENGA est prévenue. En cas de danger, appelez le 112.`;
+      const res = await this.sms.sendMessage(c.phone, text);
+      if (res?.success) sent++;
+    }
+    return sent;
+  }
+
+  /** The user is told that someone is handling their SOS / report. */
+  async onIncidentAcknowledged(payload: IncidentUpdatePayload) {
+    const title = payload.isEmergency ? 'Alerte SOS prise en charge' : 'Signalement pris en charge';
+    const body = payload.isEmergency
+      ? `L'équipe SENGA (${payload.byName ?? 'support'}) s'occupe de votre alerte. Restez joignable.`
+      : `L'équipe SENGA (${payload.byName ?? 'support'}) traite votre signalement.`;
+    await this.create(payload.userId, title, body, 'INCIDENT_ACKNOWLEDGED', payload);
+    await this.pushToUsersAnyFlavor([payload.userId], title, body, {
+      type: 'INCIDENT_ACKNOWLEDGED',
+      incidentId: payload.incidentId,
+      title,
+      body,
+    }, { profile: 'chat' });
+  }
+
+  async onIncidentResolved(payload: IncidentUpdatePayload) {
+    const title = 'Signalement clôturé';
+    const body = 'Votre signalement a été traité par l’équipe SENGA. Merci de nous avoir prévenus.';
+    await this.create(payload.userId, title, body, 'INCIDENT_RESOLVED', payload);
+    await this.pushToUsersAnyFlavor([payload.userId], title, body, {
+      type: 'INCIDENT_RESOLVED',
+      incidentId: payload.incidentId,
+      title,
+      body,
+    }, { profile: 'chat' });
+  }
+
+  /** SOS nobody took within 2 minutes: alert the ops team again (push, SMS if allowed). */
+  async onIncidentEscalated(payload: IncidentUpdatePayload) {
+    const staff = (await fetchOpsStaffForAlerts()).filter((s) => !s.audienceOnly && s.id !== payload.userId);
+    if (staff.length === 0) return;
+    const maps =
+      payload.lat != null && payload.lng != null ? ` https://maps.google.com/?q=${payload.lat},${payload.lng}` : '';
+    const title = 'SOS non pris en charge';
+    const body = `Une alerte SOS attend depuis plus de 2 minutes — ouvrez Litiges et cliquez « Je prends en charge ».${maps}`;
+    for (const s of staff) {
+      await this.create(s.id, title, body, 'INCIDENT_ESCALATED', { ...payload, forOps: true });
+    }
+    await this.pushToUsersAnyFlavor(staff.map((s) => s.id), title, body, {
+      type: 'INCIDENT_CREATED',
+      incidentId: payload.incidentId,
+      emergency: '1',
+      forOps: '1',
+      lat: payload.lat != null ? String(payload.lat) : '',
+      lng: payload.lng != null ? String(payload.lng) : '',
+      title,
+      body,
+    });
+    const smsCfg = await fetchSosSmsConfig();
+    let sms = 0;
+    if (smsCfg.escalationSms) {
+      for (const s of staff) {
+        if (!s.phone) continue;
+        const res = await this.sms.sendMessage(s.phone, `SENGA SOS NON PRIS EN CHARGE depuis 2 min — Litiges admin.${maps}`.slice(0, 160));
+        if (res?.success) sms++;
+      }
+    }
+    this.logger.warn(`incident.escalated ${payload.incidentId} ops=${staff.length} sms=${sms}`);
   }
 
   async onRideStatusSms(payload: RideStatusSmsPayload) {

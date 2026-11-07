@@ -1,3 +1,4 @@
+import '../../core/safety/sos_helper.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -533,6 +534,22 @@ Future<void> showHistoryDetailDialog(
             },
             icon: const Icon(Icons.receipt_long),
             label: Text(tr('Voir le reçu')),
+          ),
+        if (id.isNotEmpty)
+          TextButton.icon(
+            key: const Key('historyReportProblem'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              showReportProblemDialog(
+                context,
+                ref,
+                referenceType: type == 'RIDE' ? 'RIDE' : (type ?? 'OTHER'),
+                referenceId: id,
+                rideId: type == 'RIDE' ? id : null,
+              );
+            },
+            icon: const Icon(Icons.report_problem_outlined, color: MovaColors.orange),
+            label: Text(tr('Signaler un problème')),
           ),
       ],
     ),

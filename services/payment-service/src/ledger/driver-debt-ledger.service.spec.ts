@@ -117,3 +117,87 @@ describe('DriverDebtLedgerService.settleAvailableFromWallet', () => {
     );
   });
 });
+
+describe('DriverDebtLedgerService — settlement holes (audit 2026-11)', () => {
+  const debt = (id: string, amountCdf: number, createdAt = new Date('2026-11-01T10:00:00Z')) => ({
+    id,
+    driverUserId: 'driver-1',
+    referenceType: 'RIDE',
+    referenceId: `ride-${id}`,
+    category: CashDebtCategory.PLATFORM_FEE,
+    amountCdf,
+    status: CashDebtStatus.OPEN,
+    beneficiaryUserId: null,
+    description: 'Commission',
+    createdAt,
+  });
+  const prisma = {
+    driverCashDebt: { findMany: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    driverCashDebtCashRequest: {
+      updateMany: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    walletTransaction: { findFirst: jest.fn().mockResolvedValue(null) },
+  };
+  const wallet = {
+    debit: jest.fn().mockResolvedValue({ balanceCdf: 0 }),
+    credit: jest.fn(),
+    creditPlatformFee: jest.fn().mockResolvedValue(null),
+  };
+  const service = new DriverDebtLedgerService(prisma as never, wallet as never);
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('debits the same set of debts once (same reference on a double tap)', async () => {
+    prisma.driverCashDebt.findMany.mockResolvedValue([debt('a', 1000), debt('b', 2000)]);
+    await service.settleFromWallet('driver-1');
+    prisma.driverCashDebt.findMany.mockResolvedValue([debt('b', 2000), debt('a', 1000)]);
+    await service.settleFromWallet('driver-1');
+    const refs = wallet.debit.mock.calls.map((c: unknown[]) => c[3]);
+    expect(wallet.debit.mock.calls[0][1]).toBe(3000);
+    expect(refs[0]).toBe(refs[1]);
+    // only the debited debts are marked settled
+    expect(prisma.driverCashDebt.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: { in: ['a', 'b'] }, status: CashDebtStatus.OPEN } }),
+    );
+  });
+
+  it('the counter code settles only the debts known when the code was made', async () => {
+    const codeAt = new Date('2026-11-02T10:00:00Z');
+    prisma.driverCashDebtCashRequest.findFirst.mockResolvedValue({
+      id: 'req-1',
+      driverUserId: 'driver-1',
+      code: '123456',
+      createdAt: codeAt,
+    });
+    prisma.driverCashDebtCashRequest.updateMany
+      .mockResolvedValueOnce({ count: 0 }) // expireStaleCashRequests
+      .mockResolvedValueOnce({ count: 1 }); // claim
+    prisma.driverCashDebt.findMany.mockResolvedValue([debt('old', 10000)]);
+    const result = await service.confirmCashPaymentRequest('123456', 'agent-1');
+    expect(result).toMatchObject({ confirmed: true, amountCdf: 10000 });
+    expect(prisma.driverCashDebt.findMany).toHaveBeenCalledWith({
+      where: { driverUserId: 'driver-1', status: CashDebtStatus.OPEN, createdAt: { lte: codeAt } },
+    });
+    expect(prisma.driverCashDebt.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: { in: ['old'] }, status: CashDebtStatus.OPEN } }),
+    );
+  });
+
+  it('a code cannot be confirmed twice', async () => {
+    prisma.driverCashDebtCashRequest.findFirst.mockResolvedValue({
+      id: 'req-2',
+      driverUserId: 'driver-1',
+      code: '654321',
+      createdAt: new Date(),
+    });
+    prisma.driverCashDebtCashRequest.updateMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 0 });
+    prisma.driverCashDebt.findMany.mockResolvedValue([debt('x', 5000)]);
+    const result = await service.confirmCashPaymentRequest('654321');
+    expect(result).toMatchObject({ confirmed: false });
+    expect(prisma.driverCashDebt.updateMany).not.toHaveBeenCalled();
+  });
+});

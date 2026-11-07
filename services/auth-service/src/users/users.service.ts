@@ -46,6 +46,7 @@ export class UsersService {
     avatarUrl?: string | null;
     managedCity?: string | null;
     homeCity?: string | null;
+    language?: string | null;
     adminPermissions?: string[] | null;
     createdAt: Date;
     updatedAt: Date;
@@ -118,12 +119,13 @@ export class UsersService {
 
   async updateProfile(
     id: string,
-    data: { firstName?: string | null; lastName?: string | null; email?: string | null },
+    data: { firstName?: string | null; lastName?: string | null; email?: string | null; language?: string | null },
   ) {
     const normalize = (value?: string | null) => (value == null ? null : value.trim() || null);
     const current = await this.prisma.user.findUnique({ where: { id } });
     if (!current) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
-    const patch: { firstName?: string | null; lastName?: string | null; email?: string | null } = {};
+    const patch: { firstName?: string | null; lastName?: string | null; email?: string | null; language?: string } = {};
+    if (data.language === 'fr' || data.language === 'en') patch.language = data.language;
     if (data.firstName !== undefined) patch.firstName = normalize(data.firstName);
     if (data.lastName !== undefined) patch.lastName = normalize(data.lastName);
     if (data.email !== undefined) {

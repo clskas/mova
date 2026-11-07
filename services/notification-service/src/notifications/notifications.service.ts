@@ -17,7 +17,7 @@ import {
   ServiceAssignedPayload,
   ServiceStatusUpdatedPayload,
 } from '@mova/shared';
-import { RedisService } from '@mova/shared';
+import { RedisService, translateServerText } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../sms/sms.service';
 import { FcmPushService } from '../push/fcm-push.service';
@@ -137,7 +137,7 @@ export class NotificationsService implements OnModuleInit {
     const owner = await fetchAuthUserBrief(options.ownerUserId);
     if (!owner?.phone) return;
     const smsText = options.smsBody ?? `SENGA — ${options.title}. ${options.body}`;
-    await this.sms.sendMessage(owner.phone, smsText);
+    await this.sms.sendMessage(owner.phone, smsText, owner.language);
   }
 
   async create(userId: string, title: string, body: string, type: string, data?: object) {
@@ -519,7 +519,9 @@ export class NotificationsService implements OnModuleInit {
       const brief = await fetchAuthUserBrief(userId);
       const phone = brief?.phone?.trim();
       if (!phone) continue;
-      const smsBody = `SENGA Driver: ${payload.title}. ${payload.body}`.slice(0, 160);
+      const en = brief?.language === 'en';
+      const t = (v: string) => (en ? translateServerText(v, 'en') : v);
+      const smsBody = `SENGA Driver: ${t(payload.title)}. ${t(payload.body)}`.slice(0, 160);
       const result = await this.sms.sendMessage(phone, smsBody);
       if (result.success) smsSent++;
     }

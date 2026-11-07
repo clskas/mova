@@ -6,7 +6,7 @@ import {
   type SosAlertAudience,
 } from '@mova/shared';
 
-export type UserBrief = { name?: string; phone?: string };
+export type UserBrief = { name?: string; phone?: string; language?: 'fr' | 'en' };
 
 export async function fetchAuthUserBrief(userId: string): Promise<UserBrief | null> {
   try {
@@ -14,9 +14,9 @@ export async function fetchAuthUserBrief(userId: string): Promise<UserBrief | nu
       headers: { 'x-internal-api-key': INTERNAL_API_KEY },
     });
     if (!res.ok) return null;
-    const user = (await res.json()) as { firstName?: string; lastName?: string; phone?: string };
+    const user = (await res.json()) as { firstName?: string; lastName?: string; phone?: string; language?: string };
     const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
-    return { name: name || undefined, phone: user.phone };
+    return { name: name || undefined, phone: user.phone, language: user.language === 'en' ? 'en' : 'fr' };
   } catch {
     return null;
   }

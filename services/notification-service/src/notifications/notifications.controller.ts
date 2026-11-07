@@ -13,6 +13,8 @@ class RegisterPushTokenDto {
   @IsString()
   @IsIn(['driver', 'passenger', 'restaurant', 'rental_partner'])
   appFlavor?: string;
+  /** App language on this device: 'fr' or 'en'. */
+  @IsOptional() @IsIn(['fr', 'en']) language?: 'fr' | 'en';
 }
 
 @ApiTags('notifications')
@@ -59,6 +61,6 @@ export class NotificationsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Enregistrer un token FCM (mobile) ou abonnement Web Push (portail partenaire)' })
   registerPushToken(@Request() req: { user: { id: string } }, @Body() dto: RegisterPushTokenDto) {
-    return this.pushTokens.register(req.user.id, dto.token, dto.platform, dto.appFlavor ?? 'driver');
+    return this.pushTokens.register(req.user.id, dto.token, dto.platform, dto.appFlavor ?? 'driver', dto.language);
   }
 }

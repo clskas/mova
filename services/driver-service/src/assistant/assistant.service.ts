@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Injectable, Logger } from '@nestjs/common';
-import { MARKET_RDC } from '@mova/shared';
+import { MARKET_RDC, currentRequestLanguage, type AppLanguage } from '@mova/shared';
 import { DRIVER_MANUAL, PASSENGER_MANUAL } from './manuals.generated';
 
 export type AssistantApp = 'passenger' | 'driver';
@@ -29,6 +29,13 @@ export function systemPromptFor(app: AssistantApp): string {
     'Ne promets jamais de remboursement, de prix exact ou de délai. Ne demande jamais de mot de passe, de code PIN, de code OTP ni de numéro de carte.',
     '<manuel>\n' + manual + '\n</manuel>',
   ].join('\n\n');
+}
+
+/** Language block sent after the cached manual, so the cache stays shared by all users. */
+export function languageInstruction(lang: AppLanguage): string {
+  return lang === 'en'
+    ? 'The user chose English in the app. Answer in English, unless their last message is clearly in another language.'
+    : 'L’utilisateur a choisi le français dans l’app. Réponds en français, sauf si son dernier message est clairement dans une autre langue.';
 }
 
 /** Last messages only, valid roles, trimmed text, starting with the user. */
@@ -92,7 +99,10 @@ export class AssistantService {
         fallbacks: 'default',
         output_config: { effort: 'low' },
         // The manual is the same on every call: cache it.
-        system: [{ type: 'text', text: systemPromptFor(app), cache_control: { type: 'ephemeral' } }],
+        system: [
+          { type: 'text', text: systemPromptFor(app), cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: languageInstruction(currentRequestLanguage()) },
+        ],
         messages,
       });
       if (response.stop_reason === 'refusal') {

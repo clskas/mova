@@ -235,10 +235,23 @@ class DriverPushService {
       }
       messaging.onTokenRefresh.listen((token) => _registerToken(api, token));
       _initialized = true;
+      // Push texts follow the app language: re-register the token when it changes.
+      appLanguageChangedHooks.add((_) => refreshLanguage(api));
     } catch (e) {
       if (kDebugMode) {
         debugPrint('FCM non disponible (ajoutez google-services.json) : $e');
       }
+    }
+  }
+
+  /// Re-sends the current token after a language change, so push texts follow it.
+  static Future<void> refreshLanguage(ApiClient api) async {
+    if (!_initialized) return;
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null && token.isNotEmpty) await _registerToken(api, token);
+    } catch (_) {
+      /* push not available on this device */
     }
   }
 
@@ -250,6 +263,7 @@ class DriverPushService {
       'token': token,
       'platform': platform,
       'appFlavor': 'driver',
+      'language': appLanguage.value,
     });
     if (result case Failure(:final error)) {
       if (kDebugMode) debugPrint('Enregistrement token push échoué : ${error.message}');

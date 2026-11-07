@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   africasTalkingSendSms,
@@ -15,7 +15,11 @@ import {
   serdiPaySendSms,
   mapSmsDeliveryFailureToUserMessage,
   SMS_UNAVAILABLE_USER_MESSAGE,
+  currentRequestLanguage,
+  translateServerText,
+  type AppLanguage,
 } from '@mova/shared';
+import { PrismaService } from '../prisma/prisma.service';
 
 export interface SmsSendResult {
   success: boolean;
@@ -42,7 +46,8 @@ export function sanitizeAndroidSmsHash(raw?: string | null): string | undefined 
  * `androidAppHash` is accepted by the API but ignored in the SMS body.
  */
 export function otpSmsText(brand: string, code: string, _androidAppHash?: string): string {
-  return `Votre code ${brand} ${code}`;
+  // Language chosen in the app that asked for the code (x-app-language).
+  return currentRequestLanguage() === 'en' ? `Your ${brand} code ${code}` : `Votre code ${brand} ${code}`;
 }
 
 @Injectable()
@@ -217,7 +222,20 @@ export class SmsService {
     private serdiPay: SerdiPaySmsProvider,
     private africasTalking: AfricasTalkingSmsProvider,
     private twilio: TwilioSmsProvider,
+    @Optional() private prisma?: PrismaService,
   ) {}
+
+  /** Recipient's app language: their profile, else the language of the current request. */
+  private async recipientLanguage(phone: string): Promise<AppLanguage> {
+    try {
+      const user = await this.prisma?.user.findFirst({ where: { phone }, select: { language: true } });
+      if (user?.language === 'en') return 'en';
+      if (user) return 'fr';
+    } catch {
+      /* French by default */
+    }
+    return currentRequestLanguage();
+  }
 
   private get = (key: string) => this.config.get<string>(key);
 
@@ -262,6 +280,7 @@ export class SmsService {
 
   /** Transactional SMS (activation PIN, alerts) — same AfriSoft hub as OTP. */
   async sendSms(phone: string, text: string, purpose = 'notify'): Promise<SmsSendResult> {
+    text = translateServerText(text, await this.recipientLanguage(phone));
     if (isTestOtpAllowedForPhone(phone)) {
       this.logger.warn(`Skip live SMS for seed/test phone ${maskPhoneRdc(phone)}`);
       return { success: true, message: 'SMS simulé (mode test)' };

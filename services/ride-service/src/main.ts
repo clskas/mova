@@ -3,7 +3,13 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter, assertProductionSecurity, installErrorReporting, resolveCorsOrigin } from '@mova/shared';
+import {
+  HttpExceptionFilter,
+  appLanguageMiddleware,
+  assertProductionSecurity,
+  installErrorReporting,
+  resolveCorsOrigin,
+} from '@mova/shared';
 
 function isTransientDbNoise(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? '');
@@ -37,6 +43,8 @@ async function bootstrap() {
   app.useWebSocketAdapter(new IoAdapter(app));
   // Do NOT useStaticAssets for uploads: Render disk is ephemeral. Serving only via
   // UploadsService (Postgres → Supabase) prevents "works until next deploy" ghosts.
+  // Caller's app language (x-app-language) for texts built during the request.
+  app.use(appLanguageMiddleware);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, transformOptions: { enableImplicitConversion: true } }));
   app.useGlobalFilters(new HttpExceptionFilter());
   app.enableCors({ origin: resolveCorsOrigin(), credentials: true });

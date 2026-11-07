@@ -1,5 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../api/api_client.dart';
 import '../navigation/mova_navigator.dart';
 import '../theme/mova_colors.dart';
 import '../widgets/mova_widgets.dart';
@@ -11,7 +16,10 @@ class LanguagePickerCard extends StatelessWidget {
 
   Future<void> _choose(BuildContext context, String code) async {
     if (code == appLanguage.value) return;
+    final api = ProviderScope.containerOf(context, listen: false).read(apiClientProvider);
     await setAppLanguage(code);
+    // Server copy of the choice: push notifications and SMS follow it too.
+    unawaited(api.syncLanguageToProfile(force: true));
     // Rebuild every screen in the new language: back to the app's home.
     final home = movaAppHomeBuilder;
     if (home == null) return;

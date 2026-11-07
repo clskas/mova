@@ -5,12 +5,23 @@ import { PrismaService } from '../prisma/prisma.service';
 export class PushTokensService {
   constructor(private prisma: PrismaService) {}
 
-  async register(userId: string, token: string, platform?: string, appFlavor = 'driver') {
+  async register(userId: string, token: string, platform?: string, appFlavor = 'driver', language?: string) {
+    const lang = language === 'en' ? 'en' : language === 'fr' ? 'fr' : undefined;
     return this.prisma.pushDevice.upsert({
       where: { token },
-      create: { userId, token, platform, appFlavor },
-      update: { userId, platform, appFlavor, updatedAt: new Date() },
+      create: { userId, token, platform, appFlavor, ...(lang ? { language: lang } : {}) },
+      update: { userId, platform, appFlavor, ...(lang ? { language: lang } : {}), updatedAt: new Date() },
     });
+  }
+
+  /** Tokens whose device runs the app in English. */
+  async englishTokens(tokens: string[]): Promise<Set<string>> {
+    if (tokens.length === 0) return new Set();
+    const rows = await this.prisma.pushDevice.findMany({
+      where: { token: { in: tokens }, language: 'en' },
+      select: { token: true },
+    });
+    return new Set(rows.map((r) => r.token));
   }
 
   async tokensForUsers(

@@ -197,6 +197,11 @@ export type AdminDriverDetail = AdminDriver & {
     role?: string;
   } | null;
   idDocumentNumber?: string | null;
+  /** Other drivers who declared the same ID / licence number. */
+  identityDuplicates?: {
+    idDocumentNumber: { userId: string; publicId?: string }[];
+    licenseNumber: { userId: string; publicId?: string }[];
+  };
   licenseExpiry?: string | null;
   insuranceExpiry?: string | null;
   technicalInspectionExpiry?: string | null;
@@ -258,6 +263,16 @@ export type AdminDriverDetail = AdminDriver & {
         }[];
         /** Fields read from the document to pre-fill onboarding (name, numbers, dates…). */
         extractedFields?: Record<string, string> | null;
+        /** Signs of forgery seen by the AI — a hint, never a proof. */
+        forgeryCheck?: {
+          verdict?: "RAS" | "A_VERIFIER" | "SUSPECT";
+          isExpectedDocument?: boolean;
+          photoOfScreen?: boolean;
+          photocopyOrPrint?: boolean;
+          signs?: string[];
+          notes?: string;
+          checkedAt?: string;
+        } | null;
       } | null;
     }[];
     requiredComplete?: boolean;

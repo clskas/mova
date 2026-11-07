@@ -36,6 +36,7 @@ import {
   vehicleFitsPassengers,
   vehiclePassengerSeats,
 } from '@mova/shared';
+import { normalizeDocumentNumber } from '../ocr/document-forgery';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateOnboardingDto } from './drivers.dto';
 import { notifyDriverActivationPin, notifyDriverKycReject } from './kyc-notify';
@@ -522,6 +523,7 @@ export class DriversService {
     ocrCheckedAt?: Date | null;
     ocrProviderResults?: unknown;
     extractedFields?: unknown;
+    forgeryCheck?: unknown;
     id?: string;
   } | null) {
     if (!doc) return null;
@@ -536,18 +538,44 @@ export class DriversService {
       providers: Array.isArray(doc.ocrProviderResults) ? doc.ocrProviderResults : [],
       extractedFields:
         doc.extractedFields && typeof doc.extractedFields === 'object' ? doc.extractedFields : null,
+      forgeryCheck: doc.forgeryCheck && typeof doc.forgeryCheck === 'object' ? doc.forgeryCheck : null,
     };
+  }
+
+  /**
+   * Other drivers who declared the same ID or licence number (typed with or without spaces).
+   * A hint for the admin: one person may be registering several accounts, or using someone's papers.
+   */
+  async identityDuplicates(userId: string, profile: { idDocumentNumber?: string | null; licenseNumber?: string | null }) {
+    const check = async (field: 'idDocumentNumber' | 'licenseNumber') => {
+      const own = normalizeDocumentNumber(profile[field]);
+      if (own.length < 5) return [];
+      const others = await this.prisma.driverProfile.findMany({
+        where: { userId: { not: userId }, [field]: { not: null } },
+        select: { userId: true, idDocumentNumber: true, licenseNumber: true },
+      });
+      return others
+        .filter((o) => normalizeDocumentNumber(o[field]) === own)
+        .slice(0, 10)
+        .map((o) => ({ userId: o.userId, publicId: formatMovaPublicId(o.userId, 'DRIVER') }));
+    };
+    const [idDocumentNumber, licenseNumber] = await Promise.all([check('idDocumentNumber'), check('licenseNumber')]);
+    return { idDocumentNumber, licenseNumber };
   }
 
   async runKycOcr(documentId: string) {
     const doc = await this.prisma.kycDocument.findUnique({ where: { id: documentId } });
     if (!doc) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Document KYC introuvable.');
-    const updated = await this.ocrService.analyzeDocument(documentId);
+    const [updated] = await Promise.all([
+      this.ocrService.analyzeDocument(documentId),
+      this.ocrService.checkDocumentForgery(documentId).catch(() => null),
+    ]);
+    const fresh = (await this.prisma.kycDocument.findUnique({ where: { id: documentId } })) ?? updated;
     return {
       documentId,
       userId: doc.userId,
       type: doc.type,
-      ocr: this.ocrFieldsFor(updated),
+      ocr: this.ocrFieldsFor(fresh),
     };
   }
 
@@ -1761,6 +1789,7 @@ export class DriversService {
         : null,
       licenseNumber: profile?.licenseNumber,
       idDocumentNumber: profile?.idDocumentNumber,
+      identityDuplicates: await this.identityDuplicates(userId, profile),
       operatingCity: profile?.operatingCity ?? null,
       licenseExpiry: profile?.licenseExpiry,
       insuranceExpiry: profile?.insuranceExpiry,

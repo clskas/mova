@@ -83,6 +83,8 @@ Des champs OCR (nom, numéro permis…) peuvent apparaître si le service d’an
 
 **Contrôle anti-falsification (IA)** : chaque document envoyé (pièce d'identité, permis, carte grise, assurance, contrôle technique, vignette) est examiné par l'IA. Sous le document, l'admin voit **Aucun signe vu**, **À vérifier de près** ou **Falsification possible**, avec les signes repérés (texte collé, polices différentes, photo d'écran, photocopie…). La fiche signale aussi un **numéro de pièce ou de permis déjà déclaré par un autre chauffeur**. Ce sont des indications : l'IA ne peut pas prouver qu'un document est authentique. En cas de doute, demandez l'original ou un appel vidéo avant de valider.
 
+**Vérification d'identité Smile ID** : dans la fiche chauffeur, le bouton **Créer le lien de vérification** prépare un lien Smile ID. Envoyez-le au chauffeur (**Copier le lien** ou **Envoyer par WhatsApp**). Le chauffeur l'ouvre sur son téléphone, photographie sa carte d'électeur, son passeport ou son permis, puis prend un selfie en direct. Smile ID contrôle l'authenticité du document et compare le visage du selfie à la photo de la pièce. Le résultat s'affiche dans la fiche : **Identité vérifiée**, **À vérifier de près** ou **Refusé par Smile ID**, avec le nom et le numéro lus sur le document et un reçu PDF. Le badge **Test (Sandbox)** signifie que le compte Smile ID est encore en mode test : les résultats ne sont pas réels.
+
 ### Exiger des documents pour les jobs
 
 Dans **Règles plateforme** (SUPER_ADMIN, ADMIN, **CITY_ADMIN** — section documents uniquement pour l’admin ville) :

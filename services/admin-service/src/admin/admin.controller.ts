@@ -420,6 +420,31 @@ export class AdminController {
     return this.adminService.runKycOcr(id, resolveManagedCityScope(req.user));
   }
 
+  @Get('drivers/:userId/smile-id')
+  @RequirePermissions(AdminPermission.DRIVERS_READ)
+  @ApiOperation({ summary: 'Vérification d’identité Smile ID du chauffeur' })
+  driverSmileId(@Request() req: { user: AdminJwtUser }, @Param('userId') userId: string) {
+    return this.adminService.driverSmileId(userId, resolveManagedCityScope(req.user));
+  }
+
+  @Post('drivers/:userId/smile-id/link')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: 'Créer le lien de vérification Smile ID à envoyer au chauffeur' })
+  createDriverSmileIdLink(
+    @Request() req: { user: AdminJwtUser },
+    @Param('userId') userId: string,
+    @Body() body: { force?: boolean },
+  ) {
+    return this.adminService.createDriverSmileIdLink(userId, body?.force === true, resolveManagedCityScope(req.user));
+  }
+
+  @Post('drivers/:userId/smile-id/refresh')
+  @RequirePermissions(AdminPermission.KYC_WRITE)
+  @ApiOperation({ summary: 'Redemander le résultat Smile ID' })
+  refreshDriverSmileId(@Request() req: { user: AdminJwtUser }, @Param('userId') userId: string) {
+    return this.adminService.refreshDriverSmileId(userId, resolveManagedCityScope(req.user));
+  }
+
   @Post('drivers/:userId/activation-pin')
   @RequirePermissions(AdminPermission.KYC_WRITE)
   @ApiOperation({ summary: 'Générer ou régénérer le PIN d\'activation chauffeur' })

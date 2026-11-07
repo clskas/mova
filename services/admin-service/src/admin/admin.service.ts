@@ -1127,6 +1127,22 @@ export class AdminService {
     }
     return this.proxy('driver', `/internal/kyc/${documentId}/ocr`, { method: 'POST', body: JSON.stringify({}) });
   }
+  /** Smile ID identity check (document + live selfie) of a driver. */
+  async driverSmileId(userId: string, managedCity?: string | null) {
+    await this.getDriver(userId, managedCity);
+    return this.fetchJson('driver', `/internal/drivers/${userId}/smile-id`);
+  }
+  async createDriverSmileIdLink(userId: string, force: boolean, managedCity?: string | null) {
+    await this.getDriver(userId, managedCity);
+    return this.proxy('driver', `/internal/drivers/${userId}/smile-id/link`, {
+      method: 'POST',
+      body: JSON.stringify({ force }),
+    });
+  }
+  async refreshDriverSmileId(userId: string, managedCity?: string | null) {
+    await this.getDriver(userId, managedCity);
+    return this.proxy('driver', `/internal/drivers/${userId}/smile-id/refresh`, { method: 'POST', body: JSON.stringify({}) });
+  }
   async regenerateDriverActivationPin(userId: string, managedCity?: string | null) {
     await this.getDriver(userId, managedCity);
     return this.proxy('driver', `/internal/drivers/${userId}/activation-pin`, { method: 'POST', body: JSON.stringify({}) });

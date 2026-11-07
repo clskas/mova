@@ -3474,3 +3474,57 @@ export async function bulkKycReview(userIds: string[], approved: boolean, notes?
     body: JSON.stringify({ userIds, approved, notes }),
   });
 }
+
+/** Smile ID identity check (document authenticity + live selfie) of one driver. */
+export type SmileIdVerification = {
+  id: string;
+  env: "sandbox" | "production" | string;
+  link: string;
+  status: "PENDING" | "processing" | "clear" | "attention" | "block" | "error" | string;
+  message?: string | null;
+  reason?: string | null;
+  jobId?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  result?: {
+    receiptUrl?: string | null;
+    idFields?: {
+      fullName?: string | null;
+      idNumber?: string | null;
+      idType?: string | null;
+      dateOfBirth?: string | null;
+      expirationDate?: string | null;
+    };
+    fraud?: {
+      detected?: boolean;
+      sources?: string[];
+      riskLevel?: string | null;
+      riskIndicators?: string[];
+      duplicateUsers?: string | null;
+    };
+  } | null;
+};
+
+export type SmileIdState = {
+  configured: boolean;
+  env: "sandbox" | "production" | null;
+  verification: SmileIdVerification | null;
+};
+
+export async function getDriverSmileId(userId: string) {
+  return apiFetch<SmileIdState>(`/api/admin/drivers/${userId}/smile-id`);
+}
+
+export async function createDriverSmileIdLink(userId: string, force = false) {
+  return apiFetch<SmileIdState>(`/api/admin/drivers/${userId}/smile-id/link`, {
+    method: "POST",
+    body: JSON.stringify({ force }),
+  });
+}
+
+export async function refreshDriverSmileId(userId: string) {
+  return apiFetch<SmileIdState>(`/api/admin/drivers/${userId}/smile-id/refresh`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}

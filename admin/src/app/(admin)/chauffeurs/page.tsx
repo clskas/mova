@@ -27,6 +27,7 @@ import {
 import { downloadCsv } from "@/lib/export-csv";
 import { useAdmin } from "@/components/AdminProvider";
 import { VehiclePhotoCheckCard } from "@/components/VehiclePhotoCheckCard";
+import { SmileIdCard } from "@/components/SmileIdCard";
 import { AuthenticatedMedia, resolveMediaUrl } from "@/components/AuthenticatedMedia";
 import { PeriodFilterBar } from "@/components/PeriodFilterBar";
 import { MetricCard } from "@/components/dashboard/MetricCard";
@@ -1035,6 +1036,9 @@ export default function ChauffeursPage() {
                     ` — permis : ${detail!.identityDuplicates!.licenseNumber.map((d) => d.publicId ?? d.userId).join(", ")}`}
                   . Même personne avec plusieurs comptes, ou papiers d&apos;une autre personne : vérifiez avant de valider.
                 </p>
+              )}
+              {selectedId && (
+                <SmileIdCard userId={selectedId} canWrite={canReviewKyc} phone={detail?.user?.phone ?? null} />
               )}
               {(() => {
                 const v = activeDriverVehicle(selected) ?? detail?.vehicle ?? null;

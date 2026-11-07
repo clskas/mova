@@ -678,6 +678,9 @@ class ApiClient {
     if (path.contains('/drivers/earnings')) {
       return Success(MockData.earnings());
     }
+    if (path.contains('/drivers/withdraw/otp') && method == 'POST') {
+      return Success(MockData.walletWithdrawOtp(body ?? {}));
+    }
     if (path.contains('/drivers/withdraw') && method == 'POST') {
       final amount = body?['amountCdf'] as int? ?? 5000;
       return Success({

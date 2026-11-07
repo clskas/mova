@@ -45,6 +45,14 @@ class InternalWithdrawDto {
   @Type(() => Number) @IsInt() @Min(2300) amountCdf: number;
   @IsString() provider: string;
   @IsString() phone: string;
+  /**
+   * true = asked by the user through another service (driver app): the same rules as
+   * /wallet/withdraw — code sent to the account phone, or payout to the account's own number.
+   * false/absent = ops (admin) payout, no code.
+   */
+  @IsOptional() @IsBoolean() userInitiated?: boolean;
+  @IsOptional() @IsString() otp?: string;
+  @IsOptional() @IsString() accountPhone?: string;
 }
 
 class InternalTopUpDto {
@@ -143,8 +151,20 @@ export class InternalController {
     return this.wallet.clawbackOpenCashFeeAccruals();
   }
 
+  @Post('wallets/:userId/withdraw/otp')
+  withdrawOtp(@Param('userId') userId: string, @Body() dto: InternalWithdrawDto) {
+    return this.wallet.requestWithdrawOtp(userId, dto.amountCdf, dto.provider, dto.phone, dto.accountPhone);
+  }
+
   @Post('wallets/:userId/withdraw')
   withdraw(@Param('userId') userId: string, @Body() dto: InternalWithdrawDto) {
+    if (dto.userInitiated) {
+      return this.wallet.withdrawToMobileMoney(userId, dto.amountCdf, dto.provider, dto.phone, {
+        otp: dto.otp,
+        accountPhone: dto.accountPhone ?? null,
+        ownNumberWithoutOtp: true,
+      });
+    }
     return this.wallet.withdrawToMobileMoney(userId, dto.amountCdf, dto.provider, dto.phone, {
       skipOtp: true,
     });

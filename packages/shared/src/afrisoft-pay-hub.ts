@@ -197,6 +197,13 @@ export interface AfriSoftHubPaymentResult {
   telecom?: string;
   message?: string;
   completedAt?: string;
+  /**
+   * The hub may have accepted the request: no answer (network) or a server error (5xx).
+   * Money must not be refunded before checking the payment on the hub.
+   */
+  ambiguous?: boolean;
+  /** The hub answered 404: it has no payment with this id / reference. */
+  notFound?: boolean;
 }
 
 function hubCreds(get: EnvGetter): { baseUrl: string; appId: string; apiKey: string } | null {
@@ -343,10 +350,11 @@ export async function afrisoftPayHubInitiate(
     ...(params.idempotencyKey ? { idempotency_key: params.idempotencyKey } : {}),
   };
   const mmKind = params.kind === 'B2C' ? 'b2c' : 'c2b';
-  const { ok, json } = await hubFetch(get, 'POST', path, body);
+  const { ok, status: httpStatus, json } = await hubFetch(get, 'POST', path, body);
   if (!ok) {
     return {
       success: false,
+      ambiguous: httpStatus === 0 || httpStatus >= 500,
       message: pickHubErrorMessage(
         json,
         'Échec de l’initiation Mobile Money via le hub AfriSoft.',
@@ -384,10 +392,11 @@ export async function afrisoftPayHubGetStatus(
   if (!path) {
     return { success: false, message: 'payment_id ou reference requis' };
   }
-  const { ok, json } = await hubFetch(get, 'GET', path);
+  const { ok, status: httpStatus, json } = await hubFetch(get, 'GET', path);
   if (!ok) {
     return {
       success: false,
+      notFound: httpStatus === 404,
       message: pickHubErrorMessage(json, 'Paiement introuvable sur le hub.'),
     };
   }
@@ -402,7 +411,9 @@ export const afrisoftPayHubGetPayment = async (
     if (lookup.startsWith('pay_')) return afrisoftPayHubGetStatus(get, { paymentId: lookup });
     const byRef = await afrisoftPayHubGetStatus(get, { reference: lookup });
     if (byRef.success) return byRef;
-    return afrisoftPayHubGetStatus(get, { paymentId: lookup });
+    const byId = await afrisoftPayHubGetStatus(get, { paymentId: lookup });
+    // « Not found » only when the hub knows neither the reference nor the id.
+    return { ...byId, notFound: Boolean(byRef.notFound && byId.notFound) };
   }
   return afrisoftPayHubGetStatus(get, lookup);
 };

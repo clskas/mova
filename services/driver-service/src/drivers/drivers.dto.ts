@@ -82,4 +82,9 @@ export class DriverWithdrawDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @ApiPropertyOptional({ description: 'Code à 6 chiffres reçu sur le téléphone du compte (sauf retrait vers ce même numéro)' })
+  @IsOptional()
+  @IsString()
+  otp?: string;
 }

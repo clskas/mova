@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 import '../config/market_config.dart';
 import 'location_service.dart';
 import 'service_areas.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Validation GPS et géocodage stub par zone de service SENGA.
 class ServiceAreaLocation {
@@ -110,7 +111,7 @@ class ServiceAreaLocation {
   }
 
   static String outOfAreaMessage() =>
-      'Indiquez une adresse en République Démocratique du Congo.';
+      tr('Indiquez une adresse en République Démocratique du Congo.');
 
   /// @deprecated Utiliser [districtFromAddress]
   static LatLng? communeFromAddress(String address, {String? areaId}) =>

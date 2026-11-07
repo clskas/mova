@@ -299,7 +299,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                data['message']?.toString() ?? 'Retrait de ${MarketConfig.formatCdf(amountCdf)} en cours',
+                data['message']?.toString() ?? trf('Retrait de {v1} en cours', {'v1': MarketConfig.formatCdf(amountCdf)}),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -336,7 +336,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               SnackBar(
                 content: Text(
                   data['message']?.toString() ??
-                      'Enregistré hors ligne, synchronisation à la reconnexion',
+                      tr('Enregistré hors ligne, synchronisation à la reconnexion'),
                 ),
               ),
             );
@@ -348,7 +348,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           if (providerRef == null || providerRef.isEmpty) {
             setState(() {
               _topUpLoading = false;
-              _error = 'Recharge initiée mais référence manquante. Réessayez.';
+              _error = tr('Recharge initiée mais référence manquante. Réessayez.');
             });
             return;
           }
@@ -384,7 +384,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
             SnackBar(
               content: Text(
                 data['message']?.toString() ??
-                    'Recharge de ${MarketConfig.formatCdf(amountCdf)} effectuée',
+                    trf('Recharge de {v1} effectuée', {'v1': MarketConfig.formatCdf(amountCdf)}),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -411,7 +411,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           setState(() {
             _topUpLoading = false;
             _error =
-                'Toujours en attente de confirmation Mobile Money. Vérifiez votre téléphone, puis réessayez.';
+                tr('Toujours en attente de confirmation Mobile Money. Vérifiez votre téléphone, puis réessayez.');
           });
         }
         return true;
@@ -431,7 +431,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    'Recharge de ${MarketConfig.formatCdf(amountCdf)} confirmée',
+                    trf('Recharge de {v1} confirmée', {'v1': MarketConfig.formatCdf(amountCdf)}),
                   ),
                 ),
               );
@@ -441,7 +441,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           if (data['status']?.toString() == 'FAILED') {
             setState(() {
               _topUpLoading = false;
-              _error = 'Recharge Mobile Money refusée ou annulée.';
+              _error = tr('Recharge Mobile Money refusée ou annulée.');
             });
             return true;
           }
@@ -503,7 +503,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 ],
                 const SizedBox(height: 16),
                 MovaButton(
-                  label: _withdrawLoading ? 'Retrait…' : 'Retirer vers Mobile Money',
+                  label: _withdrawLoading ? tr('Retrait…') : tr('Retirer vers Mobile Money'),
                   icon: Icons.arrow_upward,
                   isSecondary: true,
                   isLoading: _withdrawLoading,
@@ -551,7 +551,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                         _topUpLoading = false;
                         _pendingTopUpRef = null;
                         _error =
-                            'Recharge annulée. Si le PIN réapparaît, refusez-le puis réessayez.';
+                            tr('Recharge annulée. Si le PIN réapparaît, refusez-le puis réessayez.');
                       });
                       if (pendingRef != null && pendingRef.isNotEmpty) {
                         await ref.read(apiClientProvider).post(
@@ -632,7 +632,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          p.name,
+                          tr(p.name),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -661,19 +661,19 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
             child: Row(
               children: [
                 ChoiceChip(
-                  label: Text('Tout (${_transactions.length})'),
+                  label: Text(trf('Tout ({length})', {'length': _transactions.length})),
                   selected: _txFilter == _WalletTxFilter.all,
                   onSelected: (_) => setState(() => _txFilter = _WalletTxFilter.all),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
-                  label: Text('Recharges ($_rechargeCount)'),
+                  label: Text(trf('Recharges ({_rechargeCount})', {'_rechargeCount': _rechargeCount})),
                   selected: _txFilter == _WalletTxFilter.recharge,
                   onSelected: (_) => setState(() => _txFilter = _WalletTxFilter.recharge),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
-                  label: Text('Retraits ($_withdrawCount)'),
+                  label: Text(trf('Retraits ({_withdrawCount})', {'_withdrawCount': _withdrawCount})),
                   selected: _txFilter == _WalletTxFilter.withdraw,
                   onSelected: (_) => setState(() => _txFilter = _WalletTxFilter.withdraw),
                 ),
@@ -763,8 +763,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 onPressed: _txLoadingMore ? null : _loadMoreTransactions,
                 child: Text(
                   _txLoadingMore
-                      ? 'Chargement…'
-                      : 'Charger plus (${_transactions.length} / $_txTotal)',
+                      ? tr('Chargement…')
+                      : trf('Charger plus ({length} / {_txTotal})', {'length': _transactions.length, '_txTotal': _txTotal}),
                 ),
               ),
             ),
@@ -855,21 +855,21 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
   ({int amount, String phone})? _validatedAmountPhone() {
     final amount = parseWithdrawAmountCdf(_amountController.text);
     if (amount == null) {
-      setState(() => _formError = 'Montant invalide. Entrez un nombre entier en FC.');
+      setState(() => _formError = tr('Montant invalide. Entrez un nombre entier en FC.'));
       return null;
     }
     if (amount < 2300) {
       setState(() => _formError =
-          'Montant minimum : 2 300 FC. Vous pouvez retirer une partie du solde si ce montant reste ≥ 2 300 FC.');
+          tr('Montant minimum : 2 300 FC. Vous pouvez retirer une partie du solde si ce montant reste ≥ 2 300 FC.'));
       return null;
     }
     if (amount > widget.maxAmount) {
-      setState(() => _formError = 'Maximum : ${MarketConfig.formatCdf(widget.maxAmount)}');
+      setState(() => _formError = trf('Maximum : {v1}', {'v1': MarketConfig.formatCdf(widget.maxAmount)}));
       return null;
     }
     final phone = MarketConfig.normalizePhone(_phoneController.text.trim());
     if (!MarketConfig.validatePhone(phone)) {
-      setState(() => _formError = 'Numéro Mobile Money invalide. Format : +243XXXXXXXXX');
+      setState(() => _formError = tr('Numéro Mobile Money invalide. Format : +243XXXXXXXXX'));
       return null;
     }
     final mismatch = MarketConfig.mmPrefixMismatchFr(_providerId, phone);
@@ -955,7 +955,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Solde disponible : ${MarketConfig.formatCdf(widget.maxAmount)}',
+              trf('Solde disponible : {v1}', {'v1': MarketConfig.formatCdf(widget.maxAmount)}),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 8),
@@ -978,7 +978,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
                 prefixIcon: Icon(Icons.account_balance_wallet_outlined),
               ),
               items: _providers
-                  .map((p) => DropdownMenuItem(value: p.id, child: Text(p.name)))
+                  .map((p) => DropdownMenuItem(value: p.id, child: Text(tr(p.name))))
                   .toList(),
               onChanged: _otpSent
                   ? null
@@ -1020,7 +1020,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
             Text(
               _otpSent
                   ? (_otpDeliveryHint ??
-                      'Code envoyé. Saisissez les 6 chiffres (SMS ou e-mail) pour confirmer le versement.')
+                      tr('Code envoyé. Saisissez les 6 chiffres (SMS ou e-mail) pour confirmer le versement.'))
                   : 'Le code à 6 chiffres s’affiche ici après envoi — ce n’est pas une erreur.',
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
@@ -1064,10 +1064,10 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
             const SizedBox(height: 20),
             MovaButton(
               label: _otpLoading
-                  ? 'Envoi du code…'
+                  ? tr('Envoi du code…')
                   : _otpSent
-                      ? 'Confirmer le retrait'
-                      : 'Envoyer le code',
+                      ? tr('Confirmer le retrait')
+                      : tr('Envoyer le code'),
               icon: _otpSent ? Icons.check : Icons.pin_outlined,
               isLoading: _otpLoading,
               onPressed: _otpLoading ? null : _confirm,
@@ -1145,14 +1145,14 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Recharger via ${widget.provider.name}',
+              trf('Recharger via {name}', {'name': widget.provider.name}),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               widget.provider.id == 'ORANGE_MONEY'
-                  ? 'Numéro Orange (80 / 84 / 85 / 89), minimum 2 300 FC. Si aucune confirmation n’apparaît, utilisez M-Pesa ou Airtel Money.'
-                  : 'Confirmez le paiement sur votre téléphone (PIN Mobile Money). Minimum 2 300 FC.',
+                  ? tr('Numéro Orange (80 / 84 / 85 / 89), minimum 2 300 FC. Si aucune confirmation n’apparaît, utilisez M-Pesa ou Airtel Money.')
+                  : tr('Confirmez le paiement sur votre téléphone (PIN Mobile Money). Minimum 2 300 FC.'),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 16),

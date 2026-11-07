@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../sos/notification_tap_router.dart';
 import 'driver_job_alert_service.dart';
+import '../../core/i18n/i18n.dart';
 
 const _prefsKnownJobs = 'driver_known_job_keys';
 
@@ -82,7 +83,7 @@ class _DriverJobTaskHandler extends TaskHandler {
                 ? NotificationTapRouter.encodeJobPayload(kind: offerKind, id: id)
                 : key;
             await DriverJobAlertService.notify(
-              title: kind == 'offer' ? 'Nouvelle offre SENGA' : 'Nouvelle mission SENGA',
+              title: kind == 'offer' ? tr('Nouvelle offre SENGA') : tr('Nouvelle mission SENGA'),
               body: message(row),
               payload: jobPayload,
               ringUntilStopped: kind == 'offer',
@@ -93,10 +94,10 @@ class _DriverJobTaskHandler extends TaskHandler {
       } catch (_) {}
     }
 
-    await checkEndpoint('/api/moving/assignments', 'mission', '', (_) => 'Nouvelle mission déménagement');
-    await checkEndpoint('/api/rides/scheduled/assignments', 'mission', '', (_) => 'Nouvelle course planifiée');
-    await checkEndpoint('/api/deliveries/assignments', 'mission', '', (_) => 'Nouvelle mission livraison');
-    await checkEndpoint('/api/rental/assignments', 'mission', '', (_) => 'Nouvelle mission location');
+    await checkEndpoint('/api/moving/assignments', 'mission', '', (_) => tr('Nouvelle mission déménagement'));
+    await checkEndpoint('/api/rides/scheduled/assignments', 'mission', '', (_) => tr('Nouvelle course planifiée'));
+    await checkEndpoint('/api/deliveries/assignments', 'mission', '', (_) => tr('Nouvelle mission livraison'));
+    await checkEndpoint('/api/rental/assignments', 'mission', '', (_) => tr('Nouvelle mission location'));
     await checkEndpoint('/api/rides/offers', 'offer', 'ride', DriverJobAlertService.rideOfferMessage);
     await checkEndpoint('/api/deliveries/offers', 'offer', 'delivery', DriverJobAlertService.deliveryOfferMessage);
 
@@ -144,7 +145,7 @@ class DriverBackgroundService {
     await FlutterForegroundTask.startService(
       serviceId: 1001,
       notificationTitle: 'SENGA Driver',
-      notificationText: 'En ligne — recherche de courses et missions',
+      notificationText: tr('En ligne — recherche de courses et missions'),
       callback: driverBackgroundStartCallback,
     );
   }

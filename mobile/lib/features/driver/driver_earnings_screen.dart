@@ -64,7 +64,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   }
 
   String get _payoutLabel {
-    final provider = _data?['payoutProvider']?.toString() ?? 'Mobile Money';
+    final provider = _data?['payoutProvider']?.toString() ?? tr('Mobile Money');
     final masked = _data?['payoutPhoneMasked']?.toString();
     if (masked != null && masked.isNotEmpty) return '$provider · $masked';
     return provider;
@@ -287,8 +287,8 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
               onPressed: _walletTxLoadingMore ? null : _loadMoreWalletMovements,
               child: Text(
                 _walletTxLoadingMore
-                    ? 'Chargement…'
-                    : 'Charger plus (${_walletMovements.length} / $_walletTxTotal)',
+                    ? tr('Chargement…')
+                    : trf('Charger plus ({length} / {_walletTxTotal})', {'length': _walletMovements.length, '_walletTxTotal': _walletTxTotal}),
               ),
             ),
           ),
@@ -374,7 +374,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     final available = _asInt(_data?['withdrawableCdf'] ?? _data?['walletBalanceCdf']);
     if (available < total) {
       setState(() => _error =
-          'Solde insuffisant pour régler ${MarketConfig.formatCdf(total)} (disponible : ${MarketConfig.formatCdf(available)})');
+          trf('Solde insuffisant pour régler {v1} (disponible : {v2})', {'v1': MarketConfig.formatCdf(total), 'v2': MarketConfig.formatCdf(available)}));
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -382,7 +382,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       builder: (ctx) => AlertDialog(
         title: Text(tr('Régler les dettes espèces')),
         content: Text(
-          'SENGA débitera ${MarketConfig.formatCdf(total)} de votre portefeuille pour solder les encaissements cash à reverser.',
+          trf('SENGA débitera {v1} de votre portefeuille pour solder les encaissements cash à reverser.', {'v1': MarketConfig.formatCdf(total)}),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
@@ -402,7 +402,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     switch (result) {
       case Success(:final data):
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message']?.toString() ?? 'Dettes espèces réglées')),
+          SnackBar(content: Text(data['message']?.toString() ?? tr('Dettes espèces réglées'))),
         );
         await _load();
       case Failure(:final error):
@@ -422,17 +422,17 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     if (_withdrawing) return;
     final phone = MarketConfig.normalizePhone(_payoutPhoneController.text.trim());
     if (!_payoutConfigured && phone.isEmpty) {
-      setState(() => _error = 'Indiquez le numéro Mobile Money de retrait.');
+      setState(() => _error = tr('Indiquez le numéro Mobile Money de retrait.'));
       return;
     }
     final amount = int.tryParse(_amountController.text.trim());
     if (amount == null || amount < _minWithdraw) {
-      setState(() => _error = 'Montant minimum : ${MarketConfig.formatCdf(_minWithdraw)}');
+      setState(() => _error = trf('Montant minimum : {v1}', {'v1': MarketConfig.formatCdf(_minWithdraw)}));
       return;
     }
     final available = _asInt(_data?['withdrawableCdf'] ?? _data?['walletBalanceCdf']);
     if (amount > available) {
-      setState(() => _error = 'Solde disponible : ${MarketConfig.formatCdf(available)}');
+      setState(() => _error = trf('Solde disponible : {v1}', {'v1': MarketConfig.formatCdf(available)}));
       return;
     }
     setState(() {
@@ -450,7 +450,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     switch (result) {
       case Success(:final data):
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message']?.toString() ?? 'Retrait en cours…')),
+          SnackBar(content: Text(data['message']?.toString() ?? tr('Retrait en cours…'))),
         );
         await _load();
       case Failure(:final error):
@@ -459,6 +459,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   }
 
   Widget _periodChip(String label, _EarningsPeriod period) {
+    label = tr(label);
     final selected = _period == period;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -476,6 +477,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   }
 
   Widget _serviceChip(String label, _ServiceFilter filter) {
+    label = tr(label);
     final selected = _serviceFilter == filter;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -549,8 +551,8 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                   children: [
                     Text(
                       _period == _EarningsPeriod.today
-                          ? 'Gains aujourd\'hui'
-                          : 'Gains période',
+                          ? tr('Gains aujourd\'hui')
+                          : tr('Gains période'),
                       style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                     ),
                     const SizedBox(height: 4),
@@ -687,7 +689,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        item['label']?.toString() ?? 'Mission',
+                        item['label']?.toString() ?? tr('Mission'),
                         style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -827,7 +829,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                 Text(tr('Retrait Mobile Money'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
                 if (_payoutConfigured)
-                  Text('Dossier : $_payoutLabel', style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13))
+                  Text(trf('Dossier : {_payoutLabel}', {'_payoutLabel': _payoutLabel}), style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13))
                 else
                   Text(
                     tr('Indiquez ci-dessous le numéro Mobile Money qui recevra le retrait.'),
@@ -844,7 +846,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                       prefixIcon: Icon(Icons.phone_android),
                     ),
                     items: _mmChoices
-                        .map((c) => DropdownMenuItem(value: c.id, child: Text(c.label)))
+                        .map((c) => DropdownMenuItem(value: c.id, child: Text(tr(c.label))))
                         .toList(),
                     onChanged: _withdrawing
                         ? null
@@ -862,7 +864,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                     labelText: tr('Numéro de retrait'),
                     hintText: tr('08X XXX XXXX'),
                     helperText: _payoutConfigured
-                        ? 'Laissez vide pour utiliser le numéro du dossier ($_payoutLabel)'
+                        ? trf('Laissez vide pour utiliser le numéro du dossier ({_payoutLabel})', {'_payoutLabel': _payoutLabel})
                         : 'Numéro qui recevra le Mobile Money',
                     prefixIcon: const Icon(Icons.phone_iphone),
                   ),
@@ -881,12 +883,12 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Recharge et retrait : minimum ${MarketConfig.formatCdf(MarketConfig.minWalletAmountCdf)}.',
+                  trf('Recharge et retrait : minimum {v1}.', {'v1': MarketConfig.formatCdf(MarketConfig.minWalletAmountCdf)}),
                   style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                 ),
                 const SizedBox(height: 12),
                 MovaButton(
-                  label: _canWithdraw ? 'Retirer vers Mobile Money' : 'Indiquez un numéro de retrait',
+                  label: _canWithdraw ? tr('Retirer vers Mobile Money') : tr('Indiquez un numéro de retrait'),
                   icon: Icons.account_balance,
                   isLoading: _withdrawing,
                   onPressed: _withdrawing ? null : (_canWithdraw ? _withdraw : null),

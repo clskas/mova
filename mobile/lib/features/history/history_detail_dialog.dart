@@ -20,20 +20,20 @@ import '../billing/receipt_screen.dart';
 import '../../core/i18n/i18n.dart';
 
 String historyStatusLabel(String? status) => switch (status) {
-      'COMPLETED' => 'Terminé',
-      'DELIVERED' => 'Livré',
-      'CONFIRMED' => 'Confirmé',
-      'SCHEDULED' => 'Planifiée',
-      'IN_TRANSIT' => 'En transit',
-      'CANCELLED' => 'Annulé',
-      'ACCEPTED' => 'Accepté',
-      'IN_PROGRESS' => 'En cours',
-      'RETURNED' => 'Retournée',
-      'PAID' => 'Payée',
-      'CLOSED' => 'Annulée',
-      'ASSIGNED' => 'Équipe assignée',
-      'PENDING' => 'En attente',
-      'DRIVER_ASSIGNED' => 'Chauffeur assigné',
+      'COMPLETED' => tr('Terminé'),
+      'DELIVERED' => tr('Livré'),
+      'CONFIRMED' => tr('Confirmé'),
+      'SCHEDULED' => tr('Planifiée'),
+      'IN_TRANSIT' => tr('En transit'),
+      'CANCELLED' => tr('Annulé'),
+      'ACCEPTED' => tr('Accepté'),
+      'IN_PROGRESS' => tr('En cours'),
+      'RETURNED' => tr('Retournée'),
+      'PAID' => tr('Payée'),
+      'CLOSED' => tr('Annulée'),
+      'ASSIGNED' => tr('Équipe assignée'),
+      'PENDING' => tr('En attente'),
+      'DRIVER_ASSIGNED' => tr('Chauffeur assigné'),
       _ => status ?? '—',
     };
 
@@ -42,32 +42,32 @@ String rideHistoryStatusLabel(Map<String, dynamic> item) {
   final status = item['status']?.toString();
   final type = item['type']?.toString();
   if (type == 'RENTAL' && status == 'RETURNED') {
-    if (item['isPaid'] == true) return 'Retournée · Payée';
-    if (item['paymentReady'] == true) return 'Retournée · À payer';
-    return 'Retournée';
+    if (item['isPaid'] == true) return tr('Retournée · Payée');
+    if (item['paymentReady'] == true) return tr('Retournée · À payer');
+    return tr('Retournée');
   }
   if (type == 'MOVING' && status == 'COMPLETED') {
-    if (item['isPaid'] == true) return 'Terminé · Payé';
-    if (item['paymentReady'] == true) return 'Terminé · À payer';
-    return 'Terminé';
+    if (item['isPaid'] == true) return tr('Terminé · Payé');
+    if (item['paymentReady'] == true) return tr('Terminé · À payer');
+    return tr('Terminé');
   }
   if (status != 'COMPLETED') return historyStatusLabel(status);
-  if (item['isPaid'] == true) return 'Terminée · Payée';
-  if (item['paymentReady'] == true) return 'Terminée · À payer';
-  return 'Terminée';
+  if (item['isPaid'] == true) return tr('Terminée · Payée');
+  if (item['paymentReady'] == true) return tr('Terminée · À payer');
+  return tr('Terminée');
 }
 
 String historyTypeLabel(String? type) => switch (type) {
-      'RIDE' => 'Course taxi',
-      'MOVING' => 'Déménagement',
-      'SCHEDULED' => 'Réservation planifiée',
-      'PARCEL' => 'Colis',
+      'RIDE' => tr('Course taxi'),
+      'MOVING' => tr('Déménagement'),
+      'SCHEDULED' => tr('Réservation planifiée'),
+      'PARCEL' => tr('Colis'),
       'EXPRESS' => 'Express',
-      'FOOD' => 'Repas',
-      'ERRAND' => 'Courses',
-      'RENTAL' => 'Location véhicule',
-      'CARPOOL' => 'Covoiturage',
-      _ => type ?? 'Service',
+      'FOOD' => tr('Repas'),
+      'ERRAND' => tr('Courses'),
+      'RENTAL' => tr('Location véhicule'),
+      'CARPOOL' => tr('Covoiturage'),
+      _ => type ?? tr('Service'),
     };
 
 List<Map<String, dynamic>> scheduledTimelineSteps(String? status) {
@@ -78,7 +78,7 @@ List<Map<String, dynamic>> scheduledTimelineSteps(String? status) {
     ('COMPLETED', 'Terminée'),
   ];
   if (status == 'CANCELLED') {
-    return [{'label': 'Réservation annulée', 'done': true}];
+    return [{'label': tr('Réservation annulée'), 'done': true}];
   }
   final order = steps.map((s) => s.$1).toList();
   final idx = order.indexOf(status ?? 'SCHEDULED');
@@ -97,7 +97,7 @@ List<Map<String, dynamic>> movingTimelineSteps(String? status) {
     ('COMPLETED', 'Déménagement terminé'),
   ];
   if (status == 'CANCELLED') {
-    return [{'label': 'Demande annulée', 'done': true}];
+    return [{'label': tr('Demande annulée'), 'done': true}];
   }
   final order = steps.map((s) => s.$1).toList();
   final idx = order.indexOf(status ?? 'PENDING');
@@ -189,13 +189,13 @@ Future<void> showHistoryDetailDialog(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (id.isNotEmpty)
-              Text('Réf. ${id.length <= 8 ? id.toUpperCase() : id.substring(0, 8).toUpperCase()}',
+              Text(trf('Réf. {v1}', {'v1': id.length <= 8 ? id.toUpperCase() : id.substring(0, 8).toUpperCase()}),
                   style: const TextStyle(fontSize: 12, color: MovaColors.violet)),
             const SizedBox(height: 8),
             Text(item['title']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Text(
-              'Statut : ${rideHistoryStatusLabel({...item, ...?live})}',
+              trf('Statut : {v1}', {'v1': rideHistoryStatusLabel({...item, ...?live})}),
               style: const TextStyle(color: MovaColors.violet, fontWeight: FontWeight.w600),
             ),
             Text(
@@ -229,7 +229,7 @@ Future<void> showHistoryDetailDialog(
                         color: done ? MovaColors.green : MovaColors.textSecondary,
                       ),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(step['label']?.toString() ?? '')),
+                      Expanded(child: Text(tr(step['label']?.toString() ?? ''))),
                     ],
                   ),
                 );

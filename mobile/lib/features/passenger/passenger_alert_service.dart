@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../sos/notification_tap_router.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Alertes passager : chauffeur trouvé, arrivée, course terminée.
 class PassengerAlertService {
@@ -83,14 +84,14 @@ class PassengerAlertService {
     switch (status) {
       case 'DRIVER_ASSIGNED':
       case 'ACCEPTED':
-        await notify(title: 'Chauffeur assigné', body: 'Votre chauffeur est en route vers vous.');
+        await notify(title: tr('Chauffeur assigné'), body: tr('Votre chauffeur est en route vers vous.'));
       case 'ARRIVING':
       case 'DRIVER_ARRIVED':
-        await notify(title: 'Chauffeur arrivé', body: 'Votre chauffeur vous attend au point de prise en charge.');
+        await notify(title: tr('Chauffeur arrivé'), body: tr('Votre chauffeur vous attend au point de prise en charge.'));
       case 'IN_PROGRESS':
-        await notify(title: 'Course en cours', body: 'Bon voyage avec SENGA !');
+        await notify(title: tr('Course en cours'), body: tr('Bon voyage avec SENGA !'));
       case 'COMPLETED':
-        await notify(title: 'Course terminée', body: 'Pensez à régler le paiement si nécessaire.');
+        await notify(title: tr('Course terminée'), body: tr('Pensez à régler le paiement si nécessaire.'));
       default:
         break;
     }
@@ -99,13 +100,13 @@ class PassengerAlertService {
   static Future<void> notifyDeliveryStatus(String status) async {
     switch (status.toUpperCase()) {
       case 'PICKED_UP':
-        await notify(title: 'Colis pris en charge', body: 'Votre livreur a récupéré votre commande.');
+        await notify(title: tr('Colis pris en charge'), body: tr('Votre livreur a récupéré votre commande.'));
       case 'IN_TRANSIT':
-        await notify(title: 'Livreur en route', body: 'Votre livraison arrive bientôt.');
+        await notify(title: tr('Livreur en route'), body: tr('Votre livraison arrive bientôt.'));
       case 'DELIVERED':
-        await notify(title: 'Livraison terminée', body: 'Merci d\'avoir utilisé SENGA !');
+        await notify(title: tr('Livraison terminée'), body: tr('Merci d\'avoir utilisé SENGA !'));
       case 'READY_FOR_PICKUP':
-        await notify(title: 'Commande prête', body: 'Un livreur va prendre en charge votre commande.');
+        await notify(title: tr('Commande prête'), body: tr('Un livreur va prendre en charge votre commande.'));
       default:
         break;
     }

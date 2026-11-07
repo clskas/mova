@@ -1,4 +1,5 @@
 import '../config/market_config.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Affichage cohérent des revenus chauffeur (net après commission SENGA).
 /// Le chauffeur ne voit jamais le montant total payé par le passager.
@@ -28,8 +29,8 @@ class DriverEarningsDisplay {
   }
 
   static String netLabel({int? net}) {
-    if (net == null) return 'Revenu net indisponible';
-    return 'Votre revenu net (après commission SENGA)';
+    if (net == null) return tr('Revenu net indisponible');
+    return tr('Votre revenu net (après commission SENGA)');
   }
 
   static String deliveryNetLabel({
@@ -43,30 +44,30 @@ class DriverEarningsDisplay {
     String? type,
   }) {
     final net = netFromMap(data);
-    if (net == null) return 'Revenu net indisponible';
+    if (net == null) return tr('Revenu net indisponible');
     final normalized = type?.toUpperCase() ?? data['type']?.toString().toUpperCase();
     return switch (normalized) {
-      'FOOD' => 'Gain livraison repas (frais de course uniquement)',
-      'ERRAND' => 'Revenu net (course + remboursement achats)',
-      'MOVING' => 'Revenu net déménagement',
-      'CARPOOL' => 'Gain sur les places réservées',
-      'RENTAL' => 'Rémunération logistique SENGA',
-      'SCHEDULED' => 'Revenu net course planifiée',
-      'PARCEL' || 'EXPRESS' || 'DELIVERY' => 'Revenu net livraison',
+      'FOOD' => tr('Gain livraison repas (frais de course uniquement)'),
+      'ERRAND' => tr('Revenu net (course + remboursement achats)'),
+      'MOVING' => tr('Revenu net déménagement'),
+      'CARPOOL' => tr('Gain sur les places réservées'),
+      'RENTAL' => tr('Rémunération logistique SENGA'),
+      'SCHEDULED' => tr('Revenu net course planifiée'),
+      'PARCEL' || 'EXPRESS' || 'DELIVERY' => tr('Revenu net livraison'),
       _ => netLabel(net: net),
     };
   }
 
   static String activityTypeLabel(String? type) {
     return switch (type?.toUpperCase()) {
-      'RIDE' => 'Course',
-      'DELIVERY' => 'Livraison',
-      'ERRAND' => 'Courses & commissions',
-      'MOVING' => 'Déménagement',
-      'RENTAL' => 'Location logistique',
-      'CARPOOL' => 'Covoiturage',
-      'SCHEDULED' => 'Course planifiée',
-      _ => 'Mission',
+      'RIDE' => tr('Course'),
+      'DELIVERY' => tr('Livraison'),
+      'ERRAND' => tr('Courses & commissions'),
+      'MOVING' => tr('Déménagement'),
+      'RENTAL' => tr('Location logistique'),
+      'CARPOOL' => tr('Covoiturage'),
+      'SCHEDULED' => tr('Course planifiée'),
+      _ => tr('Mission'),
     };
   }
 }

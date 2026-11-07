@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme/mova_colors.dart';
+import '../core/i18n/i18n.dart';
 
 /// Champ code promo réutilisable sur les écrans de commande.
 class PromoCodeField extends StatelessWidget {
@@ -26,7 +27,7 @@ class PromoCodeField extends StatelessWidget {
         style: compact ? const TextStyle(fontSize: 14) : null,
         decoration: InputDecoration(
           isDense: compact,
-          labelText: compact ? 'Code promo' : 'Code promo (optionnel)',
+          labelText: compact ? tr('Code promo') : tr('Code promo (optionnel)'),
           hintText: 'Ex. MOVA10',
           labelStyle: compact ? const TextStyle(fontSize: 13) : null,
           prefixIcon: Icon(Icons.local_offer_outlined, size: compact ? 20 : 24),

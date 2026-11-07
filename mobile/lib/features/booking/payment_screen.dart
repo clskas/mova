@@ -137,11 +137,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             if (!ready) {
               _error = switch (widget.serviceType) {
                 'RENTAL' =>
-                  'Le paiement sera disponible après le retour du véhicule. Le partenaire doit cliquer « Véhicule rendu ».',
+                  tr('Le paiement sera disponible après le retour du véhicule. Le partenaire doit cliquer « Véhicule rendu ».'),
                 'DELIVERY' =>
-                  'Le paiement espèces sera disponible après la livraison.',
+                  tr('Le paiement espèces sera disponible après la livraison.'),
                 'ERRAND' =>
-                  'Le paiement espèces sera disponible après la fin des courses.',
+                  tr('Le paiement espèces sera disponible après la fin des courses.'),
                 _ => null,
               };
             }
@@ -248,8 +248,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     setState(() {
       _awaitingMobileMoney = false;
       _error =
-          'Paiement Mobile Money annulé. Si le PIN réapparaît encore une fois, refusez-le ; '
-          'puis réessayez le paiement dans l\'app.';
+          tr('Paiement Mobile Money annulé. Si le PIN réapparaît encore une fois, refusez-le ; '
+          'puis réessayez le paiement dans l\'app.');
     });
     final api = ref.read(apiClientProvider);
     if (widget.rideId != null) {
@@ -283,7 +283,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       setState(() {
         _awaitingMobileMoney = false;
         _error =
-            'Toujours en attente de confirmation Mobile Money. Vérifiez votre téléphone, puis réessayez.';
+            tr('Toujours en attente de confirmation Mobile Money. Vérifiez votre téléphone, puis réessayez.');
       });
       return;
     }
@@ -325,12 +325,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     if (!_paymentReady) {
       final msg = switch (widget.serviceType) {
         'DELIVERY' =>
-          'Le paiement espèces sera disponible après la livraison du colis.',
+          tr('Le paiement espèces sera disponible après la livraison du colis.'),
         'ERRAND' =>
-          'Le paiement espèces sera disponible après la fin des courses.',
+          tr('Le paiement espèces sera disponible après la fin des courses.'),
         'RENTAL' =>
-          'Le paiement sera disponible après le retour du véhicule. Le partenaire doit cliquer « Véhicule rendu ».',
-        _ => 'Le paiement n\'est pas encore disponible pour cette course.',
+          tr('Le paiement sera disponible après le retour du véhicule. Le partenaire doit cliquer « Véhicule rendu ».'),
+        _ => tr('Le paiement n\'est pas encore disponible pour cette course.'),
       };
       setState(() => _error = msg);
       return;
@@ -338,7 +338,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     if (_needsPhone) {
       final phone = MarketConfig.normalizePhone(_phoneController.text);
       if (!MarketConfig.validatePhone(phone)) {
-        setState(() => _error = 'Numéro mobile money invalide (+243XXXXXXXXX).');
+        setState(() => _error = tr('Numéro mobile money invalide (+243XXXXXXXXX).'));
         return;
       }
     }
@@ -473,7 +473,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   children: [
                     Icon(icon, color: color),
                     const SizedBox(width: 12),
-                    Expanded(child: Text(label)),
+                    Expanded(child: Text(tr(label))),
                     Radio<String>(
                       value: id,
                       groupValue: _method,
@@ -537,7 +537,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Réf. $_paymentRef',
+                      trf('Réf. {_paymentRef}', {'_paymentRef': _paymentRef}),
                       style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
                     ),
                     const SizedBox(height: 4),
@@ -589,8 +589,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           const SizedBox(height: 24),
           MovaButton(
             label: _awaitingMobileMoney
-                ? 'En attente de confirmation…'
-                : 'Payer ${MarketConfig.formatCdf(_amountCdf)}',
+                ? tr('En attente de confirmation…')
+                : trf('Payer {v1}', {'v1': MarketConfig.formatCdf(_amountCdf)}),
             isLoading: _loading,
             icon: Icons.lock_outline,
             onPressed: _loading || !_paymentReady || _awaitingMobileMoney ? null : _pay,

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../config/app_version.dart';
 import '../config/market_config.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Google Sign-In → ID token for `POST /auth/google`.
 ///
@@ -64,30 +65,30 @@ String googleSignInErrorMessage(Object error) {
         error.code == '12501' ||
         blob.contains('canceled') ||
         blob.contains('cancelled')) {
-      return 'Connexion Google annulée.';
+      return tr('Connexion Google annulée.');
     }
     if (error.code == 'id_token_missing') {
-      return 'Google n\'a pas renvoyé de jeton. Client OAuth Web (serverClientId) requis ; sur iOS aussi GIDClientID + URL scheme. Utilisez le SMS.';
+      return tr('Google n\'a pas renvoyé de jeton. Client OAuth Web (serverClientId) requis ; sur iOS aussi GIDClientID + URL scheme. Utilisez le SMS.');
     }
     if (error.code == 'google_sign_in' ||
         blob.contains('no active configuration') ||
         blob.contains('gidclientid') ||
         blob.contains('url schemes') ||
         blob.contains('presentingviewcontroller')) {
-      return 'Google Sign-In iOS indisponible sur cet appareil. Utilisez le SMS.';
+      return tr('Google Sign-In iOS indisponible sur cet appareil. Utilisez le SMS.');
     }
     if (error.code == '12500' || blob.contains('12500')) {
-      return 'Connexion Google indisponible sur cet appareil. Utilisez le SMS.';
+      return tr('Connexion Google indisponible sur cet appareil. Utilisez le SMS.');
     }
     if (error.code == 'sign_in_failed' ||
         blob.contains('developer_error') ||
         blob.contains('api_exception: 10') ||
         blob.contains('apiexception: 10') ||
         RegExp(r'\b10\b').hasMatch(blob)) {
-      return 'Google refuse cette installation (empreinte SHA-1). Ce n\'est pas l\'API SENGA. Ajoutez le SHA-1 classique Play (Intégrité de l\'app) ET upload sur deux clients Android (même package). Sideload : SHA-1 debug 6A:4B:2A:B7:…. Utilisez le SMS en attendant.';
+      return tr('Google refuse cette installation (empreinte SHA-1). Ce n\'est pas l\'API SENGA. Ajoutez le SHA-1 classique Play (Intégrité de l\'app) ET upload sur deux clients Android (même package). Sideload : SHA-1 debug 6A:4B:2A:B7:…. Utilisez le SMS en attendant.');
     }
   }
-  return 'Impossible de se connecter avec Google. Réessayez ou utilisez le SMS.';
+  return tr('Impossible de se connecter avec Google. Réessayez ou utilisez le SMS.');
 }
 
 Future<String?> signInWithGoogleIdToken() async {
@@ -115,7 +116,7 @@ Future<String?> signInWithGoogleIdToken() async {
     if (idToken == null || idToken.isEmpty) {
       throw PlatformException(
         code: 'id_token_missing',
-        message: 'Google Sign-In returned an account without an ID token',
+        message: tr('Google Sign-In returned an account without an ID token'),
       );
     }
     return idToken;

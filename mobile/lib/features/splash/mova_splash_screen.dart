@@ -10,6 +10,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_service_icons.dart';
 import '../../core/widgets/passenger_service_icons.dart';
 import 'mova_splash_content.dart';
+import '../../core/i18n/i18n.dart';
 
 enum MovaSplashRole { passenger, driver }
 
@@ -134,8 +135,8 @@ class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
   Widget build(BuildContext context) {
     final title = _isPassenger ? 'Senga' : 'SENGA Driver';
     final subtitle = _isPassenger
-        ? 'Mobilité · Livraisons · Paiements — 32 villes RDC'
-        : 'Courses · Livraisons · Missions — partout en RDC';
+        ? tr('Mobilité · Livraisons · Paiements — 32 villes RDC')
+        : tr('Courses · Livraisons · Missions — partout en RDC');
 
     return Scaffold(
       body: AnimatedBuilder(
@@ -291,7 +292,7 @@ class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                'Chargement de vos services…',
+                                tr('Chargement de vos services…'),
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.75),
                                   fontSize: 12,
@@ -303,7 +304,7 @@ class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Touchez l\'écran pour continuer',
+                          tr('Touchez l\'écran pour continuer'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.65),
@@ -563,7 +564,7 @@ class _FeaturedServiceCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    service.label,
+                    tr(service.label),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -574,7 +575,7 @@ class _FeaturedServiceCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    service.description,
+                    tr(service.description),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

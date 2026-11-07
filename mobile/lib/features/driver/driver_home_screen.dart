@@ -361,9 +361,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       builder: (ctx) => AlertDialog(
         title: Text(tr('Accepter ce déménagement ?')),
         content: Text(
-          '${offer['pickupAddress'] ?? ''} → ${offer['dropoffAddress'] ?? ''}'
-          '${volume != null ? '\n$volume m³ à transporter.' : ''}'
-          '\n\nVérifiez que tout tient dans votre véhicule avant d\'accepter.',
+          trf('{v1} → {v2}{v3}\n\nVérifiez que tout tient dans votre véhicule avant d\'accepter.', {'v1': offer['pickupAddress'] ?? '', 'v2': offer['dropoffAddress'] ?? '', 'v3': volume != null ? trf('\n{volume} m³ à transporter.', {'volume': volume}) : ''}),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
@@ -383,19 +381,19 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         if (!mounted) return;
         _openAssignedMission({...moving, 'id': id, 'type': 'MOVING'});
       case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(error.message))));
         await _loadAssignments();
     }
   }
 
   String _missionStatusLabel(String? status) {
     return switch (status?.toUpperCase()) {
-      'ASSIGNED' => 'Assigné',
-      'CONFIRMED' => 'Confirmé',
-      'IN_PROGRESS' => 'En cours',
-      'COMPLETED' => 'Terminé',
-      'SCHEDULED' => 'Planifié',
-      'PENDING' => 'En attente',
+      'ASSIGNED' => tr('Assigné'),
+      'CONFIRMED' => tr('Confirmé'),
+      'IN_PROGRESS' => tr('En cours'),
+      'COMPLETED' => tr('Terminé'),
+      'SCHEDULED' => tr('Planifié'),
+      'PENDING' => tr('En attente'),
       _ => status ?? '—',
     };
   }
@@ -573,7 +571,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                           }
                         case Failure(:final error):
                           setDialogState(() => submitting = false);
-                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(error.message)));
+                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(tr(error.message))));
                       }
                     },
               child: submitting
@@ -781,7 +779,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           await Future.wait([_loadPendingCashRide(), _loadActiveRide()]);
         }
       case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(error.message))));
     }
   }
 
@@ -1119,7 +1117,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       }
     } else if (result case Failure(:final error)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message)),
+        SnackBar(content: Text(tr(error.message))),
       );
     }
   }
@@ -1142,7 +1140,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       }
     } else if (result case Failure(:final error)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message)),
+        SnackBar(content: Text(tr(error.message))),
       );
     }
   }
@@ -1229,7 +1227,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
         final isRide = offer.containsKey('vehicleType') && !offer.containsKey('deliveryType');
         final id = offer['id']?.toString() ?? '';
         final offerKey = DriverJobAlertService.offerKey(isRide ? 'ride' : 'delivery', id);
-        final title = isRide ? 'Nouvelle course' : 'Nouvelle livraison';
+        final title = isRide ? tr('Nouvelle course') : tr('Nouvelle livraison');
         final body = isRide
             ? DriverJobAlertService.rideOfferMessage(offer)
             : DriverJobAlertService.deliveryOfferMessage(offer);
@@ -1399,13 +1397,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       final gpsReady = await _ensureGpsPosition();
       if (!gpsReady) {
         setState(() => _availabilityError =
-            'Activez le GPS pour recevoir des courses près de vous.');
+            tr('Activez le GPS pour recevoir des courses près de vous.'));
         return;
       }
       final located = await _pushLocationRequired();
       if (!located) {
         locationWarning =
-            'Position non synchronisée — les offres peuvent être limitées tant que le réseau est instable.';
+            tr('Position non synchronisée — les offres peuvent être limitées tant que le réseau est instable.');
       }
     }
     final api = ref.read(apiClientProvider);
@@ -1436,16 +1434,16 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
 
   String? _offerBlockMessage(Map<String, dynamic> ridePayload, Map<String, dynamic> deliveryPayload) {
     if (ridePayload['walletBlocked'] == true || deliveryPayload['walletBlocked'] == true) {
-      return 'Solde portefeuille (virtuel) insuffisant. Rechargez dans Revenus pour recevoir des courses.';
+      return tr('Solde portefeuille (virtuel) insuffisant. Rechargez dans Revenus pour recevoir des courses.');
     }
     if (ridePayload['debtBlocked'] == true || deliveryPayload['debtBlocked'] == true) {
       final debt = ridePayload['openDebtCdf'] ?? deliveryPayload['openDebtCdf'];
       final threshold = ridePayload['debtThresholdCdf'] ?? deliveryPayload['debtThresholdCdf'];
-      return 'Dette espèces ($debt FC) au-dessus du seuil ($threshold FC). Réglez votre dette pour recevoir des missions.';
+      return trf('Dette espèces ({debt} FC) au-dessus du seuil ({threshold} FC). Réglez votre dette pour recevoir des missions.', {'debt': debt, 'threshold': threshold});
     }
     if (ridePayload['documentsBlocked'] == true || deliveryPayload['documentsBlocked'] == true) {
       return _documentsBlockReason ??
-          'Documents expirés ou incomplets — mettez à jour votre enregistrement.';
+          tr('Documents expirés ou incomplets — mettez à jour votre enregistrement.');
     }
     return null;
   }
@@ -1479,15 +1477,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   String _waitingOffersHint() {
     final mode = _serviceModeLabel();
     if (mode == _DriverServiceMode.ridesOnly) {
-      return 'En attente de courses à proximité…\n'
-          'Vérifiez : En ligne, GPS activé, KYC approuvé.';
+      return tr('En attente de courses à proximité…\n'
+          'Vérifiez : En ligne, GPS activé, KYC approuvé.');
     }
     if (mode == _DriverServiceMode.deliveriesOnly) {
-      return 'En attente de livraisons à proximité…\n'
-          'Vérifiez : En ligne, GPS activé, KYC approuvé.';
+      return tr('En attente de livraisons à proximité…\n'
+          'Vérifiez : En ligne, GPS activé, KYC approuvé.');
     }
-    return 'En attente de courses ou livraisons à proximité…\n'
-        'Vérifiez : En ligne, GPS activé, KYC approuvé.';
+    return tr('En attente de courses ou livraisons à proximité…\n'
+        'Vérifiez : En ligne, GPS activé, KYC approuvé.');
   }
 
   Map<String, dynamic>? get _documentsStatus =>
@@ -1627,7 +1625,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               value: _DriverMenuAction.history,
               child: ListTile(
                 leading: Icon(Icons.history),
-                title: Text('Historique'),
+                title: Text(tr('Historique')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -1636,7 +1634,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               value: _DriverMenuAction.carpool,
               child: ListTile(
                 leading: Icon(Icons.people_alt_outlined),
-                title: Text('Covoiturage'),
+                title: Text(tr('Covoiturage')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -1645,7 +1643,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               value: _DriverMenuAction.dossier,
               child: ListTile(
                 leading: Icon(Icons.badge_outlined),
-                title: Text('Mon dossier'),
+                title: Text(tr('Mon dossier')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -1654,7 +1652,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               value: _DriverMenuAction.inbox,
               child: ListTile(
                 leading: Icon(Icons.inbox_outlined),
-                title: Text('Boîte de réception'),
+                title: Text(tr('Boîte de réception')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -1663,7 +1661,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               value: _DriverMenuAction.notifications,
               child: ListTile(
                 leading: Icon(Icons.notifications_outlined),
-                title: Text('Sons notifications'),
+                title: Text(tr('Sons notifications')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -1672,7 +1670,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               value: _DriverMenuAction.profile,
               child: ListTile(
                 leading: Icon(Icons.person_outline),
-                title: Text('Compte et connexion'),
+                title: Text(tr('Compte et connexion')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -1681,7 +1679,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               value: _DriverMenuAction.help,
               child: ListTile(
                 leading: Icon(Icons.help_outline),
-                title: Text('Aide'),
+                title: Text(tr('Aide')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -1690,7 +1688,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               value: _DriverMenuAction.incident,
               child: ListTile(
                 leading: Icon(Icons.report_problem_outlined),
-                title: Text('Signaler un incident'),
+                title: Text(tr('Signaler un incident')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -1700,7 +1698,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
               value: _DriverMenuAction.logout,
               child: ListTile(
                 leading: Icon(Icons.logout),
-                title: Text('Déconnexion'),
+                title: Text(tr('Déconnexion')),
                 contentPadding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -1735,10 +1733,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   Expanded(
                     child: Text(
                       _kycStatus == 'PENDING'
-                          ? 'KYC en cours de validation — vous ne pouvez pas passer en ligne.'
+                          ? tr('KYC en cours de validation — vous ne pouvez pas passer en ligne.')
                           : _kycStatus == 'REJECTED'
-                              ? 'KYC refusé — renvoyez vos documents via l\'icône KYC.'
-                              : 'Documents KYC requis pour accepter des courses.',
+                              ? tr('KYC refusé — renvoyez vos documents via l\'icône KYC.')
+                              : tr('Documents KYC requis pour accepter des courses.'),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1758,10 +1756,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   Expanded(
                     child: Text(
                       _documentsRenewalPending
-                          ? 'Renouvellement de documents en cours de validation SENGA. Mettez à jour vos justificatifs dans Enregistrement si nécessaire.'
+                          ? tr('Renouvellement de documents en cours de validation SENGA. Mettez à jour vos justificatifs dans Enregistrement si nécessaire.')
                           : (_documentsBlockReason ??
-                              'Permis, assurance ou visite technique expiré(s) ou incomplet(s). '
-                                  'Mettez à jour vos dates dans Enregistrement avant de recevoir des missions.'),
+                              tr('Permis, assurance ou visite technique expiré(s) ou incomplet(s). '
+                                  'Mettez à jour vos dates dans Enregistrement avant de recevoir des missions.')),
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1824,7 +1822,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                       Text(tr('Disponibilité')),
                       const SizedBox(height: 6),
                       Text(
-                        _available ? 'En ligne' : 'Hors ligne',
+                        _available ? tr('En ligne') : tr('Hors ligne'),
                         style: TextStyle(
                           color: _available ? MovaColors.green : MovaColors.textSecondary,
                           fontWeight: FontWeight.bold,
@@ -1841,20 +1839,20 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   onChanged: (value) {
                     if (value && _kycStatus != 'APPROVED') {
                       setState(() => _availabilityError =
-                          'Documents KYC approuvés requis pour passer en ligne.');
+                          tr('Documents KYC approuvés requis pour passer en ligne.'));
                       return;
                     }
                     final typeStatus = _vehicleTypeApprovalStatus;
                     if (value && typeStatus != null && typeStatus != 'APPROVED') {
                       setState(() => _availabilityError = typeStatus == 'REJECTED'
-                          ? 'Type d\'engin refusé — corrigez le type ou la photo dans Enregistrement.'
-                          : 'Type d\'engin en attente de validation SENGA — pas encore de courses.');
+                          ? tr('Type d\'engin refusé — corrigez le type ou la photo dans Enregistrement.')
+                          : tr('Type d\'engin en attente de validation SENGA — pas encore de courses.'));
                       return;
                     }
                     if (value && !_documentsCanOperate) {
                       setState(() => _availabilityError =
                           _documentsBlockReason ??
-                              'Documents expirés ou incomplets — mettez à jour vos dates d\'expiration.');
+                              tr('Documents expirés ou incomplets — mettez à jour vos dates d\'expiration.'));
                       return;
                     }
                     _toggleAvailability(value);
@@ -1880,15 +1878,15 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         ? MovaColors.midnight
                         : MovaColors.violet;
                 final title = isRidesOnly
-                    ? 'Chauffeur SENGA — courses uniquement'
+                    ? tr('Chauffeur SENGA — courses uniquement')
                     : isDeliveriesOnly
-                        ? 'Livreur SENGA — livraisons uniquement'
-                        : 'Livreur SENGA — courses et livraisons';
+                        ? tr('Livreur SENGA — livraisons uniquement')
+                        : tr('Livreur SENGA — courses et livraisons');
                 final subtitle = isRidesOnly
-                    ? 'En ligne — courses près de votre position GPS.'
+                    ? tr('En ligne — courses près de votre position GPS.')
                     : isDeliveriesOnly
-                        ? 'En ligne — livraisons près de votre position GPS.'
-                        : 'En ligne — courses et livraisons près de votre position GPS.';
+                        ? tr('En ligne — livraisons près de votre position GPS.')
+                        : tr('En ligne — courses et livraisons près de votre position GPS.');
                 return Column(
                   children: [
                     Container(
@@ -1981,7 +1979,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                               if (net != null)
                                 Expanded(
                                   child: Text(
-                                    'Gain net ~${MarketConfig.formatCdf(net)}',
+                                    trf('Gain net ~{v1}', {'v1': MarketConfig.formatCdf(net)}),
                                     style: const TextStyle(fontSize: 12, color: MovaColors.green),
                                   ),
                                 )
@@ -2065,7 +2063,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                                   if (offer['driverNetCdf'] != null) ...[
                                     const SizedBox(height: 4),
                                     Text(
-                                      'Gain net ~${MarketConfig.formatCdf(offer['driverNetCdf'] as int)}',
+                                      trf('Gain net ~{v1}', {'v1': MarketConfig.formatCdf(offer['driverNetCdf'] as int)}),
                                       style: const TextStyle(fontSize: 11, color: MovaColors.green),
                                     ),
                                   ],
@@ -2105,7 +2103,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                       _ => Icons.event,
                     };
                     final subtitle = m['type']?.toString() == 'RENTAL'
-                        ? '${m['vehicleName'] ?? m['label'] ?? 'Location'} · ${m['pickupAddress'] ?? m['pickupCity'] ?? ''}'
+                        ? '${m['vehicleName'] ?? m['label'] ?? tr('Location')} · ${m['pickupAddress'] ?? m['pickupCity'] ?? ''}'
                         : '${m['pickupAddress'] ?? ''} → ${m['dropoffAddress'] ?? m['deliveryAddress'] ?? ''}';
                     final extra = m['startDate'] != null
                         ? '\n${DateTime.tryParse(m['startDate'].toString())?.toLocal().toString().substring(0, 16) ?? ''}'
@@ -2129,7 +2127,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      m['label']?.toString() ?? 'Mission',
+                                      m['label']?.toString() ?? tr('Mission'),
                                       style: const TextStyle(fontWeight: FontWeight.w600),
                                     ),
                                     const SizedBox(height: 4),
@@ -2183,7 +2181,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   if (_earnings!['withdrawableCdf'] != null) ...[
                     const SizedBox(height: _cardLineGap),
                     Text(
-                      'Solde retrait : ${MarketConfig.formatCdf(_earnings!['withdrawableCdf'] as int? ?? 0)}',
+                      trf('Solde retrait : {v1}', {'v1': MarketConfig.formatCdf(_earnings!['withdrawableCdf'] as int? ?? 0)}),
                       style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600, fontSize: 13),
                     ),
                   ],
@@ -2218,14 +2216,14 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         ),
                         const SizedBox(height: _cardLineGap),
                         Text(
-                          _pendingCashRide!['pickupAddress']?.toString() ?? 'Course terminée',
+                          _pendingCashRide!['pickupAddress']?.toString() ?? tr('Course terminée'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         if ((_pendingCashRide!['finalFareCdf'] ?? _pendingCashRide!['estimatedFareCdf'] ?? _pendingCashRide!['amountCdf']) != null) ...[
                           const SizedBox(height: 4),
                           Text(
-                            'À encaisser : ${MarketConfig.formatCdf(((_pendingCashRide!['finalFareCdf'] ?? _pendingCashRide!['estimatedFareCdf'] ?? _pendingCashRide!['amountCdf']) as num).round())}',
+                            trf('À encaisser : {v1}', {'v1': MarketConfig.formatCdf(((_pendingCashRide!['finalFareCdf'] ?? _pendingCashRide!['estimatedFareCdf'] ?? _pendingCashRide!['amountCdf']) as num).round())}),
                             style: const TextStyle(fontWeight: FontWeight.w700, color: MovaColors.orange),
                           ),
                         ],
@@ -2262,7 +2260,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         Text(
                           _pendingCashDelivery!['pickupAddress']?.toString() ??
                               _pendingCashDelivery!['dropoffAddress']?.toString() ??
-                              'Livraison terminée',
+                              tr('Livraison terminée'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -2358,7 +2356,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         const Icon(Icons.local_taxi, color: MovaColors.green, size: 20),
                         const SizedBox(width: 8),
                         Text(
-                          'Courses disponibles (${_rideOffers.length})',
+                          trf('Courses disponibles ({length})', {'length': _rideOffers.length}),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ],
@@ -2377,7 +2375,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 0),
                         minVerticalPadding: 12,
                         title: Text(
-                          offer['pickupAddress']?.toString() ?? 'Course',
+                          offer['pickupAddress']?.toString() ?? tr('Course'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -2436,7 +2434,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         const Icon(Icons.delivery_dining, color: MovaColors.violet, size: 20),
                         const SizedBox(width: 8),
                         Text(
-                          'Livraisons disponibles (${_deliveryOffers.length})',
+                          trf('Livraisons disponibles ({length})', {'length': _deliveryOffers.length}),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ],
@@ -2454,7 +2452,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                       final tripKm = (offer['tripDistanceKm'] as num?)?.toDouble() ??
                           (offer['distanceKm'] as num?)?.toDouble();
                       final type = offer['type']?.toString() ?? 'PARCEL';
-                      final typeLabel = type == 'ERRAND' ? 'Courses' : type;
+                      final typeLabel = type == 'ERRAND' ? tr('Courses') : type;
                       final assigned = offer['alreadyAssigned'] == true;
                       final distParts = <String>[
                         if (pickupKm != null) 'Vous → colis ${GeoUtils.formatDistanceKm(pickupKm)}',
@@ -2486,10 +2484,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                             : null,
                         title: Text(
                           assigned
-                              ? 'Mission assignée — ${type == 'ERRAND' ? (offer['description']?.toString() ?? 'Courses & commissions') : (offer['pickupAddress']?.toString() ?? 'Livraison $typeLabel')}'
+                              ? trf('Mission assignée — {v1}', {'v1': type == 'ERRAND' ? (offer['description']?.toString() ?? tr('Courses & commissions')) : (offer['pickupAddress']?.toString() ?? trf('Livraison {typeLabel}', {'typeLabel': typeLabel}))})
                               : type == 'ERRAND'
-                                  ? (offer['description']?.toString() ?? 'Courses & commissions')
-                                  : (offer['pickupAddress']?.toString() ?? 'Livraison $typeLabel'),
+                                  ? (offer['description']?.toString() ?? tr('Courses & commissions'))
+                                  : (offer['pickupAddress']?.toString() ?? trf('Livraison {typeLabel}', {'typeLabel': typeLabel})),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),

@@ -2,6 +2,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../config/market_config.dart';
 import '../location/service_areas.dart';
+import '../../core/i18n/i18n.dart';
 
 abstract final class MockData {
   static Map<String, dynamic> googleOtpChallenge() => {
@@ -37,7 +38,7 @@ abstract final class MockData {
         'phoneMasked': '+243 *** $last4',
         'publicId': isDriver ? 'DRV-MOCK01' : 'RDR-MOCK01',
         'role': isDriver ? 'DRIVER' : 'PASSENGER',
-        'name': isDriver ? 'Jean Chauffeur' : 'Marie Passagère',
+        'name': isDriver ? tr('Jean Chauffeur') : tr('Marie Passagère'),
       },
     };
   }
@@ -187,7 +188,7 @@ abstract final class MockData {
       'estimatedPriceCdf': total,
       'priceCdf': total,
       'currency': 'CDF',
-      'peakHourLabel': multiplier > 1.0 ? 'Heure de pointe' : null,
+      'peakHourLabel': multiplier > 1.0 ? tr('Heure de pointe') : null,
       'formatted': '${total.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} FC',
       if (roundTrip) 'roundTrip': true,
       if (roundTrip) 'oneWayFareCdf': oneWay,

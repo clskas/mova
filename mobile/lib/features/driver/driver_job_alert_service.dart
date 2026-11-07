@@ -10,6 +10,7 @@ import '../../core/geo/geo_utils.dart';
 import '../sos/notification_tap_router.dart';
 import 'driver_alert_prefs.dart';
 import 'native_job_wake.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Événement FCM / socket : offre prise ou annulée — fermer UI + sonnerie immédiatement.
 class DriverJobStopEvent {
@@ -92,7 +93,7 @@ class DriverJobAlertService {
     await androidPlugin?.createNotificationChannel(
       AndroidNotificationChannel(
         _channelSystemId,
-        '$_channelName (son téléphone)',
+        trf('{_channelName} (son téléphone)', {'_channelName': _channelName}),
         description: 'Missions avec le son de notification système',
         importance: Importance.max,
         playSound: true,
@@ -104,7 +105,7 @@ class DriverJobAlertService {
     await androidPlugin?.createNotificationChannel(
       AndroidNotificationChannel(
         _channelSilentId,
-        '$_channelName (sans son)',
+        trf('{_channelName} (sans son)', {'_channelName': _channelName}),
         description: 'Missions en vibration seule (son coupé dans l’app)',
         importance: Importance.max,
         playSound: false,
@@ -413,31 +414,31 @@ class DriverJobAlertService {
   static String offerKey(String kind, String id) => '$kind:$id';
 
   static String messageForMissions(List<Map<String, dynamic>> missions) {
-    if (missions.isEmpty) return 'Nouvelle mission assignée';
-    if (missions.length > 1) return '${missions.length} nouvelles missions assignées';
+    if (missions.isEmpty) return tr('Nouvelle mission assignée');
+    if (missions.length > 1) return trf('{length} nouvelles missions assignées', {'length': missions.length});
     final m = missions.first;
     final label = m['label']?.toString() ??
         switch (m['type']?.toString()) {
-          'RENTAL' => 'Location véhicule',
-          'MOVING' => 'Déménagement',
-          'SCHEDULED' => 'Course planifiée',
-          'ERRAND' => 'Courses & commissions',
-          _ => 'Mission',
+          'RENTAL' => tr('Location véhicule'),
+          'MOVING' => tr('Déménagement'),
+          'SCHEDULED' => tr('Course planifiée'),
+          'ERRAND' => tr('Courses & commissions'),
+          _ => tr('Mission'),
         };
-    return 'Nouvelle mission : $label';
+    return trf('Nouvelle mission : {label}', {'label': label});
   }
 
   static String rideOfferMessage(Map<String, dynamic> offer) {
-    final pickup = offer['pickupAddress']?.toString() ?? 'près de vous';
+    final pickup = offer['pickupAddress']?.toString() ?? tr('près de vous');
     final driverNet = DriverEarningsDisplay.netFromMap(offer);
     final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
     final dist = pickupKm != null ? ' · ${GeoUtils.formatDistanceKm(pickupKm)}' : '';
-    if (driverNet != null) return 'Course · $pickup$dist · ${MarketConfig.formatCdf(driverNet)}';
-    return 'Nouvelle course disponible · $pickup$dist';
+    if (driverNet != null) return trf('Course · {pickup}{dist} · {v1}', {'pickup': pickup, 'dist': dist, 'v1': MarketConfig.formatCdf(driverNet)});
+    return trf('Nouvelle course disponible · {pickup}{dist}', {'pickup': pickup, 'dist': dist});
   }
 
   static String deliveryOfferMessage(Map<String, dynamic> offer) {
-    final kind = offer['type']?.toString() ?? offer['deliveryType']?.toString() ?? 'Livraison';
+    final kind = offer['type']?.toString() ?? offer['deliveryType']?.toString() ?? tr('Livraison');
     final pickup = offer['pickupAddress']?.toString() ?? '';
     final driverNet = DriverEarningsDisplay.netFromMap(offer);
     final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
@@ -445,7 +446,7 @@ class DriverJobAlertService {
         (offer['tripDistanceKm'] as num?)?.toDouble() ?? (offer['distanceKm'] as num?)?.toDouble();
     final parts = <String>[kind];
     if (pickup.isNotEmpty) parts.add(pickup);
-    if (pickupKm != null) parts.add('à ${GeoUtils.formatDistanceKm(pickupKm)}');
+    if (pickupKm != null) parts.add(trf('à {v1}', {'v1': GeoUtils.formatDistanceKm(pickupKm)}));
     if (tripKm != null) parts.add('trajet ${GeoUtils.formatDistanceKm(tripKm)}');
     if (driverNet != null) parts.add(MarketConfig.formatCdf(driverNet));
     return parts.join(' · ');

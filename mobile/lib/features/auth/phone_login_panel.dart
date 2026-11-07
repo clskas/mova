@@ -94,7 +94,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
 
   bool _ensureLegalAccepted() {
     if (!_needsLegalAcceptance || _legalAccepted) return true;
-    setState(() => _error = 'Acceptez les CGU et la Politique de confidentialité pour continuer.');
+    setState(() => _error = tr('Acceptez les CGU et la Politique de confidentialité pour continuer.'));
     return false;
   }
 
@@ -186,7 +186,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       if (!MarketConfig.validatePhone(phone)) {
         setState(() {
           _loading = false;
-          _error = 'Numéro invalide. Format: +243XXXXXXXXX';
+          _error = tr('Numéro invalide. Format: +243XXXXXXXXX');
         });
         return;
       }
@@ -211,7 +211,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         } else if (isEmailIdentity(identity)) {
           setState(() {
             _loading = false;
-            _error = 'Aucun PIN pour cet e-mail. Connectez-vous avec Google.';
+            _error = tr('Aucun PIN pour cet e-mail. Connectez-vous avec Google.');
           });
         } else {
           setState(() => _step = PhoneLoginStep.otp);
@@ -221,7 +221,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         if (isEmailIdentity(identity)) {
           setState(() {
             _loading = false;
-            _error = 'Impossible de vérifier le PIN. Utilisez Continuer avec Google.';
+            _error = tr('Impossible de vérifier le PIN. Utilisez Continuer avec Google.');
           });
           return;
         }
@@ -241,7 +241,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     final phone = _normalizedPhone ?? MarketConfig.normalizePhone(_phoneController.text);
     if (!MarketConfig.validatePhone(phone)) {
       setState(() {
-        _error = 'Numéro invalide. Format: +243XXXXXXXXX';
+        _error = tr('Numéro invalide. Format: +243XXXXXXXXX');
         _loading = false;
       });
       return;
@@ -280,7 +280,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   Future<void> _loginWithPin() async {
     final pin = _pinController.text.trim();
     if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
-      setState(() => _error = 'Le code PIN doit contenir 6 chiffres.');
+      setState(() => _error = tr('Le code PIN doit contenir 6 chiffres.'));
       return;
     }
     if (_pinSubmitLock) return;
@@ -313,7 +313,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     if (phone == null) {
       setState(() {
         _loading = false;
-        _error = 'Numéro manquant. Recommencez.';
+        _error = tr('Numéro manquant. Recommencez.');
       });
       return;
     }
@@ -343,7 +343,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       if (idToken == null || idToken.isEmpty) {
         setState(() {
           _loading = false;
-          _error = 'Connexion Google annulée.';
+          _error = tr('Connexion Google annulée.');
         });
         return;
       }
@@ -379,7 +379,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       if (apple == null || apple.identityToken.isEmpty) {
         setState(() {
           _loading = false;
-          _error = 'Connexion Apple annulée.';
+          _error = tr('Connexion Apple annulée.');
         });
         return;
       }
@@ -440,7 +440,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     final challengeId = _googleChallengeId;
     final providerLabel = _socialProvider == 'apple' ? 'Apple' : 'Google';
     if (challengeId == null || challengeId.isEmpty) {
-      setState(() => _error = 'Session $providerLabel expirée. Recommencez.');
+      setState(() => _error = trf('Session {providerLabel} expirée. Recommencez.', {'providerLabel': providerLabel}));
       return;
     }
     setState(() {
@@ -474,7 +474,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         FocusManager.instance.primaryFocus?.unfocus();
         final token = data['accessToken'] as String?;
         if (token == null) {
-          setState(() => _error = 'Connexion impossible. Veuillez réessayer.');
+          setState(() => _error = tr('Connexion impossible. Veuillez réessayer.'));
           return;
         }
         final api = ref.read(apiClientProvider);
@@ -583,12 +583,12 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     // Only the SMS destination matters — do not block on a stale Google e-mail
     // left in `_normalizedPhone` after the user typed a real +243 number.
     if (isEmailIdentity(raw)) {
-      setState(() => _error = 'Pas de SMS pour un e-mail. Utilisez Continuer avec Google.');
+      setState(() => _error = tr('Pas de SMS pour un e-mail. Utilisez Continuer avec Google.'));
       return;
     }
     final phone = MarketConfig.normalizePhone(raw);
     if (!MarketConfig.validatePhone(phone)) {
-      setState(() => _error = 'Numéro invalide. Format: +243XXXXXXXXX');
+      setState(() => _error = tr('Numéro invalide. Format: +243XXXXXXXXX'));
       return;
     }
     _normalizedPhone = phone;
@@ -627,7 +627,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           _step == PhoneLoginStep.pin
               ? connectionPinPrompt(_normalizedPhone ?? _phoneController.text)
               : _step == PhoneLoginStep.forgot
-                  ? 'PIN oublié : SMS, autre numéro, ou Google.'
+                  ? tr('PIN oublié : SMS, autre numéro, ou Google.')
                   : widget.subtitle,
           textAlign: TextAlign.center,
           style: const TextStyle(color: MovaColors.textSecondary),
@@ -638,7 +638,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             controller: _phoneController,
             keyboardType: TextInputType.phone,
             decoration: InputDecoration(
-              labelText: _step == PhoneLoginStep.forgot ? 'Numéro pour le SMS' : 'Téléphone',
+              labelText: _step == PhoneLoginStep.forgot ? tr('Numéro pour le SMS') : tr('Téléphone'),
               prefixIcon: const Icon(Icons.phone),
             ),
             enabled: !_loading,
@@ -704,8 +704,8 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           if (_step == PhoneLoginStep.googleOtp) ...[
             Text(
               _googleOtpChannel == 'email'
-                  ? 'Un code a été envoyé par e-mail${_googleDestinationMasked != null && _googleDestinationMasked!.isNotEmpty ? ' ($_googleDestinationMasked)' : ''} (objet « Votre accès SENGA »). Vérifiez votre boîte de réception.'
-                  : 'Un code SMS a été envoyé${_googleDestinationMasked != null && _googleDestinationMasked!.isNotEmpty ? ' ($_googleDestinationMasked)' : ''}.',
+                  ? trf('Un code a été envoyé par e-mail{v1} (objet « Votre accès SENGA »). Vérifiez votre boîte de réception.', {'v1': _googleDestinationMasked != null && _googleDestinationMasked!.isNotEmpty ? ' ($_googleDestinationMasked)' : ''})
+                  : trf('Un code SMS a été envoyé{v1}.', {'v1': _googleDestinationMasked != null && _googleDestinationMasked!.isNotEmpty ? ' ($_googleDestinationMasked)' : ''}),
               textAlign: TextAlign.center,
               style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 13),
             ),
@@ -714,8 +714,8 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           SixDigitPinField(
             controller: _codeController,
             label: _step == PhoneLoginStep.googleOtp && _googleOtpChannel == 'email'
-                ? 'Code reçu par e-mail'
-                : 'Code reçu par SMS',
+                ? tr('Code reçu par e-mail')
+                : tr('Code reçu par SMS'),
             autofocus: true,
             enabled: !_loading,
             forOneTimeCode: true,
@@ -723,7 +723,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           if (kDebugMode && _mockHint != null) ...[
             const SizedBox(height: 8),
             Text(
-              'Code test : $_mockHint',
+              trf('Code test : {_mockHint}', {'_mockHint': _mockHint}),
               style: const TextStyle(color: MovaColors.orange, fontSize: 13),
             ),
           ],
@@ -747,10 +747,10 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         const SizedBox(height: 16),
           MovaButton(
           label: switch (_step) {
-            PhoneLoginStep.phone => 'Continuer',
-            PhoneLoginStep.pin => 'Se connecter',
-            PhoneLoginStep.forgot => 'Recevoir un SMS',
-            PhoneLoginStep.otp || PhoneLoginStep.googleOtp => 'Vérifier le code',
+            PhoneLoginStep.phone => tr('Continuer'),
+            PhoneLoginStep.pin => tr('Se connecter'),
+            PhoneLoginStep.forgot => tr('Recevoir un SMS'),
+            PhoneLoginStep.otp || PhoneLoginStep.googleOtp => tr('Vérifier le code'),
           },
           isLoading: _loading,
           onPressed: (_needsLegalAcceptance && !_legalAccepted)
@@ -783,7 +783,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           const SizedBox(height: 8),
           TextButton(
             onPressed: _loading ? null : _backToPhone,
-            child: Text(_step == PhoneLoginStep.googleOtp ? 'Retour' : 'Changer de numéro'),
+            child: Text(_step == PhoneLoginStep.googleOtp ? tr('Retour') : tr('Changer de numéro')),
           ),
         ],
         if (_showAppleSignIn || _showGoogleSignIn) ...[
@@ -862,7 +862,7 @@ class _LegalAcceptRow extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
-                "J'ai lu et j'accepte les ",
+                tr("J'ai lu et j'accepte les "),
                 style: TextStyle(fontSize: 13, color: MovaColors.textSecondary.withValues(alpha: 0.95)),
               ),
               GestureDetector(

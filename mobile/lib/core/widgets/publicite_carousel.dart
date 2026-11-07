@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/market_config.dart';
+import '../../core/i18n/i18n.dart';
 
 class PubliciteCarousel extends StatefulWidget {
   const PubliciteCarousel({
@@ -75,7 +76,7 @@ class _PubliciteCarouselState extends State<PubliciteCarousel> {
 
   void _showDetail(Map<String, dynamic> item) {
     final imageUrl = MarketConfig.resolveMediaUrl(item['imageUrl']?.toString() ?? '');
-    final titre = item['titre']?.toString() ?? 'Publicité';
+    final titre = item['titre']?.toString() ?? tr('Publicité');
     final description = item['description']?.toString();
     final lien = item['lien']?.toString();
 
@@ -133,9 +134,9 @@ class _PubliciteCarouselState extends State<PubliciteCarousel> {
                               Navigator.pop(ctx);
                               _openLink(lien);
                             },
-                            child: const Padding(
+                            child: Padding(
                               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              child: Text('En savoir plus', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                              child: Text(tr('En savoir plus'), style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                             ),
                           ),
                         ),
@@ -153,7 +154,7 @@ class _PubliciteCarouselState extends State<PubliciteCarousel> {
 
   Widget _buildSlide(Map<String, dynamic> item) {
     final imageUrl = MarketConfig.resolveMediaUrl(item['imageUrl']?.toString() ?? '');
-    final titre = item['titre']?.toString() ?? 'Publicité';
+    final titre = item['titre']?.toString() ?? tr('Publicité');
     final description = item['description']?.toString();
 
     return Padding(

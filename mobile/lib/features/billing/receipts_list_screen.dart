@@ -9,6 +9,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'billing_util.dart';
 import 'receipt_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 class ReceiptsListScreen extends ConsumerStatefulWidget {
   const ReceiptsListScreen({super.key});
@@ -67,17 +68,17 @@ class _ReceiptsListScreenState extends ConsumerState<ReceiptsListScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Mes reçus',
+      title: tr('Mes reçus'),
       child: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? MovaErrorBanner(message: _error!, onRetry: _load)
               : _items.isEmpty
-                  ? const Padding(
+                  ? Padding(
                       padding: EdgeInsets.symmetric(vertical: 48),
                       child: Center(
                         child: Text(
-                          'Aucun reçu disponible pour le moment.',
+                          tr('Aucun reçu disponible pour le moment.'),
                           style: TextStyle(color: MovaColors.textSecondary),
                           textAlign: TextAlign.center,
                         ),
@@ -103,7 +104,7 @@ class _ReceiptsListScreenState extends ConsumerState<ReceiptsListScreen> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          item['title']?.toString() ?? item['serviceTypeLabel']?.toString() ?? 'Reçu',
+                                          item['title']?.toString() ?? item['serviceTypeLabel']?.toString() ?? tr('Reçu'),
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(fontWeight: FontWeight.w600),

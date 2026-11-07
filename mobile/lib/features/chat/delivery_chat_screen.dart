@@ -12,6 +12,7 @@ import 'chat_alert_service.dart';
 import 'chat_receipt.dart';
 import 'delivery_voice_call_screen.dart';
 import 'ride_chat_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 class DeliveryChatScreen extends ConsumerStatefulWidget {
   const DeliveryChatScreen({
@@ -173,12 +174,12 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Chat · ${widget.peerLabel}',
+      title: trf('Chat · {peerLabel}', {'peerLabel': widget.peerLabel}),
       scrollable: false,
       actions: [
         if (_voiceEnabled)
           IconButton(
-            tooltip: 'Appel vocal',
+            tooltip: tr('Appel vocal'),
             icon: const Icon(Icons.call_outlined),
             onPressed: _openVoiceCall,
           ),
@@ -217,7 +218,7 @@ class _DeliveryChatScreenState extends ConsumerState<DeliveryChatScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    decoration: const InputDecoration(hintText: 'Votre message…', isDense: true),
+                    decoration: InputDecoration(hintText: tr('Votre message…'), isDense: true),
                     onSubmitted: (_) => _send(),
                   ),
                 ),

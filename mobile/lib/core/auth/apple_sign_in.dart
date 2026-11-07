@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Result of native Sign in with Apple for `POST /auth/apple`.
 class AppleSignInResult {
@@ -26,23 +27,23 @@ String appleSignInErrorMessage(Object error) {
   if (error is SignInWithAppleAuthorizationException) {
     switch (error.code) {
       case AuthorizationErrorCode.canceled:
-        return 'Connexion Apple annulée.';
+        return tr('Connexion Apple annulée.');
       case AuthorizationErrorCode.failed:
-        return 'Connexion Apple impossible. Réessayez ou utilisez le SMS.';
+        return tr('Connexion Apple impossible. Réessayez ou utilisez le SMS.');
       case AuthorizationErrorCode.invalidResponse:
-        return 'Réponse Apple invalide. Réessayez ou utilisez le SMS.';
+        return tr('Réponse Apple invalide. Réessayez ou utilisez le SMS.');
       case AuthorizationErrorCode.notHandled:
       case AuthorizationErrorCode.notInteractive:
-        return 'Connexion Apple indisponible sur cet appareil. Utilisez le SMS.';
+        return tr('Connexion Apple indisponible sur cet appareil. Utilisez le SMS.');
       case AuthorizationErrorCode.unknown:
-        return 'Connexion Apple refusée. Réessayez ou utilisez le SMS.';
+        return tr('Connexion Apple refusée. Réessayez ou utilisez le SMS.');
     }
   }
   if (error is PlatformException) {
     final blob = '${error.code} ${error.message}'.toLowerCase();
-    if (blob.contains('cancel')) return 'Connexion Apple annulée.';
+    if (blob.contains('cancel')) return tr('Connexion Apple annulée.');
   }
-  return 'Impossible de se connecter avec Apple. Réessayez ou utilisez le SMS.';
+  return tr('Impossible de se connecter avec Apple. Réessayez ou utilisez le SMS.');
 }
 
 String _randomNonce([int length = 32]) {
@@ -62,7 +63,7 @@ Future<AppleSignInResult?> signInWithAppleIdentityToken() async {
   if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
     throw PlatformException(
       code: 'apple_unavailable',
-      message: 'Sign in with Apple is only available on iOS',
+      message: tr('Sign in with Apple is only available on iOS'),
     );
   }
 
@@ -81,7 +82,7 @@ Future<AppleSignInResult?> signInWithAppleIdentityToken() async {
     if (token.isEmpty) {
       throw PlatformException(
         code: 'identity_token_missing',
-        message: 'Apple Sign-In returned no identity token',
+        message: tr('Apple Sign-In returned no identity token'),
       );
     }
     return AppleSignInResult(

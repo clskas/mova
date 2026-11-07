@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/mova_colors.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Partner store verticals exposed on `/deliveries/restaurants` as `commerceType`.
 abstract final class CommerceTypes {
@@ -25,14 +26,14 @@ abstract final class CommerceTypes {
   static String labelFr(String? type) {
     switch (normalize(type)) {
       case supermarket:
-        return 'Supermarché';
+        return tr('Supermarché');
       case pharmacy:
-        return 'Pharmacie';
+        return tr('Pharmacie');
       case boutique:
-        return 'Boutique';
+        return tr('Boutique');
       case restaurant:
       default:
-        return 'Restaurant';
+        return tr('Restaurant');
     }
   }
 
@@ -40,7 +41,7 @@ abstract final class CommerceTypes {
   static String storeNoun(String? type, {bool plural = false}) {
     switch (normalize(type)) {
       case supermarket:
-        return plural ? 'supermarchés' : 'supermarché';
+        return plural ? tr('supermarchés') : tr('supermarché');
       case pharmacy:
         return plural ? 'pharmacies' : 'pharmacie';
       case boutique:
@@ -61,7 +62,7 @@ abstract final class CommerceTypes {
   }
 
   static String catalogNoun(String? type) {
-    return normalize(type) == restaurant ? 'Menu' : 'Catalogue';
+    return normalize(type) == restaurant ? tr('Menu') : tr('Catalogue');
   }
 
   static String itemNoun(String? type, {bool plural = false}) {

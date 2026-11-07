@@ -1,3 +1,5 @@
+import '../../core/i18n/i18n.dart';
+
 /// Helpers for `/public/client-config` payload (MM + passenger service tiles).
 
 bool mmChannelEnabled(Object? rawOp, String channel) {
@@ -99,9 +101,9 @@ String? validateCargoVolume(String vehicleType, String raw) {
   final range = cargoVolumeRange(vehicleType);
   if (range == null) return null;
   final n = int.tryParse(raw.trim());
-  if (n == null) return 'Indiquez le volume utile de votre véhicule (m³).';
+  if (n == null) return tr('Indiquez le volume utile de votre véhicule (m³).');
   if (n < range.min || n > range.max) {
-    return 'Volume utile : entre ${range.min} et ${range.max} m³ pour ce véhicule.';
+    return trf('Volume utile : entre {min} et {max} m³ pour ce véhicule.', {'min': range.min, 'max': range.max});
   }
   return null;
 }
@@ -155,7 +157,8 @@ List<String> applyScannedFields(
     final text = (target.text as String).trim();
     if (text.isNotEmpty) return;
     target.text = v;
-    final label = _scannedFieldLabels[field];
+    final labelFr = _scannedFieldLabels[field];
+    final label = labelFr == null ? null : tr(labelFr);
     if (label != null) filled.add(label);
   });
   return filled;

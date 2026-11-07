@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/error/result.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/i18n/i18n.dart';
 
 Future<void> showCashClaimResult({
   required BuildContext context,
@@ -13,7 +14,7 @@ Future<void> showCashClaimResult({
     Success(:final data) => () {
         onClaimed();
         return data['message']?.toString() ??
-            'Déclaration enregistrée. Le chauffeur ou le livreur doit confirmer « J’ai reçu les espèces ».';
+            tr('Déclaration enregistrée. Le chauffeur ou le livreur doit confirmer « J’ai reçu les espèces ».');
       }(),
     Failure(:final error) => error.message,
   };
@@ -30,7 +31,7 @@ class CashPaidClaimButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MovaButton(
-      label: claimed ? 'Déclaration espèces envoyée' : 'J\'ai payé en espèces',
+      label: claimed ? tr('Déclaration espèces envoyée') : tr('J\'ai payé en espèces'),
       isSecondary: true,
       icon: Icons.payments_outlined,
       onPressed: claimed ? null : onPressed,

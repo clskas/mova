@@ -162,7 +162,7 @@ class _SosAlertScreenState extends State<SosAlertScreen> {
                 if (widget.rideId != null && widget.rideId!.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(
-                    'Course : ${widget.rideId}',
+                    trf('Course : {rideId}', {'rideId': widget.rideId}),
                     style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
                   ),
                 ],
@@ -179,7 +179,7 @@ class _SosAlertScreenState extends State<SosAlertScreen> {
                 if (widget.incidentId != null && widget.incidentId!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    'Réf. ${widget.incidentId!.length > 12 ? '${widget.incidentId!.substring(0, 8)}…' : widget.incidentId}',
+                    trf('Réf. {v1}', {'v1': widget.incidentId!.length > 12 ? '${widget.incidentId!.substring(0, 8)}…' : widget.incidentId}),
                     style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textMuted),
                   ),
                 ],
@@ -223,7 +223,7 @@ class _SosAlertScreenState extends State<SosAlertScreen> {
                 child: OutlinedButton.icon(
                   onPressed: () => launchPhoneCall(n.phone),
                   icon: const Icon(Icons.emergency_outlined, color: MovaColors.red),
-                  label: Text('Appeler — ${n.label} (${n.phone})'),
+                  label: Text(trf('Appeler — {label} ({phone})', {'label': n.label, 'phone': n.phone})),
                 ),
               ),
             ),
@@ -238,8 +238,8 @@ class _SosAlertScreenState extends State<SosAlertScreen> {
           const SizedBox(height: 20),
           Text(
             widget.forOps
-                ? 'Traitez l’urgence dans Litiges admin. La position GPS et les appels ci-dessus aident l’intervention.'
-                : 'L’équipe SENGA a été alertée. Ouvrez la carte ou appelez les secours si vous pouvez intervenir.',
+                ? tr('Traitez l’urgence dans Litiges admin. La position GPS et les appels ci-dessus aident l’intervention.')
+                : tr('L’équipe SENGA a été alertée. Ouvrez la carte ou appelez les secours si vous pouvez intervenir.'),
             style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
           ),
         ],

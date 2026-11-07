@@ -11,6 +11,7 @@ import '../chat/call_ring_service.dart';
 import '../chat/chat_alert_service.dart';
 import 'delivery_payment_state.dart';
 import 'widgets/delivery_tracking_map.dart';
+import '../../core/i18n/i18n.dart';
 
 const _terminalStatuses = {'DELIVERED', 'CANCELLED', 'COMPLETED'};
 const _activeCourierStatuses = {
@@ -110,7 +111,7 @@ class DeliveryLiveTracking {
           threadId: deliveryId,
           senderRole: role,
           text: payload['text']?.toString() ?? '',
-          peerLabel: 'Livreur',
+          peerLabel: tr('Livreur'),
           messageId: payload['id']?.toString(),
         ));
       },
@@ -127,7 +128,7 @@ class DeliveryLiveTracking {
         unawaited(CallRingService.startIncoming(
           deliveryId: deliveryId,
           starterId: payload['starterId']?.toString() ?? '',
-          peerLabel: 'Livreur',
+          peerLabel: tr('Livreur'),
           kind: 'delivery',
           fromRealtime: true,
         ));

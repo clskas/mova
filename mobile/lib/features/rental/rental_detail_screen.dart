@@ -53,7 +53,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
   String _logisticsMode = 'SELF_PASSENGER';
   final _passengerDriverNameController = TextEditingController();
   final _passengerDriverPhoneController = TextEditingController();
-  final _pickupController = TextEditingController(text: 'Gombe, Kinshasa');
+  final _pickupController = TextEditingController(text: tr('Gombe, Kinshasa'));
   final _phoneController = TextEditingController(text: '+243812345678');
   final _notesController = TextEditingController();
   final _promoController = TextEditingController();
@@ -159,12 +159,12 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
 
   Future<void> _confirm() async {
     if (!MarketConfig.validatePhone(_phoneController.text.trim())) {
-      setState(() => _error = 'Numéro de téléphone invalide (+243…).');
+      setState(() => _error = tr('Numéro de téléphone invalide (+243…).'));
       return;
     }
     if (_logisticsMode == 'PASSENGER_DRIVER' &&
         !MarketConfig.validatePhone(_passengerDriverPhoneController.text.trim())) {
-      setState(() => _error = 'Téléphone du chauffeur passager invalide (+243…).');
+      setState(() => _error = tr('Téléphone du chauffeur passager invalide (+243…).'));
       return;
     }
     setState(() {
@@ -196,10 +196,10 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 if (data['quote'] != null) 'totalCdf': (data['quote'] as Map)['totalCdf'],
                 'timeline': inquiry?['timeline'] ??
                     [
-                      {'label': 'Demande', 'completed': true, 'current': true},
-                      {'label': 'Confirmée', 'completed': false, 'current': false},
-                      {'label': 'En cours', 'completed': false, 'current': false},
-                      {'label': 'Retournée', 'completed': false, 'current': false},
+                      {'label': tr('Demande'), 'completed': true, 'current': true},
+                      {'label': tr('Confirmée'), 'completed': false, 'current': false},
+                      {'label': tr('En cours'), 'completed': false, 'current': false},
+                      {'label': tr('Retournée'), 'completed': false, 'current': false},
                     ],
               },
             ),
@@ -348,7 +348,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
   }
 
   String _optionPriceLabel(int amount, {bool included = false}) {
-    if (included || amount <= 0) return 'Inclus';
+    if (included || amount <= 0) return tr('Inclus');
     return '+${MarketConfig.formatCdf(amount)}';
   }
 
@@ -359,7 +359,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
         children: [
           Text(
             estimate.hourlyMode
-                ? 'Location (${estimate.hours} h)'
+                ? trf('Location ({hours} h)', {'hours': estimate.hours})
                 : 'Location (${estimate.days} j)',
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
@@ -452,9 +452,9 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
 
   String _insuranceTierLabel(String tier) {
     return switch (tier) {
-      'STANDARD' => 'Standard',
-      'PREMIUM' => 'Premium',
-      _ => 'Basique',
+      'STANDARD' => tr('Standard'),
+      'PREMIUM' => tr('Premium'),
+      _ => tr('Basique'),
     };
   }
 
@@ -470,7 +470,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
     if (v == null) {
       return MovaScreen(
         title: tr('Détail véhicule'),
-        child: MovaErrorBanner(message: _error ?? 'Véhicule introuvable', onRetry: _loadVehicle),
+        child: MovaErrorBanner(message: _error ?? tr('Véhicule introuvable'), onRetry: _loadVehicle),
       );
     }
 
@@ -478,7 +478,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
     final preview = _previewEstimate;
 
     return MovaScreen(
-      title: v['name']?.toString() ?? 'Véhicule',
+      title: v['name']?.toString() ?? tr('Véhicule'),
       scrollable: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -536,7 +536,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    'Propriétaire : ${v['ownerName']}',
+                    trf('Propriétaire : {v1}', {'v1': v['ownerName']}),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -556,7 +556,12 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             ),
           ],
           Text(
-            '${MarketConfig.formatCdf(v['dailyRateCdf'] as int? ?? 0)}/jour · ${MarketConfig.formatCdf(v['hourlyRateCdf'] as int? ?? RentalQuoteEstimator.resolveHourlyRateCdf(dailyRateCdf: v['dailyRateCdf'] as int? ?? 0))}/h · Caution ${MarketConfig.formatCdf(v['depositCdf'] as int? ?? 0)}',
+            trf('{daily}/jour · {hourly}/h · Caution {deposit}', {
+              'daily': MarketConfig.formatCdf(v['dailyRateCdf'] as int? ?? 0),
+              'hourly': MarketConfig.formatCdf(v['hourlyRateCdf'] as int? ??
+                  RentalQuoteEstimator.resolveHourlyRateCdf(dailyRateCdf: v['dailyRateCdf'] as int? ?? 0)),
+              'deposit': MarketConfig.formatCdf(v['depositCdf'] as int? ?? 0),
+            }),
             style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600),
           ),
           if (_step == 0) ...[
@@ -640,7 +645,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
-                  'Majoration inter-villes : +${MarketConfig.formatCdf(preview.interCityFeeCdf)}',
+                  trf('Majoration inter-villes : +{v1}', {'v1': MarketConfig.formatCdf(preview.interCityFeeCdf)}),
                   style: const TextStyle(fontSize: 12, color: MovaColors.green, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -670,7 +675,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                   if (_weeklyEligible)
                     ButtonSegment(
                       value: 'WEEKLY',
-                      label: Text('Semaine (-${RentalQuoteEstimator.weeklyDiscountPct} %)'),
+                      label: Text(trf('Semaine (-{weeklyDiscountPct} %)', {'weeklyDiscountPct': RentalQuoteEstimator.weeklyDiscountPct})),
                     ),
                 ],
                 selected: {_rentalPeriod},
@@ -680,12 +685,12 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             const SizedBox(height: 8),
             if (_hourlyMode)
               Text(
-                'Location courte durée · 1 à ${RentalQuoteEstimator.maxHourlyDurationHours} h ($_rentalHours h sélectionnée${_rentalHours > 1 ? 's' : ''})',
+                trf('Location courte durée · 1 à {maxHourlyDurationHours} h ({_rentalHours} h sélectionnée{v3})', {'maxHourlyDurationHours': RentalQuoteEstimator.maxHourlyDurationHours, '_rentalHours': _rentalHours, 'v3': _rentalHours > 1 ? 's' : ''}),
                 style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.violet),
               )
             else if (!_weeklyEligible)
               Text(
-                'Tarif à la journée · remise semaine à partir de 7 jours ($_rentalDays j sélectionné${_rentalDays > 1 ? 's' : ''})',
+                trf('Tarif à la journée · remise semaine à partir de 7 jours ({_rentalDays} j sélectionné{v2})', {'_rentalDays': _rentalDays, 'v2': _rentalDays > 1 ? 's' : ''}),
                 style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.violet),
               ),
             const SizedBox(height: 12),
@@ -716,12 +721,12 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 segments: [
                   ButtonSegment(
                     value: 'LIMITED',
-                    label: Text('Limité (${RentalQuoteEstimator.limitedMileageKmPerDay} km/j)'),
+                    label: Text(trf('Limité ({limitedMileageKmPerDay} km/j)', {'limitedMileageKmPerDay': RentalQuoteEstimator.limitedMileageKmPerDay})),
                   ),
                   ButtonSegment(
                     value: 'UNLIMITED',
                     label: Text(
-                      'Illimité (+${MarketConfig.formatCdf(preview?.unlimitedMileageSurchargeCdf ?? RentalQuoteEstimator.unlimitedMileageSurchargeCdf)})',
+                      trf('Illimité (+{v1})', {'v1': MarketConfig.formatCdf(preview?.unlimitedMileageSurchargeCdf ?? RentalQuoteEstimator.unlimitedMileageSurchargeCdf)}),
                     ),
                   ),
                 ],
@@ -744,7 +749,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  '+${MarketConfig.formatCdf(preview!.mileageFeeCdf)} · kilométrage sans plafond',
+                  trf('+{v1} · kilométrage sans plafond', {'v1': MarketConfig.formatCdf(preview!.mileageFeeCdf)}),
                   style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.green, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -899,7 +904,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             ],
             const SizedBox(height: 16),
             MovaButton(
-              label: _step == 2 ? 'Réserver maintenant' : 'Obtenir le devis',
+              label: _step == 2 ? tr('Réserver maintenant') : tr('Obtenir le devis'),
               isLoading: _submitting,
               icon: _step == 2 ? Icons.check_circle_outline : Icons.receipt_long_outlined,
               onPressed: _submitting ? null : (_step == 2 ? _confirm : _fetchQuote),

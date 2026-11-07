@@ -159,7 +159,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
   Future<void> _connectSocket({bool forceReconnect = false}) async {
     final api = ref.read(apiClientProvider);
     if (api.isMockMode) {
-      if (mounted) setState(() => _socketHint = 'Mode démo — messages via le serveur uniquement.');
+      if (mounted) setState(() => _socketHint = tr('Mode démo — messages via le serveur uniquement.'));
       return;
     }
     final token = await api.authToken();
@@ -185,7 +185,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
           setState(() {
             _socketLive = false;
             if (socket.connectionFailed) {
-              _socketHint = 'Temps réel indisponible — synchronisation toutes les 4 s.';
+              _socketHint = tr('Temps réel indisponible — synchronisation toutes les 4 s.');
             }
           });
         }
@@ -214,7 +214,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
     setState(() {
       _socketLive = ok;
       if (!ok) {
-        _socketHint = 'Temps réel limité (${MarketConfig.wsUrl}) — les messages passent par le serveur.';
+        _socketHint = trf('Temps réel limité ({wsUrl}) — les messages passent par le serveur.', {'wsUrl': MarketConfig.wsUrl});
       }
     });
   }
@@ -281,7 +281,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Chat — ${widget.peerLabel}',
+      title: trf('Chat — {peerLabel}', {'peerLabel': widget.peerLabel}),
       scrollable: false,
       actions: [
         IconButton(

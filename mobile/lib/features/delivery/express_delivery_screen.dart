@@ -23,6 +23,7 @@ import '../../widgets/promo_code_field.dart';
 import '../booking/widgets/mova_ride_map.dart';
 import '../booking/payment_screen.dart';
 import 'parcel_tracking_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Livraison express — flux colis simplifié (petit colis, sans photo).
 class ExpressDeliveryScreen extends ConsumerStatefulWidget {
@@ -33,7 +34,7 @@ class ExpressDeliveryScreen extends ConsumerStatefulWidget {
 }
 
 class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
-  final _pickupController = TextEditingController(text: 'Ma position');
+  final _pickupController = TextEditingController(text: tr('Ma position'));
   final _dropoffController = TextEditingController();
   final _promoController = TextEditingController();
   LatLng _pickup = MovaRideMap.mapDefaultCenter();
@@ -269,15 +270,15 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
         _pickupFromSuggestion = true;
         _pickupFromGps = false;
       } else {
-        return 'Adresse d\'enlèvement non reconnue — utilisez le GPS, l\'autocomplétion SENGA ou les coordonnées.';
+        return tr('Adresse d\'enlèvement non reconnue — utilisez le GPS, l\'autocomplétion SENGA ou les coordonnées.');
       }
     } else if (ServiceAreaLocation.isInBounds(_pickup)) {
       _pickup = ServiceAreaLocation.ensureInServiceArea(
         _pickup,
-        address: pickupText.isEmpty ? 'Ma position' : pickupText,
+        address: pickupText.isEmpty ? tr('Ma position') : pickupText,
       );
     } else {
-      return 'Impossible de déterminer l\'enlèvement. Activez le GPS ou choisissez une adresse dans la liste.';
+      return tr('Impossible de déterminer l\'enlèvement. Activez le GPS ou choisissez une adresse dans la liste.');
     }
 
     if (_dropoffFromManualCoords && _dropoff != null && ServiceAreaLocation.isInBounds(_dropoff!)) {
@@ -316,17 +317,17 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       return _validateDistinctEndpoints();
     }
 
-    return 'Adresse non reconnue — utilisez le GPS, l\'autocomplétion SENGA ou les coordonnées.';
+    return tr('Adresse non reconnue — utilisez le GPS, l\'autocomplétion SENGA ou les coordonnées.');
   }
 
   String? _validateDistinctEndpoints() {
     final dropoff = _dropoff;
-    if (dropoff == null) return 'Indiquez l\'adresse de livraison.';
+    if (dropoff == null) return tr('Indiquez l\'adresse de livraison.');
     final samePoint =
         (dropoff.latitude - _pickup.latitude).abs() < 0.00005 &&
         (dropoff.longitude - _pickup.longitude).abs() < 0.00005;
     if (samePoint) {
-      return 'Le point de livraison doit être différent de l\'enlèvement.';
+      return tr('Le point de livraison doit être différent de l\'enlèvement.');
     }
     return null;
   }
@@ -347,8 +348,8 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
   }
 
   String? _validate() {
-    if (_pickupController.text.trim().isEmpty) return 'Indiquez l\'adresse d\'enlèvement.';
-    if (_dropoffController.text.trim().length < 3) return 'Indiquez l\'adresse de livraison.';
+    if (_pickupController.text.trim().isEmpty) return tr('Indiquez l\'adresse d\'enlèvement.');
+    if (_dropoffController.text.trim().length < 3) return tr('Indiquez l\'adresse de livraison.');
     return null;
   }
 
@@ -384,7 +385,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       setState(() {
         _loadingDropoffGps = false;
         _validationError =
-            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+            tr('Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.');
       });
       return;
     }
@@ -510,7 +511,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
     final theme = Theme.of(context);
 
     return MovaScreen(
-      title: 'Livraison express',
+      title: tr('Livraison express'),
       scrollable: false,
       padding: EdgeInsets.zero,
       child: MovaMapFormLayout(
@@ -529,7 +530,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
                   Text(
-                    'Envoi urgent — livraison en moins de 45 min.',
+                    tr('Envoi urgent — livraison en moins de 45 min.'),
                     style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -541,8 +542,8 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                   TextField(
                     controller: _pickupController,
                     decoration: InputDecoration(
-                      labelText: 'Enlèvement',
-                      hintText: 'Ma position ou nom du lieu (ex: Marché Central)',
+                      labelText: tr('Enlèvement'),
+                      hintText: tr('Ma position ou nom du lieu (ex: Marché Central)'),
                       prefixIcon: const Icon(Icons.upload_outlined),
                       suffixIcon: _loadingGps
                           ? const Padding(
@@ -581,9 +582,9 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                     controller: _dropoffController,
                     textInputAction: TextInputAction.done,
                     decoration: InputDecoration(
-                      labelText: 'Adresse de livraison',
-                      hintText: 'Ex: Gombe, Limete, Boikene…',
-                      helperText: 'Saisissez l\'adresse ou utilisez le GPS',
+                      labelText: tr('Adresse de livraison'),
+                      hintText: tr('Ex: Gombe, Limete, Boikene…'),
+                      helperText: tr('Saisissez l\'adresse ou utilisez le GPS'),
                       helperMaxLines: 2,
                       prefixIcon: const Icon(Icons.place_outlined),
                       suffixIcon: _loadingDropoffGps || _loadingSuggestions
@@ -597,7 +598,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                             )
                           : IconButton(
                               icon: const Icon(Icons.gps_fixed, color: MovaColors.orange),
-                              tooltip: 'Ma position',
+                              tooltip: tr('Ma position'),
                               onPressed: _useMyLocationForDropoff,
                             ),
                     ),
@@ -636,14 +637,14 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                     onApply: _setDropoffFromCoords,
                   ),
                   const SizedBox(height: 12),
-                  const MovaCard(
+                  MovaCard(
                     child: Row(
                       children: [
                         Icon(Icons.flash_on, color: MovaColors.orange),
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Petit colis (< 1 kg) — priorité livreur',
+                            tr('Petit colis (< 1 kg) — priorité livreur'),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -656,7 +657,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                     ServicePriceDisplay.estimateCard(
                       totalCdf: _estimatedPrice!,
                       priceBreakdown: _priceBreakdown,
-                      totalLabel: 'Tarif express',
+                      totalLabel: tr('Tarif express'),
                     ),
                   ],
                   if (_validationError != null) ...[
@@ -673,7 +674,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                   ],
                   const SizedBox(height: 24),
                   MovaButton(
-                    label: _estimatedPrice == null ? 'Estimer' : 'Commander express',
+                    label: _estimatedPrice == null ? tr('Estimer') : tr('Commander express'),
                     isLoading: _loading,
                     icon: Icons.bolt_outlined,
                     onPressed: _loading ? null : (_estimatedPrice == null ? _estimate : _confirm),

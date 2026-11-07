@@ -124,7 +124,7 @@ class _IncomingCallSheet extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                info.kind == 'ride' ? 'Course #$shortId' : 'Livraison #$shortId',
+                info.kind == 'ride' ? trf('Course #{shortId}', {'shortId': shortId}) : 'Livraison #$shortId',
                 style: const TextStyle(color: Colors.white54, fontSize: 13),
               ),
               const Spacer(),

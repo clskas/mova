@@ -201,7 +201,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
     if (b == null) {
       return MovaScreen(
         title: tr('Réservation'),
-        child: MovaErrorBanner(message: _error ?? 'Réservation introuvable', onRetry: _loadBooking),
+        child: MovaErrorBanner(message: _error ?? tr('Réservation introuvable'), onRetry: _loadBooking),
       );
     }
 
@@ -211,7 +211,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
         b['priceCdf'] as int? ??
         0;
     final ownerPhone = b['ownerContactPhone']?.toString();
-    final statusLabel = b['statusLabel']?.toString() ?? b['status']?.toString() ?? 'En attente';
+    final statusLabel = b['statusLabel']?.toString() ?? b['status']?.toString() ?? tr('En attente');
     final status = b['status']?.toString().toUpperCase();
     final isPaid = b['isPaid'] == true || status == 'PAID';
     final escrowHeld = b['escrowHeld'] == true;
@@ -253,7 +253,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  vehicle?['name']?.toString() ?? b['vehicleType']?.toString() ?? 'Véhicule',
+                  vehicle?['name']?.toString() ?? b['vehicleType']?.toString() ?? tr('Véhicule'),
                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                 ),
                 const SizedBox(height: 8),
@@ -277,7 +277,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
                       const SizedBox(width: 6),
                       Text(
                         b['remainingActive'] == true
-                            ? 'Temps restant : ${b['remainingLabel']}'
+                            ? trf('Temps restant : {v1}', {'v1': b['remainingLabel']})
                             : b['remainingLabel']?.toString() ?? '',
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
@@ -288,14 +288,14 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
                   ),
                 ],
                 if (b['pickupCity'] != null)
-                  Text('Prise en charge : ${b['pickupCity']}${b['returnCity'] != null && b['returnCity'] != b['pickupCity'] ? ' → ${b['returnCity']}' : ''}'),
+                  Text(trf('Prise en charge : {v1}{v2}', {'v1': b['pickupCity'], 'v2': b['returnCity'] != null && b['returnCity'] != b['pickupCity'] ? ' → ${b['returnCity']}' : ''})),
                 const SizedBox(height: 8),
                 Text(
                   MarketConfig.formatCdf(total),
                   style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: MovaColors.green),
                 ),
                 Text(
-                  'Réf. ${b['id'] ?? widget.bookingId}',
+                  trf('Réf. {v1}', {'v1': b['id'] ?? widget.bookingId}),
                   style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                 ),
               ],
@@ -334,7 +334,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
             OutlinedButton.icon(
               onPressed: () => _callOwner(ownerPhone),
               icon: const Icon(Icons.phone_outlined),
-              label: Text('Propriétaire · $ownerPhone'),
+              label: Text(trf('Propriétaire · {ownerPhone}', {'ownerPhone': ownerPhone})),
             ),
           ],
           if (b['inquiryId'] != null) ...[
@@ -347,7 +347,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
                     builder: (_) => RentalChatScreen(
                       inquiryId: b['inquiryId'].toString(),
                       myRole: 'passenger',
-                      peerLabel: 'Loueur',
+                      peerLabel: tr('Loueur'),
                     ),
                   ),
                 );
@@ -391,7 +391,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
           if (paymentReady && total > 0) ...[
             const SizedBox(height: 16),
             MovaButton(
-              label: status == 'CONFIRMED' ? 'Prépayer la location' : 'Payer la location',
+              label: status == 'CONFIRMED' ? tr('Prépayer la location') : tr('Payer la location'),
               icon: Icons.payment_outlined,
               onPressed: () {
                 Navigator.push(

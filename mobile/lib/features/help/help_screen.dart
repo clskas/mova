@@ -26,7 +26,7 @@ class HelpScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return MovaScreen(
-      title: HelpConfig.hubTitle,
+      title: tr(HelpConfig.hubTitle),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -111,7 +111,7 @@ class HelpScreen extends ConsumerWidget {
             icon: Icons.quiz_outlined,
             iconColor: MovaColors.green,
             title: 'FAQ',
-            subtitle: '${kFaqItems.length} questions fréquentes',
+            subtitle: trf('{length} questions fréquentes', {'length': kFaqItems.length}),
             onTap: () => _open(context, const FaqScreen()),
           ),
           _HelpLink(

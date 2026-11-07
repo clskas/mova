@@ -135,7 +135,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
         return switch (result) {
           Success(:final data) => (
               ok: true,
-              message: data['message']?.toString() ?? 'Litige enregistré',
+              message: data['message']?.toString() ?? tr('Litige enregistré'),
             ),
           Failure(:final error) => (ok: false, message: error.message),
         };
@@ -238,7 +238,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
                   ),
                   if (scheduledAt != null) ...[
                     const SizedBox(height: 8),
-                    Text('Date prévue : $scheduledAt'),
+                    Text(trf('Date prévue : {scheduledAt}', {'scheduledAt': scheduledAt})),
                   ],
                   const SizedBox(height: 12),
                   Text(tr('Départ'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
@@ -248,7 +248,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
                   Text(dropoff, style: const TextStyle(fontWeight: FontWeight.w600)),
                   if (vehicleType != null) ...[
                     const SizedBox(height: 8),
-                    Text('Véhicule : $vehicleType'),
+                    Text(trf('Véhicule : {vehicleType}', {'vehicleType': vehicleType})),
                   ],
                 ],
               ),
@@ -276,7 +276,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
                             color: done ? MovaColors.green : MovaColors.textSecondary,
                           ),
                           const SizedBox(width: 8),
-                          Expanded(child: Text(step['label']?.toString() ?? '')),
+                          Expanded(child: Text(tr(step['label']?.toString() ?? ''))),
                         ],
                       ),
                     );
@@ -306,7 +306,7 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
             ],
             if (_canStart || _status == 'IN_PROGRESS') ...[
               MovaButton(
-                label: _status == 'IN_PROGRESS' ? 'Itinéraire arrivée' : 'Itinéraire départ',
+                label: _status == 'IN_PROGRESS' ? tr('Itinéraire arrivée') : tr('Itinéraire départ'),
                 icon: Icons.map,
                 onPressed: _saving ? null : () => _openMaps(toPickup: _status != 'IN_PROGRESS'),
               ),
@@ -347,10 +347,10 @@ class _DriverScheduledMissionScreenState extends ConsumerState<DriverScheduledMi
 
   String _statusLabel(String status) {
     return switch (status.toUpperCase()) {
-      'SCHEDULED' => 'Planifiée — en attente',
-      'CONFIRMED' => 'Confirmée — prêt à démarrer',
-      'IN_PROGRESS' => 'Course en cours',
-      'COMPLETED' => 'Terminée',
+      'SCHEDULED' => tr('Planifiée — en attente'),
+      'CONFIRMED' => tr('Confirmée — prêt à démarrer'),
+      'IN_PROGRESS' => tr('Course en cours'),
+      'COMPLETED' => tr('Terminée'),
       _ => status,
     };
   }

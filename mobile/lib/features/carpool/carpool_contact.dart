@@ -46,9 +46,9 @@ Future<void> showCarpoolContact(BuildContext context, {String? contactPhone}) as
           const SizedBox(height: 12),
           Text(
             dialable
-                ? 'Impossible d\'ouvrir l\'application téléphone sur cet appareil.'
-                : 'Numéro masqué jusqu\'à confirmation de la réservation. '
-                    'Le numéro complet sera visible une fois votre place confirmée.',
+                ? tr('Impossible d\'ouvrir l\'application téléphone sur cet appareil.')
+                : tr('Numéro masqué jusqu\'à confirmation de la réservation. '
+                    'Le numéro complet sera visible une fois votre place confirmée.'),
             style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
           ),
         ],

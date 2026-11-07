@@ -1,3 +1,5 @@
+import '../../core/i18n/i18n.dart';
+
 /// Aligné sur PinAuth / LocalPinSetup / API PIN_SIX_DIGITS_FR.
 const pinSixDigitsFr = 'Le code PIN doit contenir 6 chiffres.';
 const paymentFailedFr =
@@ -74,14 +76,14 @@ String? _withdrawFieldMessage(String msg) {
   final lower = msg.toLowerCase();
   if (RegExp(r'\botp\b').hasMatch(lower) &&
       (_isClassValidatorEnglish(msg) || lower.contains('required') || lower.contains('must'))) {
-    return 'Code SMS requis (6 chiffres envoyé au numéro Mobile Money).';
+    return tr('Code SMS requis (6 chiffres envoyé au numéro Mobile Money).');
   }
   if (RegExp(r'\bphone\b').hasMatch(lower) && _isClassValidatorEnglish(msg)) {
-    return 'Numéro Mobile Money invalide. Format : +243XXXXXXXXX.';
+    return tr('Numéro Mobile Money invalide. Format : +243XXXXXXXXX.');
   }
   if (RegExp(r'amountcdf|amount_cdf').hasMatch(lower) &&
       (_isClassValidatorEnglish(msg) || lower.contains('must not be less'))) {
-    return 'Montant invalide. Entrez un nombre entier d’au moins 2 300 FC.';
+    return tr('Montant invalide. Entrez un nombre entier d’au moins 2 300 FC.');
   }
   return null;
 }
@@ -114,7 +116,7 @@ String sanitizeUserMessage(
   if (RegExp(r'^Erreur \d{3}$').hasMatch(msg)) return fallback;
   if (RegExp(r'^PDF \d+$', caseSensitive: false).hasMatch(msg)) return fallback;
   if (msg.toLowerCase().contains('erreur interne')) {
-    return 'Un problème temporaire est survenu. Vérifiez votre connexion et réessayez.';
+    return tr('Un problème temporaire est survenu. Vérifiez votre connexion et réessayez.');
   }
   if (msg.contains('SocketException') ||
       msg.contains('TimeoutException') ||
@@ -128,7 +130,7 @@ String sanitizeUserMessage(
       msg.contains('Failed to fetch') ||
       msg.contains('NetworkError') ||
       msg.contains('Network request failed')) {
-    return 'Connexion Internet instable. Vérifiez votre réseau et réessayez.';
+    return tr('Connexion Internet instable. Vérifiez votre réseau et réessayez.');
   }
   if (msg.contains('Exception:') ||
       msg.contains('FormatException') ||

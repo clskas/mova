@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../sos/notification_tap_router.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Notifications sonores + vibration + badge non-lus pour le chat.
 class ChatAlertService {
@@ -260,10 +261,10 @@ class ChatAlertService {
     await _playChatSound();
 
     final from = switch (senderRole) {
-      'driver' => 'Chauffeur',
-      'passenger' => 'Passager',
-      'courier' => 'Livreur',
-      'partner' => 'Restaurant',
+      'driver' => tr('Chauffeur'),
+      'passenger' => tr('Passager'),
+      'courier' => tr('Livreur'),
+      'partner' => tr('Restaurant'),
       _ => peerLabel,
     };
 
@@ -271,7 +272,7 @@ class ChatAlertService {
     try {
       await _plugin.show(
         id: id,
-        title: 'Message — $from',
+        title: trf('Message — {from}', {'from': from}),
         body: text.length > 120 ? '${text.substring(0, 117)}…' : text,
         notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
@@ -319,7 +320,7 @@ class ChatAlertService {
     try {
       await _plugin.show(
         id: id,
-        title: title.isEmpty ? 'Message SENGA' : title,
+        title: title.isEmpty ? tr('Message SENGA') : title,
         body: body.length > 120 ? '${body.substring(0, 117)}…' : body,
         notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import 'help_config.dart';
+import '../../core/i18n/i18n.dart';
 
 class FaqScreen extends StatelessWidget {
   const FaqScreen({super.key});
@@ -14,7 +15,7 @@ class FaqScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            '${kFaqItems.length} questions fréquentes',
+            trf('{length} questions fréquentes', {'length': kFaqItems.length}),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: MovaColors.textSecondary,
                 ),
@@ -25,7 +26,7 @@ class FaqScreen extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 8),
               child: ExpansionTile(
                 title: Text(
-                  item.question,
+                  tr(item.question),
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
@@ -39,7 +40,7 @@ class FaqScreen extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        item.answer,
+                        tr(item.answer),
                         style: const TextStyle(
                           color: MovaColors.textSecondary,
                           height: 1.45,

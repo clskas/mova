@@ -54,7 +54,7 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
       final month = dt.month.toString().padLeft(2, '0');
       final hour = dt.hour.toString().padLeft(2, '0');
       final minute = dt.minute.toString().padLeft(2, '0');
-      return '$day/$month/${dt.year} à $hour:$minute';
+      return trf('{day}/{month}/{year} à {hour}:{minute}', {'day': day, 'month': month, 'year': dt.year, 'hour': hour, 'minute': minute});
     } catch (_) {
       return raw;
     }
@@ -110,16 +110,16 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
-                Text('Conducteur : ${widget.driverName}'),
-                if (departure.isNotEmpty) Text('Départ : $departure'),
+                Text(trf('Conducteur : {driverName}', {'driverName': widget.driverName})),
+                if (departure.isNotEmpty) Text(trf('Départ : {departure}', {'departure': departure})),
                 const SizedBox(height: 8),
                 ServicePriceDisplay.carpoolBookingCard(
                   pricePerSeatCdf: widget.pricePerSeatCdf,
                   seats: widget.seats,
-                  totalLabel: 'Total réservation',
+                  totalLabel: tr('Total réservation'),
                 ),
                 Text(
-                  'Réf. ${widget.tripId}',
+                  trf('Réf. {tripId}', {'tripId': widget.tripId}),
                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                 ),
               ],
@@ -167,7 +167,7 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
               onPressed: () => showCarpoolContact(context, contactPhone: _contactPhone),
               icon: const Icon(Icons.phone_outlined),
               label: Text(
-                _contactPhone != null ? 'Contacter · $_contactPhone' : 'Contacter le conducteur',
+                _contactPhone != null ? trf('Contacter · {_contactPhone}', {'_contactPhone': _contactPhone}) : 'Contacter le conducteur',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

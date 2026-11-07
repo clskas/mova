@@ -77,7 +77,7 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
     }
     setState(() {
       _submitting = false;
-      _error = result.message ?? 'Confirmation impossible.';
+      _error = result.message ?? tr('Confirmation impossible.');
     });
   }
 
@@ -116,7 +116,7 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
     }
     setState(() {
       _submitting = false;
-      _error = result.message ?? 'Impossible d’enregistrer le litige.';
+      _error = result.message ?? tr('Impossible d’enregistrer le litige.');
     });
   }
 
@@ -124,7 +124,7 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
   Widget build(BuildContext context) {
     final hours = widget.autoConfirmHours.clamp(1, 168);
     return AlertDialog(
-      title: Text(widget.title),
+      title: Text(tr(widget.title)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -148,15 +148,15 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
                 widget.driverNetCdf != widget.passengerTotalCdf) ...[
               const SizedBox(height: 6),
               Text(
-                'Votre part nette ~${MarketConfig.formatCdf(widget.driverNetCdf!)}',
+                trf('Votre part nette ~{v1}', {'v1': MarketConfig.formatCdf(widget.driverNetCdf!)}),
                 style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
               ),
             ],
             const SizedBox(height: 12),
           ],
           Text(
-            'Confirmez uniquement après avoir reçu les espèces du client. '
-            'Sans action de votre part, le paiement pourra être clôturé automatiquement après $hours h.',
+            trf('Confirmez uniquement après avoir reçu les espèces du client. Sans action de votre part, le paiement pourra être clôturé automatiquement après {hours} h.',
+                {'hours': hours}),
             style: const TextStyle(fontSize: 14),
           ),
           if (_error != null) ...[

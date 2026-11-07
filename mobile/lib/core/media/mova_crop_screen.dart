@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Rogner Flutter (Android) : croix + titre en haut, **Valider** en bas au centre.
 class MovaCropScreen extends StatefulWidget {
@@ -59,7 +60,7 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
       previous?.dispose();
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'Impossible de charger l\'image.');
+      setState(() => _error = tr('Impossible de charger l\'image.'));
     }
   }
 
@@ -75,7 +76,7 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
       if (cropped == null) {
         setState(() {
           _busy = false;
-          _error = 'Échec du rognage. Réessayez.';
+          _error = tr('Échec du rognage. Réessayez.');
         });
         return;
       }
@@ -84,7 +85,7 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'Échec du rognage. Réessayez.';
+        _error = tr('Échec du rognage. Réessayez.');
       });
     }
   }
@@ -192,7 +193,7 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
               height: 22,
               child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
             )
-          : const Text('Valider', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+          : Text(tr('Valider'), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
     );
   }
 
@@ -210,11 +211,11 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
                   IconButton(
                     onPressed: _busy ? null : () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                    tooltip: 'Annuler',
+                    tooltip: tr('Annuler'),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Rogner',
+                      tr('Rogner'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white,
@@ -244,7 +245,7 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
                             const SizedBox(height: 16),
                             TextButton(
                               onPressed: _load,
-                              child: const Text('Réessayer', style: TextStyle(color: Colors.white)),
+                              child: Text(tr('Réessayer'), style: TextStyle(color: Colors.white)),
                             ),
                           ],
                         ),
@@ -304,7 +305,7 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
                   Center(child: _validateButton()),
                   const SizedBox(height: 10),
                   Text(
-                    'Pincez pour zoomer, glissez pour cadrer',
+                    tr('Pincez pour zoomer, glissez pour cadrer'),
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
                   ),

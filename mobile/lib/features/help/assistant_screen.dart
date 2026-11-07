@@ -6,6 +6,7 @@ import '../../core/config/app_version.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 /// One chat bubble.
 class AssistantMessage {
@@ -34,9 +35,9 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
   final List<AssistantMessage> _messages = [
-    const AssistantMessage(
+    AssistantMessage(
       fromUser: false,
-      text: 'Bonjour ! Je suis l\'assistant SENGA. Posez votre question en français, lingala, swahili ou anglais.',
+      text: tr('Bonjour ! Je suis l\'assistant SENGA. Posez votre question en français, lingala, swahili ou anglais.'),
     ),
   ];
   bool _sending = false;
@@ -94,7 +95,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Assistant SENGA',
+      title: tr('Assistant SENGA'),
       scrollable: false,
       padding: EdgeInsets.zero,
       child: Column(
@@ -107,11 +108,11 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
               itemCount: _messages.length + (_sending ? 1 : 0),
               itemBuilder: (context, i) {
                 if (i == _messages.length) {
-                  return const Align(
+                  return Align(
                     alignment: Alignment.centerLeft,
                     child: Padding(
                       padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Text('L\'assistant écrit…', style: TextStyle(color: MovaColors.textSecondary)),
+                      child: Text(tr('L\'assistant écrit…'), style: TextStyle(color: MovaColors.textSecondary)),
                     ),
                   );
                 }
@@ -135,10 +136,10 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
               },
             ),
           ),
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Réponses générées par IA à partir du manuel SENGA. Pour un litige ou un paiement, contactez le support.',
+              tr('Réponses générées par IA à partir du manuel SENGA. Pour un litige ou un paiement, contactez le support.'),
               style: TextStyle(fontSize: 11, color: MovaColors.textSecondary),
             ),
           ),
@@ -157,8 +158,8 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                       maxLength: 2000,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(),
-                      decoration: const InputDecoration(
-                        hintText: 'Votre question…',
+                      decoration: InputDecoration(
+                        hintText: tr('Votre question…'),
                         counterText: '',
                       ),
                     ),

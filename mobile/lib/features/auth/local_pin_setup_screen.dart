@@ -7,6 +7,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'pin_session.dart';
 import 'widgets/six_digit_pin_field.dart';
+import '../../core/i18n/i18n.dart';
 
 /// PIN de connexion after the first SMS or Google email code — not the driver KYC activation PIN.
 class LocalPinSetupScreen extends ConsumerStatefulWidget {
@@ -68,7 +69,7 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
     final pin = _pinController.text.trim();
     final confirm = _confirmController.text.trim();
     if (pin.length != 6 || confirm.length != 6) {
-      setState(() => _error = 'Le code PIN doit contenir 6 chiffres.');
+      setState(() => _error = tr('Le code PIN doit contenir 6 chiffres.'));
       return;
     }
     setState(() {
@@ -106,11 +107,11 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.close),
-            tooltip: 'Fermer',
+            tooltip: tr('Fermer'),
             onPressed: _dismiss,
           ),
           title: Text(
-            widget.title,
+            tr(widget.title),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -136,7 +137,7 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
                             const Icon(Icons.lock_outline, size: 56, color: MovaColors.violet),
                             const SizedBox(height: 16),
                             Text(
-                              widget.title,
+                              tr(widget.title),
                               textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                     fontWeight: FontWeight.bold,
@@ -146,7 +147,7 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
                             const SizedBox(height: 8),
                             Text(
                               widget.reset
-                                  ? 'Obligatoire pour les prochaines connexions. 6 chiffres — évitez 123456 ou des chiffres identiques.'
+                                  ? tr('Obligatoire pour les prochaines connexions. 6 chiffres — évitez 123456 ou des chiffres identiques.')
                                   : pinSetupHintFr,
                               textAlign: TextAlign.center,
                               style: const TextStyle(color: MovaColors.textSecondary),
@@ -154,13 +155,13 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
                             const SizedBox(height: 28),
                             SixDigitPinField(
                               controller: _pinController,
-                              label: 'Nouveau PIN',
+                              label: tr('Nouveau PIN'),
                               autofocus: true,
                             ),
                             const SizedBox(height: 16),
                             SixDigitPinField(
                               controller: _confirmController,
-                              label: 'Confirmer le PIN',
+                              label: tr('Confirmer le PIN'),
                             ),
                             if (_error != null) ...[
                               const SizedBox(height: 16),
@@ -168,7 +169,7 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
                             ],
                             const SizedBox(height: 24),
                             MovaButton(
-                              label: 'Enregistrer le PIN',
+                              label: tr('Enregistrer le PIN'),
                               isLoading: _loading,
                               onPressed: _pinController.text.trim().length == 6 &&
                                       _confirmController.text.trim().length == 6

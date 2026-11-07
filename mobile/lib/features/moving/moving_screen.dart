@@ -63,7 +63,7 @@ class MovingScreen extends ConsumerStatefulWidget {
 class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  final _fromController = TextEditingController(text: 'Ma position');
+  final _fromController = TextEditingController(text: tr('Ma position'));
   final _toController = TextEditingController();
   final _itemController = TextEditingController();
   final _promoController = TextEditingController();
@@ -189,7 +189,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       setState(() {
         _loadingGps = false;
         _validationError =
-            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+            tr('Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.');
       });
       return;
     }
@@ -197,7 +197,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       _loadingGps = false;
       _pickup = ServiceAreaLocation.ensureInServiceArea(result.position, address: result.label);
       _fromController.text =
-          ServiceAreaLocation.isInBounds(result.position) ? result.label : 'Ma position';
+          ServiceAreaLocation.isInBounds(result.position) ? result.label : tr('Ma position');
       _pickupFromSuggestion = false;
       _pickupFromGps = true;
       _estimatedPrice = null;
@@ -385,7 +385,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
         }
       case Failure(:final error):
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Photo non envoyée : ${error.message}')),
+          SnackBar(content: Text(trf('Photo non envoyée : {message}', {'message': error.message}))),
         );
     }
   }
@@ -423,10 +423,10 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             _estimatedPrice = null;
             _estimateBreakdown = null;
           } else {
-            _aiNote = data['message']?.toString() ?? 'Estimation automatique indisponible.';
+            _aiNote = data['message']?.toString() ?? tr('Estimation automatique indisponible.');
           }
         case Failure(:final error):
-          _aiNote = 'Estimation automatique indisponible : ${error.message}';
+          _aiNote = trf('Estimation automatique indisponible : {message}', {'message': error.message});
       }
     });
   }
@@ -452,9 +452,9 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
   }
 
   String? _validate() {
-    if (_fromController.text.trim().isEmpty) return 'Indiquez l\'adresse de départ.';
-    if (_toController.text.trim().length < 3) return 'Indiquez l\'adresse d\'arrivée.';
-    if (_items.isEmpty) return 'Listez au moins un meuble ou carton.';
+    if (_fromController.text.trim().isEmpty) return tr('Indiquez l\'adresse de départ.');
+    if (_toController.text.trim().length < 3) return tr('Indiquez l\'adresse d\'arrivée.');
+    if (_items.isEmpty) return tr('Listez au moins un meuble ou carton.');
     return null;
   }
 
@@ -577,7 +577,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                   proximityLat: _pickup.latitude,
                   proximityLng: _pickup.longitude,
                   label: tr('Adresse de départ'),
-                  hint: 'Ma position ou nom du lieu',
+                  hint: tr('Ma position ou nom du lieu'),
                   prefixIcon: Icons.home_outlined,
                   onUserInput: _onPickupUserInput,
                   onSelected: _onPickupSuggestionSelected,
@@ -600,7 +600,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             proximityLat: _pickup.latitude,
             proximityLng: _pickup.longitude,
             label: tr('Adresse d\'arrivée'),
-            hint: 'Rechercher une commune, quartier…',
+            hint: tr('Rechercher une commune, quartier…'),
             prefixIcon: Icons.place_outlined,
             textInputAction: TextInputAction.done,
             onUserInput: _onDropoffUserInput,
@@ -614,8 +614,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           const SizedBox(height: 8),
           ..._volumeOptions.map((v) {
             return RadioListTile<String>(
-              title: Text(v.$2),
-              subtitle: Text(v.$3, style: const TextStyle(fontSize: 12)),
+              title: Text(tr(v.$2)),
+              subtitle: Text(tr(v.$3), style: const TextStyle(fontSize: 12)),
               value: v.$1,
               groupValue: _volume,
               onChanged: (val) => setState(() => _onHousingTypeChanged(val!)),
@@ -624,7 +624,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           if (_volume == 'APARTMENT' || _volume == 'HOUSE') ...[
             const SizedBox(height: 8),
             Text(
-              _volume == 'HOUSE' ? 'Nombre de pièces (maison)' : 'Nombre de pièces (hors cuisine/SDB)',
+              _volume == 'HOUSE' ? tr('Nombre de pièces (maison)') : tr('Nombre de pièces (hors cuisine/SDB)'),
               style: theme.textTheme.titleSmall,
             ),
             Slider(
@@ -661,7 +661,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             ),
           ],
           Text(
-            'Volume estimé : ${_volumeM3()} m³',
+            trf('Volume estimé : {v1} m³', {'v1': _volumeM3()}),
             style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -677,7 +677,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             return RadioListTile<String>(
               title: Row(
                 children: [
-                  Expanded(child: Text(v.$2)),
+                  Expanded(child: Text(tr(v.$2))),
                   if (isRecommended)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -692,7 +692,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                     ),
                 ],
               ),
-              subtitle: Text(v.$3, style: const TextStyle(fontSize: 12)),
+              subtitle: Text(tr(v.$3), style: const TextStyle(fontSize: 12)),
               value: v.$1,
               groupValue: _vehicleCategory,
               onChanged: (val) => setState(() {
@@ -706,7 +706,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           Row(
             children: [
               Expanded(
-                child: Text('Photos inventaire (${_photos.length})', style: theme.textTheme.titleSmall),
+                child: Text(trf('Photos inventaire ({length})', {'length': _photos.length}), style: theme.textTheme.titleSmall),
               ),
               TextButton.icon(
                 onPressed: _uploadingPhoto ? null : _addPhoto,
@@ -751,7 +751,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 [
-                  if (_aiVolumeM3 != null) 'Volume estimé par l\'IA : $_aiVolumeM3 m³ (modifiable en changeant le logement).',
+                  if (_aiVolumeM3 != null) trf('Volume estimé par l\'IA : {_aiVolumeM3} m³ (modifiable en changeant le logement).', {'_aiVolumeM3': _aiVolumeM3}),
                   if (_aiNote != null && _aiNote!.isNotEmpty) _aiNote!,
                 ].join('\n'),
                 style: theme.textTheme.bodySmall,
@@ -784,7 +784,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
               child: MovaCard(
                 child: Row(
                   children: [
-                    Expanded(child: Text(_items[i], maxLines: 2, overflow: TextOverflow.ellipsis)),
+                    Expanded(child: Text(tr(_items[i]), maxLines: 2, overflow: TextOverflow.ellipsis)),
                     IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => _removeItem(i)),
                   ],
                 ),
@@ -799,7 +799,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             if (_distanceKm != null) ...[
               const SizedBox(height: 8),
               Text(
-                'Distance : ${_distanceKm!.toStringAsFixed(1)} km — volume ${_volumeM3()} m³',
+                trf('Distance : {v1} km — volume {v2} m³', {'v1': _distanceKm!.toStringAsFixed(1), 'v2': _volumeM3()}),
                 style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
               ),
             ],
@@ -821,7 +821,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           ],
           const SizedBox(height: 24),
           MovaButton(
-            label: _estimatedPrice == null ? 'Estimer le déménagement' : 'Demander un devis',
+            label: _estimatedPrice == null ? tr('Estimer le déménagement') : tr('Demander un devis'),
             isLoading: _loading,
             icon: _estimatedPrice == null ? Icons.calculate_outlined : Icons.local_shipping_outlined,
             onPressed: _loading ? null : (_estimatedPrice == null ? _estimate : _request),
@@ -916,8 +916,8 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             controller: _tabController,
             labelColor: MovaColors.violet,
             tabs: [
-              const Tab(text: 'Nouvelle demande'),
-              Tab(text: 'Mes demandes${_myRequests.isNotEmpty ? ' (${_myRequests.length})' : ''}'),
+              Tab(text: tr('Nouvelle demande')),
+              Tab(text: trf('Mes demandes{v1}', {'v1': _myRequests.isNotEmpty ? ' (${_myRequests.length})' : ''})),
             ],
           ),
           Expanded(

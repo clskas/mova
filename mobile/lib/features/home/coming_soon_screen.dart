@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Placeholder for services not yet available nationwide.
 class ComingSoonScreen extends StatelessWidget {
@@ -29,7 +30,7 @@ class ComingSoonScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           Text(
-            'Bientôt disponible',
+            tr('Bientôt disponible'),
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -39,7 +40,7 @@ class ComingSoonScreen extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             description ??
-                '$serviceName arrive prochainement sur SENGA, partout en RDC.',
+                trf('{serviceName} arrive prochainement sur SENGA, partout en RDC.', {'serviceName': serviceName}),
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: MovaColors.textSecondary,
@@ -48,7 +49,7 @@ class ComingSoonScreen extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           MovaButton(
-            label: 'Retour à l\'accueil',
+            label: tr('Retour à l\'accueil'),
             icon: Icons.arrow_back,
             isSecondary: true,
             onPressed: () => Navigator.pop(context),

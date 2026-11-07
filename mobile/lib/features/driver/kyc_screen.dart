@@ -66,7 +66,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
         Navigator.pop(context);
       case Failure(:final error):
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message)),
+          SnackBar(content: Text(tr(error.message))),
         );
     }
   }
@@ -89,9 +89,9 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
             decoration: InputDecoration(labelText: tr('Type')),
             items: [
               DropdownMenuItem(value: 'SOS', child: Text(tr('SOS — urgence'))),
-              DropdownMenuItem(value: 'ACCIDENT', child: Text('Accident')),
-              DropdownMenuItem(value: 'HARASSMENT', child: Text('Harcèlement')),
-              DropdownMenuItem(value: 'OTHER', child: Text('Autre')),
+              DropdownMenuItem(value: 'ACCIDENT', child: Text(tr('Accident'))),
+              DropdownMenuItem(value: 'HARASSMENT', child: Text(tr('Harcèlement'))),
+              DropdownMenuItem(value: 'OTHER', child: Text(tr('Autre'))),
             ],
             onChanged: (v) => setState(() => _type = v ?? 'OTHER'),
           ),
@@ -110,7 +110,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           ),
           const SizedBox(height: 16),
           MovaButton(
-            label: _type == 'SOS' ? 'Envoyer SOS' : 'Envoyer',
+            label: _type == 'SOS' ? tr('Envoyer SOS') : tr('Envoyer'),
             isLoading: _loading,
             onPressed: _loading ? null : _submit,
           ),

@@ -7,6 +7,7 @@ import '../error/result.dart';
 import '../update/app_update_service.dart';
 import 'connectivity_service.dart';
 import 'sync_queue.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Initialise Hive, connectivité, santé API et synchronisation.
 ///
@@ -35,7 +36,7 @@ Future<void> bootstrapMovaApp(WidgetRef ref) async {
       return switch (method) {
         'POST' => api.post(path, body, skipOffline: true),
         'PATCH' => api.patch(path, body, skipOffline: true),
-        _ => const Failure(NetworkFailure('Méthode non prise en charge.')),
+        _ => Failure(NetworkFailure(tr('Méthode non prise en charge.'))),
       };
     });
     connectivity.setPendingSyncCount(queue.pendingCount);

@@ -256,29 +256,29 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     switch (_step) {
       case 0:
         if (_firstName.text.trim().isEmpty || _lastName.text.trim().isEmpty) {
-          return 'Renseignez prénom et nom.';
+          return tr('Renseignez prénom et nom.');
         }
-        if (_idNumber.text.trim().isEmpty) return 'Renseignez le numéro de pièce d\'identité.';
-        if (_operatingCity.trim().isEmpty) return 'Choisissez votre ville d\'opération.';
+        if (_idNumber.text.trim().isEmpty) return tr('Renseignez le numéro de pièce d\'identité.');
+        if (_operatingCity.trim().isEmpty) return tr('Choisissez votre ville d\'opération.');
         return null;
       case 1:
-        if (_licenseNumber.text.trim().isEmpty) return 'Renseignez le numéro de permis.';
+        if (_licenseNumber.text.trim().isEmpty) return tr('Renseignez le numéro de permis.');
         return null;
       case 2:
         if (_plate.text.trim().isEmpty || _make.text.trim().isEmpty || _model.text.trim().isEmpty) {
-          return 'Renseignez plaque, marque et modèle du véhicule.';
+          return tr('Renseignez plaque, marque et modèle du véhicule.');
         }
         if (!_isEditingDossier && _vehiclePhotos.isEmpty) {
-          return 'Ajoutez au moins une photo de votre véhicule.';
+          return tr('Ajoutez au moins une photo de votre véhicule.');
         }
         return validateCargoVolume(_vehicleType, _cargoVolume.text);
       case 3:
         if (!_activationConsentsAccepted) {
-          return 'Cochez la formation sécurité, la charte et les CGU pour continuer.';
+          return tr('Cochez la formation sécurité, la charte et les CGU pour continuer.');
         }
         return null;
       case 4:
-        if (_payoutPhone.text.trim().isEmpty) return 'Renseignez le numéro Mobile Money.';
+        if (_payoutPhone.text.trim().isEmpty) return tr('Renseignez le numéro Mobile Money.');
         return null;
       default:
         return null;
@@ -362,8 +362,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       initialDate: initial.isBefore(DateTime.now()) ? DateTime.now().add(const Duration(days: 30)) : initial,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365 * 15)),
-      helpText: 'Choisir une date',
-      cancelText: 'Annuler',
+      helpText: tr('Choisir une date'),
+      cancelText: tr('Annuler'),
       confirmText: 'OK',
     );
     if (picked != null && mounted) {
@@ -386,7 +386,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             suffixIcon: const Icon(Icons.calendar_today, color: MovaColors.violet),
           ),
           child: Text(
-            controller.text.isEmpty ? 'Appuyez pour choisir une date' : controller.text,
+            controller.text.isEmpty ? tr('Appuyez pour choisir une date') : controller.text,
             style: TextStyle(
               color: controller.text.isEmpty ? MovaColors.textSecondary : null,
             ),
@@ -472,7 +472,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         if (data.isEmpty) {
           setState(() {
             _uploadingDoc = null;
-            _error = 'Échec envoi photo — réessayez.';
+            _error = tr('Échec envoi photo — réessayez.');
           });
           return;
         }
@@ -481,7 +481,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         setState(() => _uploadingDoc = null);
         if (saved) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Photo ${_vehiclePhotos.length}/$kMaxVehiclePhotos enregistrée')),
+            SnackBar(content: Text(trf('Photo {length}/{kMaxVehiclePhotos} enregistrée', {'length': _vehiclePhotos.length, 'kMaxVehiclePhotos': kMaxVehiclePhotos}))),
           );
         }
       case Failure(:final error):
@@ -513,7 +513,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   Future<void> _finishOnboarding() async {
     if (!_isEditingDossier && !_activationConsentsAccepted) {
-      setState(() => _error = 'Cochez la formation sécurité, la charte et les CGU.');
+      setState(() => _error = tr('Cochez la formation sécurité, la charte et les CGU.'));
       return;
     }
     setState(() {
@@ -583,7 +583,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         showImagePickError(
           context,
           message: isSelfie
-              ? 'Selfie annulée — activez la caméra avant et cadrage visage.'
+              ? tr('Selfie annulée — activez la caméra avant et cadrage visage.')
               : null,
         );
       }
@@ -603,7 +603,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         if (url.isEmpty) {
           setState(() {
             _uploadingDoc = null;
-            _error = 'Échec envoi photo — réessayez.';
+            _error = tr('Échec envoi photo — réessayez.');
           });
           return;
         }
@@ -616,7 +616,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
               _markDocUploaded(type, url);
             });
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label enregistré')));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trf('{label} enregistré', {'label': label}))));
             }
             if (kScannableDocTypes.contains(type)) await _scanAndPrefill(type);
           case Failure(:final error):
@@ -649,7 +649,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         if (filled.isNotEmpty) {
           setState(() => _autoFilled.addAll(filled));
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Rempli automatiquement : ${filled.join(', ')}. Vérifiez avant de continuer.')),
+            SnackBar(content: Text(trf('Rempli automatiquement : {v1}. Vérifiez avant de continuer.', {'v1': filled.join(', ')}))),
           );
         } else if (data['message'] != null) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'].toString())));
@@ -768,7 +768,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
     return [
       if (publicId != null)
         Text(
-          'Identifiant chauffeur : $publicId',
+          trf('Identifiant chauffeur : {publicId}', {'publicId': publicId}),
           style: const TextStyle(fontWeight: FontWeight.bold, color: MovaColors.violet),
         ),
       ListTile(
@@ -841,7 +841,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           scrollPadding: _fieldScrollPadding,
           decoration: InputDecoration(
             labelText: tr('Ville d\'opération'),
-            hintText: 'Rechercher parmi ${options.length} villes RDC',
+            hintText: trf('Rechercher parmi {length} villes RDC', {'length': options.length}),
             helperText: tr('Capitales provinciales et grandes villes'),
             suffixIcon: IconButton(
               tooltip: tr('Effacer pour voir toutes les villes'),
@@ -889,7 +889,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: widget.canSkipToHome ? 'Mon dossier chauffeur' : 'Enregistrement chauffeur',
+      title: widget.canSkipToHome ? tr('Mon dossier chauffeur') : tr('Enregistrement chauffeur'),
       scrollable: false,
       resizeToAvoidBottomInset: true,
       actions: [
@@ -919,7 +919,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Étape ${_step + 1}/${_steps.length} — ${_steps[_step]}',
+                  trf('Étape {v1}/{length} — {v2}', {'v1': _step + 1, 'length': _steps.length, 'v2': tr(_steps[_step])}),
                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                 ),
                 if (_error != null) ...[
@@ -944,7 +944,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                     Expanded(
                       child: MovaButton(
                         label: _step == _steps.length - 1
-                            ? (_isEditingDossier ? 'Enregistrer' : 'Envoyer le dossier')
+                            ? (_isEditingDossier ? tr('Enregistrer') : tr('Envoyer le dossier'))
                             : 'Continuer',
                         icon: Icons.arrow_forward_rounded,
                         isLoading: _loading,
@@ -1024,14 +1024,14 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           decoration: InputDecoration(labelText: tr('Type')),
           items: [
             DropdownMenuItem(value: 'MOTO_TAXI', child: Text(tr('Moto-taxi'))),
-            DropdownMenuItem(value: 'STANDARD', child: Text('Standard')),
-            DropdownMenuItem(value: 'COMFORT', child: Text('Confort')),
+            DropdownMenuItem(value: 'STANDARD', child: Text(tr('Standard'))),
+            DropdownMenuItem(value: 'COMFORT', child: Text(tr('Confort'))),
             DropdownMenuItem(value: 'VIP', child: Text('VIP')),
-            DropdownMenuItem(value: 'FAMILIALE', child: Text('Familiale (6 à 8 places)')),
-            DropdownMenuItem(value: 'UTILITAIRE', child: Text('Utilitaire')),
-            DropdownMenuItem(value: 'CAMION', child: Text('Camion')),
-            DropdownMenuItem(value: 'TRICYCLE', child: Text('Tricycle passagers (1 à 3 places)')),
-            DropdownMenuItem(value: 'TRIPOTEUR', child: Text('Tripoteur marchandises')),
+            DropdownMenuItem(value: 'FAMILIALE', child: Text(tr('Familiale (6 à 8 places)'))),
+            DropdownMenuItem(value: 'UTILITAIRE', child: Text(tr('Utilitaire'))),
+            DropdownMenuItem(value: 'CAMION', child: Text(tr('Camion'))),
+            DropdownMenuItem(value: 'TRICYCLE', child: Text(tr('Tricycle passagers (1 à 3 places)'))),
+            DropdownMenuItem(value: 'TRIPOTEUR', child: Text(tr('Tripoteur marchandises'))),
           ],
           onChanged: (v) => setState(() {
             _vehicleType = v ?? 'STANDARD';
@@ -1051,11 +1051,11 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             decoration: InputDecoration(
               labelText: tr('Places passagers (sans compter le chauffeur)'),
               helperText: _vehicleType == 'FAMILIALE'
-                  ? 'Familiale : 5 à 8 places. Vous recevez aussi les courses Standard.'
+                  ? tr('Familiale : 5 à 8 places. Vous recevez aussi les courses Standard.')
                   : _vehicleType == 'TRICYCLE'
-                      ? 'Tricycle : 1 à 3 places. Vous recevez les courses de la gamme Tricycle et des petits colis.'
-                  : 'Les groupes plus grands que vos places ne vous seront pas proposés. '
-                      '6 places ou plus ? Choisissez la catégorie Familiale.',
+                      ? tr('Tricycle : 1 à 3 places. Vous recevez les courses de la gamme Tricycle et des petits colis.')
+                  : tr('Les groupes plus grands que vos places ne vous seront pas proposés. '
+                      '6 places ou plus ? Choisissez la catégorie Familiale.'),
               helperMaxLines: 3,
             ),
             items: [
@@ -1074,9 +1074,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             decoration: InputDecoration(
               labelText: tr('Volume utile (m³)'),
               suffixText: 'm³',
-              helperText: 'Espace de chargement de votre ${switch (_vehicleType) { 'CAMION' => 'camion', 'TRIPOTEUR' => 'tripoteur', _ => 'utilitaire' }} '
-                  '(${cargoVolumeRange(_vehicleType)!.min} à ${cargoVolumeRange(_vehicleType)!.max} m³). '
-                  'Vous ne recevrez que les déménagements qui y tiennent. SENGA le vérifie avec la photo.',
+              helperText: trf('Espace de chargement de votre {v1} ({v2} à {v3} m³). Vous ne recevrez que les déménagements qui y tiennent. SENGA le vérifie avec la photo.', {'v1': switch (_vehicleType) { 'CAMION' => 'camion', 'TRIPOTEUR' => 'tripoteur', _ => 'utilitaire' }, 'v2': cargoVolumeRange(_vehicleType)!.min, 'v3': cargoVolumeRange(_vehicleType)!.max}),
               helperMaxLines: 4,
             ),
           ),
@@ -1102,7 +1100,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         ],
         const SizedBox(height: 12),
         Text(
-          'Photos de l\'engin (${_vehiclePhotos.length}/$kMaxVehiclePhotos)',
+          trf('Photos de l\'engin ({length}/{kMaxVehiclePhotos})', {'length': _vehiclePhotos.length, 'kMaxVehiclePhotos': kMaxVehiclePhotos}),
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
         const SizedBox(height: 4),
@@ -1187,7 +1185,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             icon: _uploadingDoc == 'VEHICLE_PHOTO'
                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.photo_camera_outlined),
-            label: Text(_vehiclePhotos.isEmpty ? 'Prendre une photo' : 'Ajouter une photo'),
+            label: Text(_vehiclePhotos.isEmpty ? tr('Prendre une photo') : tr('Ajouter une photo')),
           ),
         const SizedBox(height: 20),
         _docButton('VEHICLE_REGISTRATION', 'Carte rose (optionnel)'),
@@ -1292,9 +1290,9 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
               const SizedBox(height: 12),
               Text('Identifiant : ${_state?['publicId'] ?? '—'}'),
               const SizedBox(height: 6),
-              Text('Documents requis : ${_state?['kyc']?['requiredComplete'] == true ? 'Complets' : 'Incomplets'}'),
+              Text(trf('Documents requis : {v1}', {'v1': _state?['kyc']?['requiredComplete'] == true ? tr('Complets') : tr('Incomplets')})),
               const SizedBox(height: 6),
-              Text('Statut KYC : $kycStatus'),
+              Text(trf('Statut KYC : {kycStatus}', {'kycStatus': kycStatus})),
             ],
           ),
         ),
@@ -1308,6 +1306,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   }
 
   Widget _docButton(String type, String label) {
+    label = tr(label);
     final done = _docUploaded(type);
     final notes = _docRejectNotes(type);
     return Padding(
@@ -1341,7 +1340,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
           if (notes != null && notes.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Text('Motif du refus : $notes', style: const TextStyle(color: Colors.red, fontSize: 13)),
+              child: Text(trf('Motif du refus : {notes}', {'notes': notes}), style: const TextStyle(color: Colors.red, fontSize: 13)),
             ),
         ],
       ),

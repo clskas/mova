@@ -66,7 +66,7 @@ class _CashDebtCashPaymentScreenState extends ConsumerState<CashDebtCashPaymentS
         if (data['created'] == false) {
           setState(() {
             _loading = false;
-            _error = data['message']?.toString() ?? 'Aucune dette espèces ouverte';
+            _error = data['message']?.toString() ?? tr('Aucune dette espèces ouverte');
           });
           return;
         }
@@ -108,7 +108,7 @@ class _CashDebtCashPaymentScreenState extends ConsumerState<CashDebtCashPaymentS
     if (raw == null) return '';
     final dt = DateTime.tryParse(raw)?.toLocal();
     if (dt == null) return '';
-    return 'Valide jusqu\'à ${DateFormat('HH:mm').format(dt)}';
+    return trf('Valide jusqu\'à {v1}', {'v1': DateFormat('HH:mm').format(dt)});
   }
 
   @override

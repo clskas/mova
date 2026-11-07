@@ -1,5 +1,6 @@
 import 'result.dart';
 import 'user_friendly_error.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Messages SENGA alignés sur packages/shared/src/mova-error-codes.ts
 const movaErrorMessages = <String, String>{
@@ -77,7 +78,7 @@ MovaFailure failureFromApiResponse(int statusCode, Map<String, dynamic> body) {
   if (body['maintenance'] == true || (error is Map && error['code'] == 'MAINTENANCE')) {
     final msg = (error is Map ? error['message']?.toString() : null) ??
         topMessage ??
-        'SENGA est actuellement en maintenance. Merci pour votre patience.';
+        tr('SENGA est actuellement en maintenance. Merci pour votre patience.');
     return ServerFailure(sanitizeUserMessage(msg, fallback: msg));
   }
   if (error is Map<String, dynamic>) {
@@ -115,7 +116,7 @@ MovaFailure failureFromApiResponse(int statusCode, Map<String, dynamic> body) {
   }
 
   if (statusCode == 401) {
-    return const AuthFailure('Session expirée. Reconnectez-vous.');
+    return AuthFailure(tr('Session expirée. Reconnectez-vous.'));
   }
-  return ServerFailure('Impossible de contacter le serveur. Réessayez.');
+  return ServerFailure(tr('Impossible de contacter le serveur. Réessayez.'));
 }

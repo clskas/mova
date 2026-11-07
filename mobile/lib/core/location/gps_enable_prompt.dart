@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../theme/mova_colors.dart';
 import 'location_permission.dart';
+import '../../core/i18n/i18n.dart';
 
 /// État GPS / permissions au démarrage ou au retour sur l'app.
 enum GpsReadiness {
@@ -47,22 +48,22 @@ class _GpsDialog extends StatelessWidget {
   final GpsReadiness readiness;
 
   String get _title => switch (readiness) {
-        GpsReadiness.serviceDisabled => 'Activez le GPS',
-        GpsReadiness.permissionDenied => 'Autorisez la localisation',
-        GpsReadiness.permissionDeniedForever => 'Localisation bloquée',
+        GpsReadiness.serviceDisabled => tr('Activez le GPS'),
+        GpsReadiness.permissionDenied => tr('Autorisez la localisation'),
+        GpsReadiness.permissionDeniedForever => tr('Localisation bloquée'),
         GpsReadiness.ready => '',
       };
 
   String get _message => switch (readiness) {
         GpsReadiness.serviceDisabled =>
-          'SENGA a besoin du GPS pour localiser les courses, les livraisons et votre position sur la carte. '
-          'Activez la localisation dans les paramètres de votre téléphone.',
+          tr('SENGA a besoin du GPS pour localiser les courses, les livraisons et votre position sur la carte. '
+          'Activez la localisation dans les paramètres de votre téléphone.'),
         GpsReadiness.permissionDenied =>
-          'Autorisez SENGA à accéder à votre position pour proposer des adresses précises, '
-          'estimer les prix et suivre les courses en temps réel.',
+          tr('Autorisez SENGA à accéder à votre position pour proposer des adresses précises, '
+          'estimer les prix et suivre les courses en temps réel.'),
         GpsReadiness.permissionDeniedForever =>
-          'L\'accès à la position a été refusé définitivement. '
-          'Ouvrez les paramètres de l\'application et autorisez la localisation pour utiliser SENGA.',
+          tr('L\'accès à la position a été refusé définitivement. '
+          'Ouvrez les paramètres de l\'application et autorisez la localisation pour utiliser SENGA.'),
         GpsReadiness.ready => '',
       };
 
@@ -93,14 +94,14 @@ class _GpsDialog extends StatelessWidget {
         if (readiness != GpsReadiness.serviceDisabled)
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Plus tard'),
+            child: Text(tr('Plus tard')),
           ),
         TextButton(
           onPressed: () => _primaryAction(context),
           child: Text(
             readiness == GpsReadiness.serviceDisabled
-                ? 'Ouvrir les paramètres'
-                : 'Autoriser',
+                ? tr('Ouvrir les paramètres')
+                : tr('Autoriser'),
           ),
         ),
       ],

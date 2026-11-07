@@ -78,7 +78,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           setState(() {
             _applyProfile(cached.profile!, syncedAt: cached.syncedAt);
             _loading = false;
-            _error = 'Profil hors ligne (dernière synchro).';
+            _error = tr('Profil hors ligne (dernière synchro).');
           });
         } else if (mounted) {
           setState(() {
@@ -97,7 +97,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final lastName = _lastName.text.trim();
     final email = _email.text.trim();
     if (email.isNotEmpty && !_isValidEmail(email)) {
-      setState(() => _error = 'Adresse e-mail invalide (ex. nom@domaine.com).');
+      setState(() => _error = tr('Adresse e-mail invalide (ex. nom@domaine.com).'));
       return;
     }
 
@@ -143,8 +143,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           SnackBar(
             content: Text(
               offline
-                  ? 'Profil enregistré hors ligne — synchronisation à la reconnexion.'
-                  : 'Profil mis à jour.',
+                  ? tr('Profil enregistré hors ligne — synchronisation à la reconnexion.')
+                  : tr('Profil mis à jour.'),
             ),
           ),
         );
@@ -220,7 +220,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       if (_lastSync != null) ...[
                         const SizedBox(height: 8),
                         Text(
-                          'Dernière synchro : ${_formatSync(_lastSync!)}',
+                          trf('Dernière synchro : {v1}', {'v1': _formatSync(_lastSync!)}),
                           style: const TextStyle(color: MovaColors.textSecondary, fontSize: 11),
                         ),
                       ],

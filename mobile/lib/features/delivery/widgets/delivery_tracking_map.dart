@@ -4,6 +4,7 @@ import '../../../core/geo/geo_utils.dart';
 import '../../../core/theme/mova_colors.dart';
 import '../../../core/widgets/mova_widgets.dart';
 import '../../booking/widgets/mova_ride_map.dart';
+import '../../../core/i18n/i18n.dart';
 
 /// Carte + ETA + PIN pour suivi livraison (Glovo-style).
 class DeliveryTrackingMap extends StatelessWidget {
@@ -93,7 +94,7 @@ class DeliveryTrackingMap extends StatelessWidget {
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(
-                            'Livraison ~$etaMinutes min',
+                            trf('Livraison ~{etaMinutes} min', {'etaMinutes': etaMinutes}),
                             style: const TextStyle(fontWeight: FontWeight.w600),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -110,8 +111,8 @@ class DeliveryTrackingMap extends StatelessWidget {
                   child: MovaCard(
                     child: Column(
                       children: [
-                        const Text(
-                          'Code PIN',
+                        Text(
+                          tr('Code PIN'),
                           style: TextStyle(fontSize: 11, color: MovaColors.textSecondary),
                         ),
                         Text(
@@ -164,10 +165,10 @@ class DeliveryTrackingMap extends StatelessWidget {
                           ],
                         ),
                       if (courierPositionEstimated)
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.only(top: 4),
                           child: Text(
-                            'Position estimée (GPS indisponible)',
+                            tr('Position estimée (GPS indisponible)'),
                             style: TextStyle(fontSize: 11, color: MovaColors.textSecondary),
                           ),
                         ),
@@ -179,9 +180,9 @@ class DeliveryTrackingMap extends StatelessWidget {
           ),
         ] else if (courierPositionEstimated) ...[
           const SizedBox(height: 8),
-          const MovaCard(
+          MovaCard(
             child: Text(
-              'Position du coursier estimée — le GPS sera affiché dès qu\'il sera disponible.',
+              tr('Position du coursier estimée — le GPS sera affiché dès qu\'il sera disponible.'),
               style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
             ),
           ),

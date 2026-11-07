@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/config/client_apps_config.dart';
 import '../../../core/theme/mova_colors.dart';
+import '../../../core/i18n/i18n.dart';
 
 /// « Nombre de passagers » for car rides: − / + stepper (1 to [max]).
 class PassengerCountSelector extends StatelessWidget {
@@ -30,15 +31,15 @@ class PassengerCountSelector extends StatelessWidget {
           children: [
             const Icon(Icons.people_alt_outlined, color: MovaColors.violet),
             const SizedBox(width: 8),
-            const Expanded(
+            Expanded(
               child: Text(
-                'Nombre de passagers',
+                tr('Nombre de passagers'),
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
             IconButton(
               key: const Key('passengerCountMinus'),
-              tooltip: 'Moins de passagers',
+              tooltip: tr('Moins de passagers'),
               onPressed: count > 1 ? () => onChanged(count - 1) : null,
               icon: const Icon(Icons.remove_circle_outline),
             ),
@@ -53,7 +54,7 @@ class PassengerCountSelector extends StatelessWidget {
             ),
             IconButton(
               key: const Key('passengerCountPlus'),
-              tooltip: 'Plus de passagers',
+              tooltip: tr('Plus de passagers'),
               onPressed: count < max ? () => onChanged(count + 1) : null,
               icon: const Icon(Icons.add_circle_outline),
             ),
@@ -67,12 +68,12 @@ class PassengerCountSelector extends StatelessWidget {
           )
         else if (count > standardSeats)
           Text(
-            'Seules les voitures de $count places ou plus recevront la course : l\'attente peut être plus longue.',
+            trf('Seules les voitures de {count} places ou plus recevront la course : l\'attente peut être plus longue.', {'count': count}),
             style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
           )
         else if (count >= max && max <= kCarPassengerLimit)
-          const Text(
-            '4 passagers maximum par voiture.',
+          Text(
+            tr('4 passagers maximum par voiture.'),
             key: Key('passengerCountNote'),
             style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
           ),

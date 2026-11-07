@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../sos/notification_tap_router.dart';
+import '../../core/i18n/i18n.dart';
 
 class IncomingCallInfo {
   const IncomingCallInfo({
@@ -78,8 +79,8 @@ class CallRingService {
       final isRide = payload['rideId'] != null && payload['rideId'].toString().isNotEmpty;
       final starterRole = payload['starterRole']?.toString() ?? '';
       final peerLabel = starterRole == 'driver' || starterRole == 'courier'
-          ? (isRide ? 'Chauffeur' : 'Livreur')
-          : (isRide ? 'Passager' : 'Contact');
+          ? (isRide ? tr('Chauffeur') : tr('Livreur'))
+          : (isRide ? tr('Passager') : tr('Contact'));
       unawaited(startIncoming(
         deliveryId: id,
         starterId: starterId,
@@ -209,8 +210,8 @@ class CallRingService {
     try {
       await _plugin.show(
         id: 77001,
-        title: 'Appel vocal SENGA',
-        body: '$peerLabel vous appelle — touchez Décrocher.',
+        title: tr('Appel vocal SENGA'),
+        body: trf('{peerLabel} vous appelle — touchez Décrocher.', {'peerLabel': peerLabel}),
         notificationDetails: const NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,

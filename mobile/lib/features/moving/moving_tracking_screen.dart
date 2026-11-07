@@ -203,7 +203,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Déménagement #${widget.movingId.length <= 8 ? widget.movingId.toUpperCase() : widget.movingId.substring(0, 8).toUpperCase()}',
+                        trf('Déménagement #{v1}', {'v1': widget.movingId.length <= 8 ? widget.movingId.toUpperCase() : widget.movingId.substring(0, 8).toUpperCase()}),
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       const SizedBox(height: 4),
@@ -216,10 +216,10 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                       if (_request != null)
                         ServicePriceDisplay.passengerCard(
                           {..._request!, 'type': 'MOVING'},
-                          totalLabel: 'Total déménagement',
+                          totalLabel: tr('Total déménagement'),
                         ),
                       Text(
-                        isPaid ? 'Payé' : historyStatusLabel(status),
+                        isPaid ? tr('Payé') : historyStatusLabel(status),
                         style: TextStyle(
                           color: isPaid ? MovaColors.green : MovaColors.violet,
                           fontWeight: FontWeight.w600,
@@ -229,8 +229,8 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                         const SizedBox(height: 12),
                         Text(
                           _request?['cashDisputed'] == true
-                              ? 'Litige : l\'équipe signale ne pas avoir reçu les espèces.'
-                              : 'Paiement espèces en attente — l\'équipe confirmera la réception.',
+                              ? tr('Litige : l\'équipe signale ne pas avoir reçu les espèces.')
+                              : tr('Paiement espèces en attente — l\'équipe confirmera la réception.'),
                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                         ),
                         const SizedBox(height: 8),
@@ -298,7 +298,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                           size: 22,
                         ),
                         const SizedBox(width: 12),
-                        Expanded(child: Text(step['label']?.toString() ?? '')),
+                        Expanded(child: Text(tr(step['label']?.toString() ?? ''))),
                       ],
                     ),
                   );

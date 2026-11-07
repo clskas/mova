@@ -1,3 +1,5 @@
+import '../../core/i18n/i18n.dart';
+
 /// Seed demo range `+2439000000xx` — OTP 123456, PIN setup skipped for E2E.
 bool isSeedDemoPhone(String phone) =>
     RegExp(r'^\+2439000000\d{2}$').hasMatch(phone.trim());
@@ -36,12 +38,12 @@ String maskLoginIdentity(String identity) {
     final shown = keep > local.length ? local.length : keep;
     return '${local.substring(0, shown)}***@$domain';
   }
-  if (n.length < 7) return 'votre numéro';
+  if (n.length < 7) return tr('votre numéro');
   return '${n.substring(0, 4)} ••• ${n.substring(n.length - 3)}';
 }
 
 String connectionPinPrompt(String identity) =>
-    'Entrez le PIN pour ${maskLoginIdentity(identity)}';
+    trf('Entrez le PIN pour {v1}', {'v1': maskLoginIdentity(identity)});
 
 /// Prefer +243, else Google e-mail. Never store leftover "+243".
 String loginIdentityFromAuth({

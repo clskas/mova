@@ -154,7 +154,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                 tripId: widget.tripId,
                 fromAddress: trip['fromAddress']?.toString() ?? '',
                 toAddress: trip['toAddress']?.toString() ?? '',
-                driverName: trip['driverName']?.toString() ?? 'Conducteur',
+                driverName: trip['driverName']?.toString() ?? tr('Conducteur'),
                 pricePerSeatCdf: trip['pricePerSeatCdf'] as int? ?? 0,
                 seats: _bookSeats,
                 departureAt: trip['departureAt']?.toString(),
@@ -232,7 +232,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_isDriver ? 'Trajet annulé' : 'Réservation annulée')),
+          SnackBar(content: Text(_isDriver ? tr('Trajet annulé') : tr('Réservation annulée'))),
         );
         Navigator.pop(context);
       case Failure(:final error):
@@ -258,7 +258,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
     final showBook = !_isDriver && !_isPassenger && seatsLeft > 0;
 
     return MovaScreen(
-      title: _isDriver ? 'Mon trajet' : 'Détail du trajet',
+      title: _isDriver ? tr('Mon trajet') : tr('Détail du trajet'),
       child: _loading && trip == null
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -283,8 +283,8 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                         Expanded(
                           child: Text(
                             _isDriver
-                                ? 'Covoiturage planifié — pas une course VTC instantanée.'
-                                : 'Vous êtes passager sur ce trajet partagé.',
+                                ? tr('Covoiturage planifié — pas une course VTC instantanée.')
+                                : tr('Vous êtes passager sur ce trajet partagé.'),
                             style: const TextStyle(fontSize: 12, color: MovaColors.violet),
                           ),
                         ),
@@ -324,7 +324,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                         child: Text(
                           rating != null
                               ? '${trip['driverName']} · ★ $rating'
-                              : trip['driverName']?.toString() ?? 'Conducteur',
+                              : trip['driverName']?.toString() ?? tr('Conducteur'),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -369,24 +369,24 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                     ServicePriceDisplay.carpoolBookingCard(
                       pricePerSeatCdf: trip['pricePerSeatCdf'] as int? ?? 0,
                       seats: _bookSeats,
-                      totalLabel: 'Total réservation',
+                      totalLabel: tr('Total réservation'),
                     )
                   else if (_isPassenger && (trip['mySeats'] as int? ?? 0) > 0)
                     ServicePriceDisplay.carpoolBookingCard(
                       pricePerSeatCdf: trip['pricePerSeatCdf'] as int? ?? 0,
                       seats: trip['mySeats'] as int? ?? 1,
-                      totalLabel: 'Votre réservation',
+                      totalLabel: tr('Votre réservation'),
                     )
                   else
                     ServicePriceDisplay.passengerCard(
                       {...trip, 'type': 'CARPOOL'},
-                      totalLabel: 'Prix par place',
+                      totalLabel: tr('Prix par place'),
                       seats: 1,
                     ),
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      '$seatsLeft place${seatsLeft > 1 ? 's' : ''} restante${seatsLeft > 1 ? 's' : ''}',
+                      trf('{seatsLeft} place{v2} restante{v3}', {'seatsLeft': seatsLeft, 'v2': seatsLeft > 1 ? 's' : '', 'v3': seatsLeft > 1 ? 's' : ''}),
                       style: const TextStyle(color: MovaColors.textSecondary),
                     ),
                   ),
@@ -396,7 +396,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                       children: [
                         if (trip['meetingPoint'] != null) ...[
                           const SizedBox(height: 8),
-                          Text('Point de rendez-vous : ${trip['meetingPoint']}'),
+                          Text(trf('Point de rendez-vous : {v1}', {'v1': trip['meetingPoint']})),
                         ],
                         if (trip['notes'] != null) ...[
                           const SizedBox(height: 4),
@@ -417,7 +417,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                               ),
                             ),
                           if (trip['vehicleInfo'] != null)
-                            Text('Véhicule : ${trip['vehicleInfo']}'),
+                            Text(trf('Véhicule : {v1}', {'v1': trip['vehicleInfo']})),
                           if (trip['vehicleType'] != null)
                             Text(
                               'Type : ${trip['vehicleType']}',
@@ -446,7 +446,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                       (p) => ListTile(
                         dense: true,
                         leading: const Icon(Icons.person_outline),
-                        title: Text(p['label']?.toString() ?? 'Passager'),
+                        title: Text(p['label']?.toString() ?? tr('Passager')),
                         trailing: Text('${p['seats']} pl.'),
                       ),
                     ),
@@ -569,7 +569,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                   if ((_isDriver || _isPassenger) && CancelEligibility.carpool(trip))
                     TextButton(
                       onPressed: _actionLoading ? null : _cancel,
-                      child: Text(_isDriver ? 'Annuler le trajet' : 'Annuler ma réservation'),
+                      child: Text(_isDriver ? tr('Annuler le trajet') : tr('Annuler ma réservation')),
                     ),
                 ],
                 if (_error != null) ...[
@@ -615,7 +615,7 @@ class _Timeline extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                steps[stepIdx],
+                tr(steps[stepIdx]),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

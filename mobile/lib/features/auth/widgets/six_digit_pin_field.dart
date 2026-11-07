@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/mova_colors.dart';
+import '../../../core/i18n/i18n.dart';
 
 /// Champ de saisie d'un code à 6 chiffres (PIN local ou OTP SMS/e-mail).
 ///
@@ -98,7 +99,7 @@ class _SixDigitPinFieldState extends State<SixDigitPinField> {
         ),
         counterText: '',
         helperText: forOtp
-            ? 'Le code se remplit après réception du SMS (autorisez si Android le demande)'
+            ? tr('Le code se remplit après réception du SMS (autorisez si Android le demande)')
             : null,
         helperMaxLines: 2,
       ),

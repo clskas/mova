@@ -10,6 +10,7 @@ import '../passenger/passenger_alert_service.dart';
 import '../sos/notification_tap_router.dart';
 import 'call_ring_service.dart';
 import 'chat_alert_service.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Poll léger des notifications serveur pour afficher une bannière chat / SOS
 /// même hors écran dédié, sans dépendre de FCM (fonctionne tant que l'app tourne).
@@ -70,8 +71,8 @@ class ChatPollService {
 
         final type = n['type']?.toString() ?? '';
         if (type == 'INCIDENT_CREATED') {
-          final title = n['title']?.toString() ?? 'Alerte SOS';
-          final body = n['body']?.toString() ?? 'Urgence signalée sur SENGA';
+          final title = n['title']?.toString() ?? tr('Alerte SOS');
+          final body = n['body']?.toString() ?? tr('Urgence signalée sur SENGA');
           final data = (n['data'] is Map) ? Map<String, dynamic>.from(n['data'] as Map) : const <String, dynamic>{};
           final lat = data['lat'] is num ? (data['lat'] as num).toDouble() : double.tryParse('${data['lat'] ?? ''}');
           final lng = data['lng'] is num ? (data['lng'] as num).toDouble() : double.tryParse('${data['lng'] ?? ''}');
@@ -133,7 +134,7 @@ class ChatPollService {
                   peerFromTitle.isNotEmpty &&
                   peerFromTitle.toLowerCase() != 'message senga')
               ? peerFromTitle
-              : (callKind == 'ride' ? 'Course' : 'Livraison');
+              : (callKind == 'ride' ? tr('Course') : tr('Livraison'));
           // fromRealtime:true — un NOUVEAU message chat (id non vu) = nouvel appel.
           // La suppression ne doit bloquer que les relances du même message après refus.
           CallRingService.allowNewIncoming(threadId);
@@ -151,7 +152,7 @@ class ChatPollService {
           kind: kind,
           threadId: threadId,
           messageId: messageId,
-          title: n['title']?.toString() ?? 'Message SENGA',
+          title: n['title']?.toString() ?? tr('Message SENGA'),
           body: body,
         );
       }

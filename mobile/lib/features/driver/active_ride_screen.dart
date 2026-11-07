@@ -205,7 +205,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         threadId: _rideId,
         senderRole: role,
         text: payload['text']?.toString() ?? '',
-        peerLabel: 'Passager',
+        peerLabel: tr('Passager'),
         messageId: payload['id']?.toString(),
       );
     };
@@ -223,7 +223,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         deliveryId: _rideId,
         starterId: payload['starterId']?.toString() ?? '',
         myUserId: _userId,
-        peerLabel: 'Passager',
+        peerLabel: tr('Passager'),
         kind: 'ride',
         fromRealtime: true,
       ));
@@ -246,7 +246,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         builder: (_) => DeliveryVoiceCallScreen(
           threadId: _rideId,
           kind: VoiceCallKind.ride,
-          peerLabel: 'Passager',
+          peerLabel: tr('Passager'),
           announce: true,
         ),
       ),
@@ -405,17 +405,17 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(arrived ? 'Passager absent ?' : 'Annuler la course ?'),
+        title: Text(arrived ? tr('Passager absent ?') : tr('Annuler la course ?')),
         content: Text(
           arrived
-              ? 'Confirmez uniquement si le passager ne se présente pas après l\'attente. Des frais no-show peuvent s\'appliquer.'
-              : 'Le passager sera notifié. Annulez seulement en cas de problème (sécurité, véhicule, etc.).',
+              ? tr('Confirmez uniquement si le passager ne se présente pas après l\'attente. Des frais no-show peuvent s\'appliquer.')
+              : tr('Le passager sera notifié. Annulez seulement en cas de problème (sécurité, véhicule, etc.).'),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(arrived ? 'Confirmer no-show' : 'Oui, annuler'),
+            child: Text(arrived ? tr('Confirmer no-show') : tr('Oui, annuler')),
           ),
         ],
       ),
@@ -434,7 +434,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     setState(() => _loading = false);
     switch (result) {
       case Success(:final data):
-        final msg = data['message']?.toString() ?? 'Course annulée';
+        final msg = data['message']?.toString() ?? tr('Course annulée');
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
         Navigator.popUntil(context, (r) => r.isFirst);
       case Failure(:final error):
@@ -473,8 +473,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Course terminée — revenu estimé ${MarketConfig.formatCdf(driverNet)}. '
-                  'En attente du paiement passager.',
+                  trf('Course terminée — revenu estimé {v1}. En attente du paiement passager.', {'v1': MarketConfig.formatCdf(driverNet)}),
                 ),
               ),
             );
@@ -508,11 +507,11 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   String? _nextActionLabel() => _isSharedPool
       ? null
       : switch (_status) {
-          'DRIVER_ASSIGNED' => 'Je suis arrivé',
-          'ARRIVING' => 'Démarrer la course',
+          'DRIVER_ASSIGNED' => tr('Je suis arrivé'),
+          'ARRIVING' => tr('Démarrer la course'),
           'IN_PROGRESS' => _isRoundTripReturn
-              ? 'Terminer le retour'
-              : (_isRoundTrip ? 'Arrivé à destination (aller)' : 'Terminer la course'),
+              ? tr('Terminer le retour')
+              : (_isRoundTrip ? tr('Arrivé à destination (aller)') : tr('Terminer la course')),
           _ => null,
         };
 
@@ -605,8 +604,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
 
     return MovaScreen(
       title: _status == 'COMPLETED'
-          ? 'Course terminée'
-          : (_isSharedPool ? 'Course Pool' : 'Course en cours'),
+          ? tr('Course terminée')
+          : (_isSharedPool ? tr('Course Pool') : tr('Course en cours')),
       scrollable: false,
       actions: [
         sosAppBarButton(
@@ -631,7 +630,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                 builder: (_) => RideChatScreen(
                   rideId: _rideId,
                   myRole: 'driver',
-                  peerLabel: 'Passager',
+                  peerLabel: tr('Passager'),
                 ),
               ),
             );
@@ -670,7 +669,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _ride['pickupAddress']?.toString() ?? 'Point de prise en charge',
+                    _ride['pickupAddress']?.toString() ?? tr('Point de prise en charge'),
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
@@ -711,7 +710,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                     ),
                     child: Text(
                       _ride['roundTripLabel']?.toString() ??
-                          (_isRoundTripReturn ? 'Aller-retour · Retour' : 'Aller-retour · Aller'),
+                          (_isRoundTripReturn ? tr('Aller-retour · Retour') : tr('Aller-retour · Aller')),
                       style: const TextStyle(
                         color: MovaColors.violet,
                         fontWeight: FontWeight.w700,
@@ -724,18 +723,18 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                 if (!headingToPickup)
                   Text(
                     _isRoundTripReturn
-                        ? (_ride['dropoffAddress']?.toString() ?? 'Destination aller')
-                        : (_ride['pickupAddress']?.toString() ?? 'Départ'),
+                        ? (_ride['dropoffAddress']?.toString() ?? tr('Destination aller'))
+                        : (_ride['pickupAddress']?.toString() ?? tr('Départ')),
                     style: const TextStyle(fontWeight: FontWeight.bold),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 Text(
                   headingToPickup
-                      ? 'Destination : ${_ride['dropoffAddress']?.toString() ?? 'Arrivée'}'
+                      ? 'Destination : ${_ride['dropoffAddress']?.toString() ?? tr('Arrivée')}'
                       : _isRoundTripReturn
-                          ? '→ ${_ride['activeDestinationAddress']?.toString() ?? _ride['pickupAddress']?.toString() ?? 'Retour au départ'}'
-                          : '→ ${_ride['dropoffAddress']?.toString() ?? 'Arrivée'}',
+                          ? '→ ${_ride['activeDestinationAddress']?.toString() ?? _ride['pickupAddress']?.toString() ?? tr('Retour au départ')}'
+                          : '→ ${_ride['dropoffAddress']?.toString() ?? tr('Arrivée')}',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -786,7 +785,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                     showCallWhatsAppSheet(
                       context,
                       phone: phone,
-                      peerLabel: 'le passager',
+                      peerLabel: tr('le passager'),
                     );
                   },
                 ),
@@ -819,8 +818,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
           if (!headingToPickup)
             MovaButton(
               label: _isRoundTripReturn
-                  ? 'Navigation retour (départ)'
-                  : 'Navigation destination',
+                  ? tr('Navigation retour (départ)')
+                  : tr('Navigation destination'),
               isSecondary: true,
               icon: Icons.navigation_outlined,
               onPressed: _openDropoff,
@@ -828,7 +827,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
           if (!headingToPickup) const SizedBox(height: 12),
           if (_isSharedPool) ...[
             Text(
-              'Passagers Pool (${_sharePassengers.length})',
+              trf('Passagers Pool ({length})', {'length': _sharePassengers.length}),
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
@@ -850,7 +849,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${p['pickupAddress'] ?? 'Prise'} → ${p['dropoffAddress'] ?? 'Dépose'}',
+                        '${p['pickupAddress'] ?? tr('Prise')} → ${p['dropoffAddress'] ?? tr('Dépose')}',
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 4),
@@ -901,8 +900,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             const SizedBox(height: 12),
             MovaButton(
               label: (_status == 'ARRIVING' || _status == 'DRIVER_ARRIVED')
-                  ? 'Annuler — passager absent'
-                  : 'Annuler la course',
+                  ? tr('Annuler — passager absent')
+                  : tr('Annuler la course'),
               isSecondary: true,
               icon: Icons.cancel_outlined,
               isLoading: _loading,
@@ -937,7 +936,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                     builder: (_) => RideChatScreen(
                       rideId: _rideId,
                       myRole: 'driver',
-                      peerLabel: 'Passager',
+                      peerLabel: tr('Passager'),
                     ),
                   ),
                 );
@@ -968,7 +967,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                           _driverNetCdf != _passengerCashTotalCdf) ...[
                         const SizedBox(height: 6),
                         Text(
-                          'Votre part nette ~${MarketConfig.formatCdf(_driverNetCdf!)}',
+                          trf('Votre part nette ~{v1}', {'v1': MarketConfig.formatCdf(_driverNetCdf!)}),
                           style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
                         ),
                       ],
@@ -988,7 +987,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                 const SizedBox(height: 12),
               ],
               MovaButton(
-                label: _cashDisputed ? 'J’ai reçu les espèces' : 'Cash reçu',
+                label: _cashDisputed ? tr('J’ai reçu les espèces') : tr('Cash reçu'),
                 isSecondary: true,
                 icon: Icons.payments_outlined,
                 onPressed: _confirmCash,
@@ -1028,8 +1027,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     final result = await DriverCashReceivedDialog.show(
       context,
       title: closingDispute
-          ? 'Clôturer le litige espèces ?'
-          : (auto ? 'Le passager paie en espèces' : 'Cash reçu ?'),
+          ? tr('Clôturer le litige espèces ?')
+          : (auto ? tr('Le passager paie en espèces') : tr('Cash reçu ?')),
       passengerTotalCdf: _passengerCashTotalCdf,
       driverNetCdf: _driverNetCdf,
       confirm: () async {
@@ -1066,7 +1065,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         return switch (r) {
           Success(:final data) => (
               ok: true,
-              message: data['message']?.toString() ?? 'Litige enregistré',
+              message: data['message']?.toString() ?? tr('Litige enregistré'),
             ),
           Failure(:final error) => (ok: false, message: error.message),
         };
@@ -1093,18 +1092,18 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       SnackBar(
         content: Text(
           closingDispute
-              ? 'Litige espèces non reçues clôturé — paiement confirmé.'
-              : 'Paiement espèces confirmé',
+              ? tr('Litige espèces non reçues clôturé — paiement confirmé.')
+              : tr('Paiement espèces confirmé'),
         ),
       ),
     );
   }
 
   String _statusLabel(String status) => switch (status) {
-        'DRIVER_ASSIGNED' => 'En route vers le passager',
-        'ARRIVING' => 'Arrivé — en attente du passager',
-        'IN_PROGRESS' => 'Course en cours',
-        'COMPLETED' => _isPaid ? 'Terminée · Payée' : 'Terminée · En attente de paiement',
+        'DRIVER_ASSIGNED' => tr('En route vers le passager'),
+        'ARRIVING' => tr('Arrivé — en attente du passager'),
+        'IN_PROGRESS' => tr('Course en cours'),
+        'COMPLETED' => _isPaid ? tr('Terminée · Payée') : tr('Terminée · En attente de paiement'),
         _ => status,
       };
 }
@@ -1135,7 +1134,7 @@ class _PaymentStatusChip extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            isPaid ? 'Payée' : 'En attente de paiement',
+            isPaid ? tr('Payée') : tr('En attente de paiement'),
             style: TextStyle(
               color: isPaid ? MovaColors.green : MovaColors.orange,
               fontWeight: FontWeight.w600,

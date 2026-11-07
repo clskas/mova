@@ -98,7 +98,7 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
     }
     setState(() {
       _submitting = false;
-      _error = result.message ?? 'Code PIN incorrect';
+      _error = result.message ?? tr('Code PIN incorrect');
       _controller.clear();
     });
   }
@@ -109,7 +109,7 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
     final net = widget.driverNetCdf;
     return AlertDialog(
       scrollable: true,
-      title: Text(widget.title),
+      title: Text(tr(widget.title)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -145,8 +145,7 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
                   if (net != null && net > 0 && net != total) ...[
                     const SizedBox(height: 6),
                     Text(
-                      'Dont votre part nette ~${MarketConfig.formatCdf(net)} '
-                      '(le reste = commission SENGA à reverser)',
+                      trf('Dont votre part nette ~{v1} (le reste = commission SENGA à reverser)', {'v1': MarketConfig.formatCdf(net)}),
                       style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                     ),
                   ],

@@ -4,6 +4,7 @@ import '../config/market_config.dart';
 import '../theme/mova_colors.dart';
 import '../widgets/mova_widgets.dart';
 import 'driver_earnings_display.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Affichage des montants style Glovo / Uber Eats — passager vs livreur.
 class ServicePriceDisplay {
@@ -59,7 +60,7 @@ class ServicePriceDisplay {
       totalCdf: data['estimatedPriceCdf'] as int? ?? data['passengerTotalCdf'] as int? ?? 0,
       discountCdf: data['discountCdf'] as int?,
       priceBreakdown: breakdown.isEmpty ? null : breakdown,
-      totalLabel: 'Total estimé',
+      totalLabel: tr('Total estimé'),
     );
   }
 
@@ -104,7 +105,7 @@ class ServicePriceDisplay {
           if (type == 'FOOD' && data['driverGrossCdf'] is num) ...[
             const SizedBox(height: 8),
             Text(
-              'Base frais livraison : ${MarketConfig.formatCdf((data['driverGrossCdf'] as num).round())}',
+              trf('Base frais livraison : {v1}', {'v1': MarketConfig.formatCdf((data['driverGrossCdf'] as num).round())}),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
             ),
           ],
@@ -112,12 +113,12 @@ class ServicePriceDisplay {
             const SizedBox(height: 8),
             if (serviceFee > 0)
               Text(
-                'Frais de course : ${MarketConfig.formatCdf(serviceFee)}',
+                trf('Frais de course : {v1}', {'v1': MarketConfig.formatCdf(serviceFee)}),
                 style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
               ),
             if (purchase > 0)
               Text(
-                'Achats à rembourser : ${MarketConfig.formatCdf(purchase)}',
+                trf('Achats à rembourser : {v1}', {'v1': MarketConfig.formatCdf(purchase)}),
                 style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
               ),
           ],
@@ -210,7 +211,7 @@ class ServicePriceDisplay {
     final actualPurchase = data['purchaseTotalCdf'] as int? ?? 0;
     final estimatedPurchase = data['estimatedPurchaseCdf'] as int? ?? 0;
     final purchase = actualPurchase > 0 ? actualPurchase : estimatedPurchase;
-    final purchaseLabel = actualPurchase > 0 ? 'Achats réels (remboursement)' : 'Achats estimés';
+    final purchaseLabel = actualPurchase > 0 ? tr('Achats réels (remboursement)') : tr('Achats estimés');
     final total = data['totalPriceCdf'] as int? ?? (serviceFee + purchase);
     return MovaCard(
       child: Column(
@@ -290,7 +291,7 @@ class ServicePriceDisplay {
               padding: const EdgeInsets.only(bottom: 6),
               child: Row(
                 children: [
-                  const Expanded(child: Text('Nombre de places', style: TextStyle(fontSize: 14))),
+                  Expanded(child: Text(tr('Nombre de places'), style: TextStyle(fontSize: 14))),
                   Text('$booked', style: const TextStyle(fontSize: 14)),
                 ],
               ),
@@ -335,6 +336,7 @@ class ServicePriceDisplay {
   }
 
   static Widget _row(String label, int amountCdf, {Color? valueColor}) {
+    label = tr(label);
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(

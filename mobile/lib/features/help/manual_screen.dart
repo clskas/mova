@@ -4,6 +4,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import 'help_config.dart';
 import 'legal_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 class ManualScreen extends StatelessWidget {
   const ManualScreen({
@@ -30,12 +31,12 @@ class ManualScreen extends StatelessWidget {
         if (showFullManual)
           IconButton(
             icon: const Icon(Icons.article_outlined),
-            tooltip: 'Version complète',
+            tooltip: tr('Version complète'),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const LegalScreen(
-                  title: 'Manuel complet',
+                builder: (_) => LegalScreen(
+                  title: tr('Manuel complet'),
                   asset: 'assets/legal/manuel_fr.md',
                 ),
               ),
@@ -46,7 +47,7 @@ class ManualScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            subtitle ?? 'Guide pas à pas — ${MarketConfig.coverageLabel}, ${MarketConfig.currency}',
+            subtitle ?? trf('Guide pas à pas — {coverageLabel}, {currency}', {'coverageLabel': MarketConfig.coverageLabel, 'currency': MarketConfig.currency}),
             style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -69,7 +70,7 @@ class _ChapterTile extends StatelessWidget {
       child: ExpansionTile(
         leading: Text(chapter.icon, style: const TextStyle(fontSize: 22)),
         title: Text(
-          chapter.title,
+          tr(chapter.title),
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
         ),
         iconColor: MovaColors.violet,
@@ -106,7 +107,7 @@ class _ChapterTile extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            e.value,
+                            tr(e.value),
                             style: const TextStyle(height: 1.4),
                           ),
                         ),
@@ -130,7 +131,7 @@ class _ChapterTile extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            chapter.tip!,
+                            tr(chapter.tip!),
                             style: const TextStyle(fontSize: 13, color: MovaColors.midnight),
                           ),
                         ),

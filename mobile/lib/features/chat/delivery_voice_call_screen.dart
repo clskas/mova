@@ -15,6 +15,7 @@ import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import 'call_ring_service.dart';
+import '../../core/i18n/i18n.dart';
 
 enum VoiceCallKind { ride, delivery }
 
@@ -239,8 +240,8 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
       setState(() {
         _phase = _CallPhase.error;
         _error = mic.isPermanentlyDenied
-            ? 'Microphone refusé. Activez-le dans les réglages du téléphone.'
-            : 'Autorisez le microphone pour l\'appel vocal.';
+            ? tr('Microphone refusé. Activez-le dans les réglages du téléphone.')
+            : tr('Autorisez le microphone pour l\'appel vocal.');
       });
       return;
     }
@@ -265,7 +266,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     if (url.isEmpty || token.isEmpty) {
       setState(() {
         _phase = _CallPhase.error;
-        _error = 'Configuration appel invalide.';
+        _error = tr('Configuration appel invalide.');
       });
       return;
     }
@@ -443,13 +444,13 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     final raw = e.toString();
     final lower = raw.toLowerCase();
     if (lower.contains('permission') || lower.contains('not allowed')) {
-      return 'Accès micro / salle refusé. Fermez l\'app, réautorisez le micro, puis réessayez.';
+      return tr('Accès micro / salle refusé. Fermez l\'app, réautorisez le micro, puis réessayez.');
     }
     if (lower.contains('timeout') || lower.contains('network')) {
-      return 'Réseau insuffisant pour l\'appel. Réessayez avec une meilleure connexion.';
+      return tr('Réseau insuffisant pour l\'appel. Réessayez avec une meilleure connexion.');
     }
-    if (kDebugMode) return 'Connexion appel impossible ($raw)';
-    return 'Connexion appel impossible. Réessayez.';
+    if (kDebugMode) return trf('Connexion appel impossible ({raw})', {'raw': raw});
+    return tr('Connexion appel impossible. Réessayez.');
   }
 
   void _onRoomChange() {
@@ -484,39 +485,39 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
   String get _statusTitle {
     switch (_phase) {
       case _CallPhase.connecting:
-        return 'Connexion…';
+        return tr('Connexion…');
       case _CallPhase.ringingOut:
-        return 'Appel en cours…';
+        return tr('Appel en cours…');
       case _CallPhase.inCall:
-        return 'En conversation';
+        return tr('En conversation');
       case _CallPhase.peerLeft:
-        return 'Appel terminé';
+        return tr('Appel terminé');
       case _CallPhase.error:
-        return 'Échec de l\'appel';
+        return tr('Échec de l\'appel');
     }
   }
 
   String get _statusSubtitle {
     switch (_phase) {
       case _CallPhase.connecting:
-        return 'Préparation de l\'appel vocal SENGA';
+        return tr('Préparation de l\'appel vocal SENGA');
       case _CallPhase.ringingOut:
-        return 'En attente que ${widget.peerLabel} décroche…';
+        return trf('En attente que {peerLabel} décroche…', {'peerLabel': widget.peerLabel});
       case _CallPhase.inCall:
         return _remoteNames.isEmpty
-            ? 'Connecté'
+            ? tr('Connecté')
             : 'Avec : ${_remoteNames.join(', ')}';
       case _CallPhase.peerLeft:
         switch (_peerLeftReason) {
           case _PeerLeftReason.declined:
-            return '${widget.peerLabel} a refusé l\'appel';
+            return trf('{peerLabel} a refusé l\'appel', {'peerLabel': widget.peerLabel});
           case _PeerLeftReason.noAnswer:
-            return 'Pas de réponse';
+            return tr('Pas de réponse');
           case _PeerLeftReason.hungUp:
-            return '${widget.peerLabel} a raccroché';
+            return trf('{peerLabel} a raccroché', {'peerLabel': widget.peerLabel});
         }
       case _CallPhase.error:
-        return _error ?? 'Erreur';
+        return _error ?? tr('Erreur');
     }
   }
 
@@ -525,7 +526,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     final inCall = _phase == _CallPhase.inCall;
     final canMute = _room != null && (inCall || _phase == _CallPhase.ringingOut);
     return MovaScreen(
-      title: 'Appel · ${widget.peerLabel}',
+      title: trf('Appel · {peerLabel}', {'peerLabel': widget.peerLabel}),
       scrollable: false,
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -572,8 +573,8 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
               ),
             if (inCall) ...[
               const SizedBox(height: 12),
-              const Text(
-                'Appel via Internet — haut-parleur activé',
+              Text(
+                tr('Appel via Internet — haut-parleur activé'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
               ),
@@ -585,7 +586,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
                   child: OutlinedButton.icon(
                     onPressed: canMute ? _toggleMute : null,
                     icon: Icon(_muted ? Icons.mic_off : Icons.mic),
-                    label: Text(_muted ? 'Micro coupé' : 'Couper micro'),
+                    label: Text(_muted ? tr('Micro coupé') : tr('Couper micro')),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -594,7 +595,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
                     style: FilledButton.styleFrom(backgroundColor: Colors.red),
                     onPressed: _hangUp,
                     icon: const Icon(Icons.call_end),
-                    label: Text(_phase == _CallPhase.peerLeft ? 'Fermer' : 'Raccrocher'),
+                    label: Text(_phase == _CallPhase.peerLeft ? tr('Fermer') : tr('Raccrocher')),
                   ),
                 ),
               ],

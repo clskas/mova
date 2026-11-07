@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Tappable service tile for the SENGA home hub.
 class ServiceCard extends StatelessWidget {
@@ -87,8 +88,8 @@ class ServiceCard extends StatelessWidget {
                     color: MovaColors.green.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    'Live',
+                  child: Text(
+                    tr('Live'),
                     style: TextStyle(
                       color: MovaColors.green,
                       fontSize: 10,
@@ -104,8 +105,8 @@ class ServiceCard extends StatelessWidget {
                     color: MovaColors.orange.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    'Demande',
+                  child: Text(
+                    tr('Demande'),
                     style: TextStyle(
                       color: MovaColors.orange,
                       fontSize: 10,

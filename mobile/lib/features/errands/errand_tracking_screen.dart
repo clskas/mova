@@ -175,7 +175,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
         );
         await _load(silent: true);
       case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(error.message))));
     }
   }
 
@@ -455,16 +455,16 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
 
   String _statusLabel(String? status) {
     final base = switch (status?.toUpperCase()) {
-      'PENDING' => 'Commande enregistrée',
-      'ASSIGNED' => 'Coursier assigné',
-      'IN_PROGRESS' => 'Courses en cours',
-      'COMPLETED' => 'Courses livrées',
-      'CANCELLED' => 'Commande annulée',
+      'PENDING' => tr('Commande enregistrée'),
+      'ASSIGNED' => tr('Coursier assigné'),
+      'IN_PROGRESS' => tr('Courses en cours'),
+      'COMPLETED' => tr('Courses livrées'),
+      'CANCELLED' => tr('Commande annulée'),
       _ => status ?? '',
     };
-    if (deliveryIsPaid(_order)) return '$base · Payée';
-    if (_cashPaymentPending) return '$base · Paiement espèces en attente';
-    if (deliveryPaymentDue(_order)) return '$base · Paiement en attente';
+    if (deliveryIsPaid(_order)) return trf('{base} · Payée', {'base': base});
+    if (_cashPaymentPending) return trf('{base} · Paiement espèces en attente', {'base': base});
+    if (deliveryPaymentDue(_order)) return trf('{base} · Paiement en attente', {'base': base});
     return base;
   }
 
@@ -533,15 +533,15 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                   children: [
                                     Text(
                                       _order?['cashDisputed'] == true
-                                          ? 'Litige : espèces non reçues'
-                                          : 'Paiement espèces en attente',
+                                          ? tr('Litige : espèces non reçues')
+                                          : tr('Paiement espèces en attente'),
                                       style: const TextStyle(fontWeight: FontWeight.w600),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       _order?['cashDisputed'] == true
-                                          ? 'Le livreur signale ne pas avoir reçu les espèces. Déclarez le paiement ci-dessous, ou réglez autrement.'
-                                          : 'Remettez le montant au livreur et communiquez-lui ce code PIN :',
+                                          ? tr('Le livreur signale ne pas avoir reçu les espèces. Déclarez le paiement ci-dessous, ou réglez autrement.')
+                                          : tr('Remettez le montant au livreur et communiquez-lui ce code PIN :'),
                                       style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                                     ),
                                     const SizedBox(height: 8),
@@ -605,11 +605,11 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                     Expanded(
                                       child: Text(
                                         _order?['paymentMethod']?.toString().toUpperCase() == 'CASH'
-                                            ? 'Course payée (espèces confirmées)'
+                                            ? tr('Course payée (espèces confirmées)')
                                             : (_order?['guaranteed'] == true &&
                                                     _order?['status']?.toString() != 'COMPLETED')
-                                                ? 'Budget + frais sécurisés. PIN à la réception uniquement.'
-                                                : 'Course payée',
+                                                ? tr('Budget + frais sécurisés. PIN à la réception uniquement.')
+                                                : tr('Course payée'),
                                         style: const TextStyle(fontWeight: FontWeight.w600),
                                       ),
                                     ),
@@ -647,12 +647,12 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Course #${widget.errandId.length > 8 ? widget.errandId.substring(0, 8) : widget.errandId}',
+                                    trf('Course #{v1}', {'v1': widget.errandId.length > 8 ? widget.errandId.substring(0, 8) : widget.errandId}),
                                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${_order?['pickupAddress'] ?? 'Retrait'} → '
+                                    '${_order?['pickupAddress'] ?? tr('Retrait')} → '
                                     '${_order?['dropoffAddress'] ?? _order?['deliveryAddress'] ?? widget.deliveryAddress}',
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
@@ -678,7 +678,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 12),
-                                  ServicePriceDisplay.passengerCard(_order, totalLabel: 'Total à payer'),
+                                  ServicePriceDisplay.passengerCard(_order, totalLabel: tr('Total à payer')),
                                 ],
                               ),
                             ),
@@ -697,7 +697,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                       size: 22,
                                     ),
                                     const SizedBox(width: 12),
-                                    Expanded(child: Text(step['label']?.toString() ?? '')),
+                                    Expanded(child: Text(tr(step['label']?.toString() ?? ''))),
                                   ],
                                 ),
                               );
@@ -744,7 +744,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                     builder: (_) => ErrandChatScreen(
                                       errandId: widget.errandId,
                                       myRole: 'passenger',
-                                      peerLabel: courier?['name']?.toString() ?? 'Livreur',
+                                      peerLabel: courier?['name']?.toString() ?? tr('Livreur'),
                                     ),
                                   ),
                                 );
@@ -762,7 +762,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                           if (_canCancel) const SizedBox(height: 8),
                           if (_paymentDue) ...[
                             MovaButton(
-                              label: _cashSettlementDue ? 'Payer en espèces' : 'Payer la course',
+                              label: _cashSettlementDue ? tr('Payer en espèces') : tr('Payer la course'),
                               icon: Icons.payment_outlined,
                               onPressed: _openPayment,
                             ),

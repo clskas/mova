@@ -51,7 +51,7 @@ class BookingScreen extends ConsumerStatefulWidget {
 }
 
 class _BookingScreenState extends ConsumerState<BookingScreen> {
-  final _pickupController = TextEditingController(text: 'Ma position');
+  final _pickupController = TextEditingController(text: tr('Ma position'));
   final _destinationController = TextEditingController();
   final _promoController = TextEditingController();
 
@@ -180,14 +180,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   String? get _passengerNote {
     if (_vehicleType == 'TRICYCLE' && _passengerCount >= kTricyclePassengerLimit) {
-      return 'Tricycle : 3 passagers maximum.';
+      return tr('Tricycle : 3 passagers maximum.');
     }
     if (_vehicleType != 'FAMILIALE' || _passengerCount <= kCarPassengerLimit) return null;
     if (_passengerCount > defaultPassengerSeats('FAMILIALE')) {
-      return 'Gamme Familiale : seuls les véhicules de $_passengerCount places recevront la course, '
-          'l\'attente peut être plus longue.';
+      return trf('Gamme Familiale : seuls les véhicules de {_passengerCount} places recevront la course, l\'attente peut être plus longue.', {'_passengerCount': _passengerCount});
     }
-    return 'Plus de 4 passagers : gamme Familiale (6 à 8 places) sélectionnée.';
+    return tr('Plus de 4 passagers : gamme Familiale (6 à 8 places) sélectionnée.');
   }
 
   /// 5+ passengers move a Standard / Confort / VIP booking to Familiale.
@@ -241,11 +240,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text(cashDispute ? 'Litige : espèces non reçues' : 'Paiement en attente'),
+          title: Text(cashDispute ? tr('Litige : espèces non reçues') : tr('Paiement en attente')),
           content: Text(
             cashDispute
-                ? 'Le chauffeur a signalé ne pas avoir reçu les espèces de cette course. '
-                    'Ce n’est pas une alerte SOS. Réglez ce litige (ou contactez le support) avant de commander.'
+                ? tr('Le chauffeur a signalé ne pas avoir reçu les espèces de cette course. '
+                    'Ce n’est pas une alerte SOS. Réglez ce litige (ou contactez le support) avant de commander.')
                 : 'Un paiement est encore dû sur une course terminée. Réglez-le avant de commander.',
           ),
           actions: [
@@ -441,7 +440,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       setState(() {
         _loadingGps = false;
         _validationError =
-            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+            tr('Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.');
       });
       return;
     }
@@ -494,10 +493,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               _pickup = resolved;
               _pickupFromSuggestion = true;
             } else {
-              return 'Point de départ hors zone SENGA.';
+              return tr('Point de départ hors zone SENGA.');
             }
           } else {
-            return 'Adresse de départ introuvable — choisissez une suggestion ou utilisez le GPS.';
+            return tr('Adresse de départ introuvable — choisissez une suggestion ou utilisez le GPS.');
           }
         }
         _pickup = ServiceAreaLocation.ensureInServiceArea(
@@ -584,10 +583,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   String? _validate() {
     if (_pickupController.text.trim().isEmpty) {
-      return 'Indiquez le point de départ.';
+      return tr('Indiquez le point de départ.');
     }
     if (_destinationController.text.trim().isEmpty) {
-      return 'Indiquez votre destination.';
+      return tr('Indiquez votre destination.');
     }
     return null;
   }
@@ -651,7 +650,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         }
       }
       if (selectedData == null) {
-        errorMessage ??= 'Estimation indisponible. Réessayez.';
+        errorMessage ??= tr('Estimation indisponible. Réessayez.');
       }
 
       setState(() {
@@ -665,7 +664,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       setState(() {
         _loadingEstimate = false;
         _estimates = {};
-        _error = 'Estimation indisponible. Réessayez.';
+        _error = tr('Estimation indisponible. Réessayez.');
       });
     }
   }
@@ -685,8 +684,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         SnackBar(
           content: Text(
             tricycleCapped
-                ? 'Tricycle : 3 passagers maximum.'
-                : 'Standard, Confort et VIP : 4 passagers maximum. Pour 5 à 8, choisissez Familiale.',
+                ? tr('Tricycle : 3 passagers maximum.')
+                : tr('Standard, Confort et VIP : 4 passagers maximum. Pour 5 à 8, choisissez Familiale.'),
           ),
         ),
       );
@@ -715,7 +714,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     if (_selectedEstimate == null) {
       await _fetchAllEstimates();
       if (_selectedEstimate == null) {
-        setState(() => _validationError = 'Estimation indisponible. Réessayez.');
+        setState(() => _validationError = tr('Estimation indisponible. Réessayez.'));
         return;
       }
     }
@@ -800,7 +799,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     final multiplier = (_selectedEstimate?['surchargeMultiplier'] as num?)?.toDouble();
     if (multiplier != null && multiplier > 1.0) {
       final pct = ((multiplier - 1) * 100).round();
-      return 'Heure de pointe (+$pct %)';
+      return trf('Heure de pointe (+{pct} %)', {'pct': pct});
     }
     return _selectedEstimate?['peakHourLabel']?.toString();
   }
@@ -858,7 +857,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8, bottom: 8),
                     child: FilterChip(
-                      label: Text(f.$2),
+                      label: Text(tr(f.$2)),
                       selected: selected,
                       onSelected: (on) {
                         setState(() => _poiCategoryFilter = on ? f.$1 : null);
@@ -884,8 +883,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 _poiPlaces.isEmpty
-                    ? 'Lieux d\'intérêt : aucun repère à proximité (rayon 8 km). Activez le GPS ou suggérez un lieu.'
-                    : 'Lieux sur la carte : $_visiblePoiCount affiché(s) — filtrent les marqueurs orange uniquement.',
+                    ? tr('Lieux d\'intérêt : aucun repère à proximité (rayon 8 km). Activez le GPS ou suggérez un lieu.')
+                    : trf('Lieux sur la carte : {_visiblePoiCount} affiché(s) — filtrent les marqueurs orange uniquement.', {'_visiblePoiCount': _visiblePoiCount}),
                 style: const TextStyle(fontSize: 11, color: MovaColors.textSecondary),
               ),
             ),
@@ -901,7 +900,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               proximityLat: _pickup.latitude,
               proximityLng: _pickup.longitude,
               label: tr('Départ'),
-              hint: 'Point de prise en charge',
+              hint: tr('Point de prise en charge'),
               prefixIcon: Icons.my_location,
               onUserInput: _onPickupUserInput,
               onSelected: _onPickupSuggestionSelected,
@@ -920,7 +919,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               proximityLat: _pickup.latitude,
               proximityLng: _pickup.longitude,
               label: tr('Destination'),
-              hint: 'Ex: Goma, chez Mama X, ou pin sur la carte',
+              hint: tr('Ex: Goma, chez Mama X, ou pin sur la carte'),
               prefixIcon: Icons.place,
               userCatalog: _userCatalog,
               onUserInput: _onDestinationUserInput,
@@ -995,8 +994,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
                         _vehicleCategory == 'MOTO'
-                            ? '${_nearbyVehicles.length} moto(s) à proximité'
-                            : '${_nearbyVehicles.length} taxi(s) à proximité',
+                            ? trf('{length} moto(s) à proximité', {'length': _nearbyVehicles.length})
+                            : trf('{length} taxi(s) à proximité', {'length': _nearbyVehicles.length}),
                         style: const TextStyle(fontSize: 11, color: MovaColors.textSecondary),
                       ),
                     ),
@@ -1035,7 +1034,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                               Expanded(
                                 child: Text(
                                   _roundTrip
-                                      ? 'Estimation aller-retour · ${_selectedVehicleLabel()}'
+                                      ? trf('Estimation aller-retour · {v1}', {'v1': _selectedVehicleLabel()})
                                       : 'Estimation · ${_selectedVehicleLabel()}',
                                   style: const TextStyle(fontSize: 16),
                                 ),
@@ -1067,7 +1066,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                             Text(
                               (_selectedEstimate!['savingsCdf'] is num &&
                                       (_selectedEstimate!['savingsCdf'] as num) > 0)
-                                  ? 'Pool · économie ${MarketConfig.formatCdf((_selectedEstimate!['savingsCdf'] as num).round())} vs course seule'
+                                  ? trf('Pool · économie {v1} vs course seule', {'v1': MarketConfig.formatCdf((_selectedEstimate!['savingsCdf'] as num).round())})
                                   : 'Pool · tarif partagé',
                               style: const TextStyle(fontSize: 12, color: MovaColors.green),
                             ),
@@ -1087,7 +1086,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                           ),
                           if (((_selectedEstimate!['discountCdf'] as num?)?.toInt() ?? 0) > 0) ...[
                             _breakdownRow(
-                              'Code promo${_selectedEstimate!['promoCode'] != null ? ' (${_selectedEstimate!['promoCode']})' : ''}',
+                              trf('Code promo{v1}', {'v1': _selectedEstimate!['promoCode'] != null ? ' (${_selectedEstimate!['promoCode']})' : ''}),
                               -((_selectedEstimate!['discountCdf'] as num).toInt()),
                             ),
                           ],

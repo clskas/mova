@@ -29,8 +29,8 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
   List<Map<String, dynamic>> _rides = [];
   List<Map<String, dynamic>> _myDriverTrips = [];
   List<Map<String, dynamic>> _myPassengerTrips = [];
-  final _fromController = TextEditingController(text: 'Gombe, Kinshasa');
-  final _toController = TextEditingController(text: 'Limete, Kinshasa');
+  final _fromController = TextEditingController(text: tr('Gombe, Kinshasa'));
+  final _toController = TextEditingController(text: tr('Limete, Kinshasa'));
   final _seatsController = TextEditingController(text: '3');
   final _priceController = TextEditingController();
   final _meetingPointController = TextEditingController();
@@ -84,7 +84,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     final month = dt.month.toString().padLeft(2, '0');
     final hour = dt.hour.toString().padLeft(2, '0');
     final minute = dt.minute.toString().padLeft(2, '0');
-    return '$day/$month/${dt.year} à $hour:$minute';
+    return trf('{day}/{month}/{year} à {hour}:{minute}', {'day': day, 'month': month, 'year': dt.year, 'hour': hour, 'minute': minute});
   }
 
   String _formatDate(DateTime dt) {
@@ -107,7 +107,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       'toAddress': ride['dropoffAddress'] ?? ride['toAddress'] ?? '',
       'availableSeats': seats,
       'pricePerSeatCdf': perSeat ?? 0,
-      'driverName': ride['driverName']?.toString() ?? 'Conducteur',
+      'driverName': ride['driverName']?.toString() ?? tr('Conducteur'),
       'passengerCount': ride['passengerCount'] as int? ?? passengers.length,
       'passengers': passengers,
     };
@@ -151,7 +151,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
 
   Future<void> _search() async {
     if (_toController.text.trim().isEmpty) {
-      setState(() => _validationError = 'Indiquez la destination.');
+      setState(() => _validationError = tr('Indiquez la destination.'));
       return;
     }
     setState(() {
@@ -236,12 +236,12 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
 
   Future<void> _estimateCreate() async {
     if (_toController.text.trim().isEmpty) {
-      setState(() => _validationError = 'Indiquez la destination.');
+      setState(() => _validationError = tr('Indiquez la destination.'));
       return;
     }
     final seats = int.tryParse(_seatsController.text.trim()) ?? 0;
     if (seats < 1 || seats > 6) {
-      setState(() => _validationError = 'Nombre de places : entre 1 et 6.');
+      setState(() => _validationError = tr('Nombre de places : entre 1 et 6.'));
       return;
     }
     setState(() {
@@ -274,22 +274,22 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
 
   Future<void> _createRide() async {
     if (_toController.text.trim().isEmpty) {
-      setState(() => _validationError = 'Indiquez la destination.');
+      setState(() => _validationError = tr('Indiquez la destination.'));
       return;
     }
     final seats = int.tryParse(_seatsController.text.trim()) ?? 0;
     if (seats < 1 || seats > 6) {
-      setState(() => _validationError = 'Nombre de places : entre 1 et 6.');
+      setState(() => _validationError = tr('Nombre de places : entre 1 et 6.'));
       return;
     }
     final customPrice = int.tryParse(_priceController.text.trim());
     final price = customPrice ?? _pricePerSeat;
     if (price == null || price < 500) {
-      setState(() => _validationError = 'Indiquez un prix par place (min. 500 CDF).');
+      setState(() => _validationError = tr('Indiquez un prix par place (min. 500 CDF).'));
       return;
     }
     if (_departureAt.isBefore(DateTime.now())) {
-      setState(() => _validationError = 'La date de départ doit être dans le futur.');
+      setState(() => _validationError = tr('La date de départ doit être dans le futur.'));
       return;
     }
     setState(() {
@@ -320,9 +320,10 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
             builder: (ctx) => AlertDialog(
               title: Text(tr('Trajet publié')),
               content: Text(
-                'Votre covoiturage est en ligne.\n'
-                'Départ : ${_formatDateTime(_departureAt)}\n'
-                'Prix par place : ${MarketConfig.formatCdf(price)}',
+                trf('Votre covoiturage est en ligne.\nDépart : {departure}\nPrix par place : {price}', {
+                  'departure': _formatDateTime(_departureAt),
+                  'price': MarketConfig.formatCdf(price),
+                }),
               ),
               actions: [
                 TextButton(
@@ -344,7 +345,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
 
   Future<void> _bookRide(Map<String, dynamic> ride, {int seats = 1}) async {
     final id = ride['id']?.toString() ?? '';
-    final driver = ride['driverName']?.toString() ?? 'Conducteur';
+    final driver = ride['driverName']?.toString() ?? tr('Conducteur');
     final perSeat = ride['pricePerSeatCdf'] as int? ?? 0;
     setState(() {
       _loading = true;
@@ -397,7 +398,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
   Widget _rideCard(Map<String, dynamic> ride) {
     final perSeat = ride['pricePerSeatCdf'] as int? ?? 0;
     final seats = ride['availableSeats'] as int? ?? 1;
-    final driver = ride['driverName']?.toString() ?? 'Conducteur';
+    final driver = ride['driverName']?.toString() ?? tr('Conducteur');
     final rating = ride['driverRating']?.toString();
     final kyc = ride['kycVerified'] == true;
     final eta = ride['etaLabel']?.toString() ?? '';
@@ -451,7 +452,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
             ),
             if (ride['departureAt'] != null)
               Text(
-                'Départ : ${_formatDeparture(ride['departureAt']?.toString())}',
+                trf('Départ : {v1}', {'v1': _formatDeparture(ride['departureAt']?.toString())}),
                 style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
               ),
             if (ride['ladiesOnly'] == true)
@@ -540,7 +541,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
             children: [
               const Icon(Icons.calendar_today, color: MovaColors.violet, size: 20),
               const SizedBox(width: 12),
-              Expanded(child: Text('Date : ${_formatDate(_searchDate)}')),
+              Expanded(child: Text(trf('Date : {v1}', {'v1': _formatDate(_searchDate)}))),
               const Icon(Icons.chevron_right),
             ],
           ),
@@ -552,8 +553,8 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
           decoration: InputDecoration(labelText: tr('Trier par')),
           items: [
             DropdownMenuItem(value: 'departure', child: Text(tr('Départ'))),
-            DropdownMenuItem(value: 'price', child: Text('Prix')),
-            DropdownMenuItem(value: 'rating', child: Text('Note')),
+            DropdownMenuItem(value: 'price', child: Text(tr('Prix'))),
+            DropdownMenuItem(value: 'rating', child: Text(tr('Note'))),
           ],
           onChanged: (v) {
             if (v != null) {
@@ -565,7 +566,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
         const SizedBox(height: 16),
         MovaButton(label: tr('Rechercher'), isLoading: _loading, icon: Icons.search, onPressed: _search),
         const SizedBox(height: 20),
-        Text('${ _rides.length } trajet${_rides.length > 1 ? 's' : ''} trouvé${_rides.length > 1 ? 's' : ''}',
+        Text(trf('{length} trajet{v2} trouvé{v3}', {'length': _rides.length, 'v2': _rides.length > 1 ? 's' : '', 'v3': _rides.length > 1 ? 's' : ''}),
             style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         if (_loadingList)
@@ -639,7 +640,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
           decoration: InputDecoration(
             labelText: tr('Prix par place (CDF)'),
             prefixIcon: const Icon(Icons.payments_outlined),
-            helperText: _totalPrice != null ? 'Estimation totale : ${MarketConfig.formatCdf(_totalPrice!)}' : null,
+            helperText: _totalPrice != null ? trf('Estimation totale : {v1}', {'v1': MarketConfig.formatCdf(_totalPrice!)}) : null,
           ),
         ),
         const SizedBox(height: 12),
@@ -665,7 +666,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
         if (_distanceKm != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text('Distance estimée : ${_distanceKm!.toStringAsFixed(1)} km',
+            child: Text(trf('Distance estimée : {v1} km', {'v1': _distanceKm!.toStringAsFixed(1)}),
                 style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12)),
           ),
         if (_validationError != null) ...[
@@ -678,7 +679,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
         ],
         const SizedBox(height: 16),
         MovaButton(
-          label: _priceController.text.isEmpty ? 'Estimer le prix' : 'Publier le trajet',
+          label: _priceController.text.isEmpty ? tr('Estimer le prix') : tr('Publier le trajet'),
           isLoading: _loading,
           icon: _priceController.text.isEmpty ? Icons.calculate_outlined : Icons.publish_outlined,
           onPressed: _loading
@@ -721,7 +722,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
           const SizedBox(height: 20),
         ],
         Text(
-          widget.forDriver ? 'Mes réservations passager' : 'Mes réservations',
+          widget.forDriver ? tr('Mes réservations passager') : tr('Mes réservations'),
           style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: 8),
@@ -767,7 +768,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
           ];
 
     return MovaScreen(
-      title: widget.forDriver ? 'Publier covoiturage' : 'Covoiturage',
+      title: widget.forDriver ? tr('Publier covoiturage') : tr('Covoiturage'),
       scrollable: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -779,13 +780,13 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
             labelColor: MovaColors.violet,
             unselectedLabelColor: MovaColors.textSecondary,
             tabs: widget.forDriver
-                ? const [
-                    Tab(text: 'Publier'),
-                    Tab(text: 'Mes trajets'),
+                ? [
+                    Tab(text: tr('Publier')),
+                    Tab(text: tr('Mes trajets')),
                   ]
-                : const [
-                    Tab(text: 'Rechercher'),
-                    Tab(text: 'Mes réservations'),
+                : [
+                    Tab(text: tr('Rechercher')),
+                    Tab(text: tr('Mes réservations')),
                   ],
           ),
           const SizedBox(height: 8),

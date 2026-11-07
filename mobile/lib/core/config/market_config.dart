@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Configuration marché RDC — couverture nationale (32 zones SENGA).
 class MarketConfig {
@@ -34,7 +35,7 @@ class MarketConfig {
   /// Minimum SerdiPay pour recharge et retrait portefeuille (passager + chauffeur).
   static const minWalletAmountCdf = 2300;
   static String get minWalletAmountLabel =>
-      'Minimum ${formatCdf(minWalletAmountCdf)} pour recharge et retrait';
+      trf('Minimum {v1} pour recharge et retrait', {'v1': formatCdf(minWalletAmountCdf)});
 
   /// Web OAuth client ID (Google Cloud). Required as `serverClientId` so Android
   /// returns an ID token the backend can verify. Same value as `GOOGLE_CLIENT_ID`.
@@ -346,7 +347,7 @@ class MarketConfig {
   static String? mmPrefixMismatchFr(String providerId, String phone) {
     final normalized = normalizePhone(phone);
     if (!validatePhone(normalized)) {
-      return 'Numéro Mobile Money invalide. Format : +243XXXXXXXXX (pas un e-mail).';
+      return tr('Numéro Mobile Money invalide. Format : +243XXXXXXXXX (pas un e-mail).');
     }
     final prefixes = mmPrefixes[providerId];
     if (prefixes == null) return null;
@@ -354,15 +355,12 @@ class MarketConfig {
     if (prefixes.contains(prefix)) return null;
     final list = prefixes.join(', ');
     if (providerId == 'ORANGE_MONEY') {
-      return 'Ce numéro n’est pas un numéro Orange Money (préfixes $list). '
-          'Saisissez le numéro de la SIM Orange (80, 84, 85, 89).';
+      return trf('Ce numéro n’est pas un numéro Orange Money (préfixes {list}). Saisissez le numéro de la SIM Orange (80, 84, 85, 89).', {'list': list});
     }
     if (providerId == 'MPESA') {
-      return 'Ce numéro n’est pas un numéro Vodacom M-Pesa (préfixes $list). '
-          'Saisissez le numéro de la SIM Vodacom.';
+      return trf('Ce numéro n’est pas un numéro Vodacom M-Pesa (préfixes {list}). Saisissez le numéro de la SIM Vodacom.', {'list': list});
     }
-    return 'Ce numéro n’est pas un numéro Airtel Money (préfixes $list). '
-        'Saisissez le numéro de la SIM Airtel.';
+    return trf('Ce numéro n’est pas un numéro Airtel Money (préfixes {list}). Saisissez le numéro de la SIM Airtel.', {'list': list});
   }
 
   static String normalizePhone(String phone) {

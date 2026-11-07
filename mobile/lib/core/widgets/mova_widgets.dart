@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../error/user_friendly_error.dart';
 import '../theme/mova_colors.dart';
+import '../../core/i18n/i18n.dart';
 
 class MovaCard extends StatelessWidget {
   const MovaCard({
@@ -159,7 +160,7 @@ class MovaErrorBanner extends StatelessWidget {
                 messageRow,
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton(onPressed: onRetry, child: const Text('Réessayer')),
+                  child: TextButton(onPressed: onRetry, child: Text(tr('Réessayer'))),
                 ),
               ],
             )
@@ -177,7 +178,7 @@ class MovaErrorBanner extends StatelessWidget {
                   ),
                 ),
                 if (onRetry != null)
-                  TextButton(onPressed: onRetry, child: const Text('Réessayer')),
+                  TextButton(onPressed: onRetry, child: Text(tr('Réessayer'))),
               ],
             ),
     );

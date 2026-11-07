@@ -146,8 +146,8 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
   List<Map<String, dynamic>> get _timeline {
     final raw = _delivery?['timeline'] as List? ?? _delivery?['tracking'] as List?;
     if (raw != null && raw.isNotEmpty) return raw.cast<Map<String, dynamic>>();
-    return const [
-      {'label': 'Envoyée au restaurant', 'done': true},
+    return [
+      {'label': tr('Envoyée au restaurant'), 'done': true},
       {'label': 'Acceptée', 'done': false},
       {'label': 'En route', 'done': false},
       {'label': 'Livré', 'done': false},
@@ -165,23 +165,23 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
     final base = (fromApi != null && fromApi.isNotEmpty)
         ? fromApi
         : switch (status) {
-            'PENDING' => 'En attente du restaurant',
+            'PENDING' => tr('En attente du restaurant'),
             'RESTAURANT_CONFIRMED' =>
               deliveryIsCod(_delivery) ||
                       _delivery?['escrowReady'] == true ||
                       deliveryIsPaid(_delivery)
-                  ? 'En préparation'
-                  : 'Acceptée — en attente de votre paiement',
-            'READY_FOR_PICKUP' => 'Prête — livreur en route',
-            'PICKED_UP' => 'Livreur assigné',
-            'IN_TRANSIT' => 'En livraison',
-            'DELIVERED' => 'Livré',
-            'CANCELLED' => 'Annulée',
-            _ => 'En cours',
+                  ? tr('En préparation')
+                  : tr('Acceptée — en attente de votre paiement'),
+            'READY_FOR_PICKUP' => tr('Prête — livreur en route'),
+            'PICKED_UP' => tr('Livreur assigné'),
+            'IN_TRANSIT' => tr('En livraison'),
+            'DELIVERED' => tr('Livré'),
+            'CANCELLED' => tr('Annulée'),
+            _ => tr('En cours'),
           };
-    if (deliveryIsPaid(_delivery)) return '$base · Payée';
-    if (deliveryCashPaymentPending(_delivery)) return '$base · Paiement espèces en attente';
-    if (deliveryPaymentDue(_delivery)) return '$base · Paiement en attente';
+    if (deliveryIsPaid(_delivery)) return trf('{base} · Payée', {'base': base});
+    if (deliveryCashPaymentPending(_delivery)) return trf('{base} · Paiement espèces en attente', {'base': base});
+    if (deliveryPaymentDue(_delivery)) return trf('{base} · Paiement en attente', {'base': base});
     return base;
   }
 
@@ -203,7 +203,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
         );
         await _load(silent: true);
       case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(error.message))));
     }
   }
 
@@ -456,15 +456,15 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                               children: [
                                 Text(
                                   _delivery?['cashDisputed'] == true
-                                      ? 'Litige : espèces non reçues'
-                                      : 'Paiement espèces en attente',
+                                      ? tr('Litige : espèces non reçues')
+                                      : tr('Paiement espèces en attente'),
                                   style: const TextStyle(fontWeight: FontWeight.w600),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   _delivery?['cashDisputed'] == true
-                                      ? 'Le livreur signale ne pas avoir reçu les espèces. Déclarez le paiement ci-dessous, ou réglez autrement.'
-                                      : 'Remettez le montant au livreur et communiquez-lui ce code PIN :',
+                                      ? tr('Le livreur signale ne pas avoir reçu les espèces. Déclarez le paiement ci-dessous, ou réglez autrement.')
+                                      : tr('Remettez le montant au livreur et communiquez-lui ce code PIN :'),
                                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                                 ),
                                 const SizedBox(height: 8),
@@ -542,11 +542,11 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                                 Expanded(
                                   child: Text(
                                     _delivery?['paymentMethod']?.toString().toUpperCase() == 'CASH'
-                                        ? 'Commande payée (espèces confirmées)'
+                                        ? tr('Commande payée (espèces confirmées)')
                                         : (_delivery?['guaranteed'] == true &&
                                                 _delivery?['status']?.toString() != 'DELIVERED')
-                                            ? 'Montant sécurisé. Donnez le PIN uniquement à la réception.'
-                                            : 'Commande payée',
+                                            ? tr('Montant sécurisé. Donnez le PIN uniquement à la réception.')
+                                            : tr('Commande payée'),
                                     style: const TextStyle(fontWeight: FontWeight.w600),
                                   ),
                                 ),
@@ -589,7 +589,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Commande #${widget.orderId.length > 8 ? widget.orderId.substring(0, 8) : widget.orderId}',
+                                trf('Commande #{v1}', {'v1': widget.orderId.length > 8 ? widget.orderId.substring(0, 8) : widget.orderId}),
                                 style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                               ),
                               if (widget.deliveryAddress != null) ...[
@@ -603,7 +603,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                               const SizedBox(height: 12),
                               ServicePriceDisplay.passengerCard(
                                 _delivery,
-                                totalLabel: 'Total commande',
+                                totalLabel: tr('Total commande'),
                               ),
                               Text(
                                 _statusLabel,
@@ -630,7 +630,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    step['label']?.toString() ?? '',
+                                    tr(step['label']?.toString() ?? ''),
                                     style: TextStyle(
                                       fontWeight: done ? FontWeight.w600 : FontWeight.normal,
                                       color: done ? MovaColors.midnight : MovaColors.textSecondary,
@@ -679,7 +679,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                           builder: (context, unread, _) {
                             final n = unread[ChatAlertService.threadKey('delivery', widget.orderId)] ?? 0;
                             return MovaButton(
-                              label: n > 0 ? 'Contacter le livreur ($n)' : 'Contacter le livreur',
+                              label: n > 0 ? trf('Contacter le livreur ({n})', {'n': n}) : 'Contacter le livreur',
                               isSecondary: true,
                               icon: Icons.chat_bubble_outline,
                               onPressed: () {
@@ -690,7 +690,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                                     builder: (_) => DeliveryChatScreen(
                                       deliveryId: widget.orderId,
                                       myRole: 'passenger',
-                                      peerLabel: courier?['name']?.toString() ?? 'Livreur',
+                                      peerLabel: courier?['name']?.toString() ?? tr('Livreur'),
                                     ),
                                   ),
                                 );
@@ -711,7 +711,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                       if (_canCancel) const SizedBox(height: 8),
                       if (_paymentDue) ...[
                         MovaButton(
-                          label: _cashSettlementDue ? 'Payer en espèces' : 'Payer la commande',
+                          label: _cashSettlementDue ? tr('Payer en espèces') : tr('Payer la commande'),
                           icon: Icons.payment_outlined,
                           onPressed: _openPayment,
                         ),

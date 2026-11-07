@@ -3,8 +3,8 @@
 > **Translation for information only.** This English version is provided for convenience. The French version of this Privacy Policy is the only legally binding version; in case of any difference, the French version prevails.
 
 **Last updated:** 12 June 2026  
-**Data controller:** SENGA SARL, Kinshasa, DRC  
-**DPO:** privacy@mova.cd
+**Data controller:** SENGA SARL, Beni, DRC  
+**DPO:** dev@afri-soft.com
 
 ## 1. Introduction
 
@@ -88,7 +88,7 @@ Under Congolese legislation, you have the following rights:
 - **Objection** — object to certain processing
 - **Portability** — receive your data in a structured format
 
-To exercise your rights: **privacy@mova.cd** or WhatsApp +243 900 000 000.
+To exercise your rights: **dev@afri-soft.com** or WhatsApp +243 973382808.
 
 ## 8. Cookies and trackers
 
@@ -98,19 +98,15 @@ The mobile application does not use web cookies. Local identifiers (authenticati
 
 SENGA is not intended for people under 18. We do not knowingly collect data from minors.
 
-## 10. International transfers
-
-Data is hosted primarily in Africa. Any transfer outside the DRC is subject to appropriate safeguards.
-
-## 11. Changes
+## 10. Changes
 
 This policy may be updated. The date of the last revision is shown at the top of the document. Substantial changes will be notified in the application.
 
-## 12. Contact
+## 11. Contact
 
 | Role | Contact |
 |------|---------|
-| DPO | privacy@mova.cd |
-| Support | support@mova.cd |
-| WhatsApp | +243 900 000 000 |
-| Address | Kinshasa, Democratic Republic of the Congo |
+| DPO | dev@afri-soft.com |
+| Support | dev@afri-soft.com |
+| WhatsApp | +243 973382808 |
+| Address | Afri‑Soft SARL, Boulevard Nyamwisi N°96, Quartier Matonge, Commune Mulekera, Beni, North Kivu, DRC |

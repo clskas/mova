@@ -156,8 +156,8 @@ export const MARKET_RDC = {
   },
 
   support: {
-    whatsapp: '+243900000000',
-    phone: '+243900000000',
+    whatsapp: '+243971163574',
+    phone: '+243971163574',
   },
 } as const;
 

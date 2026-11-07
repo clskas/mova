@@ -1,7 +1,7 @@
 # Conditions Générales d'Utilisation — SENGA RDC
 
-**Dernière mise à jour :** 12 juin 2026  
-**Éditeur :** SENGA SARL, Kinshasa, RDC
+**Dernière mise à jour :** 08 Août 2026
+**Éditeur :** Afrisoft SARL, Beni, RDC
 
 ## 1. Objet
 
@@ -33,10 +33,10 @@ SENGA agit exclusivement en qualité d'intermédiaire technologique. Les prestat
 Vous devez être majeur (18 ans) et disposer d'un numéro de téléphone mobile valide au format **+243** suivi de 9 chiffres.
 
 ### 3.2 Vérification
-L'inscription requiert la validation OTP par SMS. Les chauffeurs doivent compléter une vérification KYC (permis, carte rose, pièce d'identité).
+L'inscription requiert la validation OTP par SMS ou par email. Les chauffeurs doivent compléter une vérification KYC (permis, carte grise, pièce d'identité).
 
 ### 3.3 Sécurité du compte
-Vous êtes responsable de la confidentialité de votre code OTP et de votre appareil. Signalez immédiatement toute utilisation non autorisée à support@mova.cd.
+Vous êtes responsable de la confidentialité de votre code OTP et de votre appareil. Signalez immédiatement toute utilisation non autorisée à dev@afri-soft.com.
 
 ## 4. Tarification et paiements
 
@@ -48,6 +48,7 @@ Tous les prix sont affichés en **Francs congolais (CDF / FC)**.
 - M-Pesa (Vodacom)
 - Airtel Money
 - Portefeuille SENGA
+- Cash
 
 ### 4.3 Estimation
 Les prix affichés avant confirmation sont des estimations. Le montant final peut varier selon le trafic, la distance réelle ou les suppléments applicables.
@@ -71,7 +72,7 @@ Le chauffeur/livreur s'engage à :
 
 ## 6. Données personnelles
 
-Le traitement de vos données est décrit dans notre [Politique de confidentialité](privacy_fr.md). SENGA collecte notamment votre numéro de téléphone, votre position GPS pendant les courses, et l'historique de vos transactions.
+Le traitement de vos données est décrit dans notre Politique de confidentialité. SENGA collecte notamment votre numéro de téléphone, votre position GPS pendant les courses, et l'historique de vos transactions.
 
 ## 7. Responsabilité
 
@@ -93,6 +94,6 @@ Les présentes CGU sont soumises au **droit congolais**. Tout litige relève de 
 
 | Canal | Coordonnées |
 |-------|-------------|
-| Support WhatsApp | +243 900 000 000 |
-| E-mail | support@mova.cd |
+| Support WhatsApp | +243 971163574|
+| E-mail | dev@afri-soft.com |
 | Adresse | Kinshasa, RDC |

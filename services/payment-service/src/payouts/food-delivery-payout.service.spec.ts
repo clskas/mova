@@ -9,9 +9,11 @@ describe('FoodDeliveryPayoutService cash', () => {
   const wallet = {
     credit: jest.fn().mockResolvedValue({ balanceCdf: 1000 }),
     creditPlatformFee: jest.fn(),
+    recordPlatformPromoCost: jest.fn(),
   };
   const driverPayouts = {
     creditPayout: jest.fn().mockResolvedValue({ credited: true }),
+    creditCashPromoTopUp: jest.fn().mockResolvedValue({ credited: true }),
   };
   const debtLedger = {
     recordDebt: jest.fn().mockResolvedValue({ recorded: true }),
@@ -82,5 +84,27 @@ describe('FoodDeliveryPayoutService cash', () => {
     expect(driverPayouts.creditPayout).toHaveBeenCalled();
     expect(wallet.credit).toHaveBeenCalled();
     expect(debtLedger.recordDebt).not.toHaveBeenCalled();
+  });
+
+  it('cash + SENGA promo larger than the margin: the courier gets the gap, SENGA records the cost', async () => {
+    (global.fetch as unknown as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        referenceType: 'DELIVERY',
+        referenceId: 'del-2',
+        deliveryType: 'FOOD',
+        totalPaidCdf: 11000,
+        platformFeeCdf: 0,
+        driver: { userId: 'drv-1', grossCdf: 3000, netCdf: 2400, platformFeeCdf: 600 },
+        restaurants: [{ restaurantId: 'resto-1', ownerUserId: 'owner-1', grossCdf: 10000, netCdf: 10000, platformFeeCdf: 0 }],
+      }),
+    });
+    await service.creditFoodDeliverySettlement('del-2', PaymentMethod.CASH);
+    // 10 000 + 2 400 due, 11 000 paid → 1 400 short
+    expect(driverPayouts.creditCashPromoTopUp).toHaveBeenCalledWith(
+      'drv-1',
+      expect.objectContaining({ referenceType: 'DELIVERY', referenceId: 'del-2', amountCdf: 1400 }),
+    );
+    expect(wallet.recordPlatformPromoCost).toHaveBeenCalledWith(1400, expect.any(String), 'PROMO_COST:DELIVERY:del-2');
   });
 });

@@ -133,6 +133,7 @@ export class PartnerBillingService {
       totalCdf: inquiry.totalCdf,
       estimatedPriceCdf: inquiry.estimatedPriceCdf,
       discountCdf: inquiry.discountCdf,
+      partnerDiscountCdf: inquiry.partnerDiscountCdf,
       depositCdf,
       promoCode: inquiry.promoCode,
     });

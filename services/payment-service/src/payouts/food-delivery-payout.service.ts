@@ -162,6 +162,30 @@ export class FoodDeliveryPayoutService {
         platformFeeRef,
       );
     }
+    // SENGA-funded promo larger than its margin: restaurants + courier get more than the
+    // customer paid. SENGA pays the difference (and records it as a promo cost). In cash the
+    // courier holds only what the customer paid, so the gap is credited to the courier.
+    const restaurantNetTotal = settlement.restaurants.reduce(
+      (sum, r) => sum + (r.ownerUserId ? Math.max(0, Math.round(r.netCdf)) : 0),
+      0,
+    );
+    const courierNet = Math.max(0, Math.round(settlement.driver?.netCdf ?? 0));
+    const shortfall = Math.max(0, restaurantNetTotal + courierNet - Math.round(settlement.totalPaidCdf ?? 0));
+    if (shortfall > 0) {
+      if (isCash && driverUserId) {
+        results.courierPromoTopUp = await this.driverPayouts.creditCashPromoTopUp(driverUserId, {
+          referenceType: 'DELIVERY',
+          referenceId: deliveryId,
+          amountCdf: shortfall,
+        });
+      }
+      await this.wallet.recordPlatformPromoCost(
+        shortfall,
+        `Promo financée par SENGA — commande ${deliveryId.slice(0, 8)}`,
+        `PROMO_COST:DELIVERY:${deliveryId}`,
+      );
+    }
+
     results.platformFeeCdf = platformFee;
     results.totalPaidCdf = settlement.totalPaidCdf;
     results.paymentMethod = paymentMethod;

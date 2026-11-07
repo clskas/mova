@@ -338,12 +338,24 @@ export class PaymentsService {
     grossCdf: number,
     paymentMethod: PaymentMethod,
     passengerPaidCdf?: number | null,
+    customerRefund?: { userId: string; amountCdf: number },
   ) {
     const net = Math.max(0, Math.round(driverNetCdf));
-    const collected =
+    const paid =
       passengerPaidCdf != null && Number.isFinite(passengerPaidCdf)
         ? Math.max(0, Math.round(passengerPaidCdf))
         : Math.max(0, Math.round(grossCdf ?? net));
+    // Errand budget paid upfront but not spent belongs to the customer, not to SENGA.
+    const refund = Math.max(0, Math.min(paid, Math.round(customerRefund?.amountCdf ?? 0)));
+    if (refund > 0 && customerRefund && paymentMethod !== PaymentMethod.CASH) {
+      await this.walletService.credit(
+        customerRefund.userId,
+        refund,
+        `Budget non dépensé rendu — ${referenceType} ${referenceId.slice(0, 8)}`,
+        `BUDGET_REFUND:${referenceType.toUpperCase()}:${referenceId}`,
+      );
+    }
+    const collected = paid - refund;
     const platformFee = Math.max(0, collected - net);
     const cashPromoTopUp = paymentMethod === PaymentMethod.CASH ? Math.max(0, net - collected) : 0;
 
@@ -370,6 +382,14 @@ export class PaymentsService {
           e,
         );
       }
+    }
+    // SENGA-funded promo larger than its commission: the extra paid to the driver is a cost.
+    if (net > collected) {
+      await this.walletService.recordPlatformPromoCost(
+        net - collected,
+        `Promo financée par SENGA — ${referenceType} ${referenceId.slice(0, 8)}`,
+        `PROMO_COST:${referenceType.toUpperCase()}:${referenceId}`,
+      );
     }
     if (paymentMethod === PaymentMethod.CASH && platformFee > 0) {
       // Espèces : dette seulement — la trésorerie est créditée au règlement guichet.
@@ -446,7 +466,12 @@ export class PaymentsService {
         { headers: { 'x-internal-api-key': INTERNAL_API_KEY } },
       );
       if (!res.ok) return;
-      const payout = (await res.json()) as { driverId?: string; driverNetCdf?: number; grossCdf?: number };
+      const payout = (await res.json()) as {
+        driverId?: string;
+        driverNetCdf?: number;
+        grossCdf?: number;
+        customerRefundCdf?: number;
+      };
       if (!payout?.driverId || (payout.driverNetCdf ?? 0) <= 0) return;
       const payment = await this.prisma.servicePayment.findUnique({
         where: { referenceType_referenceId: { referenceType: type, referenceId } },
@@ -460,6 +485,9 @@ export class PaymentsService {
         payout.grossCdf ?? payout.driverNetCdf ?? 0,
         method,
         payment?.amountCdf,
+        payment?.userId && (payout.customerRefundCdf ?? 0) > 0
+          ? { userId: payment.userId, amountCdf: payout.customerRefundCdf ?? 0 }
+          : undefined,
       );
     } catch (e) {
       this.logger.warn(`creditDriverAfterServicePayment ${referenceType}/${referenceId} failed`, e);

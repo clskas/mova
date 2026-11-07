@@ -36,3 +36,18 @@ export function rideShareBookingDriverGrossCdf(
   const absorbShare = Math.round(Math.max(0, rideDiscountCdf ?? 0) / n);
   return Math.max(0, bookingFareCdf) + absorbShare;
 }
+
+/**
+ * Errand: SENGA's commission applies to the service fee only. The purchases are the
+ * shop's money, advanced by the courier, and are paid back in full.
+ */
+export function errandDriverNetCdf(
+  feeGrossCdf: number,
+  purchaseCdf: number | null | undefined,
+  platformPercent: number,
+): number {
+  const pct = Math.min(100, Math.max(0, Number.isFinite(platformPercent) ? platformPercent : 0));
+  const fee = Math.max(0, feeGrossCdf);
+  const feeNet = fee - Math.ceil(fee * (pct / 100));
+  return Math.round(feeNet + Math.max(0, purchaseCdf ?? 0));
+}

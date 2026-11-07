@@ -20,3 +20,15 @@ Portail web du partenaire location (loueur entreprise ou particulier).
 - **Annonce** : sur la fiche véhicule, **Rédiger avec l'IA** propose un texte d'annonce (et sa version anglaise) à partir des informations et des photos, avec les points forts et ce qui manque. Relisez et corrigez avant d'enregistrer ; la description se modifie sans nouvelle validation.
 - **Réservations** : confirmer ou refuser.
 - **Revenus** : gains en CDF.
+
+## Caution
+
+Après le retour du véhicule, indiquez le sort de la caution avec le bouton **Caution** de la réservation :
+
+- **RELEASED** (rendue) : si le client a payé en ligne, la caution lui est remboursée sur son portefeuille SENGA ;
+- **PARTIAL** (retenue en partie) : indiquez le montant que vous gardez. Ce montant est versé sur votre portefeuille, le reste est rendu au client ;
+- **DISPUTED** (litige) : rien n'est versé tant que le litige n'est pas réglé.
+
+Une fois rendue ou retenue, la caution ne peut plus être modifiée depuis le portail : contactez le support. Si le client a payé en espèces, vous détenez déjà la caution et la rendez vous-même.
+
+Les promotions financées par SENGA ne réduisent pas votre part : seules celles que vous créez ou cofinancez la réduisent.

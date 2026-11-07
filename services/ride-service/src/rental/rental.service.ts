@@ -392,6 +392,7 @@ export class RentalService {
       totalCdf: grossCdf,
       estimatedPriceCdf: inquiry.estimatedPriceCdf,
       discountCdf: partnerDiscountCdf,
+      partnerDiscountCdf: (inquiry as { partnerDiscountCdf?: number | null }).partnerDiscountCdf,
       depositCdf,
       promoCode: inquiry.promoCode,
     });
@@ -826,6 +827,7 @@ export class RentalService {
       estimatedPriceCdf: totalCdf,
       formatted: formatCdf(totalCdf),
       discountCdf: promoApplied.discountCdf,
+      partnerDiscountCdf: promoApplied.settlement?.partnerDiscountCdf ?? promoApplied.discountCdf,
       promoCode: promoApplied.promoCode,
       breakdown: { ...base.breakdown, subtotalCdf: promoApplied.estimatedPriceCdf, discountCdf: promoApplied.discountCdf },
     };
@@ -864,6 +866,10 @@ export class RentalService {
         totalCdf: quoteResult.totalCdf,
         promoCode: quoteResult.promoCode,
         discountCdf: quoteResult.discountCdf || undefined,
+        partnerDiscountCdf:
+          'partnerDiscountCdf' in quoteResult && quoteResult.discountCdf
+            ? (quoteResult.partnerDiscountCdf as number)
+            : undefined,
         logisticsMode: logistics.logisticsMode,
         passengerDriverName: logistics.passengerDriverName,
         passengerDriverPhone: logistics.passengerDriverPhone,
@@ -989,6 +995,7 @@ export class RentalService {
       totalCdf: grossCdf,
       estimatedPriceCdf: inquiry.estimatedPriceCdf,
       discountCdf: partnerDiscountCdf,
+      partnerDiscountCdf: (inquiry as { partnerDiscountCdf?: number | null }).partnerDiscountCdf,
       depositCdf,
       promoCode: (inquiry as { promoCode?: string | null }).promoCode,
     });

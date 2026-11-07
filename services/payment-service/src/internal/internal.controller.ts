@@ -6,6 +6,7 @@ import { Type } from 'class-transformer';
 import { InternalApiGuard } from '../common/internal-api.guard';
 import { WalletService } from '../wallet/wallet.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { RentalPayoutService } from '../payouts/rental-payout.service';
 import { DriverPayoutService } from '../payouts/driver-payout.service';
 import { PaymentsService } from '../payments/payments.service';
 import { DriverDebtLedgerService } from '../ledger/driver-debt-ledger.service';
@@ -55,6 +56,13 @@ class InternalWithdrawDto {
   @IsOptional() @IsString() accountPhone?: string;
 }
 
+class RentalDepositDto {
+  @IsString() customerUserId: string;
+  @IsString() ownerUserId: string;
+  @Type(() => Number) @IsInt() @Min(0) depositCdf: number;
+  @Type(() => Number) @IsInt() @Min(0) retainedCdf: number;
+}
+
 class InternalTopUpDto {
   @Type(() => Number) @IsInt() @Min(2300) amountCdf: number;
   @IsString() provider: string;
@@ -80,7 +88,13 @@ export class InternalController {
     private payments: PaymentsService,
     private debtLedger: DriverDebtLedgerService,
     private cashVirtual: CashVirtualEarningsService,
+    private rentalPayouts: RentalPayoutService,
   ) {}
+
+  @Post('rentals/:bookingId/deposit')
+  settleRentalDeposit(@Param('bookingId') bookingId: string, @Body() dto: RentalDepositDto) {
+    return this.rentalPayouts.settleDeposit(bookingId, dto);
+  }
 
   @Get('earnings/driver/:userId/cash-virtual')
   driverCashVirtual(@Param('userId') userId: string) {

@@ -14,6 +14,8 @@ type RentalSettlement = {
   platformFeeCdf: number;
   subtotalGrossCdf: number;
   depositCdf: number;
+  /** What the customer paid for the rental itself (deposit excluded). */
+  rentalPaidCdf?: number;
   logistics: {
     driverId: string;
     grossCdf: number;
@@ -55,6 +57,45 @@ export class RentalPayoutService {
       this.logger.warn(`fetchRentalSettlement ${bookingId} unreachable`, e);
       return null;
     }
+  }
+
+  /**
+   * Deposit paid online (held by SENGA): refund the customer, pay the part kept by the owner.
+   * Paid in cash, the owner already holds it — nothing to move. Idempotent.
+   */
+  async settleDeposit(
+    bookingId: string,
+    input: { customerUserId: string; ownerUserId: string; depositCdf: number; retainedCdf: number },
+  ) {
+    const payment = await this.prisma.servicePayment.findUnique({
+      where: { referenceType_referenceId: { referenceType: 'RENTAL', referenceId: bookingId } },
+    });
+    if (!payment || payment.status !== 'COMPLETED') {
+      return { moved: false as const, reason: 'not_paid_online' as const };
+    }
+    if (payment.method === PaymentMethod.CASH) {
+      return { moved: false as const, reason: 'cash' as const };
+    }
+    const deposit = Math.max(0, Math.min(Math.round(input.depositCdf), payment.amountCdf));
+    const retained = Math.max(0, Math.min(Math.round(input.retainedCdf), deposit));
+    const refund = deposit - retained;
+    if (refund > 0) {
+      await this.wallet.credit(
+        input.customerUserId,
+        refund,
+        `Caution rendue — location ${bookingId.slice(0, 8)}`,
+        `RENTAL_DEPOSIT_REFUND:${bookingId}`,
+      );
+    }
+    if (retained > 0) {
+      await this.wallet.credit(
+        input.ownerUserId,
+        retained,
+        `Caution retenue — location ${bookingId.slice(0, 8)}`,
+        `RENTAL_DEPOSIT_RETAINED:${bookingId}`,
+      );
+    }
+    return { moved: true as const, refundCdf: refund, retainedCdf: retained };
   }
 
   /**
@@ -116,6 +157,31 @@ export class RentalPayoutService {
       );
     }
     results.platformFeeCdf = rentalPlatformFee;
+
+    // SENGA-funded promo larger than its commission: the owner is due more than the customer
+    // paid for the rental. SENGA pays the gap (credited in cash, where the owner holds only
+    // what was paid) and records it as a promo cost.
+    if (settlement.ownerUserId && settlement.rentalPaidCdf != null) {
+      const ownerShortfall = Math.max(0, ownerNet - Math.round(settlement.rentalPaidCdf));
+      if (ownerShortfall > 0) {
+        if (isCash) {
+          const ref = `PROMO_TOPUP:RENTAL:${bookingId}`;
+          if (!(await this.alreadyCredited(ref))) {
+            await this.wallet.credit(
+              settlement.ownerUserId,
+              ownerShortfall,
+              `Compensation promo SENGA (location ${bookingId.slice(0, 8)})`,
+              ref,
+            );
+          }
+        }
+        await this.wallet.recordPlatformPromoCost(
+          ownerShortfall,
+          `Promo financée par SENGA — location ${bookingId.slice(0, 8)}`,
+          `PROMO_COST:RENTAL:${bookingId}`,
+        );
+      }
+    }
 
     const logistics = settlement.logistics;
     if (logistics?.driverId && logistics.netCdf > 0) {

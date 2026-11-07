@@ -1,4 +1,4 @@
-import { rideDriverGrossCdf, rideShareBookingDriverGrossCdf } from './ride-driver-gross.util';
+import { errandDriverNetCdf, rideDriverGrossCdf, rideShareBookingDriverGrossCdf } from './ride-driver-gross.util';
 
 describe('rideDriverGrossCdf', () => {
   it('sans promo = prix passager', () => {
@@ -17,5 +17,15 @@ describe('rideShareBookingDriverGrossCdf', () => {
   it('répartit la remise entre les bookings', () => {
     expect(rideShareBookingDriverGrossCdf(5000, 1000, 2)).toBe(5500);
     expect(rideShareBookingDriverGrossCdf(5000, 0, 2)).toBe(5000);
+  });
+});
+
+describe('errandDriverNetCdf', () => {
+  it('takes the commission on the fee only and pays the purchases back in full', () => {
+    // fee 5 000 at 15 % → 4 250 ; purchases 50 000 back in full
+    expect(errandDriverNetCdf(5000, 50000, 15)).toBe(54250);
+  });
+  it('works without purchases', () => {
+    expect(errandDriverNetCdf(5000, null, 15)).toBe(4250);
   });
 });

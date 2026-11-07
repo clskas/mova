@@ -674,18 +674,79 @@ export class RentalPartnerPortalService {
     });
   }
 
+  /**
+   * Deposit decision. Paid online, the deposit sits with SENGA: RELEASED refunds it to the
+   * customer's wallet; PARTIAL pays `heldCdf` (the amount kept) to the owner and refunds the
+   * rest. Paid in cash, the owner already holds it. Once settled the decision is final.
+   */
   async updateDeposit(
     ownerUserId: string,
     bookingId: string,
     data: { status: RentalDepositStatus; note?: string; heldCdf?: number },
   ) {
     await this.rental.ownerGetBooking(ownerUserId, bookingId);
+    const booking = await this.prisma.rentalInquiry.findFirst({
+      where: { id: bookingId, vehicle: { ownerUserId } },
+      include: { vehicle: true },
+    });
+    if (!booking) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    const current = booking.depositStatus;
+    if (current === RentalDepositStatus.RELEASED || current === RentalDepositStatus.PARTIAL) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Caution déjà réglée : contactez le support SENGA pour la modifier.',
+      );
+    }
+    const deposit = Math.max(
+      0,
+      Math.round(
+        booking.depositHeldCdf ?? booking.vehicle?.depositCdf ?? 0,
+      ),
+    );
+    let retainedCdf = 0;
+    if (data.status === RentalDepositStatus.PARTIAL) {
+      retainedCdf = Math.round(Number(data.heldCdf));
+      if (!Number.isFinite(retainedCdf) || retainedCdf <= 0 || retainedCdf > deposit) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          `Indiquez le montant retenu sur la caution (entre 1 et ${deposit} FC).`,
+        );
+      }
+    }
+    if (
+      (data.status === RentalDepositStatus.RELEASED || data.status === RentalDepositStatus.PARTIAL) &&
+      deposit > 0
+    ) {
+      const res = await fetch(serviceUrl('payment', `/internal/rentals/${bookingId}/deposit`), {
+        method: 'POST',
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerUserId: booking.userId,
+          ownerUserId,
+          depositCdf: deposit,
+          retainedCdf,
+        }),
+      }).catch(() => null);
+      if (!res || !res.ok) {
+        throw new MovaHttpException(
+          MovaErrorCode.INTERNAL_ERROR,
+          undefined,
+          'Règlement de la caution impossible pour le moment. Réessayez.',
+        );
+      }
+    }
     return this.prisma.rentalInquiry.update({
       where: { id: bookingId },
       data: {
         depositStatus: data.status,
         ...(data.note !== undefined ? { depositNote: data.note.trim() || null } : {}),
-        ...(data.heldCdf !== undefined ? { depositHeldCdf: data.heldCdf } : {}),
+        ...(data.status === RentalDepositStatus.PARTIAL
+          ? { depositHeldCdf: retainedCdf }
+          : data.heldCdf !== undefined && data.status !== RentalDepositStatus.RELEASED
+            ? { depositHeldCdf: data.heldCdf }
+            : {}),
       },
     });
   }

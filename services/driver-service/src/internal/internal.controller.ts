@@ -206,9 +206,23 @@ export class InternalController {
       counterpartyUserId: dto.counterpartyUserId,
     });
   }
-  @Post('incidents/:id/resolve') resolve(@Param('id') id: string, @Body('status') status: string) { return this.incidents.resolve(id, status ?? 'RESOLVED'); }
+  @Post('incidents/:id/resolve') resolve(@Param('id') id: string, @Body() body: { status?: string; actorName?: string }) {
+    return this.incidents.resolve(id, body?.status ?? 'RESOLVED', body?.actorName);
+  }
+  /** Ops agent takes the SOS / incident in charge (the user is notified). */
+  @Post('incidents/:id/acknowledge') acknowledge(@Param('id') id: string, @Body() body: { actorId?: string; actorName?: string }) {
+    return this.incidents.acknowledge(id, body?.actorId ?? '', body?.actorName);
+  }
+  @Post('incidents/:id/notes') addIncidentNote(@Param('id') id: string, @Body() body: { actorName?: string; text?: string }) {
+    return this.incidents.addNote(id, body?.actorName ?? '', body?.text ?? '');
+  }
+  /** Emergency contacts of a user (notification-service sends them the SOS SMS). */
+  @Get('incidents/trusted-contacts/:userId') trustedContactsOf(@Param('userId') userId: string) {
+    return this.incidents.listTrustedContacts(userId);
+  }
   @Delete('users/:userId/data')
-  purgeUserData(@Param('userId') userId: string) {
+  async purgeUserData(@Param('userId') userId: string) {
+    await this.incidents.purgeTrustedContacts(userId);
     return this.drivers.purgeUserData(userId);
   }
 }

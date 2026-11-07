@@ -144,7 +144,19 @@ Carte en **dernière ligne** de l'accueil (ou icône portefeuille dans la barre 
 
 ## 12. Historique
 
-Carte en **dernière ligne** de l'accueil (ou icône horloge dans la barre du bas). Retrouvez tous vos trajets, colis, commandes repas, réservations et courses (onglets : Trajets | Colis | Repas | Réservations | Courses).
+Carte en **dernière ligne** de l'accueil (ou icône horloge dans la barre du bas). Onglets : **Courses** (taxi, courses & commissions, déménagements) | **Colis** | **Repas** | **Réservations** (courses planifiées, **locations** et **covoiturages**).
+
+- Chaque ligne affiche sa **date et son heure**.
+- Choisissez un **mois** en haut : le nombre de commandes et le **total dépensé** s'affichent pour l'onglet ouvert.
+- **Charger plus** affiche les commandes plus anciennes ; l'icône ↻ actualise la liste.
+- Touchez une ligne pour le détail, le reçu, ou **Signaler un problème** (objet oublié, comportement, véhicule, prix, accident…). L'équipe SENGA vous répond ; pour une urgence, utilisez le bouton **SOS**.
+
+## 13. Alerte SOS et contacts d'urgence
+
+- Pendant une course, le bouton **SOS** rouge prévient l'équipe SENGA avec votre position. **Touchez-le** : une fenêtre de confirmation s'ouvre. **Maintenez-le 3 secondes** : l'alerte part tout de suite.
+- Après l'envoi, une fenêtre montre où en est l'alerte : **En attente d'un agent**, puis **Prise en charge** (nom de l'agent), puis **Clôturée**. Votre position est partagée avec l'équipe pendant **30 minutes** ; vous pouvez arrêter ce partage.
+- **Sans Internet**, l'app propose d'**envoyer l'alerte par SMS** au numéro de permanence SENGA, ou d'**appeler les secours** (112, police…).
+- **Contacts d'urgence** (Profil) : enregistrez jusqu'à **3 proches**. Si vous déclenchez un SOS, ils reçoivent un SMS avec votre position.
 
 ## 14. Suivi GPS en temps réel
 

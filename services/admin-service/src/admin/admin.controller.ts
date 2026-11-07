@@ -528,7 +528,21 @@ export class AdminController {
     @Param('id') id: string,
     @Body('status') status: string,
   ) {
-    return this.adminService.resolveIncident(id, status ?? 'RESOLVED', resolveManagedCityScope(req.user));
+    return this.adminService.resolveIncident(id, status ?? 'RESOLVED', resolveManagedCityScope(req.user), req.user.id);
+  }
+
+  @Post('incidents/:id/acknowledge')
+  @RequirePermissions(AdminPermission.INCIDENTS_WRITE)
+  @ApiOperation({ summary: 'Prendre en charge un SOS / incident (l’utilisateur est prévenu)' })
+  acknowledgeIncident(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    return this.adminService.acknowledgeIncident(id, req.user.id, resolveManagedCityScope(req.user));
+  }
+
+  @Post('incidents/:id/notes')
+  @RequirePermissions(AdminPermission.INCIDENTS_WRITE)
+  @ApiOperation({ summary: 'Ajouter une note au suivi d’un incident' })
+  addIncidentNote(@Request() req: { user: AdminJwtUser }, @Param('id') id: string, @Body('text') text: string) {
+    return this.adminService.addIncidentNote(id, req.user.id, text ?? '', resolveManagedCityScope(req.user));
   }
 
   @Get('fraud/alerts')
@@ -1536,7 +1550,10 @@ export class AdminController {
   @Patch('client-apps-config')
   @RequirePermissions(AdminPermission.SYSTEM_WRITE)
   @ApiOperation({ summary: 'Modifier config apps (MM + maintenance) — SuperAdmin' })
-  updateClientAppsConfig(@Body() body: Record<string, unknown>) {
+  updateClientAppsConfig(@Request() req: { user: AdminJwtUser }, @Body() body: Record<string, unknown>) {
+    if (body?.sosSms !== undefined && req.user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Seul le super administrateur peut modifier les SMS des alertes SOS et incidents.');
+    }
     return this.adminService.updateClientAppsConfig(body);
   }
 

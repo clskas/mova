@@ -56,6 +56,8 @@ export class ClientAppsConfigService implements OnModuleInit {
       passengerServices: this.config.passengerServices,
       features: this.config.features,
       sosEmergencyContacts: enabledSosEmergencyContacts(this.config),
+      // Offline SOS: the app offers to text this number (empty = call buttons only).
+      sosSmsNumber: this.config.sosSms.sosSmsNumber,
     };
   }
 
@@ -67,6 +69,7 @@ export class ClientAppsConfigService implements OnModuleInit {
       sosAlertAudiences: this.config.sosAlertAudiences,
       // Admin needs disabled rows too (CRUD).
       sosEmergencyContacts: this.config.sosEmergencyContacts,
+      sosSms: this.config.sosSms,
     };
   }
 
@@ -98,6 +101,7 @@ export class ClientAppsConfigService implements OnModuleInit {
         patch.sosEmergencyContacts !== undefined
           ? patch.sosEmergencyContacts
           : this.config.sosEmergencyContacts,
+      sosSms: patch.sosSms ? { ...this.config.sosSms, ...patch.sosSms } : this.config.sosSms,
     });
 
     this.validate(next);

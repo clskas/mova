@@ -1,3 +1,4 @@
+import '../../core/safety/sos_follow_up.dart';
 import 'dart:async';
 import '../../core/i18n/i18n.dart';
 import 'package:flutter/material.dart';
@@ -126,6 +127,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final api = ref.read(apiClientProvider);
     await api.loadToken();
     unawaited(api.syncLanguageToProfile());
+    unawaited(SosConfigCache.refresh(api));
     final result = await api.getCurrentUser(forceRefresh: forceRefresh);
     if (!mounted) return;
     if (result case Success(:final data)) {

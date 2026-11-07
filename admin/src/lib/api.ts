@@ -296,6 +296,15 @@ export type Incident = {
   lng?: number | null;
   isEmergency?: boolean;
   createdAt?: string;
+  acknowledgedAt?: string | null;
+  acknowledgedByName?: string | null;
+  escalatedAt?: string | null;
+  resolvedAt?: string | null;
+  lastLocationAt?: string | null;
+  /** Positions after a SOS: [{ lat, lng, at }]. */
+  trail?: Array<{ lat: number; lng: number; at: string }> | null;
+  /** Ops timeline: [{ at, by, text }]. */
+  notes?: Array<{ at: string; by: string; text: string }> | null;
 };
 
 export type FraudSeverity = "LOW" | "MEDIUM" | "HIGH";
@@ -2636,6 +2645,32 @@ export async function resolveIncident(id: string, status = "RESOLVED") {
   return apiFetch(`/api/admin/incidents/${id}/resolve`, { method: "POST", body: JSON.stringify({ status }) });
 }
 
+/** « Je prends en charge » : the user is told someone handles their SOS / report. */
+export async function acknowledgeIncident(id: string) {
+  return apiFetch(`/api/admin/incidents/${id}/acknowledge`, { method: "POST", body: JSON.stringify({}) });
+}
+
+export async function addIncidentNote(id: string, text: string) {
+  return apiFetch(`/api/admin/incidents/${id}/notes`, { method: "POST", body: JSON.stringify({ text }) });
+}
+
+/** Google Maps directions through the SOS trail (first → last, up to 8 stops in between). */
+export function sosTrailMapsUrl(trail: Array<{ lat: number; lng: number }>): string | null {
+  if (!trail || trail.length < 2) return null;
+  const first = trail[0];
+  const last = trail[trail.length - 1];
+  const step = Math.max(1, Math.floor((trail.length - 2) / 8));
+  const mid = trail.slice(1, -1).filter((_, i) => i % step === 0).slice(0, 8);
+  const params = new URLSearchParams({
+    api: "1",
+    origin: `${first.lat},${first.lng}`,
+    destination: `${last.lat},${last.lng}`,
+    travelmode: "walking",
+  });
+  if (mid.length) params.set("waypoints", mid.map((p) => `${p.lat},${p.lng}`).join("|"));
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
 export async function fetchFraudAlerts(days = 30, autoCreate = true): Promise<FraudAlertsResponse> {
   const params = new URLSearchParams({ days: String(days), autoCreate: autoCreate ? "true" : "false" });
   return apiFetch<FraudAlertsResponse>(`/api/admin/fraud/alerts?${params}`);
@@ -2927,6 +2962,16 @@ export type ClientAppsConfig = {
   sosAlertAudiences?: Array<"PASSENGER" | "DRIVER" | "PARTNER">;
   /** Numéros d’urgence SOS (CRUD admin → apps). */
   sosEmergencyContacts?: SosEmergencyContact[];
+  /** SMS des alertes SOS / incidents (SuperAdmin). */
+  sosSms?: SosSmsConfig;
+};
+
+export type SosSmsConfig = {
+  toStaffForSos: boolean;
+  toStaffForIncidents: boolean;
+  toTrustedContacts: boolean;
+  escalationSms: boolean;
+  sosSmsNumber: string;
 };
 
 export async function fetchClientAppsConfig(): Promise<ClientAppsConfig> {

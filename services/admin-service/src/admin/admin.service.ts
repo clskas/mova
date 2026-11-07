@@ -1170,18 +1170,52 @@ export class AdminService {
       return filterRowsByManagedCity(rows, managedCity ?? null, (r) => ({ lat: r.lat, lng: r.lng }));
     });
   }
-  async resolveIncident(id: string, status: string, managedCity?: string | null) {
-    if (managedCity) {
-      const scoped = await this.listIncidents(managedCity);
-      if (!scoped.some((row) => String(row.id ?? '') === id)) {
-        throw new MovaHttpException(
-          MovaErrorCode.AUTH_FORBIDDEN,
-          HttpStatus.FORBIDDEN,
-          'Incident hors de votre ville gérée.',
-        );
-      }
+  private async assertIncidentInScope(id: string, managedCity?: string | null) {
+    if (!managedCity) return;
+    const scoped = await this.listIncidents(managedCity);
+    if (!scoped.some((row) => String(row.id ?? '') === id)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Incident hors de votre ville gérée.',
+      );
     }
-    return this.proxy('driver', `/internal/incidents/${id}/resolve`, { method: 'POST', body: JSON.stringify({ status }) });
+  }
+
+  /** Display name of an admin for the incident timeline ("Marie K."). */
+  private async actorName(actorId?: string): Promise<string> {
+    if (!actorId) return 'Équipe SENGA';
+    try {
+      const u = await this.fetchJson<{ firstName?: string; lastName?: string; email?: string }>('auth', `/internal/users/${actorId}`);
+      const name = [u.firstName, u.lastName ? `${u.lastName.charAt(0)}.` : ''].filter(Boolean).join(' ').trim();
+      return name || u.email?.split('@')[0] || 'Équipe SENGA';
+    } catch {
+      return 'Équipe SENGA';
+    }
+  }
+
+  async resolveIncident(id: string, status: string, managedCity?: string | null, actorId?: string) {
+    await this.assertIncidentInScope(id, managedCity);
+    const actorName = await this.actorName(actorId);
+    return this.proxy('driver', `/internal/incidents/${id}/resolve`, { method: 'POST', body: JSON.stringify({ status, actorName }) });
+  }
+
+  async acknowledgeIncident(id: string, actorId: string, managedCity?: string | null) {
+    await this.assertIncidentInScope(id, managedCity);
+    const actorName = await this.actorName(actorId);
+    return this.proxy('driver', `/internal/incidents/${id}/acknowledge`, {
+      method: 'POST',
+      body: JSON.stringify({ actorId, actorName }),
+    });
+  }
+
+  async addIncidentNote(id: string, actorId: string, text: string, managedCity?: string | null) {
+    await this.assertIncidentInScope(id, managedCity);
+    const actorName = await this.actorName(actorId);
+    return this.proxy('driver', `/internal/incidents/${id}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({ actorName, text }),
+    });
   }
 
   async listRides(

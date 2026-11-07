@@ -145,7 +145,19 @@ Card on the **last row** of the home screen (or wallet icon in the bottom bar). 
 
 ## 12. History
 
-Card on the **last row** of the home screen (or clock icon in the bottom bar). Find all your trips, parcels, food orders, bookings and errands (tabs: Trips | Parcels | Meals | Bookings | Errands).
+Card on the **last row** of the home screen (or clock icon in the bottom bar). Tabs: **Rides** (taxi, shopping & errands, moves) | **Parcels** | **Meals** | **Bookings** (scheduled rides, **rentals** and **carpools**).
+
+- Each line shows its **date and time**.
+- Choose a **month** at the top: the number of orders and the **total spent** show for the open tab.
+- **Load more** shows older orders; the ↻ icon refreshes the list.
+- Tap a line for the details, the receipt, or **Report a problem** (lost item, behaviour, vehicle, price, accident…). The SENGA team gets back to you; for an emergency, use the **SOS** button.
+
+## 13. SOS alert and emergency contacts
+
+- During a ride, the red **SOS** button alerts the SENGA team with your position. **Tap it**: a confirmation window opens. **Hold it for 3 seconds**: the alert is sent at once.
+- After sending, a window shows where the alert stands: **Waiting for an agent**, then **Taken in charge** (agent's name), then **Closed**. Your position is shared with the team for **30 minutes**; you can stop this sharing.
+- **Without Internet**, the app offers to **send the alert by SMS** to the SENGA duty number, or to **call emergency services** (112, police…).
+- **Emergency contacts** (Profile): save up to **3 people**. If you raise a SOS, they get an SMS with your position.
 
 ## 14. Real-time GPS tracking
 

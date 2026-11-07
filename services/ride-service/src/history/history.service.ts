@@ -11,7 +11,9 @@ export type HistoryType = 'RIDE' | 'PARCEL' | 'FOOD' | 'EXPRESS' | 'ERRAND' | 'S
 export class HistoryService {
   constructor(private prisma: PrismaService) {}
 
-  async getUnifiedHistory(userId: string, type?: HistoryType, limit = 30) {
+  async getUnifiedHistory(userId: string, type?: HistoryType, limit = 30, before?: Date) {
+    // Paging: items older than [before] (the oldest date the app already shows).
+    const older = before && !Number.isNaN(before.getTime()) ? { createdAt: { lt: before } } : {};
     const take = Math.min(Math.max(limit, 1), 100);
     const fetchPerType = type ? take : Math.min(take * 3, 100);
     const items: {
@@ -30,7 +32,7 @@ export class HistoryService {
 
     if (includeType('RIDE')) {
       const rides = await this.prisma.ride.findMany({
-        where: { passengerId: userId },
+        where: { ...older, passengerId: userId },
         orderBy: { createdAt: 'desc' },
         take: fetchPerType,
       });
@@ -101,7 +103,7 @@ export class HistoryService {
       ];
       if (deliveryTypes.length) {
         const deliveries = await this.prisma.delivery.findMany({
-          where: { userId, type: { in: [...deliveryTypes] } },
+          where: { ...older, userId, type: { in: [...deliveryTypes] } },
           orderBy: { createdAt: 'desc' },
           take: fetchPerType,
           include: { restaurant: { select: { id: true, name: true } }, events: { orderBy: { createdAt: 'asc' } } },
@@ -140,7 +142,7 @@ export class HistoryService {
 
     if (includeType('ERRAND')) {
       const errands = await this.prisma.errandOrder.findMany({
-        where: { userId },
+        where: { ...older, userId },
         orderBy: { createdAt: 'desc' },
         take: fetchPerType,
       });
@@ -164,7 +166,7 @@ export class HistoryService {
 
     if (includeType('SCHEDULED')) {
       const scheduled = await this.prisma.scheduledRide.findMany({
-        where: { passengerId: userId, status: { not: ScheduledRideStatus.CANCELLED } },
+        where: { ...older, passengerId: userId, status: { not: ScheduledRideStatus.CANCELLED } },
         orderBy: { scheduledAt: 'desc' },
         take: fetchPerType,
       });
@@ -183,7 +185,7 @@ export class HistoryService {
 
     if (includeType('CARPOOL')) {
       const asPassenger = await this.prisma.carpoolPassenger.findMany({
-        where: { userId },
+        where: { ...older, userId },
         include: { trip: true },
         orderBy: { createdAt: 'desc' },
         take: fetchPerType,
@@ -207,7 +209,7 @@ export class HistoryService {
         });
       }
       const asDriver = await this.prisma.carpoolTrip.findMany({
-        where: { driverId: userId },
+        where: { ...older, driverId: userId },
         orderBy: { createdAt: 'desc' },
         take: fetchPerType,
       });
@@ -226,7 +228,7 @@ export class HistoryService {
 
     if (includeType('RENTAL')) {
       const rentals = await this.prisma.rentalInquiry.findMany({
-        where: { userId },
+        where: { ...older, userId },
         orderBy: { createdAt: 'desc' },
         take: fetchPerType,
         include: { vehicle: { select: { name: true, category: true } } },
@@ -257,7 +259,7 @@ export class HistoryService {
 
     if (includeType('MOVING')) {
       const movings = await this.prisma.movingRequest.findMany({
-        where: { userId },
+        where: { ...older, userId },
         orderBy: { createdAt: 'desc' },
         take: fetchPerType,
       });
@@ -287,6 +289,6 @@ export class HistoryService {
     }
 
     items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return { data: items.slice(0, take), currency: 'CDF', city: 'RDC' };
+    return { data: items.slice(0, take), hasMore: items.length > take, currency: 'CDF', city: 'RDC' };
   }
 }

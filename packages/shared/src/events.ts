@@ -22,6 +22,12 @@ export const MOVA_EVENTS = {
   SCHEDULED_REMINDER: 'scheduled.reminder',
   ERRAND_CREATED: 'errand.created',
   CHAT_MESSAGE: 'chat.message',
+  /** An ops agent took a SOS / incident in charge (the user is told). */
+  INCIDENT_ACKNOWLEDGED: 'incident.acknowledged',
+  /** A SOS nobody took within 2 minutes: alert the ops team again. */
+  INCIDENT_ESCALATED: 'incident.escalated',
+  /** A SOS / incident was closed. */
+  INCIDENT_RESOLVED: 'incident.resolved',
 } as const;
 
 export type MovaEventName = (typeof MOVA_EVENTS)[keyof typeof MOVA_EVENTS];
@@ -92,6 +98,17 @@ export interface IncidentCreatedPayload {
   lat?: number;
   lng?: number;
   isEmergency?: boolean;
+}
+
+export interface IncidentUpdatePayload {
+  incidentId: string;
+  userId: string;
+  type: string;
+  isEmergency?: boolean;
+  /** Ops agent display name (acknowledged / resolved). */
+  byName?: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface DeliveryCreatedPayload {

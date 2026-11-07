@@ -1,7 +1,6 @@
 import '../../core/i18n/i18n.dart';
 import 'dart:async';
 
-import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,7 +27,7 @@ import '../billing/cash_paid_claim_button.dart';
 import '../rating/rating_screen.dart';
 import 'payment_screen.dart';
 import 'widgets/mova_ride_map.dart';
-import '../../core/location/location_permission.dart';
+import '../../core/safety/sos_helper.dart';
 
 List<Map<String, dynamic>> computeRideTimeline(String mobileStatus) {
   const steps = [
@@ -693,69 +692,18 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     }
   }
 
-  Future<({double lat, double lng})> _resolveSosPosition() async {
-    try {
-      if (await Geolocator.isLocationServiceEnabled()) {
-        var permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied) {
-          permission = await LocationPermissionGate.request();
-        }
-        if (permission == LocationPermission.whileInUse ||
-            permission == LocationPermission.always) {
-          final pos = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.high,
-              timeLimit: Duration(seconds: 12),
-            ),
-          );
-          return (lat: pos.latitude, lng: pos.longitude);
-        }
-      }
-    } catch (_) {
-      /* fallback ci-dessous */
-    }
-    if (_driverPos != null) {
-      return (lat: _driverPos!.latitude, lng: _driverPos!.longitude);
-    }
-    return (lat: _pickup.latitude, lng: _pickup.longitude);
-  }
-
-  Future<void> _triggerSos() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(tr('Alerte SOS')),
-        content: Text(
-          tr('SENGA transmettra votre position à l\'équipe support. En cas de danger immédiat, appelez aussi les secours locaux.'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(tr('Envoyer SOS'), style: TextStyle(color: MovaColors.red)),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !mounted) return;
-    final api = ref.read(apiClientProvider);
-    final sosPos = await _resolveSosPosition();
-    if (!mounted) return;
-    final result = await api.reportSos(
+  Future<void> _triggerSos({bool skipConfirm = false}) async {
+    final fallback = _driverPos ?? _pickup;
+    await triggerSosAlert(
+      ref,
+      context,
+      skipConfirm: skipConfirm,
+      // French on purpose: read by the SENGA team.
       description: 'SOS course ${widget.rideId}',
       rideId: widget.rideId,
-      lat: sosPos.lat,
-      lng: sosPos.lng,
+      fallbackLat: fallback.latitude,
+      fallbackLng: fallback.longitude,
     );
-    if (!mounted) return;
-    switch (result) {
-      case Success():
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr('Alerte SOS envoyée — l\'équipe SENGA a été notifiée'))),
-        );
-      case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(error.message))));
-    }
   }
 
   Future<void> _cancelRide() async {
@@ -851,11 +799,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       scrollable: false,
       padding: EdgeInsets.zero,
       actions: [
-        IconButton(
-          icon: const Icon(Icons.emergency_share, color: MovaColors.red),
-          tooltip: tr('SOS'),
-          onPressed: _triggerSos,
-        ),
+        sosAppBarButton(onPressed: ([bool skip = false]) => _triggerSos(skipConfirm: skip)),
         IconButton(
           icon: const Icon(Icons.share_outlined),
           tooltip: tr('Partager'),

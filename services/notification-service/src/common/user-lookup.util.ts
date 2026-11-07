@@ -1,4 +1,7 @@
 import {
+  DEFAULT_SOS_SMS_CONFIG,
+  normalizeSosSmsConfig,
+  type SosSmsConfig,
   INTERNAL_API_KEY,
   resolveSosAlertUserIds,
   rolesForSosAudiences,
@@ -63,6 +66,36 @@ async function fetchUsersByRoles(roles: string[]): Promise<OpsStaffBrief[]> {
     if (!res.ok) return [];
     const data = (await res.json()) as OpsStaffBrief[];
     return (Array.isArray(data) ? data : []).map((u) => ({ ...u, audienceOnly: true }));
+  } catch {
+    return [];
+  }
+}
+
+/** SOS / incident SMS switches set by the super admin (defaults when the config is unreachable). */
+export async function fetchSosSmsConfig(): Promise<SosSmsConfig> {
+  try {
+    const res = await fetch(serviceUrl('ride', '/internal/client-apps-config'), {
+      headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+    });
+    if (!res.ok) return { ...DEFAULT_SOS_SMS_CONFIG };
+    const data = (await res.json()) as { sosSms?: unknown };
+    return normalizeSosSmsConfig(data.sosSms);
+  } catch {
+    return { ...DEFAULT_SOS_SMS_CONFIG };
+  }
+}
+
+export type TrustedContactBrief = { name: string; phone: string };
+
+/** People the user wants told by SMS when they raise a SOS. */
+export async function fetchTrustedContacts(userId: string): Promise<TrustedContactBrief[]> {
+  try {
+    const res = await fetch(serviceUrl('driver', `/internal/incidents/trusted-contacts/${userId}`), {
+      headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as TrustedContactBrief[];
+    return (Array.isArray(data) ? data : []).filter((c) => c?.phone).slice(0, 3);
   } catch {
     return [];
   }

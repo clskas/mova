@@ -1,3 +1,4 @@
+import '../../core/i18n/i18n.dart';
 class CompanyContact {
   const CompanyContact({
     required this.id,
@@ -29,7 +30,7 @@ class CompanyContact {
       id: json['id']?.toString() ?? '',
       name: (json['name']?.toString().trim().isNotEmpty ?? false)
           ? json['name'].toString().trim()
-          : 'Contact',
+          : tr('Contact'),
       title: text('title'),
       department: text('department'),
       phone: text('phone'),

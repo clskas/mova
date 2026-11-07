@@ -5,7 +5,7 @@ describe('FcmPushService language split', () => {
   const config = { get: () => undefined } as never;
 
   it('sends English texts to devices running the app in English, French to the others', async () => {
-    const pushTokens = { englishTokens: jest.fn().mockResolvedValue(new Set(['en-token'])) } as unknown as PushTokensService;
+    const pushTokens = { nonFrenchTokens: jest.fn().mockResolvedValue(new Map([['en-token', 'en']])) } as unknown as PushTokensService;
     const svc = new FcmPushService(config, pushTokens);
     const spy = jest.spyOn(svc, 'sendToTokens');
     await svc.sendToTokens(['fr-token', 'en-token'], { title: 'Course créée', body: 'Recherche de chauffeur en cours dans votre zone SENGA' });
@@ -20,7 +20,7 @@ describe('FcmPushService language split', () => {
   });
 
   it('keeps a single French send when no device is in English', async () => {
-    const pushTokens = { englishTokens: jest.fn().mockResolvedValue(new Set()) } as unknown as PushTokensService;
+    const pushTokens = { nonFrenchTokens: jest.fn().mockResolvedValue(new Map()) } as unknown as PushTokensService;
     const svc = new FcmPushService(config, pushTokens);
     const spy = jest.spyOn(svc, 'sendToTokens');
     await svc.sendToTokens(['a', 'b'], { title: 'Course créée', body: 'x' });

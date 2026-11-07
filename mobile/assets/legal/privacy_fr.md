@@ -1,8 +1,8 @@
 # Politique de Confidentialité — SENGA RDC
 
 **Dernière mise à jour :** 12 juin 2026  
-**Responsable du traitement :** SENGA SARL, Kinshasa, RDC  
-**DPO :** privacy@mova.cd
+**Responsable du traitement :** SENGA SARL, Beni, RDC  
+**DPO :** dev@afri-soft.com
 
 ## 1. Introduction
 
@@ -86,7 +86,7 @@ Conformément à la législation congolaise, vous disposez des droits suivants :
 - **Opposition** — vous opposer à certains traitements
 - **Portabilité** — recevoir vos données dans un format structuré
 
-Pour exercer vos droits : **privacy@mova.cd** ou WhatsApp +243 900 000 000.
+Pour exercer vos droits : **dev@afri-soft.com** ou WhatsApp +243 973382808.
 
 ## 8. Cookies et traceurs
 
@@ -96,19 +96,15 @@ L'application mobile n'utilise pas de cookies web. Des identifiants locaux (toke
 
 SENGA n'est pas destiné aux personnes de moins de 18 ans. Nous ne collectons pas sciemment de données de mineurs.
 
-## 10. Transferts internationaux
-
-Les données sont hébergées prioritairement en Afrique. Tout transfert hors RDC fait l'objet de garanties appropriées.
-
-## 11. Modifications
+## 10. Modifications
 
 Cette politique peut être mise à jour. La date de dernière révision est indiquée en tête de document. Les modifications substantielles seront notifiées dans l'application.
 
-## 12. Contact
+## 11. Contact
 
 | Rôle | Contact |
 |------|---------|
-| DPO | privacy@mova.cd |
-| Support | support@mova.cd |
-| WhatsApp | +243 900 000 000 |
-| Adresse | Kinshasa, République Démocratique du Congo |
+| DPO | dev@afri-soft.com |
+| Support | dev@afri-soft.com |
+| WhatsApp | +243 973382808 |
+| Adresse | Afri‑Soft SARL, Boulevard Nyamwisi N°96, Quartier Matonge, Commune Mulekera, Beni, Nord‑Kivu, RDC |

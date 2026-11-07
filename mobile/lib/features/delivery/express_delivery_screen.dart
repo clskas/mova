@@ -105,7 +105,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
 
   Future<void> _fetchPickupSuggestions() async {
     final query = _pickupController.text.trim();
-    if (query.length < 2 || query == 'Ma position') {
+    if (query.length < 2 || isMyPositionText(query)) {
       setState(() {
         _pickupSuggestions = [];
         _showPickupSuggestions = false;
@@ -250,7 +250,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       _pickup = pickupFromText;
     } else if ((_pickupFromGps || _pickupFromSuggestion) && ServiceAreaLocation.isInBounds(_pickup)) {
       // Coordonnées déjà fixées par GPS ou autocomplétion.
-    } else if (pickupText.isNotEmpty && pickupText != 'Ma position') {
+    } else if (pickupText.isNotEmpty && !isMyPositionText(pickupText)) {
       final api = ref.read(apiClientProvider);
       final pickupResult = await api.geoAutocomplete(
         pickupText,
@@ -366,7 +366,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
         );
         _pickupController.text = ServiceAreaLocation.isInBounds(result.position)
             ? result.label
-            : 'Ma position';
+            : tr('Ma position');
         _pickupFromSuggestion = false;
         _pickupFromGps = true;
         _estimatedPrice = null;

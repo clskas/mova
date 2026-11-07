@@ -616,8 +616,8 @@ export class NotificationsService implements OnModuleInit {
       const brief = await fetchAuthUserBrief(userId);
       const phone = brief?.phone?.trim();
       if (!phone) continue;
-      const en = brief?.language === 'en';
-      const t = (v: string) => (en ? translateServerText(v, 'en') : v);
+      const lang = brief?.language ?? 'fr';
+      const t = (v: string) => translateServerText(v, lang);
       const smsBody = `SENGA Driver: ${t(payload.title)}. ${t(payload.body)}`.slice(0, 160);
       const result = await this.sms.sendMessage(phone, smsBody);
       if (result.success) smsSent++;

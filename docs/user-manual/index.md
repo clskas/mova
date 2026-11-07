@@ -64,8 +64,8 @@ Lancement à **Kinshasa**. Extension progressive vers Lubumbashi, Goma, Bukavu e
 
 ## Support
 
-- **WhatsApp :** +243 900 000 000
-- **E-mail :** support@mova.cd
+- **WhatsApp :** +243 971163574
+- **E-mail :** dev@afri-soft.com
 - Documents légaux in-app : **Aide & Manuel** → CGU, Politique de confidentialité
 
 ## Tests et documentation technique

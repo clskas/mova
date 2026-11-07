@@ -37,7 +37,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
   DateTime _scheduledAt = DateTime.now().add(const Duration(hours: 2));
   String _vehicleType = 'MOTO_TAXI';
   LatLng _pickup = LatLng(MarketConfig.defaultLat, MarketConfig.defaultLng);
-  String _pickupLabel = 'Ma position';
+  String _pickupLabel = tr('Ma position');
   LatLng? _dropoff;
   bool _dropoffFromSuggestion = false;
   bool _dropoffFromManualCoords = false;
@@ -214,7 +214,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
         );
         _pickupLabel = ServiceAreaLocation.isInBounds(result.position)
             ? result.label
-            : 'Ma position';
+            : tr('Ma position');
         _estimatedPrice = null;
         _estimateBreakdown = null;
       } else if (!silent) {
@@ -324,7 +324,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               const SizedBox(height: 8),
               Text(live['dropoffAddress']?.toString() ?? tr('Destination'),
                   style: const TextStyle(fontWeight: FontWeight.w600)),
-              Text(trf('Départ : {v1}', {'v1': live['pickupAddress'] ?? 'Ma position'}),
+              Text(trf('Départ : {v1}', {'v1': live['pickupAddress'] ?? tr('Ma position')}),
                   style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary)),
               Text(trf('Date : {when}', {'when': when}), style: const TextStyle(fontSize: 13)),
               Text(

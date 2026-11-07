@@ -5,8 +5,8 @@ export const DEFAULT_PRIVACY_TITLE = "Politique de Confidentialité — SENGA RD
 export const DEFAULT_PRIVACY_BODY = `# Politique de Confidentialité — SENGA RDC
 
 **Dernière mise à jour :** 12 juin 2026  
-**Responsable du traitement :** SENGA SARL, Kinshasa, RDC  
-**DPO :** privacy@mova.cd
+**Responsable du traitement :** SENGA SARL, Beni, RDC  
+**DPO :** dev@afri-soft.com
 
 ## 1. Introduction
 
@@ -23,6 +23,7 @@ Cette politique explique quelles données nous collectons, pourquoi, comment lon
 
 ### 2.2 Données de localisation
 - Position GPS en temps réel **pendant** les courses, livraisons et trajets actifs
+- Après une alerte SOS, votre position est partagée avec l'équipe SENGA pendant 30 minutes (vous pouvez arrêter ce partage)
 - Adresses de départ, d'arrivée et de livraison saisies
 
 ### 2.3 Données transactionnelles
@@ -36,7 +37,12 @@ Cette politique explique quelles données nous collectons, pourquoi, comment lon
 - Photo d'identité
 - Statut de disponibilité et revenus
 
-### 2.5 Données techniques
+### 2.5 Contacts d'urgence (facultatif)
+- Nom et numéro de téléphone de 3 proches au plus, saisis par vous dans le Profil
+- Utilisés uniquement pour leur envoyer un SMS avec votre position quand vous déclenchez une alerte SOS
+- Supprimés quand vous les retirez ou quand votre compte est supprimé. Prévenez ces personnes avant de les ajouter.
+
+### 2.6 Données techniques
 - Identifiant de l'appareil
 - Version de l'application
 - Journaux d'erreurs anonymisés
@@ -84,7 +90,7 @@ Conformément à la législation congolaise, vous disposez des droits suivants :
 - **Opposition** — vous opposer à certains traitements
 - **Portabilité** — recevoir vos données dans un format structuré
 
-Pour exercer vos droits : **privacy@mova.cd** ou WhatsApp +243 900 000 000.
+Pour exercer vos droits : **dev@afri-soft.com** ou WhatsApp +243 973382808.
 
 ## 8. Cookies et traceurs
 
@@ -94,20 +100,16 @@ L'application mobile n'utilise pas de cookies web. Des identifiants locaux (toke
 
 SENGA n'est pas destiné aux personnes de moins de 18 ans. Nous ne collectons pas sciemment de données de mineurs.
 
-## 10. Transferts internationaux
-
-Les données sont hébergées prioritairement en Afrique. Tout transfert hors RDC fait l'objet de garanties appropriées.
-
-## 11. Modifications
+## 10. Modifications
 
 Cette politique peut être mise à jour. La date de dernière révision est indiquée en tête de document. Les modifications substantielles seront notifiées dans l'application.
 
-## 12. Contact
+## 11. Contact
 
 | Rôle | Contact |
 |------|---------|
-| DPO | privacy@mova.cd |
-| Support | support@mova.cd |
-| WhatsApp | +243 900 000 000 |
-| Adresse | Kinshasa, République Démocratique du Congo |
+| DPO | dev@afri-soft.com |
+| Support | dev@afri-soft.com |
+| WhatsApp | +243 973382808 |
+| Adresse | Afri‑Soft SARL, Boulevard Nyamwisi N°96, Quartier Matonge, Commune Mulekera, Beni, Nord‑Kivu, RDC |
 `;

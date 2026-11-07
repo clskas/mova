@@ -2,8 +2,8 @@
 
 > **Translation for information only.** This English version is provided for convenience. The French version of these Terms of Use is the only legally binding version; in case of any difference, the French version prevails.
 
-**Last updated:** 12 June 2026  
-**Publisher:** SENGA SARL, Kinshasa, DRC
+**Last updated:** 8 August 2026  
+**Publisher:** Afrisoft SARL, Beni, DRC
 
 ## 1. Purpose
 
@@ -35,10 +35,10 @@ SENGA acts solely as a technology intermediary. Transport and delivery providers
 You must be an adult (18 years old) and have a valid mobile phone number in the **+243** format followed by 9 digits.
 
 ### 3.2 Verification
-Registration requires OTP validation by SMS. Drivers must complete a KYC check (driving licence, vehicle registration card, ID document).
+Registration requires OTP validation by SMS or by email. Drivers must complete a KYC check (driving licence, vehicle registration card, ID document).
 
 ### 3.3 Account security
-You are responsible for keeping your OTP code and your device confidential. Report any unauthorised use immediately to support@mova.cd.
+You are responsible for keeping your OTP code and your device confidential. Report any unauthorised use immediately to dev@afri-soft.com.
 
 ## 4. Pricing and payments
 
@@ -50,6 +50,7 @@ All prices are shown in **Congolese francs (CDF / FC)**.
 - M-Pesa (Vodacom)
 - Airtel Money
 - SENGA wallet
+- Cash
 
 ### 4.3 Estimate
 Prices shown before confirmation are estimates. The final amount may vary with traffic, the actual distance or applicable surcharges.
@@ -73,7 +74,7 @@ The driver/courier agrees to:
 
 ## 6. Personal data
 
-The processing of your data is described in our [Privacy policy](privacy_en.md). SENGA collects in particular your phone number, your GPS position during rides, and your transaction history.
+The processing of your data is described in our Privacy policy. SENGA collects in particular your phone number, your GPS position during rides, and your transaction history.
 
 ## 7. Liability
 
@@ -95,6 +96,6 @@ These Terms are governed by **Congolese law**. Any dispute falls under the exclu
 
 | Channel | Details |
 |---------|---------|
-| WhatsApp support | +243 900 000 000 |
-| Email | support@mova.cd |
+| WhatsApp support | +243 971163574 |
+| Email | dev@afri-soft.com |
 | Address | Kinshasa, DRC |

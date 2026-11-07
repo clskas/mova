@@ -10,6 +10,8 @@ import { applyIosLiveVersions, buildMobileAppVersionResponse, resolveClientPlatf
 import { IosStoreVersionService } from './ios-store-version';
 import { LegalDocumentsService } from '../legal-documents/legal-documents.service';
 import { ClientAppsConfigService } from '../platform/client-apps-config.service';
+import { ContentTranslationService } from '../content-translation/content-translation.service';
+import { GENERATED_LANGUAGES, normalizeAppLanguage } from '@mova/shared';
 
 @ApiTags('public')
 @Controller('public')
@@ -19,6 +21,7 @@ export class PublicController {
     private tracking: TrackingService,
     private legalDocuments: LegalDocumentsService,
     private clientAppsConfig: ClientAppsConfigService,
+    private translations: ContentTranslationService,
     private iosStoreVersions: IosStoreVersionService,
   ) {}
 
@@ -31,6 +34,14 @@ export class PublicController {
     const response = buildMobileAppVersionResponse();
     if (resolveClientPlatform(platformHeader, platformQuery) !== 'ios') return response;
     return applyIosLiveVersions(response, await this.iosStoreVersions.get());
+  }
+
+  /** App texts in Swahili / Lingala, translated by the server ({ french: translation }). */
+  @Get('i18n/:lang')
+  appDictionary(@Param('lang') lang: string) {
+    const code = normalizeAppLanguage(lang);
+    if (!GENERATED_LANGUAGES.includes(code)) return { lang: code, strings: {}, total: 0, done: 0 };
+    return this.translations.dictionary(code, 'ui');
   }
 
   @Get('client-config')

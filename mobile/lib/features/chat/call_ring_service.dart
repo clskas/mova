@@ -129,10 +129,10 @@ class CallRingService {
     final android =
         _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await android?.createNotificationChannel(
-      const AndroidNotificationChannel(
+      AndroidNotificationChannel(
         _channelId,
-        _channelName,
-        description: 'Appels vocaux livraison SENGA',
+        tr(_channelName),
+        description: tr('Appels vocaux livraison SENGA'),
         importance: Importance.max,
         playSound: true,
         enableVibration: true,
@@ -212,10 +212,10 @@ class CallRingService {
         id: 77001,
         title: tr('Appel vocal SENGA'),
         body: trf('{peerLabel} vous appelle — touchez Décrocher.', {'peerLabel': peerLabel}),
-        notificationDetails: const NotificationDetails(
+        notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,
-            _channelName,
+            tr(_channelName),
             importance: Importance.max,
             priority: Priority.max,
             category: AndroidNotificationCategory.call,

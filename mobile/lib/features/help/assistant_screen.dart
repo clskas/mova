@@ -74,7 +74,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
         fromUser: false,
         text: reply.isNotEmpty
             ? reply
-            : 'L\'assistant est indisponible pour le moment. Utilisez « Contacter le support » dans l\'Aide.',
+            : tr('L\'assistant est indisponible pour le moment. Utilisez « Contacter le support » dans l\'Aide.'),
       ));
     });
     _scrollToEnd();

@@ -104,6 +104,20 @@ export const DEFAULT_SOS_SMS_CONFIG: SosSmsConfig = {
   sosSmsNumber: '',
 };
 
+/**
+ * Language buttons shown in the apps (super admin). French is always available.
+ * Hiding a language also stops the server from translating texts into it.
+ */
+export type LanguagesConfig = {
+  en: boolean;
+  sw: boolean;
+  ln: boolean;
+  /** false = the whole "Language" card is hidden: everyone stays in French. */
+  pickerVisible: boolean;
+};
+
+export const DEFAULT_LANGUAGES_CONFIG: LanguagesConfig = { en: true, sw: true, ln: true, pickerVisible: true };
+
 export type ClientAppsConfig = {
   mobileMoney: MmVisibilityByApp;
   maintenance: MaintenanceConfig;
@@ -124,6 +138,8 @@ export type ClientAppsConfig = {
   sosEmergencyContacts: SosEmergencyContact[];
   /** SOS / incident SMS switches (super admin). */
   sosSms: SosSmsConfig;
+  /** Language buttons in the apps (super admin). */
+  languages: LanguagesConfig;
 };
 
 export const DEFAULT_MAINTENANCE_MESSAGE_FR =
@@ -175,6 +191,7 @@ export const DEFAULT_CLIENT_APPS_CONFIG: ClientAppsConfig = {
   sosAlertAudiences: [],
   sosEmergencyContacts: structuredClone(DEFAULT_SOS_EMERGENCY_CONTACTS),
   sosSms: { ...DEFAULT_SOS_SMS_CONFIG },
+  languages: { ...DEFAULT_LANGUAGES_CONFIG },
 };
 
 export const CLIENT_APP_LABELS_FR: Record<ClientAppId, string> = {
@@ -312,8 +329,29 @@ export function mergeClientAppsConfig(raw: unknown): ClientAppsConfig {
   }
 
   base.sosSms = normalizeSosSmsConfig((src as { sosSms?: unknown }).sosSms, base.sosSms);
+  base.languages = normalizeLanguagesConfig((src as { languages?: unknown }).languages, base.languages);
 
   return base;
+}
+
+export function normalizeLanguagesConfig(
+  raw: unknown,
+  fallback: LanguagesConfig = DEFAULT_LANGUAGES_CONFIG,
+): LanguagesConfig {
+  const out = { ...fallback };
+  if (!raw || typeof raw !== 'object') return out;
+  const o = raw as Record<string, unknown>;
+  for (const k of ['en', 'sw', 'ln', 'pickerVisible'] as const) {
+    if (typeof o[k] === 'boolean') out[k] = o[k] as boolean;
+  }
+  return out;
+}
+
+/** Languages the apps may offer right now ('fr' always first). */
+export function enabledAppLanguages(config: Pick<ClientAppsConfig, 'languages'>): Array<'fr' | 'en' | 'sw' | 'ln'> {
+  const l = config.languages ?? DEFAULT_LANGUAGES_CONFIG;
+  if (!l.pickerVisible) return ['fr'];
+  return ['fr', ...(['en', 'sw', 'ln'] as const).filter((k) => l[k])];
 }
 
 /** Keeps known switches only; the SMS number is digits and + only. */

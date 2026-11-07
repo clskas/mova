@@ -12,8 +12,11 @@ class UpdateProfileDto {
   @ValidateIf((_, value) => value != null && value !== '')
   @IsEmail()
   email?: string;
-  /** App language: 'fr' or 'en'. */
-  @ApiProperty({ required: false, enum: ['fr', 'en'] }) @IsOptional() @IsIn(['fr', 'en']) language?: 'fr' | 'en';
+  /** App language: 'fr', 'en', 'sw' or 'ln'. */
+  @ApiProperty({ required: false, enum: ['fr', 'en', 'sw', 'ln'] })
+  @IsOptional()
+  @IsIn(['fr', 'en', 'sw', 'ln'])
+  language?: 'fr' | 'en' | 'sw' | 'ln';
 }
 @ApiTags('users')
 @Controller('users')

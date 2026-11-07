@@ -73,3 +73,27 @@ describe('server-i18n', () => {
     expect(runWithLanguage('en', () => currentRequestLanguage())).toBe('en');
   });
 });
+
+describe('Swahili / Lingala dictionaries', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const m = require('./server-i18n');
+
+  it('reads sw and ln from the app header', () => {
+    expect(m.normalizeAppLanguage('sw')).toBe('sw');
+    expect(m.normalizeAppLanguage('ln-CD')).toBe('ln');
+    expect(m.normalizeAppLanguage('de')).toBe('fr');
+  });
+
+  it('uses the registered dictionary, templates included, and keeps French when missing', () => {
+    m.registerServerDictionary('sw', {
+      'Course introuvable.': 'Safari haipatikani.',
+      'Paiement de {0} FC effectué. Merci d\'utiliser SENGA.': 'Malipo ya {0} FC yamefanyika. Asante kwa kutumia SENGA.',
+    });
+    expect(m.translateServerText('Course introuvable.', 'sw')).toBe('Safari haipatikani.');
+    expect(m.translateServerText('Paiement de 2 300 FC effectué. Merci d\'utiliser SENGA.', 'sw')).toBe(
+      'Malipo ya 2 300 FC yamefanyika. Asante kwa kutumia SENGA.',
+    );
+    expect(m.translateServerText('Course introuvable.', 'ln')).toBe('Course introuvable.');
+    expect(m.translateResponseBody({ message: 'Course introuvable.' }, 'sw')).toEqual({ message: 'Safari haipatikani.' });
+  });
+});

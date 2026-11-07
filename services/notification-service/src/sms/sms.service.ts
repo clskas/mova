@@ -9,6 +9,7 @@ import {
   resolveSmsBackend,
   serdiPaySendSms,
   translateServerText,
+  type AppLanguage,
 } from '@mova/shared';
 
 export interface SmsSendResult {
@@ -28,9 +29,9 @@ export class SmsService {
     return this.config.get('MOCK_SMS') === 'true' || this.config.get('MOCK_OTP') === 'true';
   }
 
-  /** [language]: the recipient's app language; French texts are translated for 'en'. */
-  async sendMessage(phone: string, body: string, language?: 'fr' | 'en'): Promise<SmsSendResult> {
-    if (language === 'en') body = translateServerText(body, 'en');
+  /** [language]: the recipient's app language; French texts are translated when it is not French. */
+  async sendMessage(phone: string, body: string, language?: AppLanguage): Promise<SmsSendResult> {
+    if (language && language !== 'fr') body = translateServerText(body, language);
     if (this.isMock()) {
       if (isProductionRuntime()) {
         this.logger.error('[MOCK SMS] refused in production');

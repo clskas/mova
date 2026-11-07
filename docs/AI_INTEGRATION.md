@@ -41,7 +41,8 @@ L'IA de SENGA passe par **Claude (Anthropic)**, appelé **uniquement par `mova-d
 | Annonce de location | Portail loueur → Véhicule | `RENTAL_LISTING` |
 | Résumé du jour, questions sur les données | Admin → Analyses IA | `DAILY_SUMMARY`, `ANALYTICS_ANSWER` (chiffres agrégés, données personnelles retirées) |
 | Brouillon de réponse aux litiges | Admin → Litiges | `REPLY_DRAFT` |
-| Traduction anglaise des contenus partenaires (menus, annonces, publicités) | App en anglais | `TRANSLATE_CONTENT` — traduit une fois, gardé en cache (`content_translations`) ; `CONTENT_TRANSLATION=false` sur `mova-ride` pour couper |
+| Traduction des contenus partenaires (menus, annonces, publicités) en anglais, swahili, lingala | App en anglais / swahili / lingala | `TRANSLATE_CONTENT` (paramètre `target`) — traduit une fois, gardé en cache (`content_translations`, colonne `lang`) ; `CONTENT_TRANSLATION=false` sur `mova-ride` pour couper |
+| Dictionnaires swahili et lingala de l'app et du serveur | App en swahili / lingala | `TRANSLATE_CONTENT` en tâche de fond sur `ui-source-strings.ts` (textes de l'app, régénérés par `scripts/sync-ui-strings.mjs`) et `server-strings-en.ts` ; l'app télécharge `GET /api/public/i18n/:lang`, les services rechargent `GET /internal/i18n/:lang/server` toutes les 10 min. Seules les langues visibles (Admin → Langues des apps) sont traduites |
 
 **Langue** : l'app envoie `X-App-Language` (fr/en). La passerelle traduit les textes du serveur (erreurs, statuts) avec le dictionnaire `packages/shared/src/server-strings-en.ts` ; notifications et SMS suivent la langue enregistrée sur le profil (`users.language`) et sur l'appareil (`push_devices.language`). Les portails web restent en français.
 

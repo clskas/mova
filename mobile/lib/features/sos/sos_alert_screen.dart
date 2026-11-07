@@ -118,7 +118,7 @@ class _SosAlertScreenState extends State<SosAlertScreen> {
         : 'Alerte SOS';
     final detail = (widget.body != null && widget.body!.trim().isNotEmpty)
         ? widget.body!.trim()
-        : 'Une urgence a été signalée sur SENGA.';
+        : tr('Une urgence a été signalée sur SENGA.');
 
     return MovaScreen(
       title: tr('Alerte SOS'),

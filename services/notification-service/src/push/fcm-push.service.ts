@@ -1,6 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { translateServerText } from '@mova/shared';
+import { normalizeAppLanguage, translateServerText } from '@mova/shared';
 import { PushTokensService } from './push-tokens.service';
 import { GoogleAuth, JWT } from 'google-auth-library';
 
@@ -56,25 +56,31 @@ export class FcmPushService {
   ): Promise<void> {
     if (tokens.length === 0) return;
 
-    // Devices running the app in English get the English text; the others keep French.
+    // Each device gets the text in its app language; French devices keep the original.
     if (this.pushTokens && !(opts as { _lang?: string } | undefined)?._lang) {
-      let english = new Set<string>();
+      let langs = new Map<string, string>();
       try {
-        english = await this.pushTokens.englishTokens([...new Set(tokens.filter(Boolean))]);
+        langs = await this.pushTokens.nonFrenchTokens([...new Set(tokens.filter(Boolean))]);
       } catch {
         /* keep French */
       }
-      if (english.size > 0) {
-        const fr = tokens.filter((t) => !english.has(t));
-        const en = tokens.filter((t) => english.has(t));
-        const tr = (v: string) => translateServerText(v, 'en');
-        const data = Object.fromEntries(
-          Object.entries(message.data ?? {}).map(([k, v]) => [k, k === 'title' || k === 'body' ? tr(String(v)) : v]),
+      if (langs.size > 0) {
+        const groups = new Map<string, string[]>();
+        for (const t of tokens) {
+          const lang = langs.get(t) ?? 'fr';
+          groups.set(lang, [...(groups.get(lang) ?? []), t]);
+        }
+        await Promise.all(
+          [...groups.entries()].map(([lang, group]) => {
+            if (lang === 'fr') return this.sendToTokens(group, message, { ...opts, _lang: 'fr' } as typeof opts);
+            const code = normalizeAppLanguage(lang);
+            const tr = (v: string) => translateServerText(v, code);
+            const data = Object.fromEntries(
+              Object.entries(message.data ?? {}).map(([k, v]) => [k, k === 'title' || k === 'body' ? tr(String(v)) : v]),
+            );
+            return this.sendToTokens(group, { title: tr(message.title), body: tr(message.body), data }, { ...opts, _lang: code } as typeof opts);
+          }),
         );
-        await Promise.all([
-          fr.length ? this.sendToTokens(fr, message, { ...opts, _lang: 'fr' } as typeof opts) : Promise.resolve(),
-          this.sendToTokens(en, { title: tr(message.title), body: tr(message.body), data }, { ...opts, _lang: 'en' } as typeof opts),
-        ]);
         return;
       }
     }

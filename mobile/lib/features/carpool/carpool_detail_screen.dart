@@ -559,7 +559,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                         label: Text(
                           trip['contactPhone'] != null
                               ? 'Appeler · ${trip['contactPhone']}'
-                              : 'Contacter le conducteur',
+                              : tr('Contacter le conducteur'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),

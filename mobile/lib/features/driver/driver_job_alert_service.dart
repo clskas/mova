@@ -94,7 +94,7 @@ class DriverJobAlertService {
       AndroidNotificationChannel(
         _channelSystemId,
         trf('{_channelName} (son téléphone)', {'_channelName': _channelName}),
-        description: 'Missions avec le son de notification système',
+        description: tr('Missions avec le son de notification système'),
         importance: Importance.max,
         playSound: true,
         enableVibration: true,
@@ -106,7 +106,7 @@ class DriverJobAlertService {
       AndroidNotificationChannel(
         _channelSilentId,
         trf('{_channelName} (sans son)', {'_channelName': _channelName}),
-        description: 'Missions en vibration seule (son coupé dans l’app)',
+        description: tr('Missions en vibration seule (son coupé dans l’app)'),
         importance: Importance.max,
         playSound: false,
         enableVibration: true,
@@ -118,8 +118,8 @@ class DriverJobAlertService {
       await androidPlugin?.createNotificationChannel(
         AndroidNotificationChannel(
           _channelSengaId,
-          _channelName,
-          description: 'Nouvelles courses, livraisons et missions — son SENGA',
+          tr(_channelName),
+          description: tr('Nouvelles courses, livraisons et missions — son SENGA'),
           importance: Importance.max,
           playSound: true,
           sound: _androidSound,
@@ -364,7 +364,7 @@ class DriverJobAlertService {
         notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             channelId,
-            _channelName,
+            tr(_channelName),
             channelDescription: 'Alertes chauffeur SENGA',
             importance: Importance.max,
             priority: Priority.max,

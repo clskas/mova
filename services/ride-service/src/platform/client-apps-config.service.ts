@@ -58,6 +58,8 @@ export class ClientAppsConfigService implements OnModuleInit {
       sosEmergencyContacts: enabledSosEmergencyContacts(this.config),
       // Offline SOS: the app offers to text this number (empty = call buttons only).
       sosSmsNumber: this.config.sosSms.sosSmsNumber,
+      // Language buttons the apps show (super admin).
+      languages: this.config.languages,
     };
   }
 
@@ -102,6 +104,7 @@ export class ClientAppsConfigService implements OnModuleInit {
           ? patch.sosEmergencyContacts
           : this.config.sosEmergencyContacts,
       sosSms: patch.sosSms ? { ...this.config.sosSms, ...patch.sosSms } : this.config.sosSms,
+      languages: patch.languages ? { ...this.config.languages, ...patch.languages } : this.config.languages,
     });
 
     this.validate(next);

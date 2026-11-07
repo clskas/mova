@@ -174,8 +174,8 @@ The trace builds up as the trip goes on. With a weak network, the position may l
 ## 15. Help and support
 
 - **SENGA Assistant (AI)**: in **Help**, type your question in English, French, Lingala or Swahili and get an immediate answer based on this manual. For a dispute, a payment or an emergency, contact human support.
-- **WhatsApp:** +243 900 000 000
-- **Email:** support@mova.cd
+- **WhatsApp:** +243 971163574
+- **Email:** dev@afri-soft.com
 - See the Terms of Use and the privacy policy in **Help & Manual**.
 
 ## 16. App updates

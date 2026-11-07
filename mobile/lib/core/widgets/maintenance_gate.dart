@@ -44,7 +44,7 @@ class _MaintenanceGateState extends ConsumerState<MaintenanceGate> {
             _message = active
                 ? (msg != null && msg.isNotEmpty
                     ? msg
-                    : 'SENGA est actuellement en maintenance. Merci pour votre patience.')
+                    : tr('SENGA est actuellement en maintenance. Merci pour votre patience.'))
                 : null;
             _checked = true;
           });

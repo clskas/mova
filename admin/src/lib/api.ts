@@ -2964,6 +2964,15 @@ export type ClientAppsConfig = {
   sosEmergencyContacts?: SosEmergencyContact[];
   /** SMS des alertes SOS / incidents (SuperAdmin). */
   sosSms?: SosSmsConfig;
+  /** Boutons de langue dans les apps (SuperAdmin). */
+  languages?: LanguagesConfig;
+};
+
+export type LanguagesConfig = {
+  en: boolean;
+  sw: boolean;
+  ln: boolean;
+  pickerVisible: boolean;
 };
 
 export type SosSmsConfig = {

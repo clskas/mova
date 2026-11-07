@@ -5,6 +5,8 @@ describe('AI tasks', () => {
     expect(['RECEIPT', 'MOVING_VOLUME', 'MENU', 'RENTAL_LISTING'].every(isAiVisionTask)).toBe(true);
     expect(['ANALYTICS_ANSWER', 'DAILY_SUMMARY', 'REPLY_DRAFT', 'TRANSLATE_CONTENT'].every(isAiTextTask)).toBe(true);
     expect(AI_TEXT_TASKS.TRANSLATE_CONTENT.prompt({ texts: { a: 'Poulet mayo' } })).toContain('Poulet mayo');
+    expect(AI_TEXT_TASKS.TRANSLATE_CONTENT.prompt({ texts: {}, target: 'sw' })).toContain('swahili');
+    expect(AI_TEXT_TASKS.TRANSLATE_CONTENT.prompt({ texts: {}, target: 'ln' })).toContain('lingala');
     expect(isAiVisionTask('toString')).toBe(false);
     expect(isAiTextTask('MENU')).toBe(false);
   });

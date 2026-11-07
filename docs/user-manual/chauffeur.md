@@ -133,4 +133,4 @@ Menu ⋮ → **Historique missions** : toutes vos missions — courses taxi, liv
 
 - **Assistant SENGA (IA)** : dans **Aide**, posez votre question (en ligne, dossier, PIN, revenus…) dans votre langue et recevez une réponse immédiate tirée de ce manuel. Pour un litige, un paiement ou une urgence, contactez le support humain.
 
-WhatsApp +243 900 000 000 — support@mova.cd
+WhatsApp +243 971163574 — dev@afri-soft.com

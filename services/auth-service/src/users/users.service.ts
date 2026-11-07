@@ -125,7 +125,7 @@ export class UsersService {
     const current = await this.prisma.user.findUnique({ where: { id } });
     if (!current) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
     const patch: { firstName?: string | null; lastName?: string | null; email?: string | null; language?: string } = {};
-    if (data.language === 'fr' || data.language === 'en') patch.language = data.language;
+    if (['fr', 'en', 'sw', 'ln'].includes(data.language ?? '')) patch.language = data.language as string;
     if (data.firstName !== undefined) patch.firstName = normalize(data.firstName);
     if (data.lastName !== undefined) patch.lastName = normalize(data.lastName);
     if (data.email !== undefined) {

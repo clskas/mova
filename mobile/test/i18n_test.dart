@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mova/core/error/result.dart';
 import 'package:mova/core/i18n/i18n.dart';
@@ -24,8 +27,43 @@ void main() {
     }
   });
 
-  test('only French and English are offered until Lingala/Swahili are reviewed', () {
-    expect(kAppLanguages.map((l) => l.code), ['fr', 'en']);
+  test('four languages; Swahili and Lingala come from the server', () {
+    expect(kAppLanguages.map((l) => l.code), ['fr', 'en', 'sw', 'ln']);
+    expect(kDownloadedLanguages, {'sw', 'ln'});
+  });
+
+  test('downloaded Swahili texts are used, missing ones stay French', () async {
+    SharedPreferences.setMockInitialValues({});
+    await setDownloadedStrings('sw', {'Annuler': 'Ghairi'});
+    await setAppLanguage('sw');
+    expect(tr('Annuler'), 'Ghairi');
+    expect(tr('Texte pas encore traduit'), 'Texte pas encore traduit');
+  });
+
+  test('a language hidden by the super admin falls back to French', () async {
+    SharedPreferences.setMockInitialValues({});
+    await setAppLanguage('en');
+    await applyVisibleLanguages({'en': false, 'sw': true, 'ln': true, 'pickerVisible': true});
+    expect(visibleAppLanguages.value, ['fr', 'sw', 'ln']);
+    expect(appLanguage.value, 'fr');
+    await applyVisibleLanguages({'pickerVisible': false});
+    expect(visibleAppLanguages.value, ['fr']);
+    await applyVisibleLanguages({});
+  });
+
+  test('the server translates exactly the app texts (run scripts/sync-ui-strings.mjs)', () {
+    final file = File('../packages/shared/src/ui-source-strings.ts');
+    if (!file.existsSync()) return;
+    final src = file.readAsStringSync();
+    final listed = (jsonDecode(src.substring(src.indexOf('= [') + 2, src.lastIndexOf(']') + 1)) as List).cast<String>().toSet();
+    expect(listed, kStringsEn.keys.toSet());
+  });
+
+  test('"Ma position" is recognised in every language', () {
+    appLanguage.value = 'en';
+    expect(isMyPositionText('Ma position'), isTrue);
+    expect(isMyPositionText(tr('Ma position')), isTrue);
+    expect(isMyPositionText('Gombe'), isFalse);
   });
 
   test('screens added in the second pass translate', () {

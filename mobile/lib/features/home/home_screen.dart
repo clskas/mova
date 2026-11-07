@@ -1,3 +1,4 @@
+import '../../core/i18n/i18n_remote.dart';
 import '../../core/safety/sos_follow_up.dart';
 import 'dart:async';
 import '../../core/i18n/i18n.dart';
@@ -128,6 +129,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     await api.loadToken();
     unawaited(api.syncLanguageToProfile());
     unawaited(SosConfigCache.refresh(api));
+    unawaited(refreshLanguageSettings(api));
     final result = await api.getCurrentUser(forceRefresh: forceRefresh);
     if (!mounted) return;
     if (result case Success(:final data)) {
@@ -310,7 +312,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   String _welcomeGreeting(String userLabel) {
-    if (userLabel.isEmpty) return PassengerCopy.homeTagline;
+    if (userLabel.isEmpty) return tr(PassengerCopy.homeTagline);
     return '${_greeting()}, $userLabel 👋';
   }
 
@@ -661,7 +663,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           const SizedBox(height: 16),
           MovaWelcomeBanner(
             greeting: _welcomeGreeting(userLabel),
-            subtitle: userLabel.isNotEmpty ? PassengerCopy.homeTagline : '',
+            subtitle: userLabel.isNotEmpty ? tr(PassengerCopy.homeTagline) : '',
           ),
           if (_publicites.isNotEmpty) ...[
             const SizedBox(height: 12),

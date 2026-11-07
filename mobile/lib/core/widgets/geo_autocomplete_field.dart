@@ -1,3 +1,4 @@
+import '../i18n/i18n.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -94,9 +95,12 @@ class _GeoAutocompleteFieldState extends State<GeoAutocompleteField> {
 
   bool get _canUpdateUi => mounted && _focusNode.hasFocus;
 
+  /// Placeholder texts in French and in the app language ("Ma position" / "My location").
+  Set<String> get _blocked => {...widget.blockedQueries, ...widget.blockedQueries.map(tr)};
+
   String _normalizeQuery(String value) {
     final trimmed = value.trim();
-    for (final blocked in widget.blockedQueries) {
+    for (final blocked in _blocked) {
       if (trimmed == blocked) return '';
       if (trimmed.startsWith(blocked) && trimmed.length > blocked.length) {
         return trimmed.substring(blocked.length).trim();
@@ -317,7 +321,7 @@ class _GeoAutocompleteFieldState extends State<GeoAutocompleteField> {
           textInputAction: widget.textInputAction,
           style: compact ? const TextStyle(fontSize: 14) : null,
           onTap: () {
-            for (final blocked in widget.blockedQueries) {
+            for (final blocked in _blocked) {
               if (widget.controller.text.trim() == blocked) {
                 widget.controller.selection = TextSelection(
                   baseOffset: 0,

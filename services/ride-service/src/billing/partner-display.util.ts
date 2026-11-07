@@ -10,8 +10,19 @@ import { markupFeeFromPartner } from './food-catalog-markup.util';
  */
 export const RESTAURANT_PLATFORM_PERCENT = 12;
 
-/** Commission SENGA sur location partenaire. */
+/** Commission SENGA sur location partenaire (défaut ; le taux admin le remplace). */
 export const RENTAL_PLATFORM_PERCENT = 12;
+
+let rentalPlatformPercentCurrent = RENTAL_PLATFORM_PERCENT;
+
+/** Latest admin rate for rentals (Commissions page), kept by CommissionService. */
+export function setRentalPlatformPercent(percent: number): void {
+  if (Number.isFinite(percent) && percent >= 0 && percent <= 100) rentalPlatformPercentCurrent = percent;
+}
+
+export function currentRentalPlatformPercent(): number {
+  return rentalPlatformPercentCurrent;
+}
 
 export type RestaurantPartnerDisplay = {
   itemsSubtotalCdf: number;
@@ -102,17 +113,31 @@ export function computeRestaurantPartnerDisplay(input: {
 export function computeRentalPartnerDisplay(input: {
   totalCdf?: number | null;
   estimatedPriceCdf?: number | null;
+  /** Whole promo discount given to the customer. */
   discountCdf?: number | null;
+  /** Part of it funded by the partner (null on older bookings = all of it). */
+  partnerDiscountCdf?: number | null;
   depositCdf?: number | null;
   promoCode?: string | null;
+  /** SENGA rate in % (admin Commissions page); defaults to the latest known rate. */
+  platformPercent?: number;
 }): RentalPartnerDisplay {
   const totalPaid = input.totalCdf ?? input.estimatedPriceCdf ?? 0;
   const depositCdf = Math.max(0, input.depositCdf ?? 0);
-  const partnerDiscountCdf = Math.max(0, input.discountCdf ?? 0);
+  const discountCdf = Math.max(0, input.discountCdf ?? 0);
+  const partnerDiscountCdf = Math.min(
+    discountCdf,
+    Math.max(0, input.partnerDiscountCdf ?? discountCdf),
+  );
+  const platformDiscountCdf = discountCdf - partnerDiscountCdf;
+  const pct = input.platformPercent ?? currentRentalPlatformPercent();
   const subtotalAfterDiscount = Math.max(0, totalPaid - depositCdf);
-  const subtotalGrossCdf = subtotalAfterDiscount + partnerDiscountCdf;
-  const platformFeeCdf = platformFeeFromGross(subtotalGrossCdf, RENTAL_PLATFORM_PERCENT);
-  const partnerNetCdf = Math.max(0, subtotalGrossCdf - platformFeeCdf - partnerDiscountCdf);
+  // Price before any promo: the commission is taken on it, then each side bears its own promo.
+  const subtotalGrossCdf = subtotalAfterDiscount + discountCdf;
+  const commissionCdf = platformFeeFromGross(subtotalGrossCdf, pct);
+  const partnerNetCdf = Math.max(0, subtotalGrossCdf - commissionCdf - partnerDiscountCdf);
+  // What SENGA really keeps: commission minus the promo it funds (never shown below 0).
+  const platformFeeCdf = Math.max(0, commissionCdf - platformDiscountCdf);
 
   return {
     subtotalGrossCdf: Math.round(subtotalGrossCdf),

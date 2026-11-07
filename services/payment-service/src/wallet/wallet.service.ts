@@ -437,6 +437,39 @@ export class WalletService {
     return this.credit(MOVA_PLATFORM_USER_ID, amountCdf, description, reference);
   }
 
+  /**
+   * A promo funded by SENGA: the extra paid to a driver / partner leaves the treasury.
+   * The treasury may go below zero (it is SENGA's own account); idempotent on `reference`.
+   */
+  async recordPlatformPromoCost(amountCdf: number, description: string, reference: string) {
+    const amount = Math.round(amountCdf);
+    if (amount <= 0) return null;
+    if (await this.findExistingLedger(reference, 'DEBIT')) return null;
+    await this.ensurePlatformWallet();
+    return this.prisma
+      .$transaction(async (tx) => {
+        const rows = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM wallets WHERE "userId" = ${MOVA_PLATFORM_USER_ID} FOR UPDATE
+        `;
+        const walletId = rows[0]?.id;
+        if (!walletId) return null;
+        const dup = await tx.walletTransaction.findFirst({ where: { reference, type: 'DEBIT' } });
+        if (dup) return null;
+        const updated = await tx.wallet.update({
+          where: { id: walletId },
+          data: { balanceCdf: { decrement: amount } },
+        });
+        await tx.walletTransaction.create({
+          data: { walletId, amountCdf: -amount, type: 'DEBIT', description, reference },
+        });
+        return updated;
+      })
+      .catch((e) => {
+        if (isPrismaUniqueViolation(e)) return null;
+        throw e;
+      });
+  }
+
   async holdFunds(
     userId: string,
     amountCdf: number,

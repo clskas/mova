@@ -464,11 +464,23 @@ export default function ReservationsPage() {
                           disabled={busyId === b.id}
                           className="px-3 py-1.5 rounded-lg text-sm border hover:bg-gray-50 disabled:opacity-50"
                           onClick={async () => {
-                            const status = window.prompt("Statut caution: HELD / RELEASED / PARTIAL / DISPUTED", b.depositStatus ?? "HELD");
+                            const status = window
+                              .prompt(
+                                "Statut caution : HELD (gardée) / RELEASED (rendue au client) / PARTIAL (retenue en partie) / DISPUTED (litige)",
+                                b.depositStatus ?? "HELD",
+                              )
+                              ?.trim()
+                              .toUpperCase();
                             if (!status) return;
+                            let heldCdf: number | undefined;
+                            if (status === "PARTIAL") {
+                              const raw = window.prompt("Montant retenu sur la caution (FC) — le reste est rendu au client");
+                              if (!raw) return;
+                              heldCdf = Number(raw.replace(/\s/g, ""));
+                            }
                             setBusyId(b.id);
                             try {
-                              await updateDeposit(b.id, { status });
+                              await updateDeposit(b.id, { status, ...(heldCdf != null ? { heldCdf } : {}) });
                               await load();
                             } catch (e) {
                               setError(toUserErrorMessage(e, "Mise à jour caution impossible"));

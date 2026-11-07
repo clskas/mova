@@ -54,7 +54,7 @@ import {
 } from '../common/payment-status.util';
 import { applyPromoCode } from '../common/promo-apply.util';
 import { cancelPendingCashRide } from '../common/escrow.util';
-import { rideDriverGrossCdf, rideShareBookingDriverGrossCdf } from '../common/ride-driver-gross.util';
+import { errandDriverNetCdf, rideDriverGrossCdf, rideShareBookingDriverGrossCdf } from '../common/ride-driver-gross.util';
 import { PromoService } from './surcharge.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { RidePoolService } from './ride-pool.service';
@@ -1730,12 +1730,15 @@ export class RidesService {
     };
     if (!r) return empty;
 
+    const rentalRule = await this.commission.get(CommissionServiceType.RENTAL);
     const display = computeRentalPartnerDisplay({
       totalCdf: r.totalCdf,
       estimatedPriceCdf: r.estimatedPriceCdf,
       discountCdf: r.discountCdf,
+      partnerDiscountCdf: r.partnerDiscountCdf,
       depositCdf: r.vehicle?.depositCdf ?? 0,
       promoCode: r.promoCode,
+      platformPercent: rentalRule.platformPercent,
     });
     const ownerUserId = r.vehicle?.ownerUserId ?? null;
 
@@ -1766,6 +1769,7 @@ export class RidesService {
       platformFeeCdf: display.platformFeeCdf,
       subtotalGrossCdf: display.subtotalGrossCdf,
       depositCdf: display.depositCdf,
+      rentalPaidCdf: Math.max(0, (r.totalCdf ?? r.estimatedPriceCdf ?? 0) - display.depositCdf),
       logistics,
     };
   }
@@ -1854,18 +1858,24 @@ export class RidesService {
           return { referenceType: type, referenceId, driverId: o?.driverId ?? null, driverNetCdf: 0 };
         }
         const rule = await this.commission.get(CommissionServiceType.ERRAND);
-        const gross =
-          rideDriverGrossCdf({
-            finalPriceCdf: o.finalPriceCdf,
-            estimatedPriceCdf: o.estimatedPriceCdf,
-            discountCdf: o.discountCdf,
-          }) + (o.purchaseTotalCdf ?? 0);
+        const feeGross = rideDriverGrossCdf({
+          finalPriceCdf: o.finalPriceCdf,
+          estimatedPriceCdf: o.estimatedPriceCdf,
+          discountCdf: o.discountCdf,
+        });
+        // Budget paid upfront but not spent: it goes back to the customer, not to SENGA.
+        const feeCharged = o.finalPriceCdf ?? o.estimatedPriceCdf;
+        const paidUpfront = o.escrowAmountCdf ?? feeCharged + (o.budgetCdf ?? o.purchaseTotalCdf ?? 0);
+        const customerRefundCdf =
+          o.purchaseTotalCdf != null ? Math.max(0, Math.round(paidUpfront - feeCharged - o.purchaseTotalCdf)) : 0;
         return {
           referenceType: type,
           referenceId,
           driverId: o.driverId,
-          driverNetCdf: this.commission.splitGross(gross, rule.platformPercent).driverNetCdf,
-          grossCdf: gross,
+          // Commission on the fee only; purchases paid back in full.
+          driverNetCdf: errandDriverNetCdf(feeGross, o.purchaseTotalCdf, rule.platformPercent),
+          grossCdf: feeGross + (o.purchaseTotalCdf ?? 0),
+          customerRefundCdf,
         };
       }
       case 'MOVING': {
@@ -2024,15 +2034,14 @@ export class RidesService {
         referenceType: 'ERRAND',
         referenceId: e.id,
         label: e.description?.toString() ?? 'Courses & commissions',
-        driverNetCdf: Math.round(
-          rideNet(
-            rideDriverGrossCdf({
-              finalPriceCdf: e.finalPriceCdf,
-              estimatedPriceCdf: e.estimatedPriceCdf,
-              discountCdf: e.discountCdf,
-            }) + (e.purchaseTotalCdf ?? 0),
-            errandRule.platformPercent,
-          ),
+        driverNetCdf: errandDriverNetCdf(
+          rideDriverGrossCdf({
+            finalPriceCdf: e.finalPriceCdf,
+            estimatedPriceCdf: e.estimatedPriceCdf,
+            discountCdf: e.discountCdf,
+          }),
+          e.purchaseTotalCdf,
+          errandRule.platformPercent,
         ),
         completedAt: e.completedAt?.toISOString() ?? null,
       })),
@@ -2146,12 +2155,13 @@ export class RidesService {
         .reduce(
           (a, e) =>
             a +
-            net(
+            errandDriverNetCdf(
               rideDriverGrossCdf({
                 finalPriceCdf: e.finalPriceCdf,
                 estimatedPriceCdf: e.estimatedPriceCdf,
                 discountCdf: e.discountCdf,
-              }) + (e.purchaseTotalCdf ?? 0),
+              }),
+              e.purchaseTotalCdf,
               errandRule.platformPercent,
             ),
           0,

@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { setRentalPlatformPercent } from '../billing/partner-display.util';
 import { CommissionServiceType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -34,8 +35,12 @@ const DEFAULTS: Record<
 };
 
 @Injectable()
-export class CommissionService {
+export class CommissionService implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
+
+  onModuleInit() {
+    void this.get(CommissionServiceType.RENTAL).catch(() => undefined);
+  }
 
   private fallback(type: CommissionServiceType): CommissionRule {
     const d = DEFAULTS[type];
@@ -52,6 +57,12 @@ export class CommissionService {
   }
 
   async get(type: CommissionServiceType): Promise<CommissionRule> {
+    const rule = await this.read(type);
+    if (type === CommissionServiceType.RENTAL) setRentalPlatformPercent(rule.platformPercent);
+    return rule;
+  }
+
+  private async read(type: CommissionServiceType): Promise<CommissionRule> {
     const row = await this.prisma.platformCommission.findUnique({ where: { serviceType: type } });
     if (!row || !row.isActive) return this.fallback(type);
     return {

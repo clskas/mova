@@ -40,6 +40,7 @@ describe('PaymentsService', () => {
     releaseHold: jest.fn().mockResolvedValue({ released: true, amountCdf: 12000 }),
     credit: jest.fn().mockResolvedValue({ balanceCdf: 12000 }),
     creditPlatformFee: jest.fn().mockResolvedValue(null),
+    recordPlatformPromoCost: jest.fn().mockResolvedValue(null),
     completePendingTopUp: jest.fn().mockResolvedValue({ found: false }),
     refundFailedPayout: jest.fn().mockResolvedValue({ found: false }),
   };
@@ -401,6 +402,12 @@ describe('PaymentsService', () => {
       expect.objectContaining({ referenceType: 'RIDE', referenceId: 'ride-big', amountCdf: 3000 }),
     );
     expect(debtLedger.settleAvailableFromWallet).toHaveBeenCalledWith('driver-1');
+    // the 3 000 paid by SENGA leaves its treasury
+    expect(wallet.recordPlatformPromoCost).toHaveBeenCalledWith(
+      3000,
+      expect.any(String),
+      'PROMO_COST:RIDE:ride-big',
+    );
   });
 
   it('rejette le paiement service si non terminé', async () => {

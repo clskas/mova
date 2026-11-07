@@ -1,3 +1,4 @@
+import { errandDriverNetCdf } from '../common/ride-driver-gross.util';
 import { receiptVerdict, runAiVision } from '../common/ai-vision.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, ErrandCategory, ErrandOrder, ErrandOrderStatus, Prisma, TrackingReferenceType, VehicleType } from '@prisma/client';
@@ -550,11 +551,12 @@ export class ErrandsService {
     let enriched: typeof formatted & { driverGrossCdf?: number; driverNetCdf?: number } = formatted;
     if (order.driverId === userId) {
       const errandRule = await this.commission.get(CommissionServiceType.ERRAND);
-      const gross = (order.finalPriceCdf ?? order.estimatedPriceCdf) + (order.purchaseTotalCdf ?? 0);
+      const fee = order.finalPriceCdf ?? order.estimatedPriceCdf;
+      const gross = fee + (order.purchaseTotalCdf ?? 0);
       enriched = {
         ...formatted,
         driverGrossCdf: gross,
-        driverNetCdf: Math.round(this.commission.splitGross(gross, errandRule.platformPercent).driverNetCdf),
+        driverNetCdf: errandDriverNetCdf(fee, order.purchaseTotalCdf, errandRule.platformPercent),
         completionPin: null,
       };
     }
@@ -621,8 +623,7 @@ export class ErrandsService {
       const distanceToPickupKm = hasGps
         ? tripDistanceKm(profile.currentLat!, profile.currentLng!, order.pickupLat, order.pickupLng)
         : 0;
-      const gross = (order.finalPriceCdf ?? order.estimatedPriceCdf) + (order.purchaseTotalCdf ?? 0);
-      const driverNetCdf = Math.round(this.commission.splitGross(gross, errandRule.platformPercent).driverNetCdf);
+      const driverNetCdf = errandDriverNetCdf(order.finalPriceCdf ?? order.estimatedPriceCdf, order.purchaseTotalCdf, errandRule.platformPercent);
       return {
         ...this.formatErrand(order),
         offerType: 'ERRAND',
@@ -652,8 +653,7 @@ export class ErrandsService {
           order.pickupLat,
           order.pickupLng,
         );
-        const gross = (order.finalPriceCdf ?? order.estimatedPriceCdf) + (order.purchaseTotalCdf ?? 0);
-        const driverNetCdf = Math.round(this.commission.splitGross(gross, errandRule.platformPercent).driverNetCdf);
+        const driverNetCdf = errandDriverNetCdf(order.finalPriceCdf ?? order.estimatedPriceCdf, order.purchaseTotalCdf, errandRule.platformPercent);
         return {
           ...this.formatErrand(order),
           offerType: 'ERRAND',

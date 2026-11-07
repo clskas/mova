@@ -852,6 +852,8 @@ model RentalInquiry {
   totalCdf          Int?
   promoCode         String?
   discountCdf       Int?
+  /// Part of discountCdf funded by the owner (the rest by SENGA). Null = all of it.
+  partnerDiscountCdf Int?
   logisticsMode           RentalLogisticsMode @default(SELF_PASSENGER)
   passengerDriverName     String?
   passengerDriverPhone    String?

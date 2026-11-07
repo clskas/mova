@@ -135,9 +135,13 @@ export function computeRentalPartnerDisplay(input: {
   // Price before any promo: the commission is taken on it, then each side bears its own promo.
   const subtotalGrossCdf = subtotalAfterDiscount + discountCdf;
   const commissionCdf = platformFeeFromGross(subtotalGrossCdf, pct);
-  const partnerNetCdf = Math.max(0, subtotalGrossCdf - commissionCdf - partnerDiscountCdf);
+  const ownerBeforePromo = subtotalGrossCdf - commissionCdf;
+  const partnerNetCdf = Math.max(0, ownerBeforePromo - partnerDiscountCdf);
+  // An owner promo larger than the owner's share cannot make the owner pay: the excess
+  // comes off SENGA's side, so the parts still add up to what the customer paid.
+  const ownerPromoExcess = Math.max(0, partnerDiscountCdf - ownerBeforePromo);
   // What SENGA really keeps: commission minus the promo it funds (never shown below 0).
-  const platformFeeCdf = Math.max(0, commissionCdf - platformDiscountCdf);
+  const platformFeeCdf = Math.max(0, commissionCdf - platformDiscountCdf - ownerPromoExcess);
 
   return {
     subtotalGrossCdf: Math.round(subtotalGrossCdf),

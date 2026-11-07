@@ -7,6 +7,7 @@ import { InternalApiGuard } from '../common/internal-api.guard';
 import { WalletService } from '../wallet/wallet.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { RentalPayoutService } from '../payouts/rental-payout.service';
+import { MoneyControlService } from '../controls/money-control.service';
 import { DriverPayoutService } from '../payouts/driver-payout.service';
 import { PaymentsService } from '../payments/payments.service';
 import { DriverDebtLedgerService } from '../ledger/driver-debt-ledger.service';
@@ -89,7 +90,24 @@ export class InternalController {
     private debtLedger: DriverDebtLedgerService,
     private cashVirtual: CashVirtualEarningsService,
     private rentalPayouts: RentalPayoutService,
+    private moneyControl: MoneyControlService,
   ) {}
+
+  @Get('money-control/latest')
+  async moneyControlLatest() {
+    // An empty body would break JSON parsing in the admin proxy.
+    return (await this.moneyControl.latest()) ?? { none: true };
+  }
+
+  @Get('money-control/history')
+  moneyControlHistory() {
+    return this.moneyControl.history();
+  }
+
+  @Post('money-control/run')
+  moneyControlRun() {
+    return this.moneyControl.run();
+  }
 
   @Post('rentals/:bookingId/deposit')
   settleRentalDeposit(@Param('bookingId') bookingId: string, @Body() dto: RentalDepositDto) {

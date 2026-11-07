@@ -256,3 +256,18 @@ model UserSubscription {
   @@index([status])
   @@map("user_subscriptions")
 }
+
+/// Nightly money control (read-only report): wallet balances, job balances, shares.
+model MoneyControlRun {
+  id             String    @id @default(uuid())
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  checkedWallets Int       @default(0)
+  checkedJobs    Int       @default(0)
+  /// Anomalies needing attention (INFO lines excluded).
+  anomalyCount   Int       @default(0)
+  anomalies      Json?
+
+  @@index([startedAt])
+  @@map("money_control_runs")
+}

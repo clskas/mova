@@ -3530,3 +3530,37 @@ export async function refreshDriverSmileId(userId: string) {
     body: JSON.stringify({}),
   });
 }
+
+/** Nightly money control (read-only report). */
+export type MoneyControlAnomaly = {
+  kind: "WALLET_BALANCE" | "WALLET_HELD" | "JOB_BALANCE" | "JOB_SHARE" | string;
+  severity: "HIGH" | "MEDIUM" | "INFO";
+  referenceType?: string;
+  referenceId?: string;
+  userId?: string;
+  expectedCdf: number;
+  actualCdf: number;
+  differenceCdf: number;
+  message: string;
+};
+
+export type MoneyControlRun = {
+  id: string;
+  startedAt: string;
+  finishedAt?: string | null;
+  checkedWallets: number;
+  checkedJobs: number;
+  anomalyCount: number;
+  anomalies?: MoneyControlAnomaly[] | null;
+};
+
+export async function getMoneyControlLatest() {
+  return apiFetch<MoneyControlRun | { none: true } | null>("/api/admin/money-control/latest");
+}
+
+export async function runMoneyControl() {
+  return apiFetch<MoneyControlRun | { started: false; message: string }>("/api/admin/money-control/run", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}

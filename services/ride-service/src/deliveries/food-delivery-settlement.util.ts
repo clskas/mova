@@ -151,3 +151,47 @@ export function applyOwnCourierRouting<T extends {
   );
   return { ...settlement, driver: null, restaurants };
 }
+
+/** SENGA commission on an amount (rounded up), with the rate clamped to 0–100 %. */
+function feeOf(grossCdf: number, percent: number): number {
+  const pct = Math.min(100, Math.max(0, Number.isFinite(percent) ? percent : 0));
+  return Math.ceil(Math.max(0, grossCdf) * (pct / 100));
+}
+
+/**
+ * Shares of a food order (pure — checked by the balance tests).
+ * - Restaurants: 100 % of the catalogue (markup model) or catalogue minus the FOOD commission
+ *   (older orders); a partner-funded promo comes off the restaurant concerned.
+ * - Courier: delivery fee minus the DELIVERY commission (only when there is a courier).
+ * - SENGA: what is left of the amount paid, never below 0 (a bigger SENGA promo is paid by
+ *   SENGA and recorded as a promo cost by the payment service).
+ */
+export function computeFoodShares(input: {
+  totalPaidCdf: number;
+  restaurants: { restaurantId: string; itemsGrossCdf: number }[];
+  catalogMarkupModel: boolean;
+  foodPercent: number;
+  deliveryPercent: number;
+  partnerDiscountCdf?: number | null;
+  discountRestaurantId?: string | null;
+  deliveryFeeGrossCdf: number;
+  hasCourier: boolean;
+}) {
+  const restaurants = input.restaurants.map((r) => {
+    const gross = Math.round(Math.max(0, r.itemsGrossCdf));
+    const fee = input.catalogMarkupModel ? 0 : feeOf(gross, input.foodPercent);
+    return { restaurantId: r.restaurantId, grossCdf: gross, netCdf: gross - fee, platformFeeCdf: fee };
+  });
+  const partnerDiscount = Math.max(0, Math.round(input.partnerDiscountCdf ?? 0));
+  if (partnerDiscount > 0 && restaurants.length > 0) {
+    const target = restaurants.find((r) => r.restaurantId === input.discountRestaurantId) ?? restaurants[0];
+    target.netCdf = Math.max(0, target.netCdf - partnerDiscount);
+  }
+  const deliveryGross = Math.max(0, input.deliveryFeeGrossCdf);
+  const courierPlatformFeeCdf = feeOf(deliveryGross, input.deliveryPercent);
+  // No courier (pickup): nobody earns the delivery fee, so it is not set aside for anyone.
+  const courierNetCdf = input.hasCourier ? Math.round(deliveryGross - courierPlatformFeeCdf) : 0;
+  const restaurantNetTotal = restaurants.reduce((sum, r) => sum + r.netCdf, 0);
+  const platformFeeCdf = Math.max(0, Math.round(input.totalPaidCdf) - restaurantNetTotal - courierNetCdf);
+  return { restaurants, courierNetCdf, courierPlatformFeeCdf, platformFeeCdf };
+}

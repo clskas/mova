@@ -1399,6 +1399,20 @@ export class AdminController {
     return this.adminService.deleteRentalVehicle(id);
   }
 
+  @Get('money-control/latest')
+  @RequirePermissions(AdminPermission.WALLETS_READ)
+  @ApiOperation({ summary: 'Dernier contrôle des comptes (lecture seule)' })
+  moneyControlLatest() {
+    return this.adminService.moneyControlLatest();
+  }
+
+  @Post('money-control/run')
+  @RequirePermissions(AdminPermission.WALLETS_READ)
+  @ApiOperation({ summary: 'Lancer le contrôle des comptes maintenant (ne déplace pas d’argent)' })
+  moneyControlRun() {
+    return this.adminService.moneyControlRun();
+  }
+
   @Get('wallet/overview')
   @RequirePermissions(AdminPermission.WALLETS_READ)
   @ApiOperation({ summary: 'Agrégats portefeuilles plateforme' })

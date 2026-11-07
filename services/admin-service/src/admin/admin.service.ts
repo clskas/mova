@@ -2180,6 +2180,14 @@ export class AdminService {
     });
   }
 
+  moneyControlLatest() {
+    return this.fetchJson('payment', '/internal/money-control/latest');
+  }
+
+  moneyControlRun() {
+    return this.proxy('payment', '/internal/money-control/run', { method: 'POST', body: JSON.stringify({}) });
+  }
+
   getPlatformConfig() {
     return this.fetchJson('ride', '/internal/platform-config');
   }

@@ -1926,4 +1926,6 @@ const Map<String, String> kStringsEn = {
   "Photographiez votre carte d'électeur, passeport ou permis, puis prenez un selfie. Cela prend 2 minutes.": "Take a photo of your voter card, passport or driving licence, then take a selfie. It takes 2 minutes.",
   "Recommencer la vérification": "Start the verification again",
   "Commencer la vérification": "Start the verification",
+  "Code de confirmation": "Confirmation code",
+  "Entrez le code à 6 chiffres reçu pour confirmer le retrait.": "Enter the 6-digit code you received to confirm the withdrawal.",
 };

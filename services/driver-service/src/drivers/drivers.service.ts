@@ -1319,10 +1319,55 @@ export class DriversService {
     }
   }
 
+  /** Asks the payment service to send the withdrawal code to the account's phone. */
+  async withdrawOtp(
+    userId: string,
+    amountCdf: number,
+    opts: { provider?: string; phone?: string; accountPhone?: string | null },
+  ) {
+    const profile = await this.getOrCreateProfile(userId);
+    const payoutPhone = (opts.phone?.trim() || profile?.payoutPhone?.trim() || '').trim();
+    const payoutProvider = (opts.provider?.trim() || profile?.payoutProvider?.trim() || 'MPESA').trim();
+    if (!payoutPhone) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Configurez votre numéro Mobile Money dans Mon dossier (étape Paiement).',
+      );
+    }
+    let res: Response;
+    try {
+      res = await fetch(serviceUrl('payment', `/internal/wallets/${userId}/withdraw/otp`), {
+        method: 'POST',
+        headers: { 'x-internal-api-key': resolveInternalApiKey(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amountCdf,
+          provider: payoutProvider,
+          phone: payoutPhone,
+          accountPhone: opts.accountPhone ?? undefined,
+        }),
+      });
+    } catch {
+      throw new MovaHttpException(MovaErrorCode.INTERNAL_ERROR, undefined, 'Service paiement indisponible.');
+    }
+    const body = (await res.json().catch(() => ({}))) as Record<string, unknown> & {
+      message?: string;
+      error?: { message?: string };
+    };
+    if (!res.ok) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        body.error?.message ?? body.message ?? 'Code de retrait impossible à envoyer.',
+      );
+    }
+    return body;
+  }
+
   async withdraw(
     userId: string,
     amountCdf: number,
-    opts?: { provider?: string; phone?: string },
+    opts?: { provider?: string; phone?: string; otp?: string; accountPhone?: string | null },
   ) {
     const profile = await this.getOrCreateProfile(userId);
     const payoutPhone = (opts?.phone?.trim() || profile?.payoutPhone?.trim() || '').trim();
@@ -1349,7 +1394,16 @@ export class DriversService {
           'x-internal-api-key': resolveInternalApiKey(),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ amountCdf, provider: payoutProvider, phone: payoutPhone }),
+        // Same rules as the wallet: a code sent to the account phone, or a payout to the
+        // account's own number. Never a free destination without a code.
+        body: JSON.stringify({
+          amountCdf,
+          provider: payoutProvider,
+          phone: payoutPhone,
+          userInitiated: true,
+          otp: opts?.otp,
+          accountPhone: opts?.accountPhone ?? undefined,
+        }),
       });
     } catch {
       throw new MovaHttpException(MovaErrorCode.INTERNAL_ERROR, undefined, 'Service paiement indisponible.');

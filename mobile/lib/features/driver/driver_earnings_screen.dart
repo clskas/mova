@@ -440,11 +440,38 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       _error = null;
     });
     final api = ref.read(apiClientProvider);
-    final result = await api.post('/drivers/withdraw', {
+    final request = <String, dynamic>{
       'amountCdf': amount,
       'provider': _withdrawProviderId,
       if (phone.isNotEmpty) 'phone': phone,
-    });
+    };
+    // A code is sent to the account's phone (or e-mail) to confirm the withdrawal.
+    final otpResult = await api.post('/drivers/withdraw/otp', request, retries: 1, skipOffline: true);
+    if (!mounted) return;
+    String? otp;
+    switch (otpResult) {
+      case Success(:final data):
+        if (data['otpRequired'] == true) {
+          otp = await _askWithdrawCode(data['message']?.toString());
+          if (!mounted) return;
+          if (otp == null) {
+            setState(() => _withdrawing = false);
+            return;
+          }
+        }
+      case Failure(:final error):
+        setState(() {
+          _withdrawing = false;
+          _error = error.message;
+        });
+        return;
+    }
+    final result = await api.post(
+      '/drivers/withdraw',
+      {...request, if (otp != null) 'otp': otp},
+      retries: 1,
+      skipOffline: true,
+    );
     if (!mounted) return;
     setState(() => _withdrawing = false);
     switch (result) {
@@ -456,6 +483,46 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       case Failure(:final error):
         setState(() => _error = error.message);
     }
+  }
+
+  /// Asks for the 6-digit withdrawal code; null when cancelled.
+  Future<String?> _askWithdrawCode(String? hint) async {
+    final controller = TextEditingController();
+    final code = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('Code de confirmation')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(hint ?? tr('Entrez le code à 6 chiffres reçu pour confirmer le retrait.')),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: InputDecoration(labelText: tr('Code à 6 chiffres')),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Annuler'))),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.replaceAll(RegExp(r'\s'), '')),
+            child: Text(tr('Confirmer le retrait')),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (code == null) return null;
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+      if (mounted) setState(() => _error = tr('Code OTP requis (6 chiffres envoyé au numéro Mobile Money).'));
+      return null;
+    }
+    return code;
   }
 
   Widget _periodChip(String label, _EarningsPeriod period) {

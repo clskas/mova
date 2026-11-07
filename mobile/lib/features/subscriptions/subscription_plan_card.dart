@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/config/market_config.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Carte plan d'abonnement SENGA Plus.
 class SubscriptionPlanCard extends StatelessWidget {
@@ -91,8 +92,8 @@ class SubscriptionPlanCard extends StatelessWidget {
                             color: MovaColors.violet,
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Text(
-                            'Le plus populaire',
+                          child: Text(
+                            tr('Le plus populaire'),
                             style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -130,7 +131,7 @@ class SubscriptionPlanCard extends StatelessWidget {
             if (savings > price) ...[
               const SizedBox(height: 6),
               Text(
-                'Économisez jusqu\'à ${MarketConfig.formatCdf(savings)}/mois si vous commandez régulièrement',
+                trf('Économisez jusqu\'à {v1}/mois si vous commandez régulièrement', {'v1': MarketConfig.formatCdf(savings)}),
                 style: const TextStyle(color: MovaColors.green, fontSize: 12, fontWeight: FontWeight.w500),
               ),
             ],
@@ -150,8 +151,8 @@ class SubscriptionPlanCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             if (isActive)
-              const Text(
-                'Plan actif sur votre compte',
+              Text(
+                tr('Plan actif sur votre compte'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600),
               )

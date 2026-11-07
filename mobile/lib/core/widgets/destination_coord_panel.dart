@@ -4,6 +4,7 @@ import '../location/destination_coords.dart';
 import '../location/location_service.dart';
 import '../location/service_area_location.dart';
 import '../theme/mova_colors.dart';
+import '../../core/i18n/i18n.dart';
 
 typedef DropoffCoordsCallback = void Function(LatLng coords, String label);
 
@@ -65,8 +66,8 @@ class _DestinationCoordPanelState extends State<DestinationCoordPanel> {
   Widget build(BuildContext context) {
     return ExpansionTile(
       tilePadding: EdgeInsets.zero,
-      title: const Text(
-        'Coordonnées GPS (avancé)',
+      title: Text(
+        tr('Coordonnées GPS (avancé)'),
         style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
       subtitle: const Text(
@@ -80,8 +81,8 @@ class _DestinationCoordPanelState extends State<DestinationCoordPanel> {
               child: TextField(
                 controller: _latController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                decoration: const InputDecoration(
-                  labelText: 'Latitude',
+                decoration: InputDecoration(
+                  labelText: tr('Latitude'),
                   isDense: true,
                 ),
               ),
@@ -91,8 +92,8 @@ class _DestinationCoordPanelState extends State<DestinationCoordPanel> {
               child: TextField(
                 controller: _lngController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                decoration: const InputDecoration(
-                  labelText: 'Longitude',
+                decoration: InputDecoration(
+                  labelText: tr('Longitude'),
                   isDense: true,
                 ),
               ),
@@ -109,7 +110,7 @@ class _DestinationCoordPanelState extends State<DestinationCoordPanel> {
           child: TextButton.icon(
             onPressed: _apply,
             icon: const Icon(Icons.check, size: 18),
-            label: const Text('Appliquer les coordonnées'),
+            label: Text(tr('Appliquer les coordonnées')),
           ),
         ),
       ],

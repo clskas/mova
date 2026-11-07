@@ -71,11 +71,11 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
 
   String get _typeLabel {
     return switch (_delivery['type']?.toString()) {
-      'FOOD' => 'Livraison repas',
+      'FOOD' => tr('Livraison repas'),
       'EXPRESS' => 'Express',
-      'PARCEL' => 'Colis',
-      'ERRAND' => 'Courses & commissions',
-      _ => 'Livraison',
+      'PARCEL' => tr('Colis'),
+      'ERRAND' => tr('Courses & commissions'),
+      _ => tr('Livraison'),
     };
   }
 
@@ -433,14 +433,14 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           SnackBar(
             content: Text(
               returned
-                  ? 'Retour expéditeur : frais de course pour vous, reliquat remboursé au client.'
+                  ? tr('Retour expéditeur : frais de course pour vous, reliquat remboursé au client.')
                   : 'Tentative enregistrée (${data['unreachableAttempts'] ?? '?'}/3). Après 30 min et 3 essais : retour.',
             ),
           ),
         );
         await _refresh();
       case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(error.message))));
     }
   }
 
@@ -469,7 +469,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     final net = (_delivery['driverNetCdf'] ?? _delivery['driverEarningsCdf'] ?? _delivery['courierFeeCdf']) as num?;
     final dialogResult = await DriverCashReceivedDialog.show(
       context,
-      title: auto ? 'Le client paie en espèces' : 'Cash reçu ?',
+      title: auto ? tr('Le client paie en espèces') : tr('Cash reçu ?'),
       passengerTotalCdf: total?.round(),
       driverNetCdf: net?.round(),
       confirm: () async {
@@ -545,7 +545,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
         builder: (_) => DeliveryVoiceCallScreen(
           threadId: _deliveryId,
           kind: VoiceCallKind.delivery,
-          peerLabel: _isFood ? _restaurantName : 'Client',
+          peerLabel: _isFood ? _restaurantName : tr('Client'),
           announce: true,
         ),
       ),
@@ -558,9 +558,9 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   }
 
   String get _navigationLabel {
-    if (!_navigateToPickup) return 'Navigation — client';
-    if (_isFood) return 'Navigation — restaurant';
-    return 'Navigation — prendre colis';
+    if (!_navigateToPickup) return tr('Navigation — client');
+    if (_isFood) return tr('Navigation — restaurant');
+    return tr('Navigation — prendre colis');
   }
 
   Future<void> _openMaps() async {
@@ -610,15 +610,15 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   String get _actionLabel {
     if (_isErrand) {
       return switch (_status) {
-        'ASSIGNED' => 'Démarrer les courses',
-        'IN_PROGRESS' => 'Marquer comme terminé',
-        _ => 'Actualiser',
+        'ASSIGNED' => tr('Démarrer les courses'),
+        'IN_PROGRESS' => tr('Marquer comme terminé'),
+        _ => tr('Actualiser'),
       };
     }
     return switch (_status) {
-      'PICKED_UP' => 'En route vers le client',
-      'IN_TRANSIT' => 'Marquer comme livré (PIN destinataire)',
-      _ => 'Actualiser',
+      'PICKED_UP' => tr('En route vers le client'),
+      'IN_TRANSIT' => tr('Marquer comme livré (PIN destinataire)'),
+      _ => tr('Actualiser'),
     };
   }
 
@@ -639,7 +639,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
                     ref,
                     context,
                     description: _isErrand
-                        ? 'SOS chauffeur — courses $_deliveryId'
+                        ? trf('SOS chauffeur — courses {_deliveryId}', {'_deliveryId': _deliveryId})
                         : 'SOS chauffeur — livraison $_deliveryId',
                     referenceType: _isErrand ? 'ERRAND' : 'DELIVERY',
                     referenceId: _deliveryId,
@@ -721,7 +721,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('Statut : $_status', style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13)),
+                Text(trf('Statut : {_status}', {'_status': _status}), style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13)),
                 if (_status == 'DELIVERED' || (_isErrand && _status == 'COMPLETED')) ...[
                   const SizedBox(height: 8),
                   _DeliveryPaymentStatusChip(isPaid: _isPaid),
@@ -738,7 +738,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           const SizedBox(height: 16),
           if (_isErrand && _status == 'IN_PROGRESS') ...[
             MovaButton(
-              label: _delivery['proofPhotoUrl'] != null ? 'Photo preuve ajoutée' : 'Photo preuve d\'achat',
+              label: _delivery['proofPhotoUrl'] != null ? tr('Photo preuve ajoutée') : tr('Photo preuve d\'achat'),
               icon: Icons.camera_alt_outlined,
               isSecondary: _delivery['proofPhotoUrl'] != null,
               onPressed: _uploadingProof || _loading ? null : _uploadProofPhoto,
@@ -772,7 +772,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
                 ),
               ),
             MovaButton(
-              label: _cashDisputed ? 'J’ai reçu les espèces' : 'Cash reçu',
+              label: _cashDisputed ? tr('J’ai reçu les espèces') : tr('Cash reçu'),
               isSecondary: true,
               icon: Icons.payments_outlined,
               onPressed: _loading ? null : () => _confirmCash(),
@@ -784,7 +784,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
             builder: (context, unread, _) {
               final n = unread[ChatAlertService.threadKey(_isErrand ? 'errand' : 'delivery', _deliveryId)] ?? 0;
               return MovaButton(
-                label: n > 0 ? 'Chat avec le client ($n)' : 'Chat avec le client',
+                label: n > 0 ? trf('Chat avec le client ({n})', {'n': n}) : 'Chat avec le client',
                 isSecondary: true,
                 icon: Icons.chat_bubble_outline,
                 onPressed: _deliveryId.isEmpty ? null : () => _openChat(peerLabel: 'Client'),
@@ -915,7 +915,7 @@ class _DeliveryPaymentStatusChip extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            isPaid ? 'Payée' : 'En attente de paiement',
+            isPaid ? tr('Payée') : tr('En attente de paiement'),
             style: TextStyle(
               color: isPaid ? MovaColors.green : MovaColors.orange,
               fontWeight: FontWeight.w600,

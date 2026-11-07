@@ -1,3 +1,5 @@
+import '../../core/i18n/i18n.dart';
+
 /// Classification des mouvements portefeuille (recharge / retrait Mobile Money).
 class WalletMovements {
   WalletMovements._();
@@ -25,9 +27,9 @@ class WalletMovements {
   static String label(Map<String, dynamic> tx) {
     final desc = tx['description']?.toString();
     if (desc != null && desc.isNotEmpty) return desc;
-    if (isRecharge(tx)) return 'Recharge';
-    if (isWithdraw(tx)) return 'Retrait';
+    if (isRecharge(tx)) return tr('Recharge');
+    if (isWithdraw(tx)) return tr('Retrait');
     final type = tx['type']?.toString() ?? '';
-    return type == 'CREDIT' ? 'Crédit' : 'Débit';
+    return type == 'CREDIT' ? tr('Crédit') : tr('Débit');
   }
 }

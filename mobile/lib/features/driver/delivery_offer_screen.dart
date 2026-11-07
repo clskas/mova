@@ -15,6 +15,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../booking/widgets/mova_ride_map.dart';
 import 'driver_job_alert_service.dart';
 import '../../core/location/location_permission.dart';
+import '../../core/i18n/i18n.dart';
 
 class DeliveryOfferScreen extends ConsumerStatefulWidget {
   const DeliveryOfferScreen({super.key, required this.offer});
@@ -41,11 +42,11 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
 
   String get _typeLabel {
     return switch (widget.offer['type']?.toString()) {
-      'FOOD' => 'Livraison repas',
-      'PARCEL' => 'Colis',
+      'FOOD' => tr('Livraison repas'),
+      'PARCEL' => tr('Colis'),
       'EXPRESS' => 'Express',
-      'ERRAND' => 'Courses & commissions',
-      _ => 'Livraison',
+      'ERRAND' => tr('Courses & commissions'),
+      _ => tr('Livraison'),
     };
   }
 
@@ -208,7 +209,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
         _timer?.cancel();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Livraison acceptée')),
+            SnackBar(content: Text(tr('Livraison acceptée'))),
           );
           Navigator.pop(context, result.data);
         }
@@ -226,7 +227,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
     final dropoff = _dropoffPoint;
 
     return MovaScreen(
-      title: 'Nouvelle livraison',
+      title: tr('Nouvelle livraison'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -270,8 +271,8 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Photo du colis',
+            Text(
+              tr('Photo du colis'),
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -392,7 +393,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Expire dans $_countdown s',
+            trf('Expire dans {_countdown} s', {'_countdown': _countdown}),
             textAlign: TextAlign.center,
             style: const TextStyle(color: MovaColors.orange, fontWeight: FontWeight.w600),
           ),
@@ -402,14 +403,14 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
           ],
           const SizedBox(height: 24),
           MovaButton(
-            label: 'Accepter la livraison',
+            label: tr('Accepter la livraison'),
             isLoading: _loading,
             icon: Icons.delivery_dining,
             onPressed: _loading ? null : _accept,
           ),
           const SizedBox(height: 12),
           MovaButton(
-            label: 'Refuser',
+            label: tr('Refuser'),
             isSecondary: true,
             onPressed: _loading ? null : _reject,
           ),
@@ -425,7 +426,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            '$label : $distance${etaMin != null ? ' · ~$etaMin min' : ''}',
+            '$label : $distance${etaMin != null ? trf(' · ~{etaMin} min', {'etaMin': etaMin}) : ''}',
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
         ),

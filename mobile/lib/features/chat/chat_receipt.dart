@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/mova_colors.dart';
 import '../billing/receipt_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 final _receiptMeta = RegExp(r'\[mova-receipt:([A-Z_]+):([^\]]+)\]');
 
 String deliveryChatRoleLabel(String role) {
   return switch (role) {
-    'passenger' => 'Client',
-    'driver' => 'Livreur',
-    'partner' => 'Restaurant',
+    'passenger' => tr('Client'),
+    'driver' => tr('Livreur'),
+    'partner' => tr('Restaurant'),
     _ => role,
   };
 }
@@ -109,9 +110,9 @@ Widget buildChatMessageBubble({
                   children: [
                     const Icon(Icons.receipt_long, color: MovaColors.violet, size: 20),
                     const SizedBox(width: 6),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Reçu de paiement',
+                        tr('Reçu de paiement'),
                         style: TextStyle(fontWeight: FontWeight.w600, color: MovaColors.violet),
                       ),
                     ),
@@ -127,7 +128,7 @@ Widget buildChatMessageBubble({
                 ],
                 const SizedBox(height: 4),
                 Text(
-                  'Appuyer pour ouvrir',
+                  tr('Appuyer pour ouvrir'),
                   style: TextStyle(fontSize: 11, color: MovaColors.textSecondary.withValues(alpha: 0.9)),
                 ),
               ],

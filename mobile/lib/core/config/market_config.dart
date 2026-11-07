@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Configuration marché RDC — couverture nationale (32 zones SENGA).
 class MarketConfig {
@@ -34,7 +35,7 @@ class MarketConfig {
   /// Minimum SerdiPay pour recharge et retrait portefeuille (passager + chauffeur).
   static const minWalletAmountCdf = 2300;
   static String get minWalletAmountLabel =>
-      'Minimum ${formatCdf(minWalletAmountCdf)} pour recharge et retrait';
+      trf('Minimum {v1} pour recharge et retrait', {'v1': formatCdf(minWalletAmountCdf)});
 
   /// Web OAuth client ID (Google Cloud). Required as `serverClientId` so Android
   /// returns an ID token the backend can verify. Same value as `GOOGLE_CLIENT_ID`.
@@ -346,7 +347,7 @@ class MarketConfig {
   static String? mmPrefixMismatchFr(String providerId, String phone) {
     final normalized = normalizePhone(phone);
     if (!validatePhone(normalized)) {
-      return 'Numéro Mobile Money invalide. Format : +243XXXXXXXXX (pas un e-mail).';
+      return tr('Numéro Mobile Money invalide. Format : +243XXXXXXXXX (pas un e-mail).');
     }
     final prefixes = mmPrefixes[providerId];
     if (prefixes == null) return null;

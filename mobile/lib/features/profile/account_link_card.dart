@@ -68,14 +68,14 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
     final masked = widget.profile['phoneMasked']?.toString();
     if (masked != null && masked.isNotEmpty) return masked;
     final phone = widget.profile['phone']?.toString() ?? '';
-    return phone.isEmpty ? 'Aucun numéro' : phone;
+    return phone.isEmpty ? tr('Aucun numéro') : phone;
   }
 
   String get _emailLabel {
     final masked = widget.profile['emailMasked']?.toString();
     if (masked != null && masked.isNotEmpty) return masked;
     final email = widget.profile['email']?.toString() ?? '';
-    return email.isEmpty ? 'Aucun e-mail Google' : email;
+    return email.isEmpty ? tr('Aucun e-mail Google') : email;
   }
 
   Future<void> _applyAuth(Map<String, dynamic> data) async {
@@ -271,17 +271,17 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
     final label = switch (kind) {
       'google' => 'Google',
       'apple' => 'Apple',
-      _ => 'ce numéro',
+      _ => tr('ce numéro'),
     };
     final remaining = switch (kind) {
-      'google' => 'votre numéro ou Apple',
-      'apple' => 'votre numéro ou Google',
-      _ => 'Google ou Apple',
+      'google' => tr('votre numéro ou Apple'),
+      'apple' => tr('votre numéro ou Google'),
+      _ => tr('Google ou Apple'),
     };
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Détacher $label ?'),
+        title: Text(trf('Détacher {label} ?', {'label': label})),
         content: Text(
           'Vous pourrez encore vous connecter avec $remaining. '
           'Détacher $label ?',
@@ -333,28 +333,28 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
           const SizedBox(height: 4),
           Text(
             _showAppleLink
-                ? 'Optionnel. Téléphone, Google et/ou Apple pour le même compte.'
-                : 'Optionnel. Vous pouvez utiliser seulement le téléphone, seulement Google, ou les deux pour le même compte.',
+                ? tr('Optionnel. Téléphone, Google et/ou Apple pour le même compte.')
+                : tr('Optionnel. Vous pouvez utiliser seulement le téléphone, seulement Google, ou les deux pour le même compte.'),
             style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
           ),
           const SizedBox(height: 12),
           _Row(
             icon: Icons.phone_outlined,
             label: tr('Téléphone'),
-            value: _hasPhone ? 'lié · $_phoneLabel' : 'non lié',
+            value: _hasPhone ? trf('lié · {_phoneLabel}', {'_phoneLabel': _phoneLabel}) : 'non lié',
           ),
           const SizedBox(height: 8),
           _Row(
             icon: Icons.g_mobiledata,
             label: tr('Google'),
-            value: _googleLinked ? 'lié · $_emailLabel' : 'non lié',
+            value: _googleLinked ? trf('lié · {_emailLabel}', {'_emailLabel': _emailLabel}) : 'non lié',
           ),
           if (_showAppleLink) ...[
             const SizedBox(height: 8),
             _Row(
               icon: Icons.apple,
               label: tr('Apple'),
-              value: _appleLinked ? 'lié' : 'non lié',
+              value: _appleLinked ? tr('lié') : tr('non lié'),
             ),
           ],
           if (_error != null) ...[
@@ -407,7 +407,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
             ],
             const SizedBox(height: 12),
             MovaButton(
-              label: _otpSent ? 'Confirmer le numéro' : 'Lier mon numéro',
+              label: _otpSent ? tr('Confirmer le numéro') : tr('Lier mon numéro'),
               icon: _otpSent ? Icons.check : Icons.sms_outlined,
               isLoading: _busy,
               onPressed: _busy ? null : (_otpSent ? _linkPhone : _requestOtp),

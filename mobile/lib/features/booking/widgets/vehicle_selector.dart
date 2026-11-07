@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/config/market_config.dart';
 import '../../../core/theme/mova_colors.dart';
+import '../../../core/i18n/i18n.dart';
 
 class VehicleEstimate {
   const VehicleEstimate({
@@ -34,7 +35,7 @@ class VehicleCategoryChips extends StatelessWidget {
           Expanded(
             child: FilterChip(
               avatar: Text(option.icon, style: const TextStyle(fontSize: 16)),
-              label: Text(option.label),
+              label: Text(tr(option.label)),
               selected: category == option.id,
               showCheckmark: false,
               selectedColor: option.id == 'MOTO'
@@ -121,7 +122,7 @@ class VehicleSelector extends StatelessWidget {
                       Text(option.icon, style: const TextStyle(fontSize: 20)),
                       const SizedBox(height: 4),
                       Text(
-                        option.label,
+                        tr(option.label),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

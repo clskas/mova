@@ -334,7 +334,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
             OutlinedButton.icon(
               onPressed: () => _callOwner(ownerPhone),
               icon: const Icon(Icons.phone_outlined),
-              label: Text('Propriétaire · $ownerPhone'),
+              label: Text(trf('Propriétaire · {ownerPhone}', {'ownerPhone': ownerPhone})),
             ),
           ],
           if (b['inquiryId'] != null) ...[
@@ -391,7 +391,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
           if (paymentReady && total > 0) ...[
             const SizedBox(height: 16),
             MovaButton(
-              label: status == 'CONFIRMED' ? 'Prépayer la location' : 'Payer la location',
+              label: status == 'CONFIRMED' ? tr('Prépayer la location') : tr('Payer la location'),
               icon: Icons.payment_outlined,
               onPressed: () {
                 Navigator.push(

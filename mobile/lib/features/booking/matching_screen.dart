@@ -194,10 +194,9 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
         title: Text(tr('Annuler la course ?')),
         content: Text(
           _cancelFeeLabel != null && _cancelFeeLabel!.isNotEmpty
-              ? 'Annulation gratuite avant l\'arrivée du chauffeur. '
-                  'Des frais de $_cancelFeeLabel peuvent s\'appliquer après acceptation.'
-              : 'Annulation gratuite avant l\'arrivée du chauffeur. '
-                  'Des frais peuvent s\'appliquer après acceptation.',
+              ? trf('Annulation gratuite avant l\'arrivée du chauffeur. Des frais de {fee} peuvent s\'appliquer après acceptation.',
+                  {'fee': _cancelFeeLabel})
+              : tr('Annulation gratuite avant l\'arrivée du chauffeur. Des frais peuvent s\'appliquer après acceptation.'),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
@@ -261,7 +260,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    _searching ? 'Recherche d\'un chauffeur…' : 'Chauffeur trouvé !',
+                    _searching ? tr('Recherche d\'un chauffeur…') : tr('Chauffeur trouvé !'),
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
@@ -276,7 +275,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
                   if (_attempt > 0) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Tentative $_attempt',
+                      trf('Tentative {_attempt}', {'_attempt': _attempt}),
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
                     ),
@@ -284,7 +283,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
                   if (_radiusKm != null) ...[
                     const SizedBox(height: 4),
                     Text(
-                      'Rayon de recherche : ${_radiusKm!.toStringAsFixed(0)} km',
+                      trf('Rayon de recherche : {v1} km', {'v1': _radiusKm!.toStringAsFixed(0)}),
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
                     ),
@@ -299,8 +298,8 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
                           Expanded(
                             child: Text(
                               _driversFound == 1
-                                  ? '1 chauffeur disponible — en attente d\'acceptation…'
-                                  : '$_driversFound chauffeurs disponibles — en attente d\'acceptation…',
+                                  ? tr('1 chauffeur disponible — en attente d\'acceptation…')
+                                  : trf('{_driversFound} chauffeurs disponibles — en attente d\'acceptation…', {'_driversFound': _driversFound}),
                               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                             ),
                           ),
@@ -324,7 +323,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            'Tarif estimé : ${MarketConfig.formatCdf(widget.estimatedFareCdf)}',
+                            trf('Tarif estimé : {v1}', {'v1': MarketConfig.formatCdf(widget.estimatedFareCdf)}),
                             textAlign: TextAlign.center,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,

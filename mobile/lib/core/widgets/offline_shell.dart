@@ -8,6 +8,7 @@ import '../config/market_config.dart';
 import '../offline/connectivity_service.dart';
 import '../theme/mova_colors.dart';
 import '../update/app_update_service.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Bannière globale hors ligne + indicateur de file de synchronisation.
 class MovaOfflineShell extends ConsumerStatefulWidget {
@@ -80,11 +81,11 @@ class _MovaOfflineShellState extends ConsumerState<MovaOfflineShell>
                             child: Text(
                               update.flexibleDownloaded
                                   ? (AppFlavor.isDriver
-                                      ? 'La mise à jour de SENGA Driver est prête. Redémarrez pour l\'installer.'
-                                      : 'La mise à jour de SENGA est prête. Redémarrez pour l\'installer.')
+                                      ? tr('La mise à jour de SENGA Driver est prête. Redémarrez pour l\'installer.')
+                                      : tr('La mise à jour de SENGA est prête. Redémarrez pour l\'installer.'))
                                   : (AppFlavor.isDriver
-                                      ? 'Une nouvelle version de SENGA Driver est disponible.'
-                                      : 'Une nouvelle version de SENGA est disponible.'),
+                                      ? tr('Une nouvelle version de SENGA Driver est disponible.')
+                                      : tr('Une nouvelle version de SENGA est disponible.')),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 13,
@@ -101,8 +102,8 @@ class _MovaOfflineShellState extends ConsumerState<MovaOfflineShell>
                             TextButton(
                               onPressed: () =>
                                   ref.read(appUpdateServiceProvider.notifier).dismiss(),
-                              child: const Text(
-                                'Plus tard',
+                              child: Text(
+                                tr('Plus tard'),
                                 style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
                               ),
                             ),
@@ -110,7 +111,7 @@ class _MovaOfflineShellState extends ConsumerState<MovaOfflineShell>
                             onPressed: () =>
                                 ref.read(appUpdateServiceProvider.notifier).openStore(),
                             child: Text(
-                              update.flexibleDownloaded ? 'Redémarrer' : 'Mettre à jour',
+                              update.flexibleDownloaded ? tr('Redémarrer') : tr('Mettre à jour'),
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
                             ),
                           ),
@@ -211,8 +212,8 @@ class _ForceUpdateBarrier extends ConsumerWidget {
                     children: [
                       const Icon(Icons.system_update, color: MovaColors.violet, size: 40),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Mise à jour obligatoire',
+                      Text(
+                        tr('Mise à jour obligatoire'),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 18,
@@ -221,9 +222,9 @@ class _ForceUpdateBarrier extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        'Cette version de SENGA n\'est plus prise en charge. '
-                        'Installez la dernière version pour continuer.',
+                      Text(
+                        tr('Cette version de SENGA n\'est plus prise en charge. '
+                        'Installez la dernière version pour continuer.'),
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 14, color: MovaColors.textSecondary, height: 1.4),
                       ),
@@ -238,8 +239,8 @@ class _ForceUpdateBarrier extends ConsumerWidget {
                           ),
                           onPressed: () =>
                               ref.read(appUpdateServiceProvider.notifier).openStore(),
-                          child: const Text(
-                            'Mettre à jour',
+                          child: Text(
+                            tr('Mettre à jour'),
                             style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
@@ -261,11 +262,11 @@ String _offlineBannerText(OfflineState state, {required bool debug}) {
   final pendingHint = pending <= 0
       ? ''
       : pending == 1
-          ? '\n1 action sera envoyée au retour du réseau'
-          : '\n$pending actions seront envoyées au retour du réseau';
+          ? tr('\n1 action sera envoyée au retour du réseau')
+          : trf('\n{pending} actions seront envoyées au retour du réseau', {'pending': pending});
   if (state.reason == OfflineReason.serverUnavailable) {
     final base = debug
-        ? '${state.bannerMessage}\nAPI: ${MarketConfig.effectiveApiBaseUrl}\nTouchez pour réessayer'
+        ? trf('{bannerMessage}\nAPI: {effectiveApiBaseUrl}\nTouchez pour réessayer', {'bannerMessage': state.bannerMessage, 'effectiveApiBaseUrl': MarketConfig.effectiveApiBaseUrl})
         : '${state.bannerMessage}\nTouchez pour réessayer';
     return '$base$pendingHint';
   }

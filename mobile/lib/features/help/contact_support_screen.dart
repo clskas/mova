@@ -148,7 +148,7 @@ class _ContactCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(contact.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text(tr(contact.name), style: const TextStyle(fontWeight: FontWeight.w700)),
             if (subtitle.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(subtitle, style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13)),

@@ -43,7 +43,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   List<Map<String, dynamic>> _restaurants = [];
   Map<String, dynamic>? _selectedRestaurant;
   final Map<String, int> _cart = {};
-  final _addressController = TextEditingController(text: 'Ma position');
+  final _addressController = TextEditingController(text: tr('Ma position'));
   final _promoController = TextEditingController();
   String _filterCuisine = '';
   /// `null` = Tous ; otherwise a [CommerceTypes] value.
@@ -214,7 +214,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           proximityLat: _deliveryLat,
           proximityLng: _deliveryLng,
           label: tr('Adresse de livraison'),
-          hint: 'Ex: Gombe, chez Mama X, Bandal…',
+          hint: tr('Ex: Gombe, chez Mama X, Bandal…'),
           prefixIcon: Icons.delivery_dining,
           textInputAction: TextInputAction.done,
           onUserInput: _onAddressUserInput,
@@ -257,7 +257,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   Future<String?> _resolveDeliveryAddress() async {
     if (_addressCoordsResolved) return null;
     final text = _addressController.text.trim();
-    if (text.isEmpty) return 'Indiquez l\'adresse de livraison.';
+    if (text.isEmpty) return tr('Indiquez l\'adresse de livraison.');
     if (text == 'Ma position') {
       await _resolveDeliveryCoords(reloadAfter: true);
       return null;
@@ -273,7 +273,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       _onAddressSuggestionSelected(data.first);
       return null;
     }
-    return 'Lieu non reconnu — choisissez une suggestion (ex. Gombe, Limete) ou utilisez le GPS.';
+    return tr('Lieu non reconnu — choisissez une suggestion (ex. Gombe, Limete) ou utilisez le GPS.');
   }
 
   void _setDeliveryFromCoords(LatLng coords, String label) {
@@ -449,7 +449,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
   void _showStockBlockedMessage(Map<String, dynamic> item) {
     final stockQty = _itemStockQty(item) ?? 0;
     final message = stockQty <= 0
-        ? 'Article en rupture de stock.'
+        ? tr('Article en rupture de stock.')
         : 'Stock insuffisant ($stockQty disponible${stockQty > 1 ? 's' : ''}).';
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
@@ -575,7 +575,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                       if (stockQty != null) ...[
                         const SizedBox(height: 8),
                         Text(
-                          stockQty <= 0 ? 'Rupture de stock' : 'Stock : $stockQty',
+                          stockQty <= 0 ? tr('Rupture de stock') : trf('Stock : {stockQty}', {'stockQty': stockQty}),
                           style: TextStyle(
                             color: stockQty <= 0 ? Colors.red.shade700 : MovaColors.textSecondary,
                             fontSize: 13,
@@ -739,7 +739,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                             if (stockQty != null) ...[
                               const SizedBox(height: 10),
                               Text(
-                                stockQty <= 0 ? 'Rupture de stock' : 'En stock : $stockQty',
+                                stockQty <= 0 ? tr('Rupture de stock') : trf('En stock : {stockQty}', {'stockQty': stockQty}),
                                 style: TextStyle(
                                   color: stockQty <= 0 ? Colors.red.shade700 : MovaColors.textSecondary,
                                   fontWeight: FontWeight.w600,
@@ -753,14 +753,14 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                 _productWarningTile(
                                   icon: Icons.warning_amber_rounded,
                                   color: MovaColors.orange,
-                                  text: 'Réservé aux personnes de 18 ans et plus',
+                                  text: tr('Réservé aux personnes de 18 ans et plus'),
                                 ),
                               if (requiresPrescription) ...[
                                 if (ageRestricted) const SizedBox(height: 8),
                                 _productWarningTile(
                                   icon: Icons.medication_outlined,
                                   color: const Color(0xFF0D9488),
-                                  text: 'Ordonnance médicale requise',
+                                  text: tr('Ordonnance médicale requise'),
                                 ),
                               ],
                             ],
@@ -870,8 +870,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                       : null,
                                   child: Text(
                                     !canAdd
-                                        ? 'Stock insuffisant'
-                                        : (qty > 0 ? 'Ajouter encore' : 'Ajouter au panier'),
+                                        ? tr('Stock insuffisant')
+                                        : (qty > 0 ? tr('Ajouter encore') : tr('Ajouter au panier')),
                                   ),
                                 ),
                               ),
@@ -1259,7 +1259,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         const SizedBox(height: 12),
         TextField(
           decoration: InputDecoration(
-            labelText: 'Rechercher un ${CommerceTypes.storesNoun(filterType: _filterCommerceType, plural: false)}',
+            labelText: trf('Rechercher un {v1}', {'v1': CommerceTypes.storesNoun(filterType: _filterCommerceType, plural: false)}),
             prefixIcon: const Icon(Icons.search),
             isDense: true,
           ),
@@ -1274,7 +1274,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
-                    label: Text(chip.label),
+                    label: Text(tr(chip.label)),
                     selected: _filterCommerceType == chip.value,
                     onSelected: _refreshing
                         ? null
@@ -1361,7 +1361,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           min: 0,
           max: 90,
           divisions: 18,
-          label: _filterMaxEta <= 0 ? 'Aucun' : '${_filterMaxEta.round()} min',
+          label: _filterMaxEta <= 0 ? tr('Aucun') : '${_filterMaxEta.round()} min',
           // Le backend applique un plancher de 20 min sur l'ETA livraison : toute valeur
           // 1–19 min exclurait tous les magasins. On la ramène donc à 20 min.
           onChanged: (v) => setState(() => _filterMaxEta = v <= 0 ? 0 : (v < 20 ? 20 : v)),
@@ -1376,7 +1376,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           min: 0,
           max: 50000,
           divisions: 20,
-          label: _filterMaxPrice <= 0 ? 'Aucun' : MarketConfig.formatCdf(_filterMaxPrice.round()),
+          label: _filterMaxPrice <= 0 ? tr('Aucun') : MarketConfig.formatCdf(_filterMaxPrice.round()),
           onChanged: (v) => setState(() => _filterMaxPrice = v),
           onChangeEnd: (_) => _loadRestaurants(background: true),
         ),
@@ -1389,13 +1389,13 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           min: 0,
           max: 10,
           divisions: 20,
-          label: _filterMaxDistance <= 0 ? 'Aucune' : '${_filterMaxDistance.toStringAsFixed(1)} km',
+          label: _filterMaxDistance <= 0 ? tr('Aucune') : '${_filterMaxDistance.toStringAsFixed(1)} km',
           onChanged: (v) => setState(() => _filterMaxDistance = v),
           onChangeEnd: (_) => _loadRestaurants(background: true),
         ),
         const SizedBox(height: 12),
         Text(
-          '${storesNoun[0].toUpperCase()}${storesNoun.substring(1)} à proximité',
+          trf('{v1}{v2} à proximité', {'v1': storesNoun[0].toUpperCase(), 'v2': storesNoun.substring(1)}),
           style: Theme.of(context).textTheme.titleSmall,
         ),
         if (filtered.isEmpty)
@@ -1404,7 +1404,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
             child: Text(
               _restaurants.isEmpty
                   ? (_hasActiveRestaurantFilters
-                      ? 'Aucun $storesNoun ne correspond aux filtres. Ajustez ou réinitialisez les filtres ci-dessus.'
+                      ? trf('Aucun {storesNoun} ne correspond aux filtres. Ajustez ou réinitialisez les filtres ci-dessus.', {'storesNoun': storesNoun})
                       : 'Aucun $storesNoun disponible à $_deliveryCityName pour le moment.')
                   : 'Aucun $storesNoun ne correspond à votre recherche.',
               style: const TextStyle(color: MovaColors.textSecondary),
@@ -1464,7 +1464,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                'Livraison ~${_deliveryEtaMin(r)} min',
+                                trf('Livraison ~{v1} min', {'v1': _deliveryEtaMin(r)}),
                                 style: const TextStyle(
                                   color: MovaColors.violet,
                                   fontSize: 13,
@@ -1519,7 +1519,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
 
     if (items.isEmpty) {
       return Text(
-        '$catalogNoun indisponible pour ce $storeNoun.',
+        trf('{catalogNoun} indisponible pour ce {storeNoun}.', {'catalogNoun': catalogNoun, 'storeNoun': storeNoun}),
         style: const TextStyle(color: MovaColors.textSecondary),
       );
     }
@@ -1619,7 +1619,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
                                 ),
                                 if (stockQty != null)
                                   Text(
-                                    stockQty <= 0 ? 'Rupture de stock' : 'Stock : $stockQty',
+                                    stockQty <= 0 ? tr('Rupture de stock') : trf('Stock : {stockQty}', {'stockQty': stockQty}),
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: stockQty <= 0 ? Colors.red.shade700 : MovaColors.textSecondary,

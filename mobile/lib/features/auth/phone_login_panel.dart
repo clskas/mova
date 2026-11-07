@@ -627,7 +627,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           _step == PhoneLoginStep.pin
               ? connectionPinPrompt(_normalizedPhone ?? _phoneController.text)
               : _step == PhoneLoginStep.forgot
-                  ? 'PIN oublié : SMS, autre numéro, ou Google.'
+                  ? tr('PIN oublié : SMS, autre numéro, ou Google.')
                   : widget.subtitle,
           textAlign: TextAlign.center,
           style: const TextStyle(color: MovaColors.textSecondary),
@@ -638,7 +638,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             controller: _phoneController,
             keyboardType: TextInputType.phone,
             decoration: InputDecoration(
-              labelText: _step == PhoneLoginStep.forgot ? 'Numéro pour le SMS' : 'Téléphone',
+              labelText: _step == PhoneLoginStep.forgot ? tr('Numéro pour le SMS') : tr('Téléphone'),
               prefixIcon: const Icon(Icons.phone),
             ),
             enabled: !_loading,
@@ -714,8 +714,8 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           SixDigitPinField(
             controller: _codeController,
             label: _step == PhoneLoginStep.googleOtp && _googleOtpChannel == 'email'
-                ? 'Code reçu par e-mail'
-                : 'Code reçu par SMS',
+                ? tr('Code reçu par e-mail')
+                : tr('Code reçu par SMS'),
             autofocus: true,
             enabled: !_loading,
             forOneTimeCode: true,
@@ -723,7 +723,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           if (kDebugMode && _mockHint != null) ...[
             const SizedBox(height: 8),
             Text(
-              'Code test : $_mockHint',
+              trf('Code test : {_mockHint}', {'_mockHint': _mockHint}),
               style: const TextStyle(color: MovaColors.orange, fontSize: 13),
             ),
           ],
@@ -747,10 +747,10 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         const SizedBox(height: 16),
           MovaButton(
           label: switch (_step) {
-            PhoneLoginStep.phone => 'Continuer',
-            PhoneLoginStep.pin => 'Se connecter',
-            PhoneLoginStep.forgot => 'Recevoir un SMS',
-            PhoneLoginStep.otp || PhoneLoginStep.googleOtp => 'Vérifier le code',
+            PhoneLoginStep.phone => tr('Continuer'),
+            PhoneLoginStep.pin => tr('Se connecter'),
+            PhoneLoginStep.forgot => tr('Recevoir un SMS'),
+            PhoneLoginStep.otp || PhoneLoginStep.googleOtp => tr('Vérifier le code'),
           },
           isLoading: _loading,
           onPressed: (_needsLegalAcceptance && !_legalAccepted)
@@ -783,7 +783,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           const SizedBox(height: 8),
           TextButton(
             onPressed: _loading ? null : _backToPhone,
-            child: Text(_step == PhoneLoginStep.googleOtp ? 'Retour' : 'Changer de numéro'),
+            child: Text(_step == PhoneLoginStep.googleOtp ? tr('Retour') : tr('Changer de numéro')),
           ),
         ],
         if (_showAppleSignIn || _showGoogleSignIn) ...[

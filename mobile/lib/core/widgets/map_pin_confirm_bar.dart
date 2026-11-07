@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../location/location_service.dart';
 import '../theme/mova_colors.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Confirmation après pin carte : destination acceptée sans nom de POI.
 class MapPinConfirmBar extends StatelessWidget {
@@ -64,7 +65,7 @@ class MapPinConfirmBar extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                    tooltip: 'Annuler',
+                    tooltip: tr('Annuler'),
                     onPressed: onCancel,
                     icon: Icon(Icons.close, size: 16, color: MovaColors.midnight.withValues(alpha: 0.7)),
                   ),
@@ -85,7 +86,7 @@ class MapPinConfirmBar extends StatelessWidget {
                   ),
                   onPressed: onUseLocation,
                   icon: const Icon(Icons.check, size: 14),
-                  label: const Text('Utiliser cet emplacement'),
+                  label: Text(tr('Utiliser cet emplacement')),
                 ),
                 if (onNamePlace != null)
                   OutlinedButton.icon(
@@ -99,7 +100,7 @@ class MapPinConfirmBar extends StatelessWidget {
                     ),
                     onPressed: onNamePlace,
                     icon: const Icon(Icons.edit_location_alt_outlined, size: 14),
-                    label: const Text('Nommer ce lieu'),
+                    label: Text(tr('Nommer ce lieu')),
                   ),
               ],
             ),

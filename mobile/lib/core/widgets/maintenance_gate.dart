@@ -5,6 +5,7 @@ import '../api/api_client.dart';
 import '../config/app_version.dart';
 import '../error/result.dart';
 import '../theme/mova_colors.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Écran plein page quand l’app est en maintenance (message admin FR).
 class MaintenanceGate extends ConsumerStatefulWidget {
@@ -70,7 +71,7 @@ class _MaintenanceGateState extends ConsumerState<MaintenanceGate> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Maintenance',
+                  tr('Maintenance'),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -90,7 +91,7 @@ class _MaintenanceGateState extends ConsumerState<MaintenanceGate> {
                   style: const TextStyle(fontSize: 15, height: 1.45, color: MovaColors.textSecondary),
                 ),
                 const SizedBox(height: 24),
-                TextButton(onPressed: _load, child: const Text('Réessayer')),
+                TextButton(onPressed: _load, child: Text(tr('Réessayer'))),
               ],
             ),
           ),

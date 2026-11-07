@@ -182,14 +182,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     if (errand == null) return '';
     final status = errand['status']?.toString().toUpperCase() ?? '';
     if (status == 'COMPLETED' && errand['isPaid'] != true) {
-      return 'Courses & commissions — paiement en attente';
+      return tr('Courses & commissions — paiement en attente');
     }
     return switch (status) {
-      'IN_PROGRESS' => 'Courses & commissions — achats en cours',
-      'ASSIGNED' => 'Courses & commissions — livreur assigné',
-      'PENDING' => 'Courses & commissions — recherche livreur',
-      'COMPLETED' => 'Courses & commissions — terminée',
-      _ => 'Courses & commissions en cours',
+      'IN_PROGRESS' => tr('Courses & commissions — achats en cours'),
+      'ASSIGNED' => tr('Courses & commissions — livreur assigné'),
+      'PENDING' => tr('Courses & commissions — recherche livreur'),
+      'COMPLETED' => tr('Courses & commissions — terminée'),
+      _ => tr('Courses & commissions en cours'),
     };
   }
 
@@ -222,13 +222,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     if (delivery == null) return '';
     final status = delivery['status']?.toString().toUpperCase() ?? '';
     final type = delivery['type']?.toString().toUpperCase() ?? '';
-    final prefix = type == 'FOOD' ? 'Commande repas' : 'Livraison';
+    final prefix = type == 'FOOD' ? tr('Commande repas') : tr('Livraison');
     return switch (status) {
-      'IN_TRANSIT' => '$prefix — livreur en route',
-      'PICKED_UP' => '$prefix — colis pris en charge',
-      'READY_FOR_PICKUP' => '$prefix — prête pour le livreur',
-      'RESTAURANT_CONFIRMED' => '$prefix — en préparation',
-      _ => '$prefix en cours',
+      'IN_TRANSIT' => trf('{prefix} — livreur en route', {'prefix': prefix}),
+      'PICKED_UP' => trf('{prefix} — colis pris en charge', {'prefix': prefix}),
+      'READY_FOR_PICKUP' => trf('{prefix} — prête pour le livreur', {'prefix': prefix}),
+      'RESTAURANT_CONFIRMED' => trf('{prefix} — en préparation', {'prefix': prefix}),
+      _ => trf('{prefix} en cours', {'prefix': prefix}),
     };
   }
 
@@ -271,19 +271,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     if (api.rideHasDriver(ride)) {
       final status = ride['status']?.toString().toUpperCase() ?? '';
       return switch (status) {
-        'IN_PROGRESS' => 'Course en cours — suivez votre trajet',
-        'DRIVER_ARRIVED' => 'Votre chauffeur est arrivé',
-        _ => 'Chauffeur en route',
+        'IN_PROGRESS' => tr('Course en cours — suivez votre trajet'),
+        'DRIVER_ARRIVED' => tr('Votre chauffeur est arrivé'),
+        _ => tr('Chauffeur en route'),
       };
     }
-    return 'Recherche d\'un chauffeur en cours…';
+    return tr('Recherche d\'un chauffeur en cours…');
   }
 
   String _greeting() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Bonjour';
-    if (hour < 18) return 'Bon après-midi';
-    return 'Bonsoir';
+    if (hour < 12) return tr('Bonjour');
+    if (hour < 18) return tr('Bon après-midi');
+    return tr('Bonsoir');
   }
 
   void _open(BuildContext context, Widget screen) {
@@ -439,7 +439,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           NavigationDestination(
             icon: Icon(Icons.history_outlined),
             selectedIcon: Icon(Icons.history, color: MovaColors.violet),
-            label: 'Historique',
+            label: tr('Historique'),
           ),
           NavigationDestination(
             icon: Icon(Icons.account_balance_wallet_outlined),
@@ -449,7 +449,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           NavigationDestination(
             icon: Icon(Icons.help_outline),
             selectedIcon: Icon(Icons.help, color: MovaColors.violet),
-            label: 'Aide',
+            label: tr('Aide'),
           ),
         ],
       ),

@@ -9,6 +9,7 @@ import '../../core/widgets/mova_screen.dart';
 import 'chat_alert_service.dart';
 import 'chat_receipt.dart';
 import 'ride_chat_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 class ErrandChatScreen extends ConsumerStatefulWidget {
   const ErrandChatScreen({
@@ -115,7 +116,7 @@ class _ErrandChatScreenState extends ConsumerState<ErrandChatScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Chat · ${widget.peerLabel}',
+      title: trf('Chat · {peerLabel}', {'peerLabel': widget.peerLabel}),
       scrollable: false,
       child: Column(
         children: [
@@ -145,8 +146,8 @@ class _ErrandChatScreenState extends ConsumerState<ErrandChatScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    decoration: const InputDecoration(
-                      hintText: 'Votre message…',
+                    decoration: InputDecoration(
+                      hintText: tr('Votre message…'),
                       isDense: true,
                     ),
                     onSubmitted: (_) => _send(),

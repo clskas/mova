@@ -110,8 +110,8 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
-                Text('Conducteur : ${widget.driverName}'),
-                if (departure.isNotEmpty) Text('Départ : $departure'),
+                Text(trf('Conducteur : {driverName}', {'driverName': widget.driverName})),
+                if (departure.isNotEmpty) Text(trf('Départ : {departure}', {'departure': departure})),
                 const SizedBox(height: 8),
                 ServicePriceDisplay.carpoolBookingCard(
                   pricePerSeatCdf: widget.pricePerSeatCdf,
@@ -119,7 +119,7 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
                   totalLabel: 'Total réservation',
                 ),
                 Text(
-                  'Réf. ${widget.tripId}',
+                  trf('Réf. {tripId}', {'tripId': widget.tripId}),
                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                 ),
               ],
@@ -167,7 +167,7 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
               onPressed: () => showCarpoolContact(context, contactPhone: _contactPhone),
               icon: const Icon(Icons.phone_outlined),
               label: Text(
-                _contactPhone != null ? 'Contacter · $_contactPhone' : 'Contacter le conducteur',
+                _contactPhone != null ? trf('Contacter · {_contactPhone}', {'_contactPhone': _contactPhone}) : 'Contacter le conducteur',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

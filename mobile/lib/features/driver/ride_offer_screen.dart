@@ -15,6 +15,7 @@ import '../../core/widgets/mova_widgets.dart';
 import 'active_ride_screen.dart';
 import 'driver_job_alert_service.dart';
 import '../../core/location/location_permission.dart';
+import '../../core/i18n/i18n.dart';
 
 class RideOfferScreen extends ConsumerStatefulWidget {
   const RideOfferScreen({
@@ -275,9 +276,9 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                     icon: const Icon(Icons.close, color: Colors.white70),
                     onPressed: _loading ? null : _reject,
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Nouvelle course',
+                      tr('Nouvelle course'),
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
                     ),
@@ -370,8 +371,8 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: MovaColors.violet.withValues(alpha: 0.5)),
                         ),
-                        child: const Text(
-                          'Aller-retour',
+                        child: Text(
+                          tr('Aller-retour'),
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -389,7 +390,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
-                            'Trajet ${GeoUtils.formatDistanceKm(distance.toDouble())}',
+                            trf('Trajet {v1}', {'v1': GeoUtils.formatDistanceKm(distance.toDouble())}),
                             style: const TextStyle(color: Colors.white70, fontSize: 15),
                           ),
                           Text(
@@ -418,7 +419,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                             Flexible(
                               child: Text(
                                 'Client à ${GeoUtils.formatDistanceKm(_pickupDistanceKm!)}'
-                                '${_pickupEtaMin != null ? ' · ~$_pickupEtaMin min' : ''}',
+                                '${_pickupEtaMin != null ? trf(' · ~{_pickupEtaMin} min', {'_pickupEtaMin': _pickupEtaMin}) : ''}',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -495,7 +496,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: MovaButton(
-                      label: 'Accepter la course',
+                      label: tr('Accepter la course'),
                       icon: Icons.check_circle_outline,
                       isLoading: _loading,
                       onPressed: _loading ? null : _accept,
@@ -505,7 +506,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: MovaButton(
-                      label: 'Refuser',
+                      label: tr('Refuser'),
                       isSecondary: true,
                       icon: Icons.close,
                       isLoading: _loading,
@@ -516,7 +517,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: MovaButton(
-                      label: 'Navigation vers le passager',
+                      label: tr('Navigation vers le passager'),
                       isSecondary: true,
                       icon: Icons.navigation_outlined,
                       onPressed: _openNavigation,

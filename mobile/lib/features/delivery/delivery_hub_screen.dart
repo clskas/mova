@@ -8,6 +8,7 @@ import '../home/service_card.dart';
 import 'express_delivery_screen.dart';
 import 'food_delivery_screen.dart';
 import 'parcel_delivery_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Hub regroupant tous les types de livraison SENGA.
 class DeliveryHubScreen extends StatelessWidget {
@@ -22,12 +23,12 @@ class DeliveryHubScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return MovaScreen(
-      title: 'Livraisons',
+      title: tr('Livraisons'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Choisissez votre type de livraison',
+            tr('Choisissez votre type de livraison'),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodyMedium?.copyWith(
@@ -58,15 +59,15 @@ class DeliveryHubScreen extends StatelessWidget {
                     ServiceCard(
                       icon: MovaServiceIcon.food(color: MovaColors.green),
                       iconColor: MovaColors.green,
-                      title: 'Livraison commerces',
-                      subtitle: 'Restaurants, supermarchés…',
+                      title: tr('Livraison commerces'),
+                      subtitle: tr('Restaurants, supermarchés…'),
                       onTap: () => _open(context, const FoodDeliveryScreen()),
                     ),
                     ServiceCard(
                       icon: MovaServiceIcon.parcel(color: MovaColors.green),
                       iconColor: MovaColors.green,
-                      title: 'Livraison colis',
-                      subtitle: 'Envoyez un colis en toute sécurité',
+                      title: tr('Livraison colis'),
+                      subtitle: tr('Envoyez un colis en toute sécurité'),
                       onTap: () => _open(context, const ParcelDeliveryScreen()),
                     ),
                   ]),
@@ -75,15 +76,15 @@ class DeliveryHubScreen extends StatelessWidget {
                     ServiceCard(
                       icon: const Icon(Icons.bolt_outlined, color: MovaColors.orange, size: 28),
                       iconColor: MovaColors.orange,
-                      title: 'Livraison express',
-                      subtitle: 'Envoi urgent en moins de 45 min',
+                      title: tr('Livraison express'),
+                      subtitle: tr('Envoi urgent en moins de 45 min'),
                       onTap: () => _open(context, const ExpressDeliveryScreen()),
                     ),
                     ServiceCard(
                       icon: MovaServiceIcon.errand(color: MovaColors.orange),
                       iconColor: MovaColors.orange,
-                      title: 'Courses & commissions',
-                      subtitle: 'Achats et courses pour vous',
+                      title: tr('Courses & commissions'),
+                      subtitle: tr('Achats et courses pour vous'),
                       onTap: () => _open(context, const ErrandScreen()),
                     ),
                   ]),

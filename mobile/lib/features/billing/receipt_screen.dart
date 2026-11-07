@@ -109,8 +109,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     unawaited(
       PassengerAlertService.notify(
         title: method.toUpperCase() == 'CASH'
-            ? 'Paiement espèces confirmé'
-            : 'Paiement confirmé',
+            ? tr('Paiement espèces confirmé')
+            : tr('Paiement confirmé'),
         body: message,
       ),
     );
@@ -205,7 +205,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     setState(() => _actionLoading = false);
     if (bytes == null) return;
     final name = '${_receipt?['receiptNumber'] ?? 'mova-receipt'}.pdf';
-    await Share.shareXFiles([XFile.fromData(bytes, name: name, mimeType: 'application/pdf')], text: 'Reçu SENGA');
+    await Share.shareXFiles([XFile.fromData(bytes, name: name, mimeType: 'application/pdf')], text: tr('Reçu SENGA'));
   }
 
   Future<void> _sendEmail() async {
@@ -356,10 +356,10 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     final receipt = _receipt;
     final lines = receipt?['lines'] is List ? receipt!['lines'] as List : const [];
     final payment = receipt?['payment'] is Map ? receipt!['payment'] as Map : null;
-    final docLabel = receipt?['documentType'] == 'INVOICE' ? 'Facture' : 'Reçu de paiement';
+    final docLabel = receipt?['documentType'] == 'INVOICE' ? tr('Facture') : tr('Reçu de paiement');
 
     return MovaScreen(
-      title: _cashStillPending ? 'Paiement espèces' : docLabel,
+      title: _cashStillPending ? tr('Paiement espèces') : docLabel,
       child: _loading
           ? const Center(child: CircularProgressIndicator())
           : _cashStillPending
@@ -520,7 +520,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                     ),
                     const SizedBox(height: 16),
                     MovaButton(
-                      label: widget.showRatingAfter ? 'Continuer' : 'Terminer',
+                      label: widget.showRatingAfter ? tr('Continuer') : tr('Terminer'),
                       onPressed: _continue,
                     ),
                   ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../theme/mova_colors.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Digits only for tel:/wa.me (keeps leading country code).
 String? dialablePhoneDigits(String? raw) {
@@ -48,7 +49,7 @@ Future<void> showCallWhatsAppSheet(
   if (digits == null) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Numéro $peerLabel indisponible')),
+      SnackBar(content: Text(trf('Numéro {peerLabel} indisponible', {'peerLabel': peerLabel}))),
     );
     return;
   }
@@ -66,7 +67,7 @@ Future<void> showCallWhatsAppSheet(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Contacter $peerLabel',
+                trf('Contacter {peerLabel}', {'peerLabel': peerLabel}),
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 4),
@@ -77,7 +78,7 @@ Future<void> showCallWhatsAppSheet(
               const SizedBox(height: 16),
               ListTile(
                 leading: const Icon(Icons.phone, color: MovaColors.green),
-                title: const Text('Appeler'),
+                title: Text(tr('Appeler')),
                 onTap: () async {
                   Navigator.pop(ctx);
                   await launchPhoneCall(digits);
@@ -92,7 +93,7 @@ Future<void> showCallWhatsAppSheet(
                   if (!context.mounted) return;
                   if (whatsappMeUrl(digits) == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Impossible d\'ouvrir WhatsApp')),
+                      SnackBar(content: Text(tr('Impossible d\'ouvrir WhatsApp'))),
                     );
                   }
                 },

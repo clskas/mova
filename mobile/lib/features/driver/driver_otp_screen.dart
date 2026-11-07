@@ -10,6 +10,7 @@ import '../../core/widgets/mova_screen.dart';
 import 'driver_onboarding_screen.dart';
 import 'driver_home_screen.dart';
 import '../auth/phone_login_panel.dart';
+import '../../core/i18n/i18n.dart';
 
 class DriverOtpScreen extends ConsumerWidget {
   const DriverOtpScreen({super.key});
@@ -54,14 +55,14 @@ class DriverOtpScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Espace chauffeur',
+          Text(
+            appLanguage.value == 'en' ? 'Driver area' : 'Espace chauffeur',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 6),
           Text(
-            'Connexion chauffeurs uniquement',
+            tr('Connexion chauffeurs uniquement'),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
@@ -80,7 +81,7 @@ class DriverOtpScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           PhoneLoginPanel(
             appRole: 'DRIVER',
-            subtitle: 'Connectez-vous avec votre PIN, un code SMS ou Google',
+            subtitle: tr('Connectez-vous avec votre PIN, un code SMS ou Google'),
             onAuthenticated: (_) => _onDriverAuthenticated(context, ref),
           ),
         ],

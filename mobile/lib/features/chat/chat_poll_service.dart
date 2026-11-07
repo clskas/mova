@@ -10,6 +10,7 @@ import '../passenger/passenger_alert_service.dart';
 import '../sos/notification_tap_router.dart';
 import 'call_ring_service.dart';
 import 'chat_alert_service.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Poll léger des notifications serveur pour afficher une bannière chat / SOS
 /// même hors écran dédié, sans dépendre de FCM (fonctionne tant que l'app tourne).
@@ -133,7 +134,7 @@ class ChatPollService {
                   peerFromTitle.isNotEmpty &&
                   peerFromTitle.toLowerCase() != 'message senga')
               ? peerFromTitle
-              : (callKind == 'ride' ? 'Course' : 'Livraison');
+              : (callKind == 'ride' ? tr('Course') : tr('Livraison'));
           // fromRealtime:true — un NOUVEAU message chat (id non vu) = nouvel appel.
           // La suppression ne doit bloquer que les relances du même message après refus.
           CallRingService.allowNewIncoming(threadId);

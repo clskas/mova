@@ -29,8 +29,8 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
   List<Map<String, dynamic>> _rides = [];
   List<Map<String, dynamic>> _myDriverTrips = [];
   List<Map<String, dynamic>> _myPassengerTrips = [];
-  final _fromController = TextEditingController(text: 'Gombe, Kinshasa');
-  final _toController = TextEditingController(text: 'Limete, Kinshasa');
+  final _fromController = TextEditingController(text: tr('Gombe, Kinshasa'));
+  final _toController = TextEditingController(text: tr('Limete, Kinshasa'));
   final _seatsController = TextEditingController(text: '3');
   final _priceController = TextEditingController();
   final _meetingPointController = TextEditingController();
@@ -320,9 +320,10 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
             builder: (ctx) => AlertDialog(
               title: Text(tr('Trajet publié')),
               content: Text(
-                'Votre covoiturage est en ligne.\n'
-                'Départ : ${_formatDateTime(_departureAt)}\n'
-                'Prix par place : ${MarketConfig.formatCdf(price)}',
+                trf('Votre covoiturage est en ligne.\nDépart : {departure}\nPrix par place : {price}', {
+                  'departure': _formatDateTime(_departureAt),
+                  'price': MarketConfig.formatCdf(price),
+                }),
               ),
               actions: [
                 TextButton(
@@ -540,7 +541,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
             children: [
               const Icon(Icons.calendar_today, color: MovaColors.violet, size: 20),
               const SizedBox(width: 12),
-              Expanded(child: Text('Date : ${_formatDate(_searchDate)}')),
+              Expanded(child: Text(trf('Date : {v1}', {'v1': _formatDate(_searchDate)}))),
               const Icon(Icons.chevron_right),
             ],
           ),
@@ -552,8 +553,8 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
           decoration: InputDecoration(labelText: tr('Trier par')),
           items: [
             DropdownMenuItem(value: 'departure', child: Text(tr('Départ'))),
-            DropdownMenuItem(value: 'price', child: Text('Prix')),
-            DropdownMenuItem(value: 'rating', child: Text('Note')),
+            DropdownMenuItem(value: 'price', child: Text(tr('Prix'))),
+            DropdownMenuItem(value: 'rating', child: Text(tr('Note'))),
           ],
           onChanged: (v) {
             if (v != null) {
@@ -639,7 +640,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
           decoration: InputDecoration(
             labelText: tr('Prix par place (CDF)'),
             prefixIcon: const Icon(Icons.payments_outlined),
-            helperText: _totalPrice != null ? 'Estimation totale : ${MarketConfig.formatCdf(_totalPrice!)}' : null,
+            helperText: _totalPrice != null ? trf('Estimation totale : {v1}', {'v1': MarketConfig.formatCdf(_totalPrice!)}) : null,
           ),
         ),
         const SizedBox(height: 12),
@@ -665,7 +666,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
         if (_distanceKm != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text('Distance estimée : ${_distanceKm!.toStringAsFixed(1)} km',
+            child: Text(trf('Distance estimée : {v1} km', {'v1': _distanceKm!.toStringAsFixed(1)}),
                 style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12)),
           ),
         if (_validationError != null) ...[
@@ -678,7 +679,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
         ],
         const SizedBox(height: 16),
         MovaButton(
-          label: _priceController.text.isEmpty ? 'Estimer le prix' : 'Publier le trajet',
+          label: _priceController.text.isEmpty ? tr('Estimer le prix') : tr('Publier le trajet'),
           isLoading: _loading,
           icon: _priceController.text.isEmpty ? Icons.calculate_outlined : Icons.publish_outlined,
           onPressed: _loading
@@ -721,7 +722,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
           const SizedBox(height: 20),
         ],
         Text(
-          widget.forDriver ? 'Mes réservations passager' : 'Mes réservations',
+          widget.forDriver ? tr('Mes réservations passager') : tr('Mes réservations'),
           style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: 8),
@@ -767,7 +768,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
           ];
 
     return MovaScreen(
-      title: widget.forDriver ? 'Publier covoiturage' : 'Covoiturage',
+      title: widget.forDriver ? tr('Publier covoiturage') : tr('Covoiturage'),
       scrollable: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -779,12 +780,12 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
             labelColor: MovaColors.violet,
             unselectedLabelColor: MovaColors.textSecondary,
             tabs: widget.forDriver
-                ? const [
-                    Tab(text: 'Publier'),
+                ? [
+                    Tab(text: tr('Publier')),
                     Tab(text: 'Mes trajets'),
                   ]
-                : const [
-                    Tab(text: 'Rechercher'),
+                : [
+                    Tab(text: tr('Rechercher')),
                     Tab(text: 'Mes réservations'),
                   ],
           ),

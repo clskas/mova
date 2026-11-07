@@ -287,8 +287,8 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
               onPressed: _walletTxLoadingMore ? null : _loadMoreWalletMovements,
               child: Text(
                 _walletTxLoadingMore
-                    ? 'Chargement…'
-                    : 'Charger plus (${_walletMovements.length} / $_walletTxTotal)',
+                    ? tr('Chargement…')
+                    : trf('Charger plus ({length} / {_walletTxTotal})', {'length': _walletMovements.length, '_walletTxTotal': _walletTxTotal}),
               ),
             ),
           ),
@@ -382,7 +382,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
       builder: (ctx) => AlertDialog(
         title: Text(tr('Régler les dettes espèces')),
         content: Text(
-          'SENGA débitera ${MarketConfig.formatCdf(total)} de votre portefeuille pour solder les encaissements cash à reverser.',
+          trf('SENGA débitera {v1} de votre portefeuille pour solder les encaissements cash à reverser.', {'v1': MarketConfig.formatCdf(total)}),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
@@ -549,8 +549,8 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                   children: [
                     Text(
                       _period == _EarningsPeriod.today
-                          ? 'Gains aujourd\'hui'
-                          : 'Gains période',
+                          ? tr('Gains aujourd\'hui')
+                          : tr('Gains période'),
                       style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                     ),
                     const SizedBox(height: 4),
@@ -827,7 +827,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                 Text(tr('Retrait Mobile Money'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
                 if (_payoutConfigured)
-                  Text('Dossier : $_payoutLabel', style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13))
+                  Text(trf('Dossier : {_payoutLabel}', {'_payoutLabel': _payoutLabel}), style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13))
                 else
                   Text(
                     tr('Indiquez ci-dessous le numéro Mobile Money qui recevra le retrait.'),
@@ -844,7 +844,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                       prefixIcon: Icon(Icons.phone_android),
                     ),
                     items: _mmChoices
-                        .map((c) => DropdownMenuItem(value: c.id, child: Text(c.label)))
+                        .map((c) => DropdownMenuItem(value: c.id, child: Text(tr(c.label))))
                         .toList(),
                     onChanged: _withdrawing
                         ? null
@@ -862,7 +862,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                     labelText: tr('Numéro de retrait'),
                     hintText: tr('08X XXX XXXX'),
                     helperText: _payoutConfigured
-                        ? 'Laissez vide pour utiliser le numéro du dossier ($_payoutLabel)'
+                        ? trf('Laissez vide pour utiliser le numéro du dossier ({_payoutLabel})', {'_payoutLabel': _payoutLabel})
                         : 'Numéro qui recevra le Mobile Money',
                     prefixIcon: const Icon(Icons.phone_iphone),
                   ),
@@ -881,12 +881,12 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Recharge et retrait : minimum ${MarketConfig.formatCdf(MarketConfig.minWalletAmountCdf)}.',
+                  trf('Recharge et retrait : minimum {v1}.', {'v1': MarketConfig.formatCdf(MarketConfig.minWalletAmountCdf)}),
                   style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                 ),
                 const SizedBox(height: 12),
                 MovaButton(
-                  label: _canWithdraw ? 'Retirer vers Mobile Money' : 'Indiquez un numéro de retrait',
+                  label: _canWithdraw ? tr('Retirer vers Mobile Money') : tr('Indiquez un numéro de retrait'),
                   icon: Icons.account_balance,
                   isLoading: _withdrawing,
                   onPressed: _withdrawing ? null : (_canWithdraw ? _withdraw : null),

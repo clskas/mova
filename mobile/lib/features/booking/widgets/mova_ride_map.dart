@@ -7,6 +7,7 @@ import '../../../core/config/test_runtime_config.dart';
 import '../../../core/config/market_config.dart';
 import '../../../core/theme/mova_colors.dart';
 import '../../../core/widgets/map_pin_confirm_bar.dart';
+import '../../../core/i18n/i18n.dart';
 
 class MovaRideMap extends StatefulWidget {
   const MovaRideMap({
@@ -309,10 +310,10 @@ class _MovaRideMapState extends State<MovaRideMap> {
                     width: 140,
                     height: 72,
                     alignment: Alignment.topCenter,
-                    child: const _LabeledPin(
+                    child: _LabeledPin(
                       color: Color(0xFFE67E22),
                       icon: Icons.push_pin,
-                      label: 'Pin',
+                      label: tr('Pin'),
                     ),
                   ),
                 if (driver != null)
@@ -378,10 +379,10 @@ class _MovaRideMapState extends State<MovaRideMap> {
                   color: MovaColors.midnight.withValues(alpha: 0.75),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Padding(
+                child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   child: Text(
-                    'Appui long ou tap : pin, puis « Utiliser cet emplacement »',
+                    tr('Appui long ou tap : pin, puis « Utiliser cet emplacement »'),
                     style: TextStyle(color: MovaColors.white, fontSize: 11),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

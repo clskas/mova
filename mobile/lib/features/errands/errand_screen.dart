@@ -19,6 +19,7 @@ import '../booking/widgets/mova_ride_map.dart';
 import '../../widgets/promo_code_field.dart';
 import '../wallet/wallet_screen.dart';
 import 'errand_tracking_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 class ErrandScreen extends ConsumerStatefulWidget {
   const ErrandScreen({super.key});
@@ -28,7 +29,7 @@ class ErrandScreen extends ConsumerStatefulWidget {
 }
 
 class _ErrandScreenState extends ConsumerState<ErrandScreen> {
-  final _pickupController = TextEditingController(text: 'Commerce / pharmacie, Gombe');
+  final _pickupController = TextEditingController(text: tr('Commerce / pharmacie, Gombe'));
   final _dropoffController = TextEditingController();
   final _itemController = TextEditingController();
   final List<String> _items = [];
@@ -168,8 +169,8 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     final text = address.trim();
     if (text.isEmpty) {
       return isDelivery
-          ? 'Indiquez le lieu de livraison (nom du quartier ou adresse).'
-          : 'Indiquez l\'adresse du commerce ou point de retrait.';
+          ? tr('Indiquez le lieu de livraison (nom du quartier ou adresse).')
+          : tr('Indiquez l\'adresse du commerce ou point de retrait.');
     }
     if (text == 'Ma position') {
       if (isDelivery) {
@@ -189,7 +190,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           return null;
         }
       }
-      return 'Activez le GPS avec le bouton cible ou saisissez un nom de lieu.';
+      return tr('Activez le GPS avec le bouton cible ou saisissez un nom de lieu.');
     }
     final fromTextCoords = DestinationCoords.parseText(text);
     if (fromTextCoords != null && ServiceAreaLocation.isInBounds(fromTextCoords)) {
@@ -231,8 +232,8 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       }
     }
     return isDelivery
-        ? 'Lieu de livraison non reconnu — saisissez un nom de quartier (ex. Gombe, Limete) ou utilisez le GPS.'
-        : 'Adresse de retrait non reconnue — saisissez un nom de lieu ou choisissez une suggestion.';
+        ? tr('Lieu de livraison non reconnu — saisissez un nom de quartier (ex. Gombe, Limete) ou utilisez le GPS.')
+        : tr('Adresse de retrait non reconnue — saisissez un nom de lieu ou choisissez une suggestion.');
   }
 
   Future<String?> _ensureAddressCoords() async {
@@ -309,19 +310,19 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   }
 
   String? _validate() {
-    if (_items.isEmpty) return 'Ajoutez au moins un article à la liste.';
+    if (_items.isEmpty) return tr('Ajoutez au moins un article à la liste.');
     if (_pickupController.text.trim().isEmpty) {
-      return 'Indiquez l\'adresse du commerce ou point de retrait.';
+      return tr('Indiquez l\'adresse du commerce ou point de retrait.');
     }
     if (_dropoffController.text.trim().isEmpty) {
-      return 'Indiquez le lieu de livraison (nom du quartier ou adresse).';
+      return tr('Indiquez le lieu de livraison (nom du quartier ou adresse).');
     }
     final budget = int.tryParse(_budgetController.text.trim());
     if (budget == null || budget <= 0) {
-      return 'Budget achats max obligatoire — rechargez votre wallet SENGA pour bloquer ce montant.';
+      return tr('Budget achats max obligatoire — rechargez votre wallet SENGA pour bloquer ce montant.');
     }
     if (_minimumBudgetCdf != null && budget < _minimumBudgetCdf!) {
-      return 'Budget minimum : ${MarketConfig.formatCdf(_minimumBudgetCdf!)} (achats estimés).';
+      return trf('Budget minimum : {v1} (achats estimés).', {'v1': MarketConfig.formatCdf(_minimumBudgetCdf!)});
     }
     return null;
   }
@@ -342,7 +343,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     if (result case Failure(:final error)) {
       return error.message;
     }
-    return 'Impossible de vérifier le wallet.';
+    return tr('Impossible de vérifier le wallet.');
   }
 
   Future<void> _estimate() async {
@@ -453,7 +454,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
     final autocompleteCity = _autocompleteCity;
 
     return MovaScreen(
-      title: 'Courses & commissions',
+      title: tr('Courses & commissions'),
       scrollable: false,
       padding: EdgeInsets.zero,
       child: MovaMapFormLayout(
@@ -470,8 +471,8 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
         children: [
           Text(
             compact
-                ? 'Listez vos achats — un livreur s\'en charge.'
-                : 'Listez vos achats — un livreur s\'en charge pour vous.',
+                ? tr('Listez vos achats — un livreur s\'en charge.')
+                : tr('Listez vos achats — un livreur s\'en charge pour vous.'),
             style: theme.textTheme.bodyMedium?.copyWith(
               color: MovaColors.textSecondary,
               fontSize: compact ? 13 : null,
@@ -486,8 +487,8 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
             city: autocompleteCity,
             proximityLat: _pickupPoint.latitude,
             proximityLng: _pickupPoint.longitude,
-            label: compact ? 'Retrait (commerce)' : 'Point de retrait (commerce)',
-            hint: 'Ex: Pharmacie, Marché…',
+            label: compact ? tr('Retrait (commerce)') : tr('Point de retrait (commerce)'),
+            hint: tr('Ex: Pharmacie, Marché…'),
             prefixIcon: Icons.store_outlined,
             onUserInput: _onPickupUserInput,
             onSelected: _selectPickupSuggestion,
@@ -499,8 +500,8 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
             city: autocompleteCity,
             proximityLat: _pickupPoint.latitude,
             proximityLng: _pickupPoint.longitude,
-            label: compact ? 'Livraison' : 'Lieu de livraison',
-            hint: 'Ex: Gombe, Bandal…',
+            label: compact ? tr('Livraison') : tr('Lieu de livraison'),
+            hint: tr('Ex: Gombe, Bandal…'),
             prefixIcon: Icons.home_outlined,
             textInputAction: TextInputAction.next,
             blockedQueries: const {},
@@ -517,7 +518,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
                   )
                 : IconButton(
                     icon: Icon(Icons.gps_fixed, color: MovaColors.violet, size: compact ? 20 : 24),
-                    tooltip: 'Ma position',
+                    tooltip: tr('Ma position'),
                     visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
                     onPressed: _loadingGps ? null : _useMyLocation,
                   ),
@@ -530,17 +531,17 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
             style: compact ? const TextStyle(fontSize: 14) : null,
             decoration: InputDecoration(
               isDense: compact,
-              labelText: compact ? 'Budget max (FC) *' : 'Budget achats max (FC) *',
+              labelText: compact ? tr('Budget max (FC) *') : tr('Budget achats max (FC) *'),
               hintText: _minimumBudgetCdf != null
-                  ? 'Min. ${MarketConfig.formatCdf(_minimumBudgetCdf!)}'
+                  ? trf('Min. {v1}', {'v1': MarketConfig.formatCdf(_minimumBudgetCdf!)})
                   : 'Ex: 50000',
-              helperText: 'Obligatoire — bloqué sur votre wallet SENGA jusqu\'à la fin de la course.',
+              helperText: tr('Obligatoire — bloqué sur votre wallet SENGA jusqu\'à la fin de la course.'),
               helperMaxLines: 2,
               labelStyle: compact ? const TextStyle(fontSize: 13) : null,
               prefixIcon: Icon(Icons.account_balance_wallet_outlined, size: compact ? 20 : 24),
               suffixIcon: IconButton(
                 icon: Icon(Icons.add_card_outlined, color: MovaColors.violet, size: compact ? 20 : 24),
-                tooltip: 'Recharger le wallet',
+                tooltip: tr('Recharger le wallet'),
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -554,12 +555,12 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           if (_walletAvailableCdf != null) ...[
             const SizedBox(height: 6),
             Text(
-              'Solde wallet disponible : ${MarketConfig.formatCdf(_walletAvailableCdf!)}',
+              trf('Solde wallet disponible : {v1}', {'v1': MarketConfig.formatCdf(_walletAvailableCdf!)}),
               style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
             ),
           ],
           SizedBox(height: gap),
-          Text('Liste de courses', style: theme.textTheme.titleSmall?.copyWith(fontSize: compact ? 14 : null)),
+          Text(tr('Liste de courses'), style: theme.textTheme.titleSmall?.copyWith(fontSize: compact ? 14 : null)),
           SizedBox(height: compact ? 6 : 8),
           Row(
             children: [
@@ -568,7 +569,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
                   controller: _itemController,
                   style: compact ? const TextStyle(fontSize: 14) : null,
                   decoration: InputDecoration(
-                    hintText: compact ? 'Ex: Riz, Pain…' : 'Ex: Riz 5 kg, Pain, Savon…',
+                    hintText: compact ? tr('Ex: Riz, Pain…') : tr('Ex: Riz 5 kg, Pain, Savon…'),
                     hintStyle: compact ? const TextStyle(fontSize: 13) : null,
                     isDense: true,
                   ),
@@ -586,7 +587,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
-                'Ajoutez au moins un article',
+                tr('Ajoutez au moins un article'),
                 style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
               ),
             )
@@ -647,8 +648,8 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           SizedBox(height: compact ? 16 : 24),
           MovaButton(
             label: _estimatedPrice == null
-                ? 'Estimer le prix'
-                : (compact ? 'Envoyer' : 'Envoyer au livreur'),
+                ? tr('Estimer le prix')
+                : (compact ? tr('Envoyer') : tr('Envoyer au livreur')),
             isLoading: _loading,
             icon: _estimatedPrice == null ? Icons.calculate_outlined : Icons.send_outlined,
             onPressed: _loading

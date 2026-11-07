@@ -232,7 +232,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
     switch (result) {
       case Success():
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_isDriver ? 'Trajet annulé' : 'Réservation annulée')),
+          SnackBar(content: Text(_isDriver ? tr('Trajet annulé') : tr('Réservation annulée'))),
         );
         Navigator.pop(context);
       case Failure(:final error):
@@ -258,7 +258,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
     final showBook = !_isDriver && !_isPassenger && seatsLeft > 0;
 
     return MovaScreen(
-      title: _isDriver ? 'Mon trajet' : 'Détail du trajet',
+      title: _isDriver ? tr('Mon trajet') : tr('Détail du trajet'),
       child: _loading && trip == null
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -283,8 +283,8 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                         Expanded(
                           child: Text(
                             _isDriver
-                                ? 'Covoiturage planifié — pas une course VTC instantanée.'
-                                : 'Vous êtes passager sur ce trajet partagé.',
+                                ? tr('Covoiturage planifié — pas une course VTC instantanée.')
+                                : tr('Vous êtes passager sur ce trajet partagé.'),
                             style: const TextStyle(fontSize: 12, color: MovaColors.violet),
                           ),
                         ),
@@ -569,7 +569,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                   if ((_isDriver || _isPassenger) && CancelEligibility.carpool(trip))
                     TextButton(
                       onPressed: _actionLoading ? null : _cancel,
-                      child: Text(_isDriver ? 'Annuler le trajet' : 'Annuler ma réservation'),
+                      child: Text(_isDriver ? tr('Annuler le trajet') : tr('Annuler ma réservation')),
                     ),
                 ],
                 if (_error != null) ...[

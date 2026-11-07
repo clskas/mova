@@ -53,7 +53,7 @@ class ParcelDeliveryScreen extends ConsumerStatefulWidget {
 }
 
 class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
-  final _pickupController = TextEditingController(text: 'Ma position');
+  final _pickupController = TextEditingController(text: tr('Ma position'));
   final _dropoffController = TextEditingController();
   final _promoController = TextEditingController();
   final _picker = ImagePicker();
@@ -297,15 +297,15 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
         _pickupFromSuggestion = true;
         _pickupFromGps = false;
       } else {
-        return 'Adresse d\'enlèvement non reconnue — utilisez le GPS, l\'autocomplétion SENGA ou les coordonnées.';
+        return tr('Adresse d\'enlèvement non reconnue — utilisez le GPS, l\'autocomplétion SENGA ou les coordonnées.');
       }
     } else if (ServiceAreaLocation.isInBounds(_pickup)) {
       _pickup = ServiceAreaLocation.ensureInServiceArea(
         _pickup,
-        address: pickupText.isEmpty ? 'Ma position' : pickupText,
+        address: pickupText.isEmpty ? tr('Ma position') : pickupText,
       );
     } else {
-      return 'Impossible de déterminer l\'enlèvement. Activez le GPS ou choisissez une adresse dans la liste.';
+      return tr('Impossible de déterminer l\'enlèvement. Activez le GPS ou choisissez une adresse dans la liste.');
     }
 
     if (_dropoffFromManualCoords && _dropoff != null && ServiceAreaLocation.isInBounds(_dropoff!)) {
@@ -335,7 +335,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
           address: _dropoffController.text,
         );
       } else {
-        return 'Adresse non reconnue — utilisez le GPS, l\'autocomplétion SENGA ou les coordonnées.';
+        return tr('Adresse non reconnue — utilisez le GPS, l\'autocomplétion SENGA ou les coordonnées.');
       }
     } else {
       _dropoff = ServiceAreaLocation.ensureInServiceArea(
@@ -366,10 +366,10 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
 
   String? _validate() {
     if (_pickupController.text.trim().isEmpty) {
-      return 'Indiquez l\'adresse d\'enlèvement.';
+      return tr('Indiquez l\'adresse d\'enlèvement.');
     }
     if (_dropoffController.text.trim().isEmpty) {
-      return 'Indiquez l\'adresse de livraison.';
+      return tr('Indiquez l\'adresse de livraison.');
     }
     return null;
   }
@@ -574,7 +574,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                     proximityLat: _pickup.latitude,
                     proximityLng: _pickup.longitude,
                     label: tr('Adresse d\'enlèvement'),
-                    hint: 'Ma position ou nom du lieu',
+                    hint: tr('Ma position ou nom du lieu'),
                     prefixIcon: Icons.upload_outlined,
                     onUserInput: _onPickupUserInput,
                     onSelected: _selectPickupSuggestion,
@@ -592,7 +592,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                     proximityLat: _pickup.latitude,
                     proximityLng: _pickup.longitude,
                     label: tr('Adresse de livraison'),
-                    hint: 'Ex: Gombe, chez Mama X, ou pin sur la carte',
+                    hint: tr('Ex: Gombe, chez Mama X, ou pin sur la carte'),
                     prefixIcon: Icons.place_outlined,
                     userCatalog: _userCatalog,
                     textInputAction: TextInputAction.done,
@@ -635,8 +635,8 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                     ),
                     label: Text(
                       _photoFile != null
-                          ? 'Photo ajoutée (optionnel)'
-                          : 'Ajouter une photo (optionnel)',
+                          ? tr('Photo ajoutée (optionnel)')
+                          : tr('Ajouter une photo (optionnel)'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -693,7 +693,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                   ],
                   const SizedBox(height: 24),
                   MovaButton(
-                    label: _estimatedPrice == null ? 'Estimer le prix' : 'Confirmer l\'envoi',
+                    label: _estimatedPrice == null ? tr('Estimer le prix') : tr('Confirmer l\'envoi'),
                     isLoading: _loading,
                     icon: _estimatedPrice == null
                         ? Icons.calculate_outlined

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api/api_client.dart';
 import '../navigation/mova_navigator.dart';
 import 'mova_crop_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Paramètres adaptés aux appareils à faible mémoire (évite le kill processus caméra).
 const int kMovaPickMaxSide = 1024;
@@ -96,7 +97,7 @@ Future<XFile?> cropMovaImage(XFile source) async {
           cropGridColor: const Color(0x66FFFFFF),
         ),
         IOSUiSettings(
-          title: 'Rogner',
+          title: tr('Rogner'),
           cancelButtonTitle: 'Annuler',
           doneButtonTitle: 'Valider',
           aspectRatioPresets: presets,
@@ -150,12 +151,12 @@ Future<ImageSource?> showMovaImageSourceSheet(BuildContext context) {
         children: [
           ListTile(
             leading: const Icon(Icons.camera_alt),
-            title: const Text('Prendre une photo'),
+            title: Text(tr('Prendre une photo')),
             onTap: () => Navigator.pop(ctx, ImageSource.camera),
           ),
           ListTile(
             leading: const Icon(Icons.photo_library),
-            title: const Text('Galerie'),
+            title: Text(tr('Galerie')),
             onTap: () => Navigator.pop(ctx, ImageSource.gallery),
           ),
         ],

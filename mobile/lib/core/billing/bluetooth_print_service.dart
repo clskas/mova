@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/material.dart';
+import '../../core/i18n/i18n.dart';
 
 class BluetoothPrintService {
   BluetoothPrintService._();
@@ -47,7 +48,7 @@ class BluetoothPrintService {
     BluetoothDevice? selected = devices.length == 1 ? devices.first : await showDialog<BluetoothDevice>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Imprimante Bluetooth'),
+        title: Text(tr('Imprimante Bluetooth')),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView(
@@ -63,7 +64,7 @@ class BluetoothPrintService {
                 .toList(),
           ),
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler'))],
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Annuler')))],
       ),
     );
 

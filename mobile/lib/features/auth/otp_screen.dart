@@ -6,6 +6,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../home/home_screen.dart';
 import 'phone_login_panel.dart';
+import '../../core/i18n/i18n.dart';
 
 class OtpScreen extends ConsumerWidget {
   const OtpScreen({super.key});
@@ -31,7 +32,7 @@ class OtpScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           Text(
-            'Bienvenue sur SENGA',
+            appLanguage.value == 'en' ? 'Welcome to SENGA' : 'Bienvenue sur SENGA',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -49,7 +50,7 @@ class OtpScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           PhoneLoginPanel(
             appRole: 'PASSENGER',
-            subtitle: 'Mobilité partout en RDC — PIN, SMS ou Google',
+            subtitle: tr('Mobilité partout en RDC — PIN, SMS ou Google'),
             onAuthenticated: (_) async {
               if (!context.mounted) return;
               Navigator.of(context).pushReplacement(

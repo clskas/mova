@@ -109,7 +109,7 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
     final net = widget.driverNetCdf;
     return AlertDialog(
       scrollable: true,
-      title: Text(widget.title),
+      title: Text(tr(widget.title)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

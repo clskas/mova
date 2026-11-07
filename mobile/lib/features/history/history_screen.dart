@@ -79,15 +79,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   }
 
   String _statusLabel(String? status) => switch (status) {
-        'COMPLETED' => 'Terminé',
-        'DELIVERED' => 'Livré',
-        'CONFIRMED' => 'Confirmé',
-        'SCHEDULED' => 'Planifié',
-        'IN_TRANSIT' => 'En transit',
-        'CANCELLED' => 'Annulé',
-        'ACCEPTED' => 'Accepté',
-        'IN_PROGRESS' => 'En cours',
-        'PENDING' => 'En attente',
+        'COMPLETED' => tr('Terminé'),
+        'DELIVERED' => tr('Livré'),
+        'CONFIRMED' => tr('Confirmé'),
+        'SCHEDULED' => tr('Planifié'),
+        'IN_TRANSIT' => tr('En transit'),
+        'CANCELLED' => tr('Annulé'),
+        'ACCEPTED' => tr('Accepté'),
+        'IN_PROGRESS' => tr('En cours'),
+        'PENDING' => tr('En attente'),
         _ => status ?? '',
       };
 
@@ -487,8 +487,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
               const SizedBox(height: 8),
               MovaButton(
                 label: _isActiveErrand(item['status']?.toString())
-                    ? 'Suivre la course'
-                    : 'Voir le suivi',
+                    ? tr('Suivre la course')
+                    : tr('Voir le suivi'),
                 isSecondary: true,
                 icon: Icons.map_outlined,
                 onPressed: () => _openErrandTracking(item),
@@ -571,11 +571,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             onTap: (_) => setState(() {}),
             labelColor: MovaColors.violet,
             unselectedLabelColor: MovaColors.textSecondary,
-            tabs: const [
-              Tab(text: 'Courses'),
-              Tab(text: 'Colis'),
-              Tab(text: 'Repas'),
-              Tab(text: 'Réservations'),
+            tabs: [
+              Tab(text: tr('Courses')),
+              Tab(text: tr('Colis')),
+              Tab(text: tr('Repas')),
+              Tab(text: tr('Réservations')),
             ],
           ),
           const SizedBox(height: 12),

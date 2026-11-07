@@ -4,6 +4,7 @@ import '../../core/error/result.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../../core/api/api_client.dart';
+import '../../core/i18n/i18n.dart';
 
 class RatingScreen extends ConsumerStatefulWidget {
   const RatingScreen({
@@ -71,7 +72,7 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
       if (result case Success(:final data)) {
         final order = data['errand'] as Map<String, dynamic>? ?? data;
         if (order['rated'] == true || order['hasRated'] == true) {
-          _closeDone(message: 'Vous avez déjà noté cette commande.');
+          _closeDone(message: tr('Vous avez déjà noté cette commande.'));
           return;
         }
         setState(() {
@@ -90,7 +91,7 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
     if (!mounted) return;
     if (result case Success(:final data)) {
       if (data['rated'] == true || data['hasRated'] == true || data['passengerRated'] == true) {
-        _closeDone(message: 'Vous avez déjà noté cette course.');
+        _closeDone(message: tr('Vous avez déjà noté cette course.'));
         return;
       }
       setState(() {
@@ -144,22 +145,22 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
         _closeDone();
       case Failure(:final error):
         if (_isAlreadyRatedMessage(error.message)) {
-          _closeDone(message: 'Vous avez déjà noté.');
+          _closeDone(message: tr('Vous avez déjà noté.'));
           return;
         }
         setState(() => _error = error.message);
     }
   }
 
-  String get _title => widget.isErrand ? 'Noter le livreur' : 'Noter la course';
+  String get _title => widget.isErrand ? tr('Noter le livreur') : tr('Noter la course');
 
   String get _prompt {
     final label = widget.isErrand ? 'livraison' : 'course';
     final peer = _peerName ?? widget.peerLabel;
     if (peer != null) {
-      return 'Comment était votre $label avec $peer ?';
+      return trf('Comment était votre {label} avec {peer} ?', {'label': label, 'peer': peer});
     }
-    return widget.isErrand ? 'Comment était votre livreur ?' : 'Comment était votre course ?';
+    return widget.isErrand ? tr('Comment était votre livreur ?') : tr('Comment était votre course ?');
   }
 
   @override
@@ -187,9 +188,9 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
                 TextField(
                   controller: _commentController,
                   maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Commentaire (optionnel)',
-                    hintText: 'Partagez votre expérience…',
+                  decoration: InputDecoration(
+                    labelText: tr('Commentaire (optionnel)'),
+                    hintText: tr('Partagez votre expérience…'),
                     alignLabelWithHint: true,
                   ),
                 ),
@@ -199,7 +200,7 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
                 ],
                 const SizedBox(height: 24),
                 MovaButton(
-                  label: 'Envoyer',
+                  label: tr('Envoyer'),
                   isLoading: _loading,
                   onPressed: _submit,
                 ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../location/saved_places_store.dart';
 import '../theme/mova_colors.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Puces lieux nommés / récents GPS (sans Maison / Bureau).
 class SavedPlacesBar extends StatefulWidget {
@@ -49,7 +50,7 @@ class _SavedPlacesBarState extends State<SavedPlacesBar> {
                   size: 16,
                   color: MovaColors.violet,
                 ),
-                label: Text(place.name, overflow: TextOverflow.ellipsis),
+                label: Text(tr(place.name), overflow: TextOverflow.ellipsis),
                 onPressed: () => widget.onSelected(place),
               ),
             ),

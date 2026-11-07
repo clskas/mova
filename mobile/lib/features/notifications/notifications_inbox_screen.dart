@@ -133,9 +133,9 @@ class _NotificationsInboxScreenState extends ConsumerState<NotificationsInboxScr
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(title?.isNotEmpty == true ? title! : 'Notification SENGA'),
+        title: Text(title?.isNotEmpty == true ? title! : tr('Notification SENGA')),
         content: SingleChildScrollView(
-          child: Text(body?.isNotEmpty == true ? body! : 'Aucun détail supplémentaire.'),
+          child: Text(body?.isNotEmpty == true ? body! : tr('Aucun détail supplémentaire.')),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Fermer'))),

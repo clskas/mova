@@ -134,16 +134,16 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
 
   String _statusLabel(String? status) {
     final base = switch (status) {
-      'PENDING' => 'Commande confirmée',
-      'READY_FOR_PICKUP' => 'En attente du livreur',
-      'PICKED_UP' => 'Colis pris en charge',
-      'IN_TRANSIT' => 'Livreur en route',
-      'DELIVERED' => 'Livré',
+      'PENDING' => tr('Commande confirmée'),
+      'READY_FOR_PICKUP' => tr('En attente du livreur'),
+      'PICKED_UP' => tr('Colis pris en charge'),
+      'IN_TRANSIT' => tr('Livreur en route'),
+      'DELIVERED' => tr('Livré'),
       _ => status ?? '',
     };
-    if (deliveryIsPaid(_delivery)) return '$base · Payée';
-    if (deliveryCashPaymentPending(_delivery)) return '$base · Paiement espèces en attente';
-    if (deliveryPaymentDue(_delivery)) return '$base · Paiement en attente';
+    if (deliveryIsPaid(_delivery)) return trf('{base} · Payée', {'base': base});
+    if (deliveryCashPaymentPending(_delivery)) return trf('{base} · Paiement espèces en attente', {'base': base});
+    if (deliveryPaymentDue(_delivery)) return trf('{base} · Paiement en attente', {'base': base});
     return base;
   }
 
@@ -187,7 +187,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
         );
         await _load(silent: true);
       case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(error.message))));
     }
   }
 
@@ -345,15 +345,15 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                                   children: [
                                     Text(
                                       _delivery?['cashDisputed'] == true
-                                          ? 'Litige : espèces non reçues'
-                                          : 'Paiement espèces en attente',
+                                          ? tr('Litige : espèces non reçues')
+                                          : tr('Paiement espèces en attente'),
                                       style: const TextStyle(fontWeight: FontWeight.w600),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       _delivery?['cashDisputed'] == true
-                                          ? 'Le livreur signale ne pas avoir reçu les espèces. Déclarez le paiement ci-dessous, ou réglez autrement.'
-                                          : 'Remettez le montant au livreur et communiquez-lui ce code PIN :',
+                                          ? tr('Le livreur signale ne pas avoir reçu les espèces. Déclarez le paiement ci-dessous, ou réglez autrement.')
+                                          : tr('Remettez le montant au livreur et communiquez-lui ce code PIN :'),
                                       style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
                                     ),
                                     const SizedBox(height: 8),
@@ -406,11 +406,11 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                                     Expanded(
                                       child: Text(
                                         _delivery?['paymentMethod']?.toString().toUpperCase() == 'CASH'
-                                            ? 'Livraison payée (espèces confirmées)'
+                                            ? tr('Livraison payée (espèces confirmées)')
                                             : (_delivery?['guaranteed'] == true &&
                                                     _delivery?['status']?.toString() != 'DELIVERED')
-                                                ? 'Montant sécurisé. Donnez le PIN uniquement au livreur à la réception.'
-                                                : 'Livraison payée',
+                                                ? tr('Montant sécurisé. Donnez le PIN uniquement au livreur à la réception.')
+                                                : tr('Livraison payée'),
                                         style: const TextStyle(fontWeight: FontWeight.w600),
                                       ),
                                     ),
@@ -455,7 +455,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Colis #${widget.parcelId.length > 8 ? widget.parcelId.substring(0, 8) : widget.parcelId}',
+                                    trf('Colis #{v1}', {'v1': widget.parcelId.length > 8 ? widget.parcelId.substring(0, 8) : widget.parcelId}),
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
@@ -533,7 +533,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                               builder: (context, unread, _) {
                                 final n = unread[ChatAlertService.threadKey('delivery', widget.parcelId)] ?? 0;
                                 return MovaButton(
-                                  label: n > 0 ? 'Contacter le livreur ($n)' : 'Contacter le livreur',
+                                  label: n > 0 ? trf('Contacter le livreur ({n})', {'n': n}) : 'Contacter le livreur',
                                   isSecondary: true,
                                   icon: Icons.chat_bubble_outline,
                                   onPressed: () {
@@ -564,7 +564,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                           if (_canCancel) const SizedBox(height: 8),
                           if (_paymentDue) ...[
                             MovaButton(
-                              label: _cashSettlementDue ? 'Payer en espèces' : 'Payer la livraison',
+                              label: _cashSettlementDue ? tr('Payer en espèces') : tr('Payer la livraison'),
                               icon: Icons.payment_outlined,
                               onPressed: _openPayment,
                             ),

@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../../core/navigation/mova_navigator.dart';
 import 'sos_alert_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Routage des taps notifications (SOS, offres course/livraison, appels).
 class NotificationTapRouter {
@@ -146,7 +147,7 @@ class NotificationTapRouter {
   static SosOpenRequest? parseSosPayload(String payload) {
     final trimmed = payload.trim();
     if (trimmed == 'SOS' || trimmed.toLowerCase() == 'sos') {
-      return const SosOpenRequest(title: 'Alerte SOS');
+      return SosOpenRequest(title: tr('Alerte SOS'));
     }
     String jsonStr = trimmed;
     if (trimmed.startsWith('sos:')) {
@@ -172,7 +173,7 @@ class NotificationTapRouter {
       );
     } catch (e) {
       if (kDebugMode) debugPrint('NotificationTapRouter parse SOS: $e');
-      return const SosOpenRequest(title: 'Alerte SOS');
+      return SosOpenRequest(title: tr('Alerte SOS'));
     }
   }
 

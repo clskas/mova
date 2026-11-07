@@ -174,12 +174,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final dist = (km != null && km > 0) ? ' · ${km.toStringAsFixed(1)} km' : '';
     return switch (_status.toUpperCase()) {
       'IN_PROGRESS' => _isRoundTripReturn
-          ? 'Retour au départ : ~$_etaMinutes min$dist'
+          ? trf('Retour au départ : ~{_etaMinutes} min{dist}', {'_etaMinutes': _etaMinutes, 'dist': dist})
           : (_isRoundTrip
-              ? 'Arrivée (aller) : ~$_etaMinutes min$dist'
+              ? trf('Arrivée (aller) : ~{_etaMinutes} min{dist}', {'_etaMinutes': _etaMinutes, 'dist': dist})
               : 'Arrivée à destination : ~$_etaMinutes min$dist'),
-      'DRIVER_ARRIVED' => 'Votre chauffeur est arrivé',
-      _ => 'Chauffeur à ~$_etaMinutes min$dist',
+      'DRIVER_ARRIVED' => tr('Votre chauffeur est arrivé'),
+      _ => trf('Chauffeur à ~{_etaMinutes} min{dist}', {'_etaMinutes': _etaMinutes, 'dist': dist}),
     };
   }
 
@@ -511,14 +511,14 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         if (!wasPaid) {
           final isCash = method?.toUpperCase() == 'CASH';
           final msg = isCash
-              ? 'Paiement espèces confirmé par le chauffeur'
-              : 'Paiement confirmé';
+              ? tr('Paiement espèces confirmé par le chauffeur')
+              : tr('Paiement confirmé');
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
           unawaited(
             PassengerAlertService.notify(
-              title: isCash ? 'Paiement espèces confirmé' : 'Paiement confirmé',
+              title: isCash ? tr('Paiement espèces confirmé') : tr('Paiement confirmé'),
               body: isCash
-                  ? 'Le chauffeur a validé votre paiement. Merci de noter la course.'
+                  ? tr('Le chauffeur a validé votre paiement. Merci de noter la course.')
                   : msg,
             ),
           );
@@ -754,7 +754,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
           SnackBar(content: Text(tr('Alerte SOS envoyée — l\'équipe SENGA a été notifiée'))),
         );
       case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(error.message))));
     }
   }
 
@@ -794,7 +794,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         );
         Navigator.pop(context);
       case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(error.message))));
     }
   }
 
@@ -1006,8 +1006,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                       child: Text(
                                         _ride?['roundTripLabel']?.toString() ??
                                             (_isRoundTripReturn
-                                                ? 'Aller-retour · Retour'
-                                                : 'Aller-retour · Aller'),
+                                                ? tr('Aller-retour · Retour')
+                                                : tr('Aller-retour · Aller')),
                                         textAlign: TextAlign.center,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w700,
@@ -1049,8 +1049,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                               ServicePriceDisplay.passengerCard(
                                 _ride!,
                                 totalLabel: _status.toUpperCase() == 'COMPLETED'
-                                    ? 'Total course'
-                                    : 'Tarif estimé',
+                                    ? tr('Total course')
+                                    : tr('Tarif estimé'),
                               ),
                             ],
                             const SizedBox(height: 16),
@@ -1145,8 +1145,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                     Expanded(
                                       child: Text(
                                         _cashDisputed
-                                            ? 'Litige : le chauffeur signale ne pas avoir reçu les espèces. Déclarez le paiement ou réglez autrement.'
-                                            : 'Paiement espèces en attente — remettez l\'argent au chauffeur ; il confirmera « Cash reçu ».',
+                                            ? tr('Litige : le chauffeur signale ne pas avoir reçu les espèces. Déclarez le paiement ou réglez autrement.')
+                                            : tr('Paiement espèces en attente — remettez l\'argent au chauffeur ; il confirmera « Cash reçu ».'),
                                         style: const TextStyle(
                                           color: MovaColors.orange,
                                           fontWeight: FontWeight.w600,

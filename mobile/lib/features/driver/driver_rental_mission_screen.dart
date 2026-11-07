@@ -194,7 +194,7 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
                   Text(vehicleName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                   if (period != null) ...[
                     const SizedBox(height: 8),
-                    Text('Période : $period'),
+                    Text(trf('Période : {period}', {'period': period})),
                   ],
                   const SizedBox(height: 8),
                   Text(tr('Lieu'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
@@ -208,11 +208,11 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
                   ),
                   if (returnCity != null && returnCity.isNotEmpty && returnCity != pickup) ...[
                     const SizedBox(height: 4),
-                    Text('Retour : $returnCity', style: const TextStyle(fontSize: 13)),
+                    Text(trf('Retour : {returnCity}', {'returnCity': returnCity}), style: const TextStyle(fontSize: 13)),
                   ],
                   if (logistics != null) ...[
                     const SizedBox(height: 8),
-                    Text('Logistique : $logistics', style: const TextStyle(fontSize: 13)),
+                    Text(trf('Logistique : {logistics}', {'logistics': logistics}), style: const TextStyle(fontSize: 13)),
                   ],
                   if (contactPhone != null && contactPhone.isNotEmpty) ...[
                     const SizedBox(height: 12),
@@ -292,11 +292,11 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
 
   String _statusLabel(String status) {
     return switch (status.toUpperCase()) {
-      'PENDING' => 'En attente',
-      'CONTACTED' => 'Prise en charge propriétaire',
-      'CONFIRMED' => 'Confirmée — prêt pour la remise',
-      'IN_PROGRESS' => 'Location en cours',
-      'RETURNED' => 'Terminée',
+      'PENDING' => tr('En attente'),
+      'CONTACTED' => tr('Prise en charge propriétaire'),
+      'CONFIRMED' => tr('Confirmée — prêt pour la remise'),
+      'IN_PROGRESS' => tr('Location en cours'),
+      'RETURNED' => tr('Terminée'),
       _ => status,
     };
   }

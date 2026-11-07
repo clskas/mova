@@ -64,8 +64,8 @@ class _DriverNotificationSettingsScreenState
       await DriverJobAlertService.notify(
         title: tr('Test SENGA Driver'),
         body: _style == DriverAlertSoundStyle.senga
-            ? 'Son SENGA des missions'
-            : 'Son système du téléphone',
+            ? tr('Son SENGA des missions')
+            : tr('Son système du téléphone'),
       );
     } finally {
       if (mounted) setState(() => _testing = false);
@@ -93,7 +93,7 @@ class _DriverNotificationSettingsScreenState
                     color: MovaColors.violet,
                   ),
                   title: Text(tr('Son des alertes'), style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(_muted ? 'Coupé (vibration seule)' : 'Activé'),
+                  subtitle: Text(_muted ? tr('Coupé (vibration seule)') : tr('Activé')),
                   value: !_muted,
                   onChanged: (on) => _setMuted(!on),
                 ),
@@ -140,7 +140,7 @@ class _DriverNotificationSettingsScreenState
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.volume_up_outlined),
-                  label: Text(_testing ? 'Test…' : 'Tester le son'),
+                  label: Text(_testing ? tr('Test…') : tr('Tester le son')),
                 ),
                 const SizedBox(height: 12),
                 Text(

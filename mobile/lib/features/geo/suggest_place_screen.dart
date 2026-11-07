@@ -12,6 +12,7 @@ import '../../core/location/service_areas.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/i18n/i18n.dart';
 
 const _categories = [
   ('MARKET', 'Marché'),
@@ -203,9 +204,9 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
   }
 
   String _statusLabel(String? status) => switch (status) {
-        'PENDING' => 'En attente',
-        'APPROVED' => 'Publié',
-        'REJECTED' => 'Refusé',
+        'PENDING' => tr('En attente'),
+        'APPROVED' => tr('Publié'),
+        'REJECTED' => tr('Refusé'),
         _ => status ?? '—',
       };
 
@@ -218,14 +219,14 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Nommer ce lieu',
+      title: tr('Nommer ce lieu'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Donnez un nom local (chez Mama X, carrefour…) — il est publié tout de suite dans SENGA. '
+          Text(
+            tr('Donnez un nom local (chez Mama X, carrefour…) — il est publié tout de suite dans SENGA. '
             'Pour un hôpital, un hôtel ou un grand marché, choisissez la catégorie : validation SENGA, '
-            'Mapbox/OSM restent la référence officielle.',
+            'Mapbox/OSM restent la référence officielle.'),
             style: TextStyle(color: MovaColors.textSecondary, fontSize: 14),
           ),
           const SizedBox(height: 16),
@@ -235,17 +236,17 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
           ],
           TextField(
             controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'Nom du lieu',
-              hintText: 'Ex. Chez Mama X, carrefour Victoire',
+            decoration: InputDecoration(
+              labelText: tr('Nom du lieu'),
+              hintText: tr('Ex. Chez Mama X, carrefour Victoire'),
               border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             value: _category,
-            decoration: const InputDecoration(
-              labelText: 'Catégorie',
+            decoration: InputDecoration(
+              labelText: tr('Catégorie'),
               border: OutlineInputBorder(),
             ),
             items: _categories
@@ -258,12 +259,12 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             value: _city,
-            decoration: const InputDecoration(
-              labelText: 'Ville',
+            decoration: InputDecoration(
+              labelText: tr('Ville'),
               border: OutlineInputBorder(),
             ),
             items: ServiceAreas.all
-                .map((a) => DropdownMenuItem(value: a.name, child: Text(a.name)))
+                .map((a) => DropdownMenuItem(value: a.name, child: Text(tr(a.name))))
                 .toList(),
             onChanged: (v) {
               if (v != null) setState(() => _city = v);
@@ -272,25 +273,25 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
           const SizedBox(height: 12),
           TextField(
             controller: _addressController,
-            decoration: const InputDecoration(
-              labelText: 'Adresse (optionnel)',
-              hintText: 'Rue, quartier…',
+            decoration: InputDecoration(
+              labelText: tr('Adresse (optionnel)'),
+              hintText: tr('Rue, quartier…'),
               border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _notesController,
-            decoration: const InputDecoration(
-              labelText: 'Précisions (optionnel)',
-              hintText: 'Horaires, repère visuel…',
+            decoration: InputDecoration(
+              labelText: tr('Précisions (optionnel)'),
+              hintText: tr('Horaires, repère visuel…'),
               border: OutlineInputBorder(),
             ),
             maxLines: 2,
           ),
           const SizedBox(height: 12),
           MovaButton(
-            label: _coords == null ? 'Utiliser ma position GPS' : 'Mettre à jour la position GPS',
+            label: _coords == null ? tr('Utiliser ma position GPS') : tr('Mettre à jour la position GPS'),
             icon: Icons.my_location,
             isSecondary: true,
             isLoading: _loadingGps,
@@ -299,21 +300,21 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
           if (_coords != null) ...[
             const SizedBox(height: 8),
             Text(
-              'Position : ${_coords!.latitude.toStringAsFixed(5)}, ${_coords!.longitude.toStringAsFixed(5)}',
+              trf('Position : {v1}, {v2}', {'v1': _coords!.latitude.toStringAsFixed(5), 'v2': _coords!.longitude.toStringAsFixed(5)}),
               style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
             ),
           ],
           const SizedBox(height: 16),
           MovaButton(
-            label: _category == 'OTHER' ? 'Enregistrer le lieu' : 'Envoyer la suggestion',
+            label: _category == 'OTHER' ? tr('Enregistrer le lieu') : tr('Envoyer la suggestion'),
             icon: Icons.place_outlined,
             isLoading: _submitting,
             onPressed: _submitting ? null : _submit,
           ),
           if (_mine.isNotEmpty) ...[
             const SizedBox(height: 24),
-            const Text(
-              'Mes suggestions',
+            Text(
+              tr('Mes suggestions'),
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
             ),
             const SizedBox(height: 8),

@@ -63,7 +63,7 @@ class MovingScreen extends ConsumerStatefulWidget {
 class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  final _fromController = TextEditingController(text: 'Ma position');
+  final _fromController = TextEditingController(text: tr('Ma position'));
   final _toController = TextEditingController();
   final _itemController = TextEditingController();
   final _promoController = TextEditingController();
@@ -197,7 +197,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       _loadingGps = false;
       _pickup = ServiceAreaLocation.ensureInServiceArea(result.position, address: result.label);
       _fromController.text =
-          ServiceAreaLocation.isInBounds(result.position) ? result.label : 'Ma position';
+          ServiceAreaLocation.isInBounds(result.position) ? result.label : tr('Ma position');
       _pickupFromSuggestion = false;
       _pickupFromGps = true;
       _estimatedPrice = null;
@@ -385,7 +385,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
         }
       case Failure(:final error):
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Photo non envoyée : ${error.message}')),
+          SnackBar(content: Text(trf('Photo non envoyée : {message}', {'message': error.message}))),
         );
     }
   }
@@ -452,9 +452,9 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
   }
 
   String? _validate() {
-    if (_fromController.text.trim().isEmpty) return 'Indiquez l\'adresse de départ.';
-    if (_toController.text.trim().length < 3) return 'Indiquez l\'adresse d\'arrivée.';
-    if (_items.isEmpty) return 'Listez au moins un meuble ou carton.';
+    if (_fromController.text.trim().isEmpty) return tr('Indiquez l\'adresse de départ.');
+    if (_toController.text.trim().length < 3) return tr('Indiquez l\'adresse d\'arrivée.');
+    if (_items.isEmpty) return tr('Listez au moins un meuble ou carton.');
     return null;
   }
 
@@ -577,7 +577,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                   proximityLat: _pickup.latitude,
                   proximityLng: _pickup.longitude,
                   label: tr('Adresse de départ'),
-                  hint: 'Ma position ou nom du lieu',
+                  hint: tr('Ma position ou nom du lieu'),
                   prefixIcon: Icons.home_outlined,
                   onUserInput: _onPickupUserInput,
                   onSelected: _onPickupSuggestionSelected,
@@ -600,7 +600,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             proximityLat: _pickup.latitude,
             proximityLng: _pickup.longitude,
             label: tr('Adresse d\'arrivée'),
-            hint: 'Rechercher une commune, quartier…',
+            hint: tr('Rechercher une commune, quartier…'),
             prefixIcon: Icons.place_outlined,
             textInputAction: TextInputAction.done,
             onUserInput: _onDropoffUserInput,
@@ -624,7 +624,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           if (_volume == 'APARTMENT' || _volume == 'HOUSE') ...[
             const SizedBox(height: 8),
             Text(
-              _volume == 'HOUSE' ? 'Nombre de pièces (maison)' : 'Nombre de pièces (hors cuisine/SDB)',
+              _volume == 'HOUSE' ? tr('Nombre de pièces (maison)') : tr('Nombre de pièces (hors cuisine/SDB)'),
               style: theme.textTheme.titleSmall,
             ),
             Slider(
@@ -661,7 +661,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             ),
           ],
           Text(
-            'Volume estimé : ${_volumeM3()} m³',
+            trf('Volume estimé : {v1} m³', {'v1': _volumeM3()}),
             style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -706,7 +706,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           Row(
             children: [
               Expanded(
-                child: Text('Photos inventaire (${_photos.length})', style: theme.textTheme.titleSmall),
+                child: Text(trf('Photos inventaire ({length})', {'length': _photos.length}), style: theme.textTheme.titleSmall),
               ),
               TextButton.icon(
                 onPressed: _uploadingPhoto ? null : _addPhoto,
@@ -799,7 +799,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             if (_distanceKm != null) ...[
               const SizedBox(height: 8),
               Text(
-                'Distance : ${_distanceKm!.toStringAsFixed(1)} km — volume ${_volumeM3()} m³',
+                trf('Distance : {v1} km — volume {v2} m³', {'v1': _distanceKm!.toStringAsFixed(1), 'v2': _volumeM3()}),
                 style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textSecondary),
               ),
             ],
@@ -821,7 +821,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           ],
           const SizedBox(height: 24),
           MovaButton(
-            label: _estimatedPrice == null ? 'Estimer le déménagement' : 'Demander un devis',
+            label: _estimatedPrice == null ? tr('Estimer le déménagement') : tr('Demander un devis'),
             isLoading: _loading,
             icon: _estimatedPrice == null ? Icons.calculate_outlined : Icons.local_shipping_outlined,
             onPressed: _loading ? null : (_estimatedPrice == null ? _estimate : _request),
@@ -916,7 +916,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             controller: _tabController,
             labelColor: MovaColors.violet,
             tabs: [
-              const Tab(text: 'Nouvelle demande'),
+              Tab(text: tr('Nouvelle demande')),
               Tab(text: 'Mes demandes${_myRequests.isNotEmpty ? ' (${_myRequests.length})' : ''}'),
             ],
           ),

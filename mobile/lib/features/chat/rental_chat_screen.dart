@@ -9,6 +9,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import 'chat_receipt.dart';
 import 'ride_chat_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 class RentalChatScreen extends ConsumerStatefulWidget {
   const RentalChatScreen({
@@ -113,7 +114,7 @@ class _RentalChatScreenState extends ConsumerState<RentalChatScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Chat · ${widget.peerLabel}',
+      title: trf('Chat · {peerLabel}', {'peerLabel': widget.peerLabel}),
       scrollable: false,
       child: Column(
         children: [
@@ -148,7 +149,7 @@ class _RentalChatScreenState extends ConsumerState<RentalChatScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    decoration: const InputDecoration(hintText: 'Votre message…', isDense: true),
+                    decoration: InputDecoration(hintText: tr('Votre message…'), isDense: true),
                     onSubmitted: (_) => _send(),
                   ),
                 ),

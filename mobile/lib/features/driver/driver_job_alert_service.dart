@@ -10,6 +10,7 @@ import '../../core/geo/geo_utils.dart';
 import '../sos/notification_tap_router.dart';
 import 'driver_alert_prefs.dart';
 import 'native_job_wake.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Événement FCM / socket : offre prise ou annulée — fermer UI + sonnerie immédiatement.
 class DriverJobStopEvent {
@@ -413,18 +414,18 @@ class DriverJobAlertService {
   static String offerKey(String kind, String id) => '$kind:$id';
 
   static String messageForMissions(List<Map<String, dynamic>> missions) {
-    if (missions.isEmpty) return 'Nouvelle mission assignée';
-    if (missions.length > 1) return '${missions.length} nouvelles missions assignées';
+    if (missions.isEmpty) return tr('Nouvelle mission assignée');
+    if (missions.length > 1) return trf('{length} nouvelles missions assignées', {'length': missions.length});
     final m = missions.first;
     final label = m['label']?.toString() ??
         switch (m['type']?.toString()) {
-          'RENTAL' => 'Location véhicule',
-          'MOVING' => 'Déménagement',
-          'SCHEDULED' => 'Course planifiée',
-          'ERRAND' => 'Courses & commissions',
-          _ => 'Mission',
+          'RENTAL' => tr('Location véhicule'),
+          'MOVING' => tr('Déménagement'),
+          'SCHEDULED' => tr('Course planifiée'),
+          'ERRAND' => tr('Courses & commissions'),
+          _ => tr('Mission'),
         };
-    return 'Nouvelle mission : $label';
+    return trf('Nouvelle mission : {label}', {'label': label});
   }
 
   static String rideOfferMessage(Map<String, dynamic> offer) {
@@ -432,8 +433,8 @@ class DriverJobAlertService {
     final driverNet = DriverEarningsDisplay.netFromMap(offer);
     final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
     final dist = pickupKm != null ? ' · ${GeoUtils.formatDistanceKm(pickupKm)}' : '';
-    if (driverNet != null) return 'Course · $pickup$dist · ${MarketConfig.formatCdf(driverNet)}';
-    return 'Nouvelle course disponible · $pickup$dist';
+    if (driverNet != null) return trf('Course · {pickup}{dist} · {v1}', {'pickup': pickup, 'dist': dist, 'v1': MarketConfig.formatCdf(driverNet)});
+    return trf('Nouvelle course disponible · {pickup}{dist}', {'pickup': pickup, 'dist': dist});
   }
 
   static String deliveryOfferMessage(Map<String, dynamic> offer) {

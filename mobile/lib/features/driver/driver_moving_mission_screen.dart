@@ -229,7 +229,7 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
                   Text(dropoff, style: const TextStyle(fontWeight: FontWeight.w600)),
                   if (volume != null) ...[
                     const SizedBox(height: 8),
-                    Text('Volume : $volume m³'),
+                    Text(trf('Volume : {volume} m³', {'volume': volume})),
                   ],
                 ],
               ),
@@ -268,7 +268,7 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
             const SizedBox(height: 12),
             if (_status == 'ASSIGNED' || _status == 'IN_PROGRESS') ...[
               MovaButton(
-                label: _status == 'ASSIGNED' ? 'Itinéraire départ' : 'Itinéraire arrivée',
+                label: _status == 'ASSIGNED' ? tr('Itinéraire départ') : tr('Itinéraire arrivée'),
                 icon: Icons.map,
                 onPressed: _saving ? null : () => _openMaps(toPickup: _status == 'ASSIGNED'),
               ),
@@ -309,9 +309,9 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
 
   String _statusLabel(String status) {
     return switch (status.toUpperCase()) {
-      'ASSIGNED' => 'Assigné — prêt à démarrer',
-      'IN_PROGRESS' => 'Déménagement en cours',
-      'COMPLETED' => 'Terminé',
+      'ASSIGNED' => tr('Assigné — prêt à démarrer'),
+      'IN_PROGRESS' => tr('Déménagement en cours'),
+      'COMPLETED' => tr('Terminé'),
       _ => status,
     };
   }

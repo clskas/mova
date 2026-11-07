@@ -281,7 +281,7 @@ class _RideChatScreenState extends ConsumerState<RideChatScreen> {
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Chat — ${widget.peerLabel}',
+      title: trf('Chat — {peerLabel}', {'peerLabel': widget.peerLabel}),
       scrollable: false,
       actions: [
         IconButton(

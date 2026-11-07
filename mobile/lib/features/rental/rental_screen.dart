@@ -293,7 +293,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
     final selected = _compareIds.contains(id);
     final imageUrl = MarketConfig.resolveMediaUrl(v['imageUrl']?.toString() ?? '');
     final isAvailable = v['isAvailable'] != false;
-    final availabilityLabel = v['availabilityLabel']?.toString() ?? (isAvailable ? 'Disponible' : 'En location');
+    final availabilityLabel = v['availabilityLabel']?.toString() ?? (isAvailable ? tr('Disponible') : tr('En location'));
     final availabilityColor = isAvailable ? MovaColors.green : MovaColors.orange;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -388,7 +388,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
               child: TextButton.icon(
                 onPressed: () => _toggleCompare(id),
                 icon: Icon(selected ? Icons.check_box : Icons.check_box_outline_blank, color: MovaColors.violet, size: 20),
-                label: Text(selected ? 'Retirer' : 'Comparer', style: const TextStyle(fontSize: 12)),
+                label: Text(selected ? tr('Retirer') : tr('Comparer'), style: const TextStyle(fontSize: 12)),
               ),
             ),
           ],
@@ -658,7 +658,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                     decoration: InputDecoration(labelText: tr('Transmission'), isDense: true),
                     items: [
                       DropdownMenuItem(value: 'AUTO', child: Text(tr('Automatique'))),
-                      DropdownMenuItem(value: 'MANUAL', child: Text('Manuelle')),
+                      DropdownMenuItem(value: 'MANUAL', child: Text(tr('Manuelle'))),
                     ],
                     onChanged: (v) {
                       setState(() => _transmission = v ?? '');
@@ -673,9 +673,9 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                     decoration: InputDecoration(labelText: tr('Tri'), isDense: true),
                     items: [
                       DropdownMenuItem(value: 'price_asc', child: Text(tr('Prix ↑'))),
-                      DropdownMenuItem(value: 'price_desc', child: Text('Prix ↓')),
-                      DropdownMenuItem(value: 'rating', child: Text('Note')),
-                      DropdownMenuItem(value: 'category', child: Text('Catégorie')),
+                      DropdownMenuItem(value: 'price_desc', child: Text(tr('Prix ↓'))),
+                      DropdownMenuItem(value: 'rating', child: Text(tr('Note'))),
+                      DropdownMenuItem(value: 'category', child: Text(tr('Catégorie'))),
                     ],
                     onChanged: (v) {
                       setState(() => _sortBy = v ?? 'price_asc');
@@ -694,7 +694,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                       decoration: InputDecoration(labelText: tr('Transmission'), isDense: true),
                       items: [
                         DropdownMenuItem(value: 'AUTO', child: Text(tr('Automatique'))),
-                        DropdownMenuItem(value: 'MANUAL', child: Text('Manuelle')),
+                        DropdownMenuItem(value: 'MANUAL', child: Text(tr('Manuelle'))),
                       ],
                       onChanged: (v) {
                       setState(() => _transmission = v ?? '');
@@ -707,9 +707,9 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                       decoration: InputDecoration(labelText: tr('Tri'), isDense: true),
                       items: [
                         DropdownMenuItem(value: 'price_asc', child: Text(tr('Prix ↑'))),
-                        DropdownMenuItem(value: 'price_desc', child: Text('Prix ↓')),
-                        DropdownMenuItem(value: 'rating', child: Text('Note')),
-                        DropdownMenuItem(value: 'category', child: Text('Catégorie')),
+                        DropdownMenuItem(value: 'price_desc', child: Text(tr('Prix ↓'))),
+                        DropdownMenuItem(value: 'rating', child: Text(tr('Note'))),
+                        DropdownMenuItem(value: 'category', child: Text(tr('Catégorie'))),
                       ],
                       onChanged: (v) {
                       setState(() => _sortBy = v ?? 'price_asc');
@@ -733,7 +733,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: MovaButton(
-                label: 'Comparer (${_compareIds.length})',
+                label: trf('Comparer ({length})', {'length': _compareIds.length}),
                 isSecondary: true,
                 onPressed: () => setState(() => _step = _RentalStep.compare),
               ),
@@ -765,8 +765,8 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                   const SizedBox(height: 12),
                   Text(
                     _error != null
-                        ? 'Impossible de charger le catalogue.\nVérifiez votre connexion réseau.'
-                        : 'Aucun véhicule pour ces critères.\nÉlargissez les filtres ou changez de ville.',
+                        ? tr('Impossible de charger le catalogue.\nVérifiez votre connexion réseau.')
+                        : tr('Aucun véhicule pour ces critères.\nÉlargissez les filtres ou changez de ville.'),
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: MovaColors.textSecondary),
                   ),
@@ -926,8 +926,8 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
           TabBar(
             controller: _tabController,
             labelColor: MovaColors.violet,
-            tabs: const [
-              Tab(text: 'Rechercher'),
+            tabs: [
+              Tab(text: tr('Rechercher')),
               Tab(text: 'Mes locations'),
             ],
           ),

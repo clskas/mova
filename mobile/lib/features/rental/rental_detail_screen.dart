@@ -53,7 +53,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
   String _logisticsMode = 'SELF_PASSENGER';
   final _passengerDriverNameController = TextEditingController();
   final _passengerDriverPhoneController = TextEditingController();
-  final _pickupController = TextEditingController(text: 'Gombe, Kinshasa');
+  final _pickupController = TextEditingController(text: tr('Gombe, Kinshasa'));
   final _phoneController = TextEditingController(text: '+243812345678');
   final _notesController = TextEditingController();
   final _promoController = TextEditingController();
@@ -348,7 +348,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
   }
 
   String _optionPriceLabel(int amount, {bool included = false}) {
-    if (included || amount <= 0) return 'Inclus';
+    if (included || amount <= 0) return tr('Inclus');
     return '+${MarketConfig.formatCdf(amount)}';
   }
 
@@ -359,7 +359,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
         children: [
           Text(
             estimate.hourlyMode
-                ? 'Location (${estimate.hours} h)'
+                ? trf('Location ({hours} h)', {'hours': estimate.hours})
                 : 'Location (${estimate.days} j)',
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
@@ -452,9 +452,9 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
 
   String _insuranceTierLabel(String tier) {
     return switch (tier) {
-      'STANDARD' => 'Standard',
-      'PREMIUM' => 'Premium',
-      _ => 'Basique',
+      'STANDARD' => tr('Standard'),
+      'PREMIUM' => tr('Premium'),
+      _ => tr('Basique'),
     };
   }
 
@@ -640,7 +640,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
-                  'Majoration inter-villes : +${MarketConfig.formatCdf(preview.interCityFeeCdf)}',
+                  trf('Majoration inter-villes : +{v1}', {'v1': MarketConfig.formatCdf(preview.interCityFeeCdf)}),
                   style: const TextStyle(fontSize: 12, color: MovaColors.green, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -670,7 +670,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                   if (_weeklyEligible)
                     ButtonSegment(
                       value: 'WEEKLY',
-                      label: Text('Semaine (-${RentalQuoteEstimator.weeklyDiscountPct} %)'),
+                      label: Text(trf('Semaine (-{weeklyDiscountPct} %)', {'weeklyDiscountPct': RentalQuoteEstimator.weeklyDiscountPct})),
                     ),
                 ],
                 selected: {_rentalPeriod},
@@ -716,12 +716,12 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 segments: [
                   ButtonSegment(
                     value: 'LIMITED',
-                    label: Text('Limité (${RentalQuoteEstimator.limitedMileageKmPerDay} km/j)'),
+                    label: Text(trf('Limité ({limitedMileageKmPerDay} km/j)', {'limitedMileageKmPerDay': RentalQuoteEstimator.limitedMileageKmPerDay})),
                   ),
                   ButtonSegment(
                     value: 'UNLIMITED',
                     label: Text(
-                      'Illimité (+${MarketConfig.formatCdf(preview?.unlimitedMileageSurchargeCdf ?? RentalQuoteEstimator.unlimitedMileageSurchargeCdf)})',
+                      trf('Illimité (+{v1})', {'v1': MarketConfig.formatCdf(preview?.unlimitedMileageSurchargeCdf ?? RentalQuoteEstimator.unlimitedMileageSurchargeCdf)}),
                     ),
                   ),
                 ],
@@ -744,7 +744,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  '+${MarketConfig.formatCdf(preview!.mileageFeeCdf)} · kilométrage sans plafond',
+                  trf('+{v1} · kilométrage sans plafond', {'v1': MarketConfig.formatCdf(preview!.mileageFeeCdf)}),
                   style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.green, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -899,7 +899,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             ],
             const SizedBox(height: 16),
             MovaButton(
-              label: _step == 2 ? 'Réserver maintenant' : 'Obtenir le devis',
+              label: _step == 2 ? tr('Réserver maintenant') : tr('Obtenir le devis'),
               isLoading: _submitting,
               icon: _step == 2 ? Icons.check_circle_outline : Icons.receipt_long_outlined,
               onPressed: _submitting ? null : (_step == 2 ? _confirm : _fetchQuote),

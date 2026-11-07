@@ -5,6 +5,7 @@ import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
 import '../../core/theme/mova_colors.dart';
 import '../location/location_permission.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Resolve GPS for SOS (high accuracy, then optional fallback).
 Future<({double? lat, double? lng})> resolveSosPosition({
@@ -51,16 +52,16 @@ Future<void> triggerSosAlert(
   final confirm = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Alerte SOS'),
-      content: const Text(
-        'SENGA transmettra votre position à l\'équipe support. '
-        'En cas de danger immédiat, appelez aussi les secours locaux.',
+      title: Text(tr('Alerte SOS')),
+      content: Text(
+        tr('SENGA transmettra votre position à l\'équipe support. '
+        'En cas de danger immédiat, appelez aussi les secours locaux.'),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
         TextButton(
           onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Envoyer SOS', style: TextStyle(color: MovaColors.red)),
+          child: Text(tr('Envoyer SOS'), style: TextStyle(color: MovaColors.red)),
         ),
       ],
     ),
@@ -86,10 +87,10 @@ Future<void> triggerSosAlert(
   switch (result) {
     case Success():
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Alerte SOS envoyée — l\'équipe SENGA a été notifiée')),
+        SnackBar(content: Text(tr('Alerte SOS envoyée — l\'équipe SENGA a été notifiée'))),
       );
     case Failure(:final error):
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(error.message))));
   }
 }
 

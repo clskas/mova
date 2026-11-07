@@ -1,3 +1,5 @@
+import '../../core/i18n/i18n.dart';
+
 /// Fusionne les champs paiement renvoyés à la racine de l'API livraison.
 Map<String, dynamic> mergeDeliveryApiPayload(Map<String, dynamic> data) {
   final delivery = data['delivery'] as Map<String, dynamic>? ??
@@ -66,7 +68,7 @@ bool deliveryPaymentDue(Map<String, dynamic>? delivery) =>
 String paymentConfirmedMessage({String? method, bool isDelivery = true}) {
   final actor = isDelivery ? 'livreur' : 'chauffeur';
   if (method?.toUpperCase() == 'CASH') {
-    return 'Paiement espèces confirmé par le $actor';
+    return trf('Paiement espèces confirmé par le {actor}', {'actor': actor});
   }
-  return 'Paiement confirmé';
+  return tr('Paiement confirmé');
 }

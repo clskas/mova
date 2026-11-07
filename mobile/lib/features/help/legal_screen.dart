@@ -8,6 +8,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../../core/config/market_config.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 class LegalScreen extends StatelessWidget {
   const LegalScreen({
@@ -52,9 +53,9 @@ class LegalScreen extends StatelessWidget {
         future: _load(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const Center(
+            return Center(
               child: Text(
-                'Document indisponible. Réessayez plus tard.',
+                tr('Document indisponible. Réessayez plus tard.'),
                 style: TextStyle(color: MovaColors.textSecondary),
               ),
             );

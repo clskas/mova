@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Raison de l'état hors ligne (réseau vs passerelle).
 enum OfflineReason {
@@ -23,9 +24,9 @@ class OfflineState {
 
   String get bannerMessage => switch (reason) {
         OfflineReason.online => '',
-        OfflineReason.noNetwork => 'Pas de réseau',
+        OfflineReason.noNetwork => tr('Pas de réseau'),
         OfflineReason.serverUnavailable =>
-          'Serveur indisponible — mode hors ligne',
+          tr('Serveur indisponible — mode hors ligne'),
       };
 }
 

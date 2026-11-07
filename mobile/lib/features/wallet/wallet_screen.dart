@@ -431,7 +431,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    'Recharge de ${MarketConfig.formatCdf(amountCdf)} confirmée',
+                    trf('Recharge de {v1} confirmée', {'v1': MarketConfig.formatCdf(amountCdf)}),
                   ),
                 ),
               );
@@ -503,7 +503,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 ],
                 const SizedBox(height: 16),
                 MovaButton(
-                  label: _withdrawLoading ? 'Retrait…' : 'Retirer vers Mobile Money',
+                  label: _withdrawLoading ? tr('Retrait…') : tr('Retirer vers Mobile Money'),
                   icon: Icons.arrow_upward,
                   isSecondary: true,
                   isLoading: _withdrawLoading,
@@ -632,7 +632,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          p.name,
+                          tr(p.name),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -661,19 +661,19 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
             child: Row(
               children: [
                 ChoiceChip(
-                  label: Text('Tout (${_transactions.length})'),
+                  label: Text(trf('Tout ({length})', {'length': _transactions.length})),
                   selected: _txFilter == _WalletTxFilter.all,
                   onSelected: (_) => setState(() => _txFilter = _WalletTxFilter.all),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
-                  label: Text('Recharges ($_rechargeCount)'),
+                  label: Text(trf('Recharges ({_rechargeCount})', {'_rechargeCount': _rechargeCount})),
                   selected: _txFilter == _WalletTxFilter.recharge,
                   onSelected: (_) => setState(() => _txFilter = _WalletTxFilter.recharge),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
-                  label: Text('Retraits ($_withdrawCount)'),
+                  label: Text(trf('Retraits ({_withdrawCount})', {'_withdrawCount': _withdrawCount})),
                   selected: _txFilter == _WalletTxFilter.withdraw,
                   onSelected: (_) => setState(() => _txFilter = _WalletTxFilter.withdraw),
                 ),
@@ -763,8 +763,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 onPressed: _txLoadingMore ? null : _loadMoreTransactions,
                 child: Text(
                   _txLoadingMore
-                      ? 'Chargement…'
-                      : 'Charger plus (${_transactions.length} / $_txTotal)',
+                      ? tr('Chargement…')
+                      : trf('Charger plus ({length} / {_txTotal})', {'length': _transactions.length, '_txTotal': _txTotal}),
                 ),
               ),
             ),
@@ -955,7 +955,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Solde disponible : ${MarketConfig.formatCdf(widget.maxAmount)}',
+              trf('Solde disponible : {v1}', {'v1': MarketConfig.formatCdf(widget.maxAmount)}),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 8),
@@ -978,7 +978,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
                 prefixIcon: Icon(Icons.account_balance_wallet_outlined),
               ),
               items: _providers
-                  .map((p) => DropdownMenuItem(value: p.id, child: Text(p.name)))
+                  .map((p) => DropdownMenuItem(value: p.id, child: Text(tr(p.name))))
                   .toList(),
               onChanged: _otpSent
                   ? null
@@ -1064,10 +1064,10 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
             const SizedBox(height: 20),
             MovaButton(
               label: _otpLoading
-                  ? 'Envoi du code…'
+                  ? tr('Envoi du code…')
                   : _otpSent
-                      ? 'Confirmer le retrait'
-                      : 'Envoyer le code',
+                      ? tr('Confirmer le retrait')
+                      : tr('Envoyer le code'),
               icon: _otpSent ? Icons.check : Icons.pin_outlined,
               isLoading: _otpLoading,
               onPressed: _otpLoading ? null : _confirm,
@@ -1145,14 +1145,14 @@ class _WalletTopUpSheetState extends State<_WalletTopUpSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Recharger via ${widget.provider.name}',
+              trf('Recharger via {name}', {'name': widget.provider.name}),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               widget.provider.id == 'ORANGE_MONEY'
-                  ? 'Numéro Orange (80 / 84 / 85 / 89), minimum 2 300 FC. Si aucune confirmation n’apparaît, utilisez M-Pesa ou Airtel Money.'
-                  : 'Confirmez le paiement sur votre téléphone (PIN Mobile Money). Minimum 2 300 FC.',
+                  ? tr('Numéro Orange (80 / 84 / 85 / 89), minimum 2 300 FC. Si aucune confirmation n’apparaît, utilisez M-Pesa ou Airtel Money.')
+                  : tr('Confirmez le paiement sur votre téléphone (PIN Mobile Money). Minimum 2 300 FC.'),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 16),

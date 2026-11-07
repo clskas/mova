@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/mova_colors.dart';
 import '../location/service_area_prefs.dart';
 import '../location/service_areas.dart';
+import '../../core/i18n/i18n.dart';
 
 class ServiceAreaSelector extends ConsumerWidget {
   const ServiceAreaSelector({super.key, this.compact = false, this.sheetTitle});
@@ -34,7 +35,7 @@ class ServiceAreaSelector extends ConsumerWidget {
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  area.name,
+                  tr(area.name),
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: MovaColors.violet,
                     fontWeight: FontWeight.w600,
@@ -79,7 +80,7 @@ class ServiceAreaSelector extends ConsumerWidget {
                         a.id == currentId ? Icons.radio_button_checked : Icons.radio_button_off,
                         color: MovaColors.violet,
                       ),
-                      title: Text(a.name),
+                      title: Text(tr(a.name)),
                       subtitle: Text(a.province, style: const TextStyle(fontSize: 12)),
                       onTap: () => Navigator.pop(ctx, a.id),
                     );

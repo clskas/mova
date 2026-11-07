@@ -32,7 +32,7 @@ Future<bool> showCashPinConfirmDialog(
           ),
           const SizedBox(height: 12),
           Text(
-            'Remettez l\'argent au $peerLabel, puis communiquez-lui ce code PIN :',
+            trf('Remettez l\'argent au {peerLabel}, puis communiquez-lui ce code PIN :', {'peerLabel': peerLabel}),
             textAlign: TextAlign.center,
             style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
           ),
@@ -49,7 +49,7 @@ Future<bool> showCashPinConfirmDialog(
           ),
           const SizedBox(height: 8),
           Text(
-            'Le $peerLabel saisit ce code dans son application pour confirmer le paiement.',
+            trf('Le {peerLabel} saisit ce code dans son application pour confirmer le paiement.', {'peerLabel': peerLabel}),
             textAlign: TextAlign.center,
             style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 12),
           ),

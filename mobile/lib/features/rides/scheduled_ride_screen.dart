@@ -260,7 +260,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             return null;
           }
         }
-        return 'SENGA couvre toute la République Démocratique du Congo. Indiquez une destination valide.';
+        return tr('SENGA couvre toute la République Démocratique du Congo. Indiquez une destination valide.');
       }
       _dropoff = ServiceAreaLocation.ensureInServiceArea(
         resolved,
@@ -320,13 +320,13 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Réf. ${_shortRef(id)}', style: const TextStyle(color: MovaColors.violet, fontSize: 12)),
+              Text(trf('Réf. {v1}', {'v1': _shortRef(id)}), style: const TextStyle(color: MovaColors.violet, fontSize: 12)),
               const SizedBox(height: 8),
               Text(live['dropoffAddress']?.toString() ?? 'Destination',
                   style: const TextStyle(fontWeight: FontWeight.w600)),
               Text('Départ : ${live['pickupAddress'] ?? 'Ma position'}',
                   style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary)),
-              Text('Date : $when', style: const TextStyle(fontSize: 13)),
+              Text(trf('Date : {when}', {'when': when}), style: const TextStyle(fontSize: 13)),
               Text(
                 historyStatusLabel(status),
                 style: const TextStyle(color: MovaColors.violet, fontWeight: FontWeight.w600),
@@ -506,10 +506,10 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
 
   String? _validate() {
     if (_destinationController.text.trim().isEmpty) {
-      return 'Indiquez votre destination.';
+      return tr('Indiquez votre destination.');
     }
     if (_scheduledAt.isBefore(DateTime.now())) {
-      return 'La date de réservation doit être dans le futur.';
+      return tr('La date de réservation doit être dans le futur.');
     }
     return null;
   }
@@ -587,15 +587,20 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             builder: (ctx) => AlertDialog(
               title: Text(tr('Réservation confirmée')),
               content: Text(
-                'Votre transport SENGA est réservé.\n\n'
-                'Référence : ${_shortRef(ride?['id']?.toString())}\n'
-                'Date et heure : $when\n'
-                'Départ : Ma position\n'
-                'Destination : ${_destinationController.text.trim()}\n'
-                'Véhicule : ${_vehicleLabel(_vehicleType)}'
-                '${_estimatedPrice != null ? '\nTarif estimé : ${MarketConfig.formatCdf(_estimatedPrice!)}' : ''}\n\n'
-                'Vous recevrez un rappel la veille (J-1) et avant le départ. '
-                'Consultez « Mes réservations » pour modifier ou annuler.',
+                trf(
+                  'Votre transport SENGA est réservé.\n\nRéférence : {ref}\nDate et heure : {when}\nDépart : Ma position\n'
+                  'Destination : {destination}\nVéhicule : {vehicle}{price}\n\n'
+                  'Vous recevrez un rappel la veille (J-1) et avant le départ. Consultez « Mes réservations » pour modifier ou annuler.',
+                  {
+                    'ref': _shortRef(ride?['id']?.toString()),
+                    'when': when,
+                    'destination': _destinationController.text.trim(),
+                    'vehicle': _vehicleLabel(_vehicleType),
+                    'price': _estimatedPrice != null
+                        ? trf('\nTarif estimé : {v1}', {'v1': MarketConfig.formatCdf(_estimatedPrice!)})
+                        : '',
+                  },
+                ),
                 maxLines: 12,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -690,7 +695,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Réf. $ref',
+                        trf('Réf. {ref}', {'ref': ref}),
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -812,8 +817,8 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               Expanded(
                 child: Text(
                   _loadingGps
-                      ? 'Localisation…'
-                      : 'Départ : $_pickupLabel',
+                      ? tr('Localisation…')
+                      : trf('Départ : {_pickupLabel}', {'_pickupLabel': _pickupLabel}),
                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                 ),
               ),
@@ -908,7 +913,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               Text(
                 '${(_estimateBreakdown!['distanceKm'] as num).toStringAsFixed(1)} km'
                 '${_estimateBreakdown!['durationMin'] != null ? ' · ~${_estimateBreakdown!['durationMin']} min' : ''}'
-                '${_estimateBreakdown!['isInterCity'] == true ? ' · Inter-villes' : ''}',
+                '${_estimateBreakdown!['isInterCity'] == true ? tr(' · Inter-villes') : ''}',
                 style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
               ),
             ],
@@ -930,7 +935,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
           ],
           const SizedBox(height: 24),
           MovaButton(
-            label: _estimatedPrice == null ? 'Estimer le tarif' : 'Confirmer la réservation',
+            label: _estimatedPrice == null ? tr('Estimer le tarif') : tr('Confirmer la réservation'),
             isLoading: _loading,
             icon: Icons.event_available_outlined,
             onPressed: _loading

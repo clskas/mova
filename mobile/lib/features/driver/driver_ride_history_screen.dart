@@ -9,6 +9,7 @@ import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'active_ride_screen.dart';
 import '../chat/ride_chat_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 class DriverRideHistoryScreen extends ConsumerStatefulWidget {
   const DriverRideHistoryScreen({super.key});
@@ -56,13 +57,13 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
     final status = ride['status']?.toString();
     if (status == 'COMPLETED') {
       final paid = ride['isPaid'] == true;
-      return paid ? 'Terminée · Payée' : 'Terminée · À encaisser';
+      return paid ? tr('Terminée · Payée') : tr('Terminée · À encaisser');
     }
     return switch (status) {
-      'CANCELLED' => 'Annulée',
-      'DRIVER_ASSIGNED' => 'Assignée',
-      'ARRIVING' => 'En route',
-      'IN_PROGRESS' => 'En cours',
+      'CANCELLED' => tr('Annulée'),
+      'DRIVER_ASSIGNED' => tr('Assignée'),
+      'ARRIVING' => tr('En route'),
+      'IN_PROGRESS' => tr('En cours'),
       _ => status ?? '—',
     };
   }
@@ -93,7 +94,7 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
         );
         if (mounted) _load();
       case Failure(:final error):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(error.message))));
     }
   }
 
@@ -124,7 +125,7 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
   @override
   Widget build(BuildContext context) {
     return MovaScreen(
-      title: 'Mes courses',
+      title: tr('Mes courses'),
       scrollable: false,
       actions: [
         IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
@@ -134,9 +135,9 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
           : _error != null
               ? MovaErrorBanner(message: _error!, onRetry: _load)
               : _rides.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
-                        'Aucune course pour le moment.',
+                        tr('Aucune course pour le moment.'),
                         style: TextStyle(color: MovaColors.textSecondary),
                       ),
                     )
@@ -168,7 +169,7 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
                                   if (_canOpenChat(ride))
                                     IconButton(
                                       icon: const Icon(Icons.chat_bubble_outline, color: MovaColors.violet),
-                                      tooltip: 'Chat passager',
+                                      tooltip: tr('Chat passager'),
                                       onPressed: () => _openChat(ride),
                                     ),
                                   if (driverNet != null)
@@ -231,7 +232,7 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
                               if (_needsCashConfirm(ride)) ...[
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Appuyez pour confirmer le paiement espèces (PIN)',
+                                  tr('Appuyez pour confirmer le paiement espèces (PIN)'),
                                   style: TextStyle(
                                     color: MovaColors.orange.withValues(alpha: 0.95),
                                     fontSize: 12,

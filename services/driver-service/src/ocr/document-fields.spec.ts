@@ -21,4 +21,9 @@ describe('document fields (onboarding pre-fill)', () => {
   it('accepts ISO dates', () => {
     expect(cleanExtractedFields('VEHICLE_INSURANCE', { expiryDate: '2027-05-31' })).toEqual({ expiryDate: '2027-05-31' });
   });
+  it('keeps the voter card National Number alone', () => {
+    expect(cleanExtractedFields('ID_PHOTO', { idNumber: 'NN 3337 0090 005' })).toEqual({ idNumber: '33370090005' });
+    expect(cleanExtractedFields('ID_PHOTO', { idNumber: '33370090005' })).toEqual({ idNumber: '33370090005' });
+    expect(cleanExtractedFields('ID_PHOTO', { idNumber: 'OP0123456' })).toEqual({ idNumber: 'OP0123456' });
+  });
 });

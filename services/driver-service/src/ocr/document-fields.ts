@@ -14,7 +14,10 @@ export const SCANNABLE_DOCUMENT_FIELDS: Record<string, string[]> = {
 const FIELD_HINTS: Record<string, string> = {
   firstName: 'Prénom(s) du titulaire, tel qu\'écrit',
   lastName: 'Nom(s) de famille du titulaire, tel qu\'écrit',
-  idNumber: 'Numéro de la pièce d\'identité ou du passeport',
+  idNumber:
+    "Numéro de la pièce d'identité. Carte d'électeur RDC : le Numéro National, écrit en haut à droite après « NN » " +
+    '(sous CODE CI / NOM CI), chiffres seuls — jamais le numéro imprimé sous la photo (ex. A51060142). ' +
+    'Passeport : le numéro du passeport',
   birthDate: 'Date de naissance au format YYYY-MM-DD',
   licenseNumber: 'Numéro du permis de conduire',
   expiryDate: "Date d'expiration / fin de validité au format YYYY-MM-DD",
@@ -44,7 +47,10 @@ function promptFor(type: string): string {
   return (
     `Tu lis la photo d'un document officiel d'un chauffeur en République Démocratique du Congo (type attendu : ${type}). ` +
     'Recopie uniquement ce qui est réellement écrit sur le document, sans rien deviner ni inventer. ' +
-    'Si un champ est absent ou illisible, mets null. Les dates doivent être au format YYYY-MM-DD.'
+    'Si un champ est absent ou illisible, mets null. Les dates doivent être au format YYYY-MM-DD.' +
+    (type === 'ID_PHOTO'
+      ? " Sur une carte d'électeur de la CENI, le numéro de la pièce est le Numéro National (NN), en haut à droite."
+      : '')
   );
 }
 
@@ -56,7 +62,9 @@ export function cleanExtractedFields(type: string, raw: Record<string, unknown>)
   for (const f of SCANNABLE_DOCUMENT_FIELDS[type] ?? []) {
     const v = raw[f];
     if (typeof v !== 'string') continue;
-    const value = v.trim().replace(/\s+/g, ' ');
+    let value = v.trim().replace(/\s+/g, ' ');
+    // Voter card: keep the National Number alone ("NN 3337 0090 005" → "33370090005").
+    if (f === 'idNumber') value = value.replace(/^N\.?N\.?\s*[:°]?\s*/i, '').replace(/^(\d[\d ]+\d)$/, (m) => m.replace(/ /g, ''));
     if (!value || value.length > 80) continue;
     if ((f === 'expiryDate' || f === 'birthDate') && !ISO_DATE.test(value)) continue;
     out[f] = value;

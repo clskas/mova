@@ -93,7 +93,7 @@ class DriverJobAlertService {
     await androidPlugin?.createNotificationChannel(
       AndroidNotificationChannel(
         _channelSystemId,
-        '$_channelName (son téléphone)',
+        trf('{_channelName} (son téléphone)', {'_channelName': _channelName}),
         description: 'Missions avec le son de notification système',
         importance: Importance.max,
         playSound: true,
@@ -105,7 +105,7 @@ class DriverJobAlertService {
     await androidPlugin?.createNotificationChannel(
       AndroidNotificationChannel(
         _channelSilentId,
-        '$_channelName (sans son)',
+        trf('{_channelName} (sans son)', {'_channelName': _channelName}),
         description: 'Missions en vibration seule (son coupé dans l’app)',
         importance: Importance.max,
         playSound: false,
@@ -446,7 +446,7 @@ class DriverJobAlertService {
         (offer['tripDistanceKm'] as num?)?.toDouble() ?? (offer['distanceKm'] as num?)?.toDouble();
     final parts = <String>[kind];
     if (pickup.isNotEmpty) parts.add(pickup);
-    if (pickupKm != null) parts.add('à ${GeoUtils.formatDistanceKm(pickupKm)}');
+    if (pickupKm != null) parts.add(trf('à {v1}', {'v1': GeoUtils.formatDistanceKm(pickupKm)}));
     if (tripKm != null) parts.add('trajet ${GeoUtils.formatDistanceKm(tripKm)}');
     if (driverNet != null) parts.add(MarketConfig.formatCdf(driverNet));
     return parts.join(' · ');

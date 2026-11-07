@@ -145,8 +145,7 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
                   if (net != null && net > 0 && net != total) ...[
                     const SizedBox(height: 6),
                     Text(
-                      'Dont votre part nette ~${MarketConfig.formatCdf(net)} '
-                      '(le reste = commission SENGA à reverser)',
+                      trf('Dont votre part nette ~{v1} (le reste = commission SENGA à reverser)', {'v1': MarketConfig.formatCdf(net)}),
                       style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                     ),
                   ],

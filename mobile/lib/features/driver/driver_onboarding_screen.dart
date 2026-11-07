@@ -649,7 +649,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         if (filled.isNotEmpty) {
           setState(() => _autoFilled.addAll(filled));
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Rempli automatiquement : ${filled.join(', ')}. Vérifiez avant de continuer.')),
+            SnackBar(content: Text(trf('Rempli automatiquement : {v1}. Vérifiez avant de continuer.', {'v1': filled.join(', ')}))),
           );
         } else if (data['message'] != null) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'].toString())));
@@ -919,7 +919,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  trf('Étape {v1}/{length} — {v2}', {'v1': _step + 1, 'length': _steps.length, 'v2': _steps[_step]}),
+                  trf('Étape {v1}/{length} — {v2}', {'v1': _step + 1, 'length': _steps.length, 'v2': tr(_steps[_step])}),
                   style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
                 ),
                 if (_error != null) ...[
@@ -1074,9 +1074,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             decoration: InputDecoration(
               labelText: tr('Volume utile (m³)'),
               suffixText: 'm³',
-              helperText: 'Espace de chargement de votre ${switch (_vehicleType) { 'CAMION' => 'camion', 'TRIPOTEUR' => 'tripoteur', _ => 'utilitaire' }} '
-                  '(${cargoVolumeRange(_vehicleType)!.min} à ${cargoVolumeRange(_vehicleType)!.max} m³). '
-                  'Vous ne recevrez que les déménagements qui y tiennent. SENGA le vérifie avec la photo.',
+              helperText: trf('Espace de chargement de votre {v1} ({v2} à {v3} m³). Vous ne recevrez que les déménagements qui y tiennent. SENGA le vérifie avec la photo.', {'v1': switch (_vehicleType) { 'CAMION' => 'camion', 'TRIPOTEUR' => 'tripoteur', _ => 'utilitaire' }, 'v2': cargoVolumeRange(_vehicleType)!.min, 'v3': cargoVolumeRange(_vehicleType)!.max}),
               helperMaxLines: 4,
             ),
           ),
@@ -1292,7 +1290,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
               const SizedBox(height: 12),
               Text('Identifiant : ${_state?['publicId'] ?? '—'}'),
               const SizedBox(height: 6),
-              Text('Documents requis : ${_state?['kyc']?['requiredComplete'] == true ? tr('Complets') : tr('Incomplets')}'),
+              Text(trf('Documents requis : {v1}', {'v1': _state?['kyc']?['requiredComplete'] == true ? tr('Complets') : tr('Incomplets')})),
               const SizedBox(height: 6),
               Text(trf('Statut KYC : {kycStatus}', {'kycStatus': kycStatus})),
             ],
@@ -1308,6 +1306,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
   }
 
   Widget _docButton(String type, String label) {
+    label = tr(label);
     final done = _docUploaded(type);
     final notes = _docRejectNotes(type);
     return Padding(

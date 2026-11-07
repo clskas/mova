@@ -177,7 +177,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
           ? trf('Retour au départ : ~{_etaMinutes} min{dist}', {'_etaMinutes': _etaMinutes, 'dist': dist})
           : (_isRoundTrip
               ? trf('Arrivée (aller) : ~{_etaMinutes} min{dist}', {'_etaMinutes': _etaMinutes, 'dist': dist})
-              : 'Arrivée à destination : ~$_etaMinutes min$dist'),
+              : trf('Arrivée à destination : ~{_etaMinutes} min{dist}', {'_etaMinutes': _etaMinutes, 'dist': dist})),
       'DRIVER_ARRIVED' => tr('Votre chauffeur est arrivé'),
       _ => trf('Chauffeur à ~{_etaMinutes} min{dist}', {'_etaMinutes': _etaMinutes, 'dist': dist}),
     };
@@ -677,7 +677,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         final url = data['shareUrl']?.toString() ?? 'https://mova.cd/suivi/${widget.rideId}';
         final pickup = _ride?['pickupAddress']?.toString() ?? tr('Départ');
         final dropoff = _ride?['dropoffAddress']?.toString() ?? tr('Arrivée');
-        final text = 'Je suis en course SENGA ($pickup → $dropoff). Suivi : $url';
+        final text = trf('Je suis en course SENGA ({pickup} → {dropoff}). Suivi : {url}', {'pickup': pickup, 'dropoff': dropoff, 'url': url});
         await Clipboard.setData(ClipboardData(text: text));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(tr('Lien de suivi copié dans le presse-papiers'))),
@@ -790,7 +790,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       case Success(:final data):
         final fee = data['cancellationFeeFormatted']?.toString();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message']?.toString() ?? 'Course annulée${fee != null ? ' — $fee' : ''}')),
+          SnackBar(content: Text(data['message']?.toString() ?? trf('Course annulée{v1}', {'v1': fee != null ? ' — $fee' : ''}))),
         );
         Navigator.pop(context);
       case Failure(:final error):
@@ -1057,7 +1057,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                             Text(tr('Statut'), style: Theme.of(context).textTheme.titleSmall),
                             const SizedBox(height: 8),
                             ..._timelineSteps.map((step) {
-                              final label = step['label']?.toString() ?? '';
+                              final label = tr(step['label']?.toString() ?? '');
                               final done = step['done'] == true;
                               final active = !done &&
                                   _timelineSteps.indexOf(step) ==

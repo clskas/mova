@@ -277,7 +277,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
                       const SizedBox(width: 6),
                       Text(
                         b['remainingActive'] == true
-                            ? 'Temps restant : ${b['remainingLabel']}'
+                            ? trf('Temps restant : {v1}', {'v1': b['remainingLabel']})
                             : b['remainingLabel']?.toString() ?? '',
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
@@ -288,14 +288,14 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
                   ),
                 ],
                 if (b['pickupCity'] != null)
-                  Text('Prise en charge : ${b['pickupCity']}${b['returnCity'] != null && b['returnCity'] != b['pickupCity'] ? ' → ${b['returnCity']}' : ''}'),
+                  Text(trf('Prise en charge : {v1}{v2}', {'v1': b['pickupCity'], 'v2': b['returnCity'] != null && b['returnCity'] != b['pickupCity'] ? ' → ${b['returnCity']}' : ''})),
                 const SizedBox(height: 8),
                 Text(
                   MarketConfig.formatCdf(total),
                   style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: MovaColors.green),
                 ),
                 Text(
-                  'Réf. ${b['id'] ?? widget.bookingId}',
+                  trf('Réf. {v1}', {'v1': b['id'] ?? widget.bookingId}),
                   style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                 ),
               ],

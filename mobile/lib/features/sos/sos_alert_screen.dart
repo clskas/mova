@@ -179,7 +179,7 @@ class _SosAlertScreenState extends State<SosAlertScreen> {
                 if (widget.incidentId != null && widget.incidentId!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    'Réf. ${widget.incidentId!.length > 12 ? '${widget.incidentId!.substring(0, 8)}…' : widget.incidentId}',
+                    trf('Réf. {v1}', {'v1': widget.incidentId!.length > 12 ? '${widget.incidentId!.substring(0, 8)}…' : widget.incidentId}),
                     style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.textMuted),
                   ),
                 ],

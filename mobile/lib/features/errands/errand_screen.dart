@@ -335,8 +335,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           ((data['balanceCdf'] as int? ?? 0) - (data['heldBalanceCdf'] as int? ?? 0));
       _walletAvailableCdf = available;
       if (available < budget) {
-        return 'Solde wallet insuffisant : ${MarketConfig.formatCdf(available)} disponible, '
-            '${MarketConfig.formatCdf(budget)} requis. Rechargez votre wallet SENGA.';
+        return trf('Solde wallet insuffisant : {v1} disponible, {v2} requis. Rechargez votre wallet SENGA.', {'v1': MarketConfig.formatCdf(available), 'v2': MarketConfig.formatCdf(budget)});
       }
       return null;
     }

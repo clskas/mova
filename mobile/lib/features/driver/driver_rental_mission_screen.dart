@@ -248,7 +248,7 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
                             color: done ? MovaColors.green : MovaColors.textSecondary,
                           ),
                           const SizedBox(width: 8),
-                          Expanded(child: Text(step['label']?.toString() ?? '')),
+                          Expanded(child: Text(tr(step['label']?.toString() ?? ''))),
                         ],
                       ),
                     );

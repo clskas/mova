@@ -26,7 +26,7 @@ class HelpScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return MovaScreen(
-      title: HelpConfig.hubTitle,
+      title: tr(HelpConfig.hubTitle),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

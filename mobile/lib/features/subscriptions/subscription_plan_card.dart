@@ -26,7 +26,7 @@ class SubscriptionPlanCard extends StatelessWidget {
     final reduction = plan['feeReductionPercent'] as int? ?? 0;
     final priority = plan['priorityMatching'] == true;
     final benefits = <String>[
-      if (reduction > 0) '−$reduction % sur les frais de service (courses, livraisons, déménagement)',
+      if (reduction > 0) trf('−{reduction} % sur les frais de service (courses, livraisons, déménagement)', {'reduction': reduction}),
       if (priority) 'Priorité de matching chauffeur / livreur',
       'Réduction appliquée automatiquement à chaque commande',
       'Paiement mensuel depuis votre portefeuille SENGA',

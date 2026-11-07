@@ -630,7 +630,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    step['label']?.toString() ?? '',
+                                    tr(step['label']?.toString() ?? ''),
                                     style: TextStyle(
                                       fontWeight: done ? FontWeight.w600 : FontWeight.normal,
                                       color: done ? MovaColors.midnight : MovaColors.textSecondary,

@@ -105,7 +105,7 @@ class ServicePriceDisplay {
           if (type == 'FOOD' && data['driverGrossCdf'] is num) ...[
             const SizedBox(height: 8),
             Text(
-              'Base frais livraison : ${MarketConfig.formatCdf((data['driverGrossCdf'] as num).round())}',
+              trf('Base frais livraison : {v1}', {'v1': MarketConfig.formatCdf((data['driverGrossCdf'] as num).round())}),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 12),
             ),
           ],
@@ -336,6 +336,7 @@ class ServicePriceDisplay {
   }
 
   static Widget _row(String label, int amountCdf, {Color? valueColor}) {
+    label = tr(label);
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(

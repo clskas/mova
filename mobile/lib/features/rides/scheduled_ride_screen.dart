@@ -77,7 +77,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
     final month = dt.month.toString().padLeft(2, '0');
     final hour = dt.hour.toString().padLeft(2, '0');
     final minute = dt.minute.toString().padLeft(2, '0');
-    return '$day/$month/${dt.year} à $hour:$minute';
+    return trf('{day}/{month}/{year} à {hour}:{minute}', {'day': day, 'month': month, 'year': dt.year, 'hour': hour, 'minute': minute});
   }
 
   Map<String, dynamic> _ridePayload() {
@@ -324,7 +324,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               const SizedBox(height: 8),
               Text(live['dropoffAddress']?.toString() ?? tr('Destination'),
                   style: const TextStyle(fontWeight: FontWeight.w600)),
-              Text('Départ : ${live['pickupAddress'] ?? 'Ma position'}',
+              Text(trf('Départ : {v1}', {'v1': live['pickupAddress'] ?? 'Ma position'}),
                   style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary)),
               Text(trf('Date : {when}', {'when': when}), style: const TextStyle(fontSize: 13)),
               Text(
@@ -378,7 +378,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                         color: done ? MovaColors.green : MovaColors.textSecondary,
                       ),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(step['label']?.toString() ?? '')),
+                      Expanded(child: Text(tr(step['label']?.toString() ?? ''))),
                     ],
                   ),
                 );

@@ -184,8 +184,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     }
     if (_vehicleType != 'FAMILIALE' || _passengerCount <= kCarPassengerLimit) return null;
     if (_passengerCount > defaultPassengerSeats('FAMILIALE')) {
-      return 'Gamme Familiale : seuls les véhicules de $_passengerCount places recevront la course, '
-          'l\'attente peut être plus longue.';
+      return trf('Gamme Familiale : seuls les véhicules de {_passengerCount} places recevront la course, l\'attente peut être plus longue.', {'_passengerCount': _passengerCount});
     }
     return tr('Plus de 4 passagers : gamme Familiale (6 à 8 places) sélectionnée.');
   }
@@ -996,7 +995,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       child: Text(
                         _vehicleCategory == 'MOTO'
                             ? trf('{length} moto(s) à proximité', {'length': _nearbyVehicles.length})
-                            : '${_nearbyVehicles.length} taxi(s) à proximité',
+                            : trf('{length} taxi(s) à proximité', {'length': _nearbyVehicles.length}),
                         style: const TextStyle(fontSize: 11, color: MovaColors.textSecondary),
                       ),
                     ),
@@ -1067,7 +1066,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                             Text(
                               (_selectedEstimate!['savingsCdf'] is num &&
                                       (_selectedEstimate!['savingsCdf'] as num) > 0)
-                                  ? 'Pool · économie ${MarketConfig.formatCdf((_selectedEstimate!['savingsCdf'] as num).round())} vs course seule'
+                                  ? trf('Pool · économie {v1} vs course seule', {'v1': MarketConfig.formatCdf((_selectedEstimate!['savingsCdf'] as num).round())})
                                   : 'Pool · tarif partagé',
                               style: const TextStyle(fontSize: 12, color: MovaColors.green),
                             ),
@@ -1087,7 +1086,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                           ),
                           if (((_selectedEstimate!['discountCdf'] as num?)?.toInt() ?? 0) > 0) ...[
                             _breakdownRow(
-                              'Code promo${_selectedEstimate!['promoCode'] != null ? ' (${_selectedEstimate!['promoCode']})' : ''}',
+                              trf('Code promo{v1}', {'v1': _selectedEstimate!['promoCode'] != null ? ' (${_selectedEstimate!['promoCode']})' : ''}),
                               -((_selectedEstimate!['discountCdf'] as num).toInt()),
                             ),
                           ],

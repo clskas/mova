@@ -459,6 +459,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   }
 
   Widget _periodChip(String label, _EarningsPeriod period) {
+    label = tr(label);
     final selected = _period == period;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -476,6 +477,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   }
 
   Widget _serviceChip(String label, _ServiceFilter filter) {
+    label = tr(label);
     final selected = _serviceFilter == filter;
     return Padding(
       padding: const EdgeInsets.only(right: 8),

@@ -418,8 +418,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                             const SizedBox(width: 8),
                             Flexible(
                               child: Text(
-                                'Client à ${GeoUtils.formatDistanceKm(_pickupDistanceKm!)}'
-                                '${_pickupEtaMin != null ? trf(' · ~{_pickupEtaMin} min', {'_pickupEtaMin': _pickupEtaMin}) : ''}',
+                                trf('Client à {v1}{v2}', {'v1': GeoUtils.formatDistanceKm(_pickupDistanceKm!), 'v2': _pickupEtaMin != null ? trf(' · ~{_pickupEtaMin} min', {'_pickupEtaMin': _pickupEtaMin}) : ''}),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,

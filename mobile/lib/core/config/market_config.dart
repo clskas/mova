@@ -355,15 +355,12 @@ class MarketConfig {
     if (prefixes.contains(prefix)) return null;
     final list = prefixes.join(', ');
     if (providerId == 'ORANGE_MONEY') {
-      return 'Ce numéro n’est pas un numéro Orange Money (préfixes $list). '
-          'Saisissez le numéro de la SIM Orange (80, 84, 85, 89).';
+      return trf('Ce numéro n’est pas un numéro Orange Money (préfixes {list}). Saisissez le numéro de la SIM Orange (80, 84, 85, 89).', {'list': list});
     }
     if (providerId == 'MPESA') {
-      return 'Ce numéro n’est pas un numéro Vodacom M-Pesa (préfixes $list). '
-          'Saisissez le numéro de la SIM Vodacom.';
+      return trf('Ce numéro n’est pas un numéro Vodacom M-Pesa (préfixes {list}). Saisissez le numéro de la SIM Vodacom.', {'list': list});
     }
-    return 'Ce numéro n’est pas un numéro Airtel Money (préfixes $list). '
-        'Saisissez le numéro de la SIM Airtel.';
+    return trf('Ce numéro n’est pas un numéro Airtel Money (préfixes {list}). Saisissez le numéro de la SIM Airtel.', {'list': list});
   }
 
   static String normalizePhone(String phone) {

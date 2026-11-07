@@ -697,7 +697,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                       size: 22,
                                     ),
                                     const SizedBox(width: 12),
-                                    Expanded(child: Text(step['label']?.toString() ?? '')),
+                                    Expanded(child: Text(tr(step['label']?.toString() ?? ''))),
                                   ],
                                 ),
                               );

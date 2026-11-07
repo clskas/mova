@@ -211,7 +211,7 @@ class CallRingService {
       await _plugin.show(
         id: 77001,
         title: tr('Appel vocal SENGA'),
-        body: '$peerLabel vous appelle — touchez Décrocher.',
+        body: trf('{peerLabel} vous appelle — touchez Décrocher.', {'peerLabel': peerLabel}),
         notificationDetails: const NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,

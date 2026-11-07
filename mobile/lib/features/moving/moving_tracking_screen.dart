@@ -298,7 +298,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                           size: 22,
                         ),
                         const SizedBox(width: 12),
-                        Expanded(child: Text(step['label']?.toString() ?? '')),
+                        Expanded(child: Text(tr(step['label']?.toString() ?? ''))),
                       ],
                     ),
                   );

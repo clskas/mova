@@ -473,7 +473,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   children: [
                     Icon(icon, color: color),
                     const SizedBox(width: 12),
-                    Expanded(child: Text(label)),
+                    Expanded(child: Text(tr(label))),
                     Radio<String>(
                       value: id,
                       groupValue: _method,

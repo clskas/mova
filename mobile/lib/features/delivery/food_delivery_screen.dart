@@ -450,7 +450,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     final stockQty = _itemStockQty(item) ?? 0;
     final message = stockQty <= 0
         ? tr('Article en rupture de stock.')
-        : 'Stock insuffisant ($stockQty disponible${stockQty > 1 ? 's' : ''}).';
+        : trf('Stock insuffisant ({stockQty} disponible{v2}).', {'stockQty': stockQty, 'v2': stockQty > 1 ? 's' : ''});
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
@@ -1247,7 +1247,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          '${storesNoun[0].toUpperCase()}${storesNoun.substring(1)} à $_deliveryCityName',
+          trf('{v1}{v2} à {_deliveryCityName}', {'v1': storesNoun[0].toUpperCase(), 'v2': storesNoun.substring(1), '_deliveryCityName': _deliveryCityName}),
           style: const TextStyle(
             color: MovaColors.textSecondary,
             fontSize: 13,
@@ -1353,7 +1353,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           ),
         if (showCuisineFilter) const SizedBox(height: 8),
         Text(
-          'Délai max (ETA, min. 20 min): ${_filterMaxEta <= 0 ? 'aucun' : '${_filterMaxEta.round()} min'}',
+          trf('Délai max (ETA, min. 20 min): {v1}', {'v1': _filterMaxEta <= 0 ? tr('aucun') : '${_filterMaxEta.round()} min'}),
           style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
         ),
         Slider(
@@ -1368,7 +1368,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           onChangeEnd: (_) => _loadRestaurants(background: true),
         ),
         Text(
-          'Prix max (article le moins cher): ${_filterMaxPrice <= 0 ? 'aucun' : MarketConfig.formatCdf(_filterMaxPrice.round())}',
+          trf('Prix max (article le moins cher): {v1}', {'v1': _filterMaxPrice <= 0 ? tr('aucun') : MarketConfig.formatCdf(_filterMaxPrice.round())}),
           style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
         ),
         Slider(
@@ -1381,7 +1381,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
           onChangeEnd: (_) => _loadRestaurants(background: true),
         ),
         Text(
-          'Distance max: ${_filterMaxDistance <= 0 ? 'aucune' : '${_filterMaxDistance.toStringAsFixed(1)} km'}',
+          trf('Distance max: {v1}', {'v1': _filterMaxDistance <= 0 ? tr('aucune') : '${_filterMaxDistance.toStringAsFixed(1)} km'}),
           style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
         ),
         Slider(
@@ -1405,8 +1405,8 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
               _restaurants.isEmpty
                   ? (_hasActiveRestaurantFilters
                       ? trf('Aucun {storesNoun} ne correspond aux filtres. Ajustez ou réinitialisez les filtres ci-dessus.', {'storesNoun': storesNoun})
-                      : 'Aucun $storesNoun disponible à $_deliveryCityName pour le moment.')
-                  : 'Aucun $storesNoun ne correspond à votre recherche.',
+                      : trf('Aucun {storesNoun} disponible à {_deliveryCityName} pour le moment.', {'storesNoun': storesNoun, '_deliveryCityName': _deliveryCityName}))
+                  : trf('Aucun {storesNoun} ne correspond à votre recherche.', {'storesNoun': storesNoun}),
               style: const TextStyle(color: MovaColors.textSecondary),
               textAlign: TextAlign.center,
             ),

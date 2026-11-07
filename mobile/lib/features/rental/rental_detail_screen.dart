@@ -536,7 +536,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    'Propriétaire : ${v['ownerName']}',
+                    trf('Propriétaire : {v1}', {'v1': v['ownerName']}),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -556,7 +556,12 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             ),
           ],
           Text(
-            '${MarketConfig.formatCdf(v['dailyRateCdf'] as int? ?? 0)}/jour · ${MarketConfig.formatCdf(v['hourlyRateCdf'] as int? ?? RentalQuoteEstimator.resolveHourlyRateCdf(dailyRateCdf: v['dailyRateCdf'] as int? ?? 0))}/h · Caution ${MarketConfig.formatCdf(v['depositCdf'] as int? ?? 0)}',
+            trf('{daily}/jour · {hourly}/h · Caution {deposit}', {
+              'daily': MarketConfig.formatCdf(v['dailyRateCdf'] as int? ?? 0),
+              'hourly': MarketConfig.formatCdf(v['hourlyRateCdf'] as int? ??
+                  RentalQuoteEstimator.resolveHourlyRateCdf(dailyRateCdf: v['dailyRateCdf'] as int? ?? 0)),
+              'deposit': MarketConfig.formatCdf(v['depositCdf'] as int? ?? 0),
+            }),
             style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600),
           ),
           if (_step == 0) ...[
@@ -680,12 +685,12 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
             const SizedBox(height: 8),
             if (_hourlyMode)
               Text(
-                'Location courte durée · 1 à ${RentalQuoteEstimator.maxHourlyDurationHours} h ($_rentalHours h sélectionnée${_rentalHours > 1 ? 's' : ''})',
+                trf('Location courte durée · 1 à {maxHourlyDurationHours} h ({_rentalHours} h sélectionnée{v3})', {'maxHourlyDurationHours': RentalQuoteEstimator.maxHourlyDurationHours, '_rentalHours': _rentalHours, 'v3': _rentalHours > 1 ? 's' : ''}),
                 style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.violet),
               )
             else if (!_weeklyEligible)
               Text(
-                'Tarif à la journée · remise semaine à partir de 7 jours ($_rentalDays j sélectionné${_rentalDays > 1 ? 's' : ''})',
+                trf('Tarif à la journée · remise semaine à partir de 7 jours ({_rentalDays} j sélectionné{v2})', {'_rentalDays': _rentalDays, 'v2': _rentalDays > 1 ? 's' : ''}),
                 style: theme.textTheme.bodySmall?.copyWith(color: MovaColors.violet),
               ),
             const SizedBox(height: 12),

@@ -84,7 +84,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
     final month = dt.month.toString().padLeft(2, '0');
     final hour = dt.hour.toString().padLeft(2, '0');
     final minute = dt.minute.toString().padLeft(2, '0');
-    return '$day/$month/${dt.year} à $hour:$minute';
+    return trf('{day}/{month}/{year} à {hour}:{minute}', {'day': day, 'month': month, 'year': dt.year, 'hour': hour, 'minute': minute});
   }
 
   String _formatDate(DateTime dt) {
@@ -452,7 +452,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
             ),
             if (ride['departureAt'] != null)
               Text(
-                'Départ : ${_formatDeparture(ride['departureAt']?.toString())}',
+                trf('Départ : {v1}', {'v1': _formatDeparture(ride['departureAt']?.toString())}),
                 style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
               ),
             if (ride['ladiesOnly'] == true)
@@ -566,7 +566,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
         const SizedBox(height: 16),
         MovaButton(label: tr('Rechercher'), isLoading: _loading, icon: Icons.search, onPressed: _search),
         const SizedBox(height: 20),
-        Text('${ _rides.length } trajet${_rides.length > 1 ? 's' : ''} trouvé${_rides.length > 1 ? 's' : ''}',
+        Text(trf('{length} trajet{v2} trouvé{v3}', {'length': _rides.length, 'v2': _rides.length > 1 ? 's' : '', 'v3': _rides.length > 1 ? 's' : ''}),
             style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         if (_loadingList)

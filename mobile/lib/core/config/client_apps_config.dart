@@ -157,7 +157,8 @@ List<String> applyScannedFields(
     final text = (target.text as String).trim();
     if (text.isNotEmpty) return;
     target.text = v;
-    final label = _scannedFieldLabels[field];
+    final labelFr = _scannedFieldLabels[field];
+    final label = labelFr == null ? null : tr(labelFr);
     if (label != null) filled.add(label);
   });
   return filled;

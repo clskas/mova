@@ -54,7 +54,7 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
       final month = dt.month.toString().padLeft(2, '0');
       final hour = dt.hour.toString().padLeft(2, '0');
       final minute = dt.minute.toString().padLeft(2, '0');
-      return '$day/$month/${dt.year} à $hour:$minute';
+      return trf('{day}/{month}/{year} à {hour}:{minute}', {'day': day, 'month': month, 'year': dt.year, 'hour': hour, 'minute': minute});
     } catch (_) {
       return raw;
     }

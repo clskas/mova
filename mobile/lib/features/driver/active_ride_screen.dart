@@ -473,8 +473,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Course terminée — revenu estimé ${MarketConfig.formatCdf(driverNet)}. '
-                  'En attente du paiement passager.',
+                  trf('Course terminée — revenu estimé {v1}. En attente du paiement passager.', {'v1': MarketConfig.formatCdf(driverNet)}),
                 ),
               ),
             );

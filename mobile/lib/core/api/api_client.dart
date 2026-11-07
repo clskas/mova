@@ -1146,7 +1146,7 @@ class ApiClient {
         return Success(response.bodyBytes);
       }
       return Failure(ServerFailure(sanitizeUserMessage(
-        'Téléchargement impossible (${response.statusCode})',
+        trf('Téléchargement impossible ({statusCode})', {'statusCode': response.statusCode}),
         fallback: 'Téléchargement impossible. Réessayez.',
       )));
     } catch (_) {

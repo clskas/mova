@@ -426,6 +426,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   }
 
   DataRow _compareRow(String label, List<String> values) {
+    label = tr(label);
     return DataRow(cells: [DataCell(Text(label)), ...values.map((v) => DataCell(Text(v)))]);
   }
 
@@ -463,6 +464,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
   }
 
   Widget _featureChip(IconData icon, String label) {
+    label = tr(label);
     return Chip(
       avatar: Icon(icon, size: 16, color: MovaColors.violet),
       label: Text(label, style: const TextStyle(fontSize: 11)),
@@ -751,7 +753,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
           const SizedBox(height: 16),
           if (!_loading && _vehicles.isNotEmpty)
             Text(
-              '${_vehicles.length} véhicule${_vehicles.length > 1 ? 's' : ''} disponible${_vehicles.length > 1 ? 's' : ''}',
+              trf('{length} véhicule{v2} disponible{v3}', {'length': _vehicles.length, 'v2': _vehicles.length > 1 ? 's' : '', 'v3': _vehicles.length > 1 ? 's' : ''}),
               style: theme.textTheme.labelLarge?.copyWith(color: MovaColors.green),
             ),
           if (_loading)
@@ -797,7 +799,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
               .map((v) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: MovaButton(
-                      label: 'Réserver ${v['name']}',
+                      label: trf('Réserver {v1}', {'v1': v['name']}),
                       isSecondary: true,
                       onPressed: () => _openDetail(v),
                     ),
@@ -859,7 +861,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                   const SizedBox(height: 4),
                   Text(
                     inq['remainingActive'] == true
-                        ? 'Temps restant : ${inq['remainingLabel']}'
+                        ? trf('Temps restant : {v1}', {'v1': inq['remainingLabel']})
                         : inq['remainingLabel']?.toString() ?? '',
                     style: TextStyle(
                       fontSize: 12,
@@ -898,7 +900,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            'Propriétaire : ${inq['ownerContactPhone']}',
+                            trf('Propriétaire : {v1}', {'v1': inq['ownerContactPhone']}),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),

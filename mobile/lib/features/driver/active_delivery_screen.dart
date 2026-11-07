@@ -434,7 +434,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
             content: Text(
               returned
                   ? tr('Retour expéditeur : frais de course pour vous, reliquat remboursé au client.')
-                  : 'Tentative enregistrée (${data['unreachableAttempts'] ?? '?'}/3). Après 30 min et 3 essais : retour.',
+                  : trf('Tentative enregistrée ({v1}/3). Après 30 min et 3 essais : retour.', {'v1': data['unreachableAttempts'] ?? '?'}),
             ),
           ),
         );
@@ -640,7 +640,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
                     context,
                     description: _isErrand
                         ? trf('SOS chauffeur — courses {_deliveryId}', {'_deliveryId': _deliveryId})
-                        : 'SOS chauffeur — livraison $_deliveryId',
+                        : trf('SOS chauffeur — livraison {_deliveryId}', {'_deliveryId': _deliveryId}),
                     referenceType: _isErrand ? 'ERRAND' : 'DELIVERY',
                     referenceId: _deliveryId,
                   ),

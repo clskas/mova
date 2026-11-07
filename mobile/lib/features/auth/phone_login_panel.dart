@@ -704,8 +704,8 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           if (_step == PhoneLoginStep.googleOtp) ...[
             Text(
               _googleOtpChannel == 'email'
-                  ? 'Un code a été envoyé par e-mail${_googleDestinationMasked != null && _googleDestinationMasked!.isNotEmpty ? ' ($_googleDestinationMasked)' : ''} (objet « Votre accès SENGA »). Vérifiez votre boîte de réception.'
-                  : 'Un code SMS a été envoyé${_googleDestinationMasked != null && _googleDestinationMasked!.isNotEmpty ? ' ($_googleDestinationMasked)' : ''}.',
+                  ? trf('Un code a été envoyé par e-mail{v1} (objet « Votre accès SENGA »). Vérifiez votre boîte de réception.', {'v1': _googleDestinationMasked != null && _googleDestinationMasked!.isNotEmpty ? ' ($_googleDestinationMasked)' : ''})
+                  : trf('Un code SMS a été envoyé{v1}.', {'v1': _googleDestinationMasked != null && _googleDestinationMasked!.isNotEmpty ? ' ($_googleDestinationMasked)' : ''}),
               textAlign: TextAlign.center,
               style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 13),
             ),
@@ -862,7 +862,7 @@ class _LegalAcceptRow extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
-                "J'ai lu et j'accepte les ",
+                tr("J'ai lu et j'accepte les "),
                 style: TextStyle(fontSize: 13, color: MovaColors.textSecondary.withValues(alpha: 0.95)),
               ),
               GestureDetector(

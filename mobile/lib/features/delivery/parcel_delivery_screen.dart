@@ -616,7 +616,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                     return RadioListTile<String>(
                       contentPadding: EdgeInsets.zero,
                       title: Text(tr(cat.$2)),
-                      subtitle: Text(cat.$3, style: const TextStyle(fontSize: 12)),
+                      subtitle: Text(tr(cat.$3), style: const TextStyle(fontSize: 12)),
                       value: cat.$1,
                       groupValue: _weightCategory,
                       onChanged: (val) {

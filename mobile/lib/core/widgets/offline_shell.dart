@@ -267,7 +267,7 @@ String _offlineBannerText(OfflineState state, {required bool debug}) {
   if (state.reason == OfflineReason.serverUnavailable) {
     final base = debug
         ? trf('{bannerMessage}\nAPI: {effectiveApiBaseUrl}\nTouchez pour réessayer', {'bannerMessage': state.bannerMessage, 'effectiveApiBaseUrl': MarketConfig.effectiveApiBaseUrl})
-        : '${state.bannerMessage}\nTouchez pour réessayer';
+        : trf('{bannerMessage}\nTouchez pour réessayer', {'bannerMessage': state.bannerMessage});
     return '$base$pendingHint';
   }
   return '${state.bannerMessage}$pendingHint';
@@ -277,6 +277,5 @@ String formatLastSync(DateTime? syncedAt) {
   if (syncedAt == null) return '';
   String pad(int n) => n.toString().padLeft(2, '0');
   final d = syncedAt;
-  return 'Dernière synchro : ${pad(d.day)}/${pad(d.month)}/${d.year} '
-      '${pad(d.hour)}:${pad(d.minute)}';
+  return trf('Dernière synchro : {v1}/{v2}/{year} {v4}:{v5}', {'v1': pad(d.day), 'v2': pad(d.month), 'year': d.year, 'v4': pad(d.hour), 'v5': pad(d.minute)});
 }

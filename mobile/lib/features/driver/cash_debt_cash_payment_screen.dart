@@ -108,7 +108,7 @@ class _CashDebtCashPaymentScreenState extends ConsumerState<CashDebtCashPaymentS
     if (raw == null) return '';
     final dt = DateTime.tryParse(raw)?.toLocal();
     if (dt == null) return '';
-    return 'Valide jusqu\'à ${DateFormat('HH:mm').format(dt)}';
+    return trf('Valide jusqu\'à {v1}', {'v1': DateFormat('HH:mm').format(dt)});
   }
 
   @override

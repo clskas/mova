@@ -361,9 +361,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       builder: (ctx) => AlertDialog(
         title: Text(tr('Accepter ce déménagement ?')),
         content: Text(
-          '${offer['pickupAddress'] ?? ''} → ${offer['dropoffAddress'] ?? ''}'
-          '${volume != null ? trf('\n{volume} m³ à transporter.', {'volume': volume}) : ''}'
-          '\n\nVérifiez que tout tient dans votre véhicule avant d\'accepter.',
+          trf('{v1} → {v2}{v3}\n\nVérifiez que tout tient dans votre véhicule avant d\'accepter.', {'v1': offer['pickupAddress'] ?? '', 'v2': offer['dropoffAddress'] ?? '', 'v3': volume != null ? trf('\n{volume} m³ à transporter.', {'volume': volume}) : ''}),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
@@ -2065,7 +2063,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                                   if (offer['driverNetCdf'] != null) ...[
                                     const SizedBox(height: 4),
                                     Text(
-                                      'Gain net ~${MarketConfig.formatCdf(offer['driverNetCdf'] as int)}',
+                                      trf('Gain net ~{v1}', {'v1': MarketConfig.formatCdf(offer['driverNetCdf'] as int)}),
                                       style: const TextStyle(fontSize: 11, color: MovaColors.green),
                                     ),
                                   ],
@@ -2183,7 +2181,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   if (_earnings!['withdrawableCdf'] != null) ...[
                     const SizedBox(height: _cardLineGap),
                     Text(
-                      'Solde retrait : ${MarketConfig.formatCdf(_earnings!['withdrawableCdf'] as int? ?? 0)}',
+                      trf('Solde retrait : {v1}', {'v1': MarketConfig.formatCdf(_earnings!['withdrawableCdf'] as int? ?? 0)}),
                       style: const TextStyle(color: MovaColors.green, fontWeight: FontWeight.w600, fontSize: 13),
                     ),
                   ],
@@ -2225,7 +2223,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         if ((_pendingCashRide!['finalFareCdf'] ?? _pendingCashRide!['estimatedFareCdf'] ?? _pendingCashRide!['amountCdf']) != null) ...[
                           const SizedBox(height: 4),
                           Text(
-                            'À encaisser : ${MarketConfig.formatCdf(((_pendingCashRide!['finalFareCdf'] ?? _pendingCashRide!['estimatedFareCdf'] ?? _pendingCashRide!['amountCdf']) as num).round())}',
+                            trf('À encaisser : {v1}', {'v1': MarketConfig.formatCdf(((_pendingCashRide!['finalFareCdf'] ?? _pendingCashRide!['estimatedFareCdf'] ?? _pendingCashRide!['amountCdf']) as num).round())}),
                             style: const TextStyle(fontWeight: FontWeight.w700, color: MovaColors.orange),
                           ),
                         ],
@@ -2486,7 +2484,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                             : null,
                         title: Text(
                           assigned
-                              ? 'Mission assignée — ${type == 'ERRAND' ? (offer['description']?.toString() ?? tr('Courses & commissions')) : (offer['pickupAddress']?.toString() ?? trf('Livraison {typeLabel}', {'typeLabel': typeLabel}))}'
+                              ? trf('Mission assignée — {v1}', {'v1': type == 'ERRAND' ? (offer['description']?.toString() ?? tr('Courses & commissions')) : (offer['pickupAddress']?.toString() ?? trf('Livraison {typeLabel}', {'typeLabel': typeLabel}))})
                               : type == 'ERRAND'
                                   ? (offer['description']?.toString() ?? tr('Courses & commissions'))
                                   : (offer['pickupAddress']?.toString() ?? trf('Livraison {typeLabel}', {'typeLabel': typeLabel})),

@@ -504,7 +504,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Text(
-                                        map['label']?.toString() ?? '',
+                                        tr(map['label']?.toString() ?? ''),
                                         style: TextStyle(
                                           fontWeight: done ? FontWeight.w600 : FontWeight.normal,
                                           color: done ? MovaColors.midnight : MovaColors.textSecondary,

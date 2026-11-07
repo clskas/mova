@@ -426,7 +426,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             _aiNote = data['message']?.toString() ?? tr('Estimation automatique indisponible.');
           }
         case Failure(:final error):
-          _aiNote = 'Estimation automatique indisponible : ${error.message}';
+          _aiNote = trf('Estimation automatique indisponible : {message}', {'message': error.message});
       }
     });
   }
@@ -615,7 +615,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           ..._volumeOptions.map((v) {
             return RadioListTile<String>(
               title: Text(tr(v.$2)),
-              subtitle: Text(v.$3, style: const TextStyle(fontSize: 12)),
+              subtitle: Text(tr(v.$3), style: const TextStyle(fontSize: 12)),
               value: v.$1,
               groupValue: _volume,
               onChanged: (val) => setState(() => _onHousingTypeChanged(val!)),
@@ -692,7 +692,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
                     ),
                 ],
               ),
-              subtitle: Text(v.$3, style: const TextStyle(fontSize: 12)),
+              subtitle: Text(tr(v.$3), style: const TextStyle(fontSize: 12)),
               value: v.$1,
               groupValue: _vehicleCategory,
               onChanged: (val) => setState(() {
@@ -751,7 +751,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 [
-                  if (_aiVolumeM3 != null) 'Volume estimé par l\'IA : $_aiVolumeM3 m³ (modifiable en changeant le logement).',
+                  if (_aiVolumeM3 != null) trf('Volume estimé par l\'IA : {_aiVolumeM3} m³ (modifiable en changeant le logement).', {'_aiVolumeM3': _aiVolumeM3}),
                   if (_aiNote != null && _aiNote!.isNotEmpty) _aiNote!,
                 ].join('\n'),
                 style: theme.textTheme.bodySmall,
@@ -917,7 +917,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             labelColor: MovaColors.violet,
             tabs: [
               Tab(text: tr('Nouvelle demande')),
-              Tab(text: 'Mes demandes${_myRequests.isNotEmpty ? ' (${_myRequests.length})' : ''}'),
+              Tab(text: trf('Mes demandes{v1}', {'v1': _myRequests.isNotEmpty ? ' (${_myRequests.length})' : ''})),
             ],
           ),
           Expanded(

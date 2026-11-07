@@ -222,7 +222,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     switch (result) {
       case Success(:final data):
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Envoyé à ${data['sentTo'] ?? email}')),
+          SnackBar(content: Text(trf('Envoyé à {v1}', {'v1': data['sentTo'] ?? email}))),
         );
       case Failure(:final error):
         ScaffoldMessenger.of(context).showSnackBar(

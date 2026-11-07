@@ -386,7 +386,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      '$seatsLeft place${seatsLeft > 1 ? 's' : ''} restante${seatsLeft > 1 ? 's' : ''}',
+                      trf('{seatsLeft} place{v2} restante{v3}', {'seatsLeft': seatsLeft, 'v2': seatsLeft > 1 ? 's' : '', 'v3': seatsLeft > 1 ? 's' : ''}),
                       style: const TextStyle(color: MovaColors.textSecondary),
                     ),
                   ),
@@ -396,7 +396,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                       children: [
                         if (trip['meetingPoint'] != null) ...[
                           const SizedBox(height: 8),
-                          Text('Point de rendez-vous : ${trip['meetingPoint']}'),
+                          Text(trf('Point de rendez-vous : {v1}', {'v1': trip['meetingPoint']})),
                         ],
                         if (trip['notes'] != null) ...[
                           const SizedBox(height: 4),
@@ -417,7 +417,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                               ),
                             ),
                           if (trip['vehicleInfo'] != null)
-                            Text('Véhicule : ${trip['vehicleInfo']}'),
+                            Text(trf('Véhicule : {v1}', {'v1': trip['vehicleInfo']})),
                           if (trip['vehicleType'] != null)
                             Text(
                               'Type : ${trip['vehicleType']}',

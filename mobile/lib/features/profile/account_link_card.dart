@@ -283,8 +283,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
       builder: (ctx) => AlertDialog(
         title: Text(trf('Détacher {label} ?', {'label': label})),
         content: Text(
-          'Vous pourrez encore vous connecter avec $remaining. '
-          'Détacher $label ?',
+          trf('Vous pourrez encore vous connecter avec {remaining}. Détacher {label} ?', {'remaining': remaining, 'label': label}),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),

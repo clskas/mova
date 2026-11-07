@@ -51,7 +51,7 @@ export class UpdateOnboardingDto {
   @ApiPropertyOptional({ type: [String], description: 'Photos de l\'engin (5 max) ; la première est la photo principale' })
   @IsOptional() @IsArray() @ArrayMaxSize(5) @IsString({ each: true }) vehiclePhotoUrls?: string[];
   @ApiPropertyOptional({ description: 'Places passagers (chauffeur non compris), 1–8 ; moto = 1' })
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(8) vehiclePassengerSeats?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(20) vehiclePassengerSeats?: number;
   @ApiPropertyOptional({ description: 'Volume utile (m³) — utilitaire 1–25, camion 5–100' })
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) vehicleCargoVolumeM3?: number;
 }

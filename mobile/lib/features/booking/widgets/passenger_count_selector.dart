@@ -10,13 +10,16 @@ class PassengerCountSelector extends StatelessWidget {
     super.key,
     required this.count,
     required this.onChanged,
-    this.max = kMaxRidePassengerCount,
+    int? max,
     this.note,
-  });
+  }) : _max = max;
 
   final int count;
   final ValueChanged<int> onChanged;
-  final int max;
+  final int? _max;
+
+  /// Largest group (defaults to the admin's largest range).
+  int get max => _max ?? kMaxRidePassengerCount;
 
   /// Replaces the default hint (e.g. « gamme Familiale sélectionnée »).
   final String? note;
@@ -73,7 +76,7 @@ class PassengerCountSelector extends StatelessWidget {
           )
         else if (count >= max && max <= kCarPassengerLimit)
           Text(
-            tr('4 passagers maximum par voiture.'),
+            trf('{n} passagers maximum par voiture.', {'n': kCarPassengerLimit}),
             key: Key('passengerCountNote'),
             style: TextStyle(fontSize: 12, color: MovaColors.textSecondary),
           ),

@@ -1,3 +1,4 @@
+import { applySeatLimits } from '@mova/shared';
 import { HttpStatus, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
   ClientAppsConfig,
@@ -35,6 +36,7 @@ export class ClientAppsConfigService implements OnModuleInit {
     await this.ensureRow();
     const row = await this.prisma.platformConfig.findUnique({ where: { id: CONFIG_ID } });
     this.config = mergeClientAppsConfig(row?.config);
+    applySeatLimits(this.config.seatLimits);
   }
 
   private async ensureRow() {
@@ -60,6 +62,8 @@ export class ClientAppsConfigService implements OnModuleInit {
       sosSmsNumber: this.config.sosSms.sosSmsNumber,
       // Language buttons the apps show (super admin).
       languages: this.config.languages,
+      // Seat limits per range (admin): the apps size the passenger selector with them.
+      seatLimits: this.config.seatLimits,
     };
   }
 
@@ -105,6 +109,7 @@ export class ClientAppsConfigService implements OnModuleInit {
           : this.config.sosEmergencyContacts,
       sosSms: patch.sosSms ? { ...this.config.sosSms, ...patch.sosSms } : this.config.sosSms,
       languages: patch.languages ? { ...this.config.languages, ...patch.languages } : this.config.languages,
+      seatLimits: patch.seatLimits ? { ...this.config.seatLimits, ...patch.seatLimits } : this.config.seatLimits,
     });
 
     this.validate(next);
@@ -114,6 +119,7 @@ export class ClientAppsConfigService implements OnModuleInit {
       data: { config: next as object },
     });
     this.config = mergeClientAppsConfig(row.config);
+    applySeatLimits(this.config.seatLimits);
     return this.getAdmin();
   }
 

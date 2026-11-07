@@ -2966,7 +2966,20 @@ export type ClientAppsConfig = {
   sosSms?: SosSmsConfig;
   /** Boutons de langue dans les apps (SuperAdmin). */
   languages?: LanguagesConfig;
+  /** Nombre de places par gamme (Admin / SuperAdmin). */
+  seatLimits?: SeatLimits;
 };
+
+export type SeatLimits = {
+  carMaxPassengers: number;
+  familialeMinSeats: number;
+  familialeMaxSeats: number;
+  tricycleMaxSeats: number;
+};
+
+export async function updateSeatLimits(limits: SeatLimits): Promise<ClientAppsConfig> {
+  return apiFetch<ClientAppsConfig>("/api/admin/seat-limits", { method: "PATCH", body: JSON.stringify(limits) });
+}
 
 export type LanguagesConfig = {
   en: boolean;

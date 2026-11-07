@@ -1,3 +1,4 @@
+import '../config/client_apps_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -34,6 +35,9 @@ class _MaintenanceGateState extends ConsumerState<MaintenanceGate> {
     switch (result) {
       case Success(:final data):
         final root = data is Map ? Map<String, dynamic>.from(data as Map) : <String, dynamic>{};
+        // Seat limits set in the admin (tricycle, Familiale…).
+        final seats = root['seatLimits'];
+        if (seats is Map) applySeatLimits(Map<String, dynamic>.from(seats));
         final maintenance = root['maintenance'];
         if (maintenance is Map) {
           final apps = maintenance['apps'];

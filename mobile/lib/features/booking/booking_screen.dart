@@ -138,6 +138,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     final result = await ref.read(apiClientProvider).get('/public/client-config');
     if (!mounted) return;
     if (result case Success(:final data)) {
+      final seats = data['seatLimits'];
+      if (seats is Map) applySeatLimits(Map<String, dynamic>.from(seats));
       final enabled = passengerCountFeatureEnabled(data['features']);
       final familiale = familialeFeatureEnabled(data['features']);
       final familialeChanged = familiale != _familialeEnabled;
@@ -180,13 +182,17 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   String? get _passengerNote {
     if (_vehicleType == 'TRICYCLE' && _passengerCount >= kTricyclePassengerLimit) {
-      return tr('Tricycle : 3 passagers maximum.');
+      return trf('Tricycle : {n} passagers maximum.', {'n': kTricyclePassengerLimit});
     }
     if (_vehicleType != 'FAMILIALE' || _passengerCount <= kCarPassengerLimit) return null;
     if (_passengerCount > defaultPassengerSeats('FAMILIALE')) {
       return trf('Gamme Familiale : seuls les véhicules de {_passengerCount} places recevront la course, l\'attente peut être plus longue.', {'_passengerCount': _passengerCount});
     }
-    return tr('Plus de 4 passagers : gamme Familiale (6 à 8 places) sélectionnée.');
+    return trf('Plus de {car} passagers : gamme Familiale ({min} à {max} places) sélectionnée.', {
+      'car': kCarPassengerLimit,
+      'min': kFamilialeMinSeats,
+      'max': kFamilialeMaxSeats,
+    });
   }
 
   /// 5+ passengers move a Standard / Confort / VIP booking to Familiale.
@@ -684,8 +690,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         SnackBar(
           content: Text(
             tricycleCapped
-                ? tr('Tricycle : 3 passagers maximum.')
-                : tr('Standard, Confort et VIP : 4 passagers maximum. Pour 5 à 8, choisissez Familiale.'),
+                ? trf('Tricycle : {n} passagers maximum.', {'n': kTricyclePassengerLimit})
+                : trf('Standard, Confort et VIP : {car} passagers maximum. Pour {from} à {to}, choisissez Familiale.', {
+                    'car': kCarPassengerLimit,
+                    'from': kCarPassengerLimit + 1,
+                    'to': kFamilialeMaxSeats,
+                  }),
           ),
         ),
       );

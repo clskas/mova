@@ -40,7 +40,7 @@ bool tricycleFeatureEnabled(Object? features) =>
     features is Map && features['tricycleEnabled'] == true;
 
 /// Mirrors @mova/shared passenger-seats (driver excluded).
-const Map<String, int> kDefaultPassengerSeats = {
+final Map<String, int> kDefaultPassengerSeats = {
   'MOTO_TAXI': 1,
   'STANDARD': 4,
   'COMFORT': 4,
@@ -51,26 +51,50 @@ const Map<String, int> kDefaultPassengerSeats = {
   'TRICYCLE': 3,
   'TRIPOTEUR': 1,
 };
-const int kMaxRidePassengerCount = 8;
+/// Seat limits — defaults, replaced by the values set in the admin (Services SENGA → Nombre de places).
+int kMaxRidePassengerCount = 8;
 
-/// Standard / Confort / VIP are 4-seat cars; 5+ passengers book the Familiale gamme.
-const int kCarPassengerLimit = 4;
+/// Largest group in a Standard / Confort / VIP car; above it the app books the Familiale gamme.
+int kCarPassengerLimit = 4;
 
-/// A passenger tricycle carries at most 3 people.
-const int kTricyclePassengerLimit = 3;
+/// A passenger tricycle carries at most this many people.
+int kTricyclePassengerLimit = 3;
+
+/// A Familiale vehicle carries this many passengers.
+int kFamilialeMinSeats = 5;
+int kFamilialeMaxSeats = 8;
+
+/// Applies the seat limits from /public/client-config (`seatLimits`). Invalid values are ignored.
+void applySeatLimits(Map<String, dynamic>? raw) {
+  int pick(String key, int current, int min, int max) {
+    final v = raw?[key];
+    final n = v is num ? v.toInt() : int.tryParse(v?.toString() ?? '');
+    return n == null || n < min || n > max ? current : n;
+  }
+
+  kCarPassengerLimit = pick('carMaxPassengers', kCarPassengerLimit, 1, 8);
+  kFamilialeMaxSeats = pick('familialeMaxSeats', kFamilialeMaxSeats, 5, 20);
+  kFamilialeMinSeats = pick('familialeMinSeats', kFamilialeMinSeats, 2, kFamilialeMaxSeats);
+  kTricyclePassengerLimit = pick('tricycleMaxSeats', kTricyclePassengerLimit, 1, 10);
+  kMaxRidePassengerCount = [kFamilialeMaxSeats, kCarPassengerLimit, kTricyclePassengerLimit].reduce((a, b) => a > b ? a : b);
+  kDefaultPassengerSeats['FAMILIALE'] = kFamilialeMinSeats > 6 ? kFamilialeMinSeats : (kFamilialeMaxSeats < 6 ? kFamilialeMaxSeats : 6);
+  kDefaultPassengerSeats['TRICYCLE'] = kTricyclePassengerLimit < 3 ? kTricyclePassengerLimit : 3;
+}
 
 /// Gammes limited to [kCarPassengerLimit] passengers.
 bool isFourSeatGamme(String vehicleType) =>
     vehicleType == 'STANDARD' || vehicleType == 'COMFORT' || vehicleType == 'VIP';
 
-/// Seats a driver may declare: Familiale 5–8, truck 1–2, moto 1, other cars 1–8.
+List<int> _range(int from, int to) => [for (var i = from; i <= to; i++) i];
+
+/// Seats a driver may declare (Familiale and tricycle ranges come from the admin).
 List<int> declarableSeats(String vehicleType) => switch (vehicleType) {
       'MOTO_TAXI' => const [1],
       'CAMION' => const [1, 2],
-      'FAMILIALE' => const [5, 6, 7, 8],
-      'TRICYCLE' => const [1, 2, 3],
+      'FAMILIALE' => _range(kFamilialeMinSeats, kFamilialeMaxSeats),
+      'TRICYCLE' => _range(1, kTricyclePassengerLimit),
       'TRIPOTEUR' => const [1],
-      _ => const [1, 2, 3, 4, 5, 6, 7, 8],
+      _ => _range(1, kFamilialeMaxSeats > 8 ? kFamilialeMaxSeats : 8),
     };
 
 /// Largest number of vehicle photos (driver vehicle, rental vehicle).

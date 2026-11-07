@@ -160,7 +160,7 @@ void main() {
         await tester.pump();
       }
       expect(tester.widget<Text>(find.byKey(const Key('passengerCountValue'))).data, '5');
-      expect(find.textContaining('gamme Familiale (6 à 8 places) sélectionnée'), findsOneWidget);
+      expect(find.textContaining('gamme Familiale (5 à 8 places) sélectionnée'), findsOneWidget);
 
       await tester.tap(find.text('Confort'));
       await tester.pump();

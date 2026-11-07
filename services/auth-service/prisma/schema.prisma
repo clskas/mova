@@ -44,6 +44,8 @@ model User {
   managedCity String?
   /// Passager (et autres) : dernière ville d'activité SENGA (course / livraison).
   homeCity  String?
+  /// Language chosen in the app ('fr' | 'en'): push, SMS and server texts follow it.
+  language  String     @default("fr")
   /// Super-admin overrides of AdminPermission values. Empty = use role defaults.
   adminPermissions String[] @default([])
   createdAt DateTime   @default(now())

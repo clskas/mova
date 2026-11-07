@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Patch, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, ValidateIf } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, ValidateIf } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
@@ -12,6 +12,8 @@ class UpdateProfileDto {
   @ValidateIf((_, value) => value != null && value !== '')
   @IsEmail()
   email?: string;
+  /** App language: 'fr' or 'en'. */
+  @ApiProperty({ required: false, enum: ['fr', 'en'] }) @IsOptional() @IsIn(['fr', 'en']) language?: 'fr' | 'en';
 }
 @ApiTags('users')
 @Controller('users')

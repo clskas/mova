@@ -16,6 +16,8 @@ import {
   afrisoftPayHubGetPayment,
   afrisoftPayHubInitiatePayout,
   afrisoftSmsHubSendSms,
+  currentRequestLanguage,
+  translateServerText,
   formatCdf,
   isAfrisoftHubAsyncRef,
   isAfrisoftPayHubClientConfigured,
@@ -839,7 +841,10 @@ export class WalletService {
 
     if (isAfrisoftSmsHubClientConfigured(this.envGetter)) {
       const text = serdiPaySanitizeSmsText(
-        `SENGA : code ${liveCode} pour confirmer le retrait de ${amountLabel} FC vers ce numero Valable 10 min`,
+        translateServerText(
+          `SENGA : code ${liveCode} pour confirmer le retrait de ${amountLabel} FC vers ce numero Valable 10 min`,
+          currentRequestLanguage(),
+        ),
       );
       const sms = await afrisoftSmsHubSendSms(this.envGetter, {
         phone: normalizedPhone,

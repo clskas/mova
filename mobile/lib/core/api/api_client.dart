@@ -97,6 +97,19 @@ class ApiClient {
     _token = prefs.getString('auth_token');
   }
 
+  static String? _syncedLanguage;
+
+  /// Saves the app language on the profile once per run (and after each change), so push
+  /// notifications and SMS sent while the app is closed use it. Silent when signed out.
+  Future<void> syncLanguageToProfile({bool force = false}) async {
+    final code = appLanguage.value;
+    if (!force && _syncedLanguage == code) return;
+    if (_token == null) await loadToken();
+    if (_token == null || _token!.isEmpty) return;
+    final result = await patch('/users/me', {'language': code}, retries: 1, skipOffline: true);
+    if (result is Success) _syncedLanguage = code;
+  }
+
   Future<void> saveToken(String token) async {
     _token = token;
     final prefs = await SharedPreferences.getInstance();
@@ -176,6 +189,8 @@ class ApiClient {
           'X-Senga-Platform':
               defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
         if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
+        // Server texts (errors, statuses, partner content) come back in this language.
+        'X-App-Language': appLanguage.value,
       };
 
   /// Vérifie la santé de la passerelle. Essaie l'URL principale puis le secours LAN (en parallèle).

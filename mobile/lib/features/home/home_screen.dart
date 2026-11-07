@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../core/i18n/i18n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -124,6 +125,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   Future<void> _loadUser({bool forceRefresh = false}) async {
     final api = ref.read(apiClientProvider);
     await api.loadToken();
+    unawaited(api.syncLanguageToProfile());
     final result = await api.getCurrentUser(forceRefresh: forceRefresh);
     if (!mounted) return;
     if (result case Success(:final data)) {

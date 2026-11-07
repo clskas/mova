@@ -21,6 +21,7 @@ import {
   smtpTlsServername,
 } from './email-otp.mailer';
 import { otpSmsText } from './sms.providers';
+import { runWithLanguage } from '@mova/shared';
 
 describe('smtpReplyComplete', () => {
   it('waits for the last EHLO line (250 space, not 250-)', () => {
@@ -120,6 +121,11 @@ describe('sengaAccessMailCopy', () => {
     expect(sms).not.toContain('rental.afri-soft.com');
     expect(sms).not.toContain('sengapartner.afri-soft.com');
     expect(sms).not.toMatch(/Location/i);
+  });
+
+  it('SMS OTP follows the app language of the request', () => {
+    expect(otpSmsText('SENGA', '319027')).toBe('Votre code SENGA 319027');
+    expect(runWithLanguage('en', () => otpSmsText('SENGA', '319027'))).toBe('Your SENGA code 319027');
   });
 });
 

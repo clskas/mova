@@ -25,9 +25,20 @@ Future<void> loadAppLanguage() async {
   }
 }
 
+/// Called after a language change (e.g. the driver app re-registers its push token).
+/// Each app adds its own hooks at startup, so shared code never imports app-specific code.
+final List<Future<void> Function(String code)> appLanguageChangedHooks = [];
+
 Future<void> setAppLanguage(String code) async {
   if (!kAppLanguages.any((l) => l.code == code)) return;
   appLanguage.value = code;
+  for (final hook in List.of(appLanguageChangedHooks)) {
+    try {
+      await hook(code);
+    } catch (_) {
+      /* a failing hook never blocks the language change */
+    }
+  }
   try {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefKey, code);

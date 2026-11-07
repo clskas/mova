@@ -24,7 +24,7 @@ export async function runAiVision(
 
 /** Asks driver-service to run a fixed text-only task (reply draft…). Never throws. */
 export async function runAiText(
-  task: 'ANALYTICS_ANSWER' | 'DAILY_SUMMARY' | 'REPLY_DRAFT',
+  task: 'ANALYTICS_ANSWER' | 'DAILY_SUMMARY' | 'REPLY_DRAFT' | 'TRANSLATE_CONTENT',
   context: Record<string, unknown>,
 ): Promise<AiVisionAnswer> {
   try {

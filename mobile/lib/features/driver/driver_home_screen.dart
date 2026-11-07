@@ -268,6 +268,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     await _connectDriverCashInbox();
     await DriverJobAlertService.init();
     await DriverPushService.init(ref.read(apiClientProvider));
+    unawaited(ref.read(apiClientProvider).syncLanguageToProfile());
     if (mounted) {
       setState(() => _bootstrapping = false);
       _startAssignmentsPolling();

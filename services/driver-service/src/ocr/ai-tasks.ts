@@ -147,7 +147,7 @@ export function isAiVisionTask(task: unknown): task is AiVisionTask {
 }
 
 /** Text-only tasks (no photos): admin analytics, daily summary, reply drafts. */
-export type AiTextTask = 'ANALYTICS_ANSWER' | 'DAILY_SUMMARY' | 'REPLY_DRAFT';
+export type AiTextTask = 'ANALYTICS_ANSWER' | 'DAILY_SUMMARY' | 'REPLY_DRAFT' | 'TRANSLATE_CONTENT';
 
 const DATA_RULES =
   'Réponds uniquement à partir des données fournies ; si elles ne permettent pas de répondre, dis-le et indique quelle donnée manque. ' +
@@ -222,6 +222,37 @@ export const AI_TEXT_TASKS: Record<
           'propose plutôt les prochaines étapes. Ne cite aucune donnée personnelle. Réponds dans la langue du message du client.',
         `Contexte : ${String(ctx.kind ?? '')} ${String(ctx.subject ?? '').slice(0, 300)}`,
         `Message du client : ${String(ctx.message ?? '').slice(0, 2000)}`,
+      ].join('\n'),
+  },
+  /** Partner content (menu items, listings, ads) → English, shown to users who chose English. */
+  TRANSLATE_CONTENT: {
+    maxTokens: 4000,
+    schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              key: { type: 'string', description: 'La clé reçue, recopiée telle quelle' },
+              en: { type: 'string', description: 'Traduction anglaise' },
+            },
+            required: ['key', 'en'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['items'],
+      additionalProperties: false,
+    },
+    prompt: (ctx) =>
+      [
+        'Traduis en anglais les textes ci-dessous, écrits par des partenaires SENGA en RDC (menus de restaurants, magasins, annonces de location de véhicules, publicités).',
+        'Garde tels quels les noms propres, les marques, les noms de plats locaux sans équivalent (ex. pondu, liboke, fufu, chikwangue, makayabu) et les montants.',
+        'Traduction naturelle et courte, à peu près de même longueur, sans rien ajouter ni commenter. Si un texte est déjà en anglais, recopie-le.',
+        'Renvoie un élément par clé reçue, avec la même clé.',
+        `Textes (JSON clé → texte) : ${JSON.stringify(ctx.texts ?? {}).slice(0, 12000)}`,
       ].join('\n'),
   },
 };

@@ -41,6 +41,9 @@ L'IA de SENGA passe par **Claude (Anthropic)**, appelé **uniquement par `mova-d
 | Annonce de location | Portail loueur → Véhicule | `RENTAL_LISTING` |
 | Résumé du jour, questions sur les données | Admin → Analyses IA | `DAILY_SUMMARY`, `ANALYTICS_ANSWER` (chiffres agrégés, données personnelles retirées) |
 | Brouillon de réponse aux litiges | Admin → Litiges | `REPLY_DRAFT` |
+| Traduction anglaise des contenus partenaires (menus, annonces, publicités) | App en anglais | `TRANSLATE_CONTENT` — traduit une fois, gardé en cache (`content_translations`) ; `CONTENT_TRANSLATION=false` sur `mova-ride` pour couper |
+
+**Langue** : l'app envoie `X-App-Language` (fr/en). La passerelle traduit les textes du serveur (erreurs, statuts) avec le dictionnaire `packages/shared/src/server-strings-en.ts` ; notifications et SMS suivent la langue enregistrée sur le profil (`users.language`) et sur l'appareil (`push_devices.language`). Les portails web restent en français.
 
 **Couper l'IA** : `AI_ENABLED=false` sur `mova-driver` (Render). Toutes les fonctions affichent alors un message et la saisie manuelle continue de fonctionner. Aucune décision n'est prise par l'IA seule : un humain relit toujours (menu, annonce, réponses, verdicts).
 

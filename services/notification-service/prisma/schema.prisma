@@ -28,6 +28,8 @@ model PushDevice {
   token     String   @unique
   platform  String?
   appFlavor String   @default("driver")
+  /// App language on this device ('fr' | 'en'): push texts are sent in it.
+  language  String   @default("fr")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

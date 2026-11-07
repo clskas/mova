@@ -25,6 +25,14 @@ class LegalScreen extends StatelessWidget {
   final String? apiPath;
 
   Future<({String body, String format})> _load() async {
+    // English: the bundled translation (the published server text is the binding French version).
+    if (appLanguage.value == 'en' && asset.endsWith('_fr.md')) {
+      try {
+        return (body: await rootBundle.loadString(asset.replaceFirst(RegExp(r'_fr\.md$'), '_en.md')), format: 'markdown');
+      } catch (_) {
+        /* no English file: fall back to French below */
+      }
+    }
     final path = apiPath;
     if (path != null && path.isNotEmpty) {
       try {

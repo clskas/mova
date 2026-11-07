@@ -1231,3 +1231,15 @@ model UploadedMedia {
   @@index([category])
   @@map("uploaded_media")
 }
+
+/// English version of a partner text (menu item, listing, ad), translated once by Claude.
+model ContentTranslation {
+  /// sha1 of the French source text
+  id        String   @id
+  source    String
+  en        String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("content_translations")
+}

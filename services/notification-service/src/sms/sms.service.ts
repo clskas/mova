@@ -8,6 +8,7 @@ import {
   isTwilioSmsConfigured,
   resolveSmsBackend,
   serdiPaySendSms,
+  translateServerText,
 } from '@mova/shared';
 
 export interface SmsSendResult {
@@ -27,7 +28,9 @@ export class SmsService {
     return this.config.get('MOCK_SMS') === 'true' || this.config.get('MOCK_OTP') === 'true';
   }
 
-  async sendMessage(phone: string, body: string): Promise<SmsSendResult> {
+  /** [language]: the recipient's app language; French texts are translated for 'en'. */
+  async sendMessage(phone: string, body: string, language?: 'fr' | 'en'): Promise<SmsSendResult> {
+    if (language === 'en') body = translateServerText(body, 'en');
     if (this.isMock()) {
       if (isProductionRuntime()) {
         this.logger.error('[MOCK SMS] refused in production');

@@ -1,5 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { translateServerText } from '@mova/shared';
+import { PushTokensService } from './push-tokens.service';
 import { GoogleAuth, JWT } from 'google-auth-library';
 
 export interface FcmPushMessage {
@@ -38,7 +40,10 @@ export class FcmPushService {
   private cachedProjectId: string | null = null;
   private configLogged = false;
 
-  constructor(private config: ConfigService) {}
+  constructor(
+    private config: ConfigService,
+    @Optional() private pushTokens?: PushTokensService,
+  ) {}
 
   isConfigured(): boolean {
     return Boolean(this.loadServiceAccount() || this.config.get<string>('FCM_SERVER_KEY')?.trim());
@@ -50,6 +55,29 @@ export class FcmPushService {
     opts?: { profile?: FcmPushProfile; platform?: FcmPushPlatform; iosSound?: string },
   ): Promise<void> {
     if (tokens.length === 0) return;
+
+    // Devices running the app in English get the English text; the others keep French.
+    if (this.pushTokens && !(opts as { _lang?: string } | undefined)?._lang) {
+      let english = new Set<string>();
+      try {
+        english = await this.pushTokens.englishTokens([...new Set(tokens.filter(Boolean))]);
+      } catch {
+        /* keep French */
+      }
+      if (english.size > 0) {
+        const fr = tokens.filter((t) => !english.has(t));
+        const en = tokens.filter((t) => english.has(t));
+        const tr = (v: string) => translateServerText(v, 'en');
+        const data = Object.fromEntries(
+          Object.entries(message.data ?? {}).map(([k, v]) => [k, k === 'title' || k === 'body' ? tr(String(v)) : v]),
+        );
+        await Promise.all([
+          fr.length ? this.sendToTokens(fr, message, { ...opts, _lang: 'fr' } as typeof opts) : Promise.resolve(),
+          this.sendToTokens(en, { title: tr(message.title), body: tr(message.body), data }, { ...opts, _lang: 'en' } as typeof opts),
+        ]);
+        return;
+      }
+    }
 
     const unique = [...new Set(tokens.filter(Boolean))];
     const data = Object.fromEntries(

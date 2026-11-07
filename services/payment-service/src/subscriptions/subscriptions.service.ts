@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { SubscriptionStatus, SubscriptionTarget } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
@@ -74,7 +75,16 @@ export class SubscriptionsService {
     });
   }
 
+  /** Marks subscriptions past their end date as EXPIRED (one month per payment). */
+  private async expireEnded(userId: string) {
+    await this.prisma.userSubscription.updateMany({
+      where: { userId, status: SubscriptionStatus.ACTIVE, endsAt: { lte: new Date() } },
+      data: { status: SubscriptionStatus.EXPIRED },
+    });
+  }
+
   async getActiveSubscription(userId: string, target?: SubscriptionTarget) {
+    await this.expireEnded(userId);
     const subs = await this.prisma.userSubscription.findMany({
       where: { userId, status: SubscriptionStatus.ACTIVE },
       include: { plan: true },
@@ -87,10 +97,16 @@ export class SubscriptionsService {
     if (!plan.isActive) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Ce plan n\'est plus disponible.');
     }
+    await this.expireEnded(userId);
     const endsAt = new Date();
     endsAt.setMonth(endsAt.getMonth() + 1);
-    const subscribeRef = `SUBSCRIBE:${userId}:${plan.target}`;
+    // One reference per subscription: a fixed one let every later subscription through
+    // without any debit (the wallet treats a known reference as already paid).
+    const subscribeRef = `SUBSCRIBE:${userId}:${plan.target}:${randomUUID()}`;
     const sub = await this.prisma.$transaction(async (tx) => {
+      // Debit first: it locks the wallet row, so a concurrent subscribe waits here and then
+      // sees the subscription created by the first one (and rolls back its debit).
+      await this.wallet.debit(userId, plan.monthlyPriceCdf, `Abonnement ${plan.name}`, subscribeRef, tx);
       const existing = await tx.userSubscription.findFirst({
         where: { userId, status: SubscriptionStatus.ACTIVE, plan: { target: plan.target } },
       });
@@ -101,7 +117,6 @@ export class SubscriptionsService {
           'Vous avez déjà un abonnement actif pour ce profil.',
         );
       }
-      await this.wallet.debit(userId, plan.monthlyPriceCdf, `Abonnement ${plan.name}`, subscribeRef, tx);
       return tx.userSubscription.create({
         data: {
           userId,

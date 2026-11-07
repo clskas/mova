@@ -14,6 +14,15 @@ export type RecordDebtInput = {
   beneficiaryUserId?: string;
 };
 
+/** Stable key of a set of debts (ids + amounts): the same set always gives the same key. */
+export function debtSetKey(debts: Array<{ id: string; amountCdf: number }>): string {
+  const canonical = debts
+    .map((d) => `${d.id}:${d.amountCdf}`)
+    .sort()
+    .join('|');
+  return crypto.createHash('sha256').update(canonical).digest('hex').slice(0, 24);
+}
+
 @Injectable()
 export class DriverDebtLedgerService {
   private readonly logger = new Logger(DriverDebtLedgerService.name);
@@ -161,25 +170,22 @@ export class DriverDebtLedgerService {
   }
 
   async settleFromWallet(driverUserId: string) {
-    const summary = await this.getSummary(driverUserId);
-    if (summary.totalOpenCdf <= 0) {
-      return { settled: false as const, message: 'Aucune dette espèces ouverte' };
-    }
-
     const openDebts = await this.prisma.driverCashDebt.findMany({
       where: { driverUserId, status: CashDebtStatus.OPEN },
     });
+    const total = openDebts.reduce((sum, d) => sum + d.amountCdf, 0);
+    if (total <= 0) {
+      return { settled: false as const, message: 'Aucune dette espèces ouverte' };
+    }
 
-    const settlementRef = `CASH_DEBT_SETTLE:${driverUserId}:${Date.now()}`;
-    await this.wallet.debit(
-      driverUserId,
-      summary.totalOpenCdf,
-      'Règlement dettes espèces SENGA',
-      settlementRef,
-    );
+    // Same debts (and amounts) → same reference: a double tap debits once (the wallet
+    // de-duplicates on the reference under its row lock).
+    const settlementRef = `CASH_DEBT_SETTLE:${driverUserId}:${debtSetKey(openDebts)}`;
+    await this.wallet.debit(driverUserId, total, 'Règlement dettes espèces SENGA', settlementRef);
 
+    // Only the debts that were debited — one recorded meanwhile stays open.
     const updated = await this.prisma.driverCashDebt.updateMany({
-      where: { driverUserId, status: CashDebtStatus.OPEN },
+      where: { id: { in: openDebts.map((d) => d.id) }, status: CashDebtStatus.OPEN },
       data: {
         status: CashDebtStatus.SETTLED,
         settledAt: new Date(),
@@ -191,7 +197,7 @@ export class DriverDebtLedgerService {
 
     return {
       settled: true as const,
-      amountCdf: summary.totalOpenCdf,
+      amountCdf: total,
       settledCount: updated.count,
       settlementRef,
       message: 'Dettes espèces réglées depuis le portefeuille',
@@ -584,8 +590,17 @@ export class DriverDebtLedgerService {
       return { confirmed: false as const, message: 'Code invalide ou expiré' };
     }
 
-    const summary = await this.getSummary(request.driverUserId);
-    if (summary.totalOpenCdf <= 0) {
+    // Only the debts that existed when the code was made: the counter collects the amount
+    // shown with the code, and debts recorded afterwards stay open.
+    const openDebts = await this.prisma.driverCashDebt.findMany({
+      where: {
+        driverUserId: request.driverUserId,
+        status: CashDebtStatus.OPEN,
+        createdAt: { lte: request.createdAt },
+      },
+    });
+    const total = openDebts.reduce((sum, d) => sum + d.amountCdf, 0);
+    if (total <= 0) {
       await this.prisma.driverCashDebtCashRequest.update({
         where: { id: request.id },
         data: { status: CashDebtCashRequestStatus.CANCELLED },
@@ -593,24 +608,29 @@ export class DriverDebtLedgerService {
       return { confirmed: false as const, message: 'Aucune dette ouverte pour ce chauffeur' };
     }
 
-    const openDebts = await this.prisma.driverCashDebt.findMany({
-      where: { driverUserId: request.driverUserId, status: CashDebtStatus.OPEN },
-    });
-    const settlementRef = `CASH_DEBT_CASH:${request.id}:${Date.now()}`;
-    const updated = await this.prisma.driverCashDebt.updateMany({
-      where: { driverUserId: request.driverUserId, status: CashDebtStatus.OPEN },
-      data: { status: CashDebtStatus.SETTLED, settledAt: new Date(), settlementRef },
-    });
-
-    await this.prisma.driverCashDebtCashRequest.update({
-      where: { id: request.id },
+    // Claim the code first so two counters cannot confirm it twice.
+    const claimed = await this.prisma.driverCashDebtCashRequest.updateMany({
+      where: { id: request.id, status: CashDebtCashRequestStatus.PENDING },
       data: {
         status: CashDebtCashRequestStatus.CONFIRMED,
         confirmedAt: new Date(),
         confirmedBy: confirmedByUserId ?? null,
-        settlementRef,
-        amountCdf: summary.totalOpenCdf,
       },
+    });
+    if (claimed.count !== 1) {
+      return { confirmed: false as const, message: 'Code déjà utilisé' };
+    }
+
+    const settlementRef = `CASH_DEBT_CASH:${request.id}`;
+    const updated = await this.prisma.driverCashDebt.updateMany({
+      where: { id: { in: openDebts.map((d) => d.id) }, status: CashDebtStatus.OPEN },
+      data: { status: CashDebtStatus.SETTLED, settledAt: new Date(), settlementRef },
+    });
+    const summary = { totalOpenCdf: total };
+
+    await this.prisma.driverCashDebtCashRequest.update({
+      where: { id: request.id },
+      data: { settlementRef, amountCdf: total },
     });
 
     await this.applyCashDebtSettlementCredits(openDebts);

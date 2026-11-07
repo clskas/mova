@@ -5,7 +5,7 @@ import { MovaHttpException } from '@mova/shared';
 describe('SubscriptionsService', () => {
   const prisma = {
     subscriptionPlan: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
-    userSubscription: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn() },
+    userSubscription: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     $transaction: jest.fn(),
   };
 
@@ -41,5 +41,33 @@ describe('SubscriptionsService', () => {
   it('signale un plan introuvable', async () => {
     prisma.subscriptionPlan.findUnique.mockResolvedValue(null);
     await expect(service.getPlan('missing')).rejects.toBeInstanceOf(MovaHttpException);
+  });
+  describe('paid re-subscribe and expiry (audit 2026-11)', () => {
+    const plan = { id: 'p1', name: 'SENGA Plus', target: 'PASSENGER', monthlyPriceCdf: 15000, isActive: true };
+    const tx = { userSubscription: { findFirst: jest.fn(), create: jest.fn() } };
+    beforeEach(() => {
+      prisma.subscriptionPlan.findUnique.mockResolvedValue(plan);
+      prisma.$transaction.mockImplementation(async (fn: (t: typeof tx) => unknown) => fn(tx));
+      tx.userSubscription.findFirst.mockResolvedValue(null);
+      tx.userSubscription.create.mockResolvedValue({ id: 's', plan });
+    });
+
+    it('debits every subscription with its own reference', async () => {
+      await service.subscribe('u1', 'p1');
+      await service.subscribe('u1', 'p1');
+      const refs = wallet.debit.mock.calls.map((c: unknown[]) => c[3]);
+      expect(wallet.debit).toHaveBeenCalledTimes(2);
+      expect(refs[0]).not.toBe(refs[1]);
+      expect(String(refs[0])).toMatch(/^SUBSCRIBE:u1:PASSENGER:/);
+    });
+
+    it('expires subscriptions past their end date', async () => {
+      prisma.userSubscription.findMany.mockResolvedValue([]);
+      await service.getActiveSubscription('u1');
+      expect(prisma.userSubscription.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'u1', status: 'ACTIVE', endsAt: { lte: expect.any(Date) } },
+        data: { status: 'EXPIRED' },
+      });
+    });
   });
 });

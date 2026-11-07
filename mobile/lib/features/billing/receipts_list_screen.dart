@@ -104,7 +104,7 @@ class _ReceiptsListScreenState extends ConsumerState<ReceiptsListScreen> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          item['title']?.toString() ?? item['serviceTypeLabel']?.toString() ?? 'Reçu',
+                                          item['title']?.toString() ?? item['serviceTypeLabel']?.toString() ?? tr('Reçu'),
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(fontWeight: FontWeight.w600),

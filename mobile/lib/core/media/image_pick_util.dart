@@ -82,7 +82,7 @@ Future<XFile?> cropMovaImage(XFile source) async {
       maxHeight: kMovaPickMaxSide,
       uiSettings: [
         AndroidUiSettings(
-          toolbarTitle: 'Rogner',
+          toolbarTitle: tr('Rogner'),
           toolbarColor: const Color(0xFF6366F1),
           toolbarWidgetColor: Colors.white,
           activeControlsWidgetColor: const Color(0xFF6366F1),
@@ -98,8 +98,8 @@ Future<XFile?> cropMovaImage(XFile source) async {
         ),
         IOSUiSettings(
           title: tr('Rogner'),
-          cancelButtonTitle: 'Annuler',
-          doneButtonTitle: 'Valider',
+          cancelButtonTitle: tr('Annuler'),
+          doneButtonTitle: tr('Valider'),
           aspectRatioPresets: presets,
         ),
       ],
@@ -136,7 +136,7 @@ void showImagePickError(BuildContext context, {String? message}) {
     SnackBar(
       content: Text(
         message ??
-            'Impossible d\'accéder à la caméra ou à la galerie. Réessayez.',
+            tr('Impossible d\'accéder à la caméra ou à la galerie. Réessayez.'),
       ),
     ),
   );

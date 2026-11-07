@@ -64,7 +64,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
   }
 
   String get _payoutLabel {
-    final provider = _data?['payoutProvider']?.toString() ?? 'Mobile Money';
+    final provider = _data?['payoutProvider']?.toString() ?? tr('Mobile Money');
     final masked = _data?['payoutPhoneMasked']?.toString();
     if (masked != null && masked.isNotEmpty) return '$provider · $masked';
     return provider;
@@ -374,7 +374,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     final available = _asInt(_data?['withdrawableCdf'] ?? _data?['walletBalanceCdf']);
     if (available < total) {
       setState(() => _error =
-          'Solde insuffisant pour régler ${MarketConfig.formatCdf(total)} (disponible : ${MarketConfig.formatCdf(available)})');
+          trf('Solde insuffisant pour régler {v1} (disponible : {v2})', {'v1': MarketConfig.formatCdf(total), 'v2': MarketConfig.formatCdf(available)}));
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -402,7 +402,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     switch (result) {
       case Success(:final data):
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message']?.toString() ?? 'Dettes espèces réglées')),
+          SnackBar(content: Text(data['message']?.toString() ?? tr('Dettes espèces réglées'))),
         );
         await _load();
       case Failure(:final error):
@@ -422,17 +422,17 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     if (_withdrawing) return;
     final phone = MarketConfig.normalizePhone(_payoutPhoneController.text.trim());
     if (!_payoutConfigured && phone.isEmpty) {
-      setState(() => _error = 'Indiquez le numéro Mobile Money de retrait.');
+      setState(() => _error = tr('Indiquez le numéro Mobile Money de retrait.'));
       return;
     }
     final amount = int.tryParse(_amountController.text.trim());
     if (amount == null || amount < _minWithdraw) {
-      setState(() => _error = 'Montant minimum : ${MarketConfig.formatCdf(_minWithdraw)}');
+      setState(() => _error = trf('Montant minimum : {v1}', {'v1': MarketConfig.formatCdf(_minWithdraw)}));
       return;
     }
     final available = _asInt(_data?['withdrawableCdf'] ?? _data?['walletBalanceCdf']);
     if (amount > available) {
-      setState(() => _error = 'Solde disponible : ${MarketConfig.formatCdf(available)}');
+      setState(() => _error = trf('Solde disponible : {v1}', {'v1': MarketConfig.formatCdf(available)}));
       return;
     }
     setState(() {
@@ -450,7 +450,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     switch (result) {
       case Success(:final data):
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message']?.toString() ?? 'Retrait en cours…')),
+          SnackBar(content: Text(data['message']?.toString() ?? tr('Retrait en cours…'))),
         );
         await _load();
       case Failure(:final error):
@@ -687,7 +687,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        item['label']?.toString() ?? 'Mission',
+                        item['label']?.toString() ?? tr('Mission'),
                         style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,

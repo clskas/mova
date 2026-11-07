@@ -4,6 +4,7 @@ import '../chat/delivery_chat_screen.dart';
 import '../chat/errand_chat_screen.dart';
 import '../chat/rental_chat_screen.dart';
 import '../chat/ride_chat_screen.dart';
+import '../../core/i18n/i18n.dart';
 
 String historyToBillingType(String? historyType) {
   switch (historyType) {
@@ -64,7 +65,7 @@ void openBillingChat(
           builder: (_) => RideChatScreen(
             rideId: rideId,
             myRole: 'passenger',
-            peerLabel: 'Chauffeur',
+            peerLabel: tr('Chauffeur'),
           ),
         ),
       );
@@ -77,7 +78,7 @@ void openBillingChat(
           builder: (_) => ErrandChatScreen(
             errandId: errandId,
             myRole: 'passenger',
-            peerLabel: 'Livreur',
+            peerLabel: tr('Livreur'),
           ),
         ),
       );
@@ -90,7 +91,7 @@ void openBillingChat(
           builder: (_) => DeliveryChatScreen(
             deliveryId: deliveryId,
             myRole: 'passenger',
-            peerLabel: 'Livreur',
+            peerLabel: tr('Livreur'),
           ),
         ),
       );
@@ -103,7 +104,7 @@ void openBillingChat(
           builder: (_) => RentalChatScreen(
             inquiryId: inquiryId,
             myRole: 'passenger',
-            peerLabel: 'Loueur',
+            peerLabel: tr('Loueur'),
           ),
         ),
       );
@@ -115,7 +116,7 @@ void openBillingChat(
             builder: (_) => RideChatScreen(
               rideId: fallbackRideId,
               myRole: 'passenger',
-              peerLabel: 'Chauffeur',
+              peerLabel: tr('Chauffeur'),
             ),
           ),
         );

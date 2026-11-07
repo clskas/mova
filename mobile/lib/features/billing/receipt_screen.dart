@@ -315,7 +315,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           SnackBar(
             content: Text(
               data['message']?.toString() ??
-                  'Déclaration enregistrée — le chauffeur confirmera « Cash reçu ».',
+                  tr('Déclaration enregistrée — le chauffeur confirmera « Cash reçu ».'),
             ),
           ),
         );

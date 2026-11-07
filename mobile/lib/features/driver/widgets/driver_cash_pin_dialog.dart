@@ -98,7 +98,7 @@ class _DriverCashPinDialogState extends State<DriverCashPinDialog> {
     }
     setState(() {
       _submitting = false;
-      _error = result.message ?? 'Code PIN incorrect';
+      _error = result.message ?? tr('Code PIN incorrect');
       _controller.clear();
     });
   }

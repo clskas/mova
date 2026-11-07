@@ -31,7 +31,7 @@ class BluetoothPrintService {
     if (device != null) {
       await _printer.connect(device);
     } else if (!await isConnected()) {
-      throw StateError('Aucune imprimante Bluetooth connectée.');
+      throw StateError(tr('Aucune imprimante Bluetooth connectée.'));
     }
     await _printer.writeBytes(bytes);
   }
@@ -42,7 +42,7 @@ class BluetoothPrintService {
     if (!context.mounted) return;
 
     if (devices.isEmpty) {
-      throw StateError('Aucune imprimante Bluetooth appairée. Appairez votre imprimante dans les réglages Android.');
+      throw StateError(tr('Aucune imprimante Bluetooth appairée. Appairez votre imprimante dans les réglages Android.'));
     }
 
     BluetoothDevice? selected = devices.length == 1 ? devices.first : await showDialog<BluetoothDevice>(
@@ -56,7 +56,7 @@ class BluetoothPrintService {
             children: devices
                 .map(
                   (d) => ListTile(
-                    title: Text(d.name ?? 'Imprimante'),
+                    title: Text(d.name ?? tr('Imprimante')),
                     subtitle: Text(d.address ?? ''),
                     onTap: () => Navigator.pop(ctx, d),
                   ),

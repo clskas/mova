@@ -266,7 +266,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
     if (url.isEmpty || token.isEmpty) {
       setState(() {
         _phase = _CallPhase.error;
-        _error = 'Configuration appel invalide.';
+        _error = tr('Configuration appel invalide.');
       });
       return;
     }
@@ -517,7 +517,7 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
             return trf('{peerLabel} a raccroché', {'peerLabel': widget.peerLabel});
         }
       case _CallPhase.error:
-        return _error ?? 'Erreur';
+        return _error ?? tr('Erreur');
     }
   }
 

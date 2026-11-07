@@ -66,7 +66,7 @@ class _CashDebtCashPaymentScreenState extends ConsumerState<CashDebtCashPaymentS
         if (data['created'] == false) {
           setState(() {
             _loading = false;
-            _error = data['message']?.toString() ?? 'Aucune dette espèces ouverte';
+            _error = data['message']?.toString() ?? tr('Aucune dette espèces ouverte');
           });
           return;
         }

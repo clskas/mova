@@ -50,7 +50,7 @@ class SubscriptionPlanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = plan['name']?.toString() ?? 'Plan';
+    final name = plan['name']?.toString() ?? tr('Plan');
     final price = plan['monthlyPriceCdf'] as int? ?? 0;
     final description = plan['description']?.toString();
     final benefits = benefitsFor(plan);

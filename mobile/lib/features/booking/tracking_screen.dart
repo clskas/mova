@@ -40,7 +40,7 @@ List<Map<String, dynamic>> computeRideTimeline(String mobileStatus) {
     'Terminé',
   ];
   if (mobileStatus == 'CANCELLED') {
-    return [{'label': 'Course annulée', 'done': true}];
+    return [{'label': tr('Course annulée'), 'done': true}];
   }
   final normalized = switch (mobileStatus) {
     'ACCEPTED' => 'DRIVER_ASSIGNED',
@@ -492,7 +492,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
           threadId: widget.rideId,
           senderRole: role,
           text: payload['text']?.toString() ?? '',
-          peerLabel: _driver?['name']?.toString() ?? 'Chauffeur',
+          peerLabel: _driver?['name']?.toString() ?? tr('Chauffeur'),
           messageId: payload['id']?.toString(),
         );
       },
@@ -549,7 +549,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         deliveryId: widget.rideId,
         starterId: payload['starterId']?.toString() ?? '',
         myUserId: _userId,
-        peerLabel: _driver?['name']?.toString() ?? 'Chauffeur',
+        peerLabel: _driver?['name']?.toString() ?? tr('Chauffeur'),
         kind: 'ride',
         fromRealtime: true,
       ));
@@ -557,7 +557,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   }
 
   Future<void> _openVoiceCall() {
-    final peer = _driver?['name']?.toString() ?? 'Chauffeur';
+    final peer = _driver?['name']?.toString() ?? tr('Chauffeur');
     unawaited(CallRingService.stop(deliveryId: widget.rideId));
     return Navigator.push(
       context,
@@ -664,7 +664,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     await showCallWhatsAppSheet(
       context,
       phone: phone,
-      peerLabel: 'le chauffeur',
+      peerLabel: tr('le chauffeur'),
     );
   }
 
@@ -675,16 +675,16 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     switch (result) {
       case Success(:final data):
         final url = data['shareUrl']?.toString() ?? 'https://mova.cd/suivi/${widget.rideId}';
-        final pickup = _ride?['pickupAddress']?.toString() ?? 'Départ';
-        final dropoff = _ride?['dropoffAddress']?.toString() ?? 'Arrivée';
+        final pickup = _ride?['pickupAddress']?.toString() ?? tr('Départ');
+        final dropoff = _ride?['dropoffAddress']?.toString() ?? tr('Arrivée');
         final text = 'Je suis en course SENGA ($pickup → $dropoff). Suivi : $url';
         await Clipboard.setData(ClipboardData(text: text));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(tr('Lien de suivi copié dans le presse-papiers'))),
         );
       case Failure():
-        final pickup = _ride?['pickupAddress']?.toString() ?? 'Départ';
-        final dropoff = _ride?['dropoffAddress']?.toString() ?? 'Arrivée';
+        final pickup = _ride?['pickupAddress']?.toString() ?? tr('Départ');
+        final dropoff = _ride?['dropoffAddress']?.toString() ?? tr('Arrivée');
         final text = 'Je suis en course SENGA ($pickup → $dropoff). https://mova.cd/suivi/${widget.rideId}';
         await Clipboard.setData(ClipboardData(text: text));
         ScaffoldMessenger.of(context).showSnackBar(
@@ -834,7 +834,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       );
     }
 
-    final driverName = _driver?['name']?.toString() ?? 'Chauffeur';
+    final driverName = _driver?['name']?.toString() ?? tr('Chauffeur');
     final rating = (_driver?['rating'] as num?)?.toDouble();
     final plate = _driver?['plateNumber']?.toString() ?? '—';
     final vehicle = _driver?['vehicleType']?.toString() ??

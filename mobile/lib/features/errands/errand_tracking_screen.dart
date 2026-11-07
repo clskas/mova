@@ -652,7 +652,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${_order?['pickupAddress'] ?? 'Retrait'} → '
+                                    '${_order?['pickupAddress'] ?? tr('Retrait')} → '
                                     '${_order?['dropoffAddress'] ?? _order?['deliveryAddress'] ?? widget.deliveryAddress}',
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
@@ -678,7 +678,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 12),
-                                  ServicePriceDisplay.passengerCard(_order, totalLabel: 'Total à payer'),
+                                  ServicePriceDisplay.passengerCard(_order, totalLabel: tr('Total à payer')),
                                 ],
                               ),
                             ),
@@ -744,7 +744,7 @@ class _ErrandTrackingScreenState extends ConsumerState<ErrandTrackingScreen> {
                                     builder: (_) => ErrandChatScreen(
                                       errandId: widget.errandId,
                                       myRole: 'passenger',
-                                      peerLabel: courier?['name']?.toString() ?? 'Livreur',
+                                      peerLabel: courier?['name']?.toString() ?? tr('Livreur'),
                                     ),
                                   ),
                                 );

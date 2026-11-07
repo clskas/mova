@@ -44,7 +44,7 @@ class _ContactSupportScreenState extends ConsumerState<ContactSupportScreen> {
         setState(() {
           _contacts = const [];
           _loading = false;
-          _error = 'Impossible de charger les contacts.';
+          _error = tr('Impossible de charger les contacts.');
         });
     }
   }

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../error/result.dart';
+import '../../core/i18n/i18n.dart';
 
 final syncQueueProvider = Provider<SyncQueue>((ref) => SyncQueue.instance);
 
@@ -68,7 +69,7 @@ class SyncQueue {
 
   static SyncQueue get instance {
     if (_instance == null) {
-      throw StateError('SyncQueue.init() must be called before use');
+      throw StateError(tr('SyncQueue.init() must be called before use'));
     }
     return _instance!;
   }

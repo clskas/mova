@@ -78,7 +78,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           setState(() {
             _applyProfile(cached.profile!, syncedAt: cached.syncedAt);
             _loading = false;
-            _error = 'Profil hors ligne (dernière synchro).';
+            _error = tr('Profil hors ligne (dernière synchro).');
           });
         } else if (mounted) {
           setState(() {
@@ -97,7 +97,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final lastName = _lastName.text.trim();
     final email = _email.text.trim();
     if (email.isNotEmpty && !_isValidEmail(email)) {
-      setState(() => _error = 'Adresse e-mail invalide (ex. nom@domaine.com).');
+      setState(() => _error = tr('Adresse e-mail invalide (ex. nom@domaine.com).'));
       return;
     }
 

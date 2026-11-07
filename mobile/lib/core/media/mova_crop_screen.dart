@@ -60,7 +60,7 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
       previous?.dispose();
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'Impossible de charger l\'image.');
+      setState(() => _error = tr('Impossible de charger l\'image.'));
     }
   }
 
@@ -76,7 +76,7 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
       if (cropped == null) {
         setState(() {
           _busy = false;
-          _error = 'Échec du rognage. Réessayez.';
+          _error = tr('Échec du rognage. Réessayez.');
         });
         return;
       }
@@ -85,7 +85,7 @@ class _MovaCropScreenState extends State<MovaCropScreen> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'Échec du rognage. Réessayez.';
+        _error = tr('Échec du rognage. Réessayez.');
       });
     }
   }

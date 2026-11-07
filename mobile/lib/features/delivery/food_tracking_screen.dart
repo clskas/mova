@@ -146,8 +146,8 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
   List<Map<String, dynamic>> get _timeline {
     final raw = _delivery?['timeline'] as List? ?? _delivery?['tracking'] as List?;
     if (raw != null && raw.isNotEmpty) return raw.cast<Map<String, dynamic>>();
-    return const [
-      {'label': 'Envoyée au restaurant', 'done': true},
+    return [
+      {'label': tr('Envoyée au restaurant'), 'done': true},
       {'label': 'Acceptée', 'done': false},
       {'label': 'En route', 'done': false},
       {'label': 'Livré', 'done': false},
@@ -603,7 +603,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                               const SizedBox(height: 12),
                               ServicePriceDisplay.passengerCard(
                                 _delivery,
-                                totalLabel: 'Total commande',
+                                totalLabel: tr('Total commande'),
                               ),
                               Text(
                                 _statusLabel,
@@ -690,7 +690,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
                                     builder: (_) => DeliveryChatScreen(
                                       deliveryId: widget.orderId,
                                       myRole: 'passenger',
-                                      peerLabel: courier?['name']?.toString() ?? 'Livreur',
+                                      peerLabel: courier?['name']?.toString() ?? tr('Livreur'),
                                     ),
                                   ),
                                 );

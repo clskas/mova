@@ -125,7 +125,7 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
     if (loc == null) {
       setState(() {
         _loadingGps = false;
-        _error = 'Activez le GPS pour positionner le lieu.';
+        _error = tr('Activez le GPS pour positionner le lieu.');
       });
       return;
     }
@@ -142,12 +142,12 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
   Future<void> _submit() async {
     final name = _nameController.text.trim();
     if (name.length < 2) {
-      setState(() => _error = 'Indiquez le nom du lieu.');
+      setState(() => _error = tr('Indiquez le nom du lieu.'));
       return;
     }
     final coords = _coords;
     if (coords == null) {
-      setState(() => _error = 'Positionnez le lieu (GPS ou coordonnées).');
+      setState(() => _error = tr('Positionnez le lieu (GPS ou coordonnées).'));
       return;
     }
     if (!ServiceAreaLocation.isInBounds(coords)) {
@@ -182,7 +182,7 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
           );
         }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message']?.toString() ?? 'Lieu enregistré.')),
+          SnackBar(content: Text(data['message']?.toString() ?? tr('Lieu enregistré.'))),
         );
         if (mounted && Navigator.canPop(context) && widget.initialLat != null) {
           Navigator.pop(context, data);
@@ -250,7 +250,7 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
               border: OutlineInputBorder(),
             ),
             items: _categories
-                .map((c) => DropdownMenuItem(value: c.$1, child: Text(c.$2)))
+                .map((c) => DropdownMenuItem(value: c.$1, child: Text(tr(c.$2))))
                 .toList(),
             onChanged: (v) {
               if (v != null) setState(() => _category = v);
@@ -330,7 +330,7 @@ class _SuggestPlaceScreenState extends ConsumerState<SuggestPlaceScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              s['name']?.toString() ?? 'Lieu',
+                              s['name']?.toString() ?? tr('Lieu'),
                               style: const TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),

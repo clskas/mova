@@ -165,7 +165,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       setState(() {
         _loadingGps = false;
         _validationError =
-            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+            tr('Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.');
       });
       return;
     }
@@ -1118,11 +1118,11 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
 
   Future<void> _estimateOrder() async {
     if (_cart.isEmpty) {
-      setState(() => _validationError = 'Ajoutez au moins un article au panier.');
+      setState(() => _validationError = tr('Ajoutez au moins un article au panier.'));
       return;
     }
     if (_addressController.text.trim().isEmpty) {
-      setState(() => _validationError = 'Indiquez l\'adresse de livraison.');
+      setState(() => _validationError = tr('Indiquez l\'adresse de livraison.'));
       return;
     }
     final geoError = await _resolveDeliveryAddress();
@@ -1154,11 +1154,11 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
 
   Future<void> _order() async {
     if (_cart.isEmpty) {
-      setState(() => _validationError = 'Ajoutez au moins un article au panier.');
+      setState(() => _validationError = tr('Ajoutez au moins un article au panier.'));
       return;
     }
     if (_addressController.text.trim().isEmpty) {
-      setState(() => _validationError = 'Indiquez l\'adresse de livraison.');
+      setState(() => _validationError = tr('Indiquez l\'adresse de livraison.'));
       return;
     }
     final geoError = await _resolveDeliveryAddress();
@@ -1241,9 +1241,9 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Align(
+        Align(
           alignment: Alignment.centerLeft,
-          child: ServiceAreaSelector(sheetTitle: 'Ville de livraison'),
+          child: ServiceAreaSelector(sheetTitle: tr('Ville de livraison')),
         ),
         const SizedBox(height: 6),
         Text(

@@ -86,9 +86,9 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   String get _restaurantName {
     final restaurant = _delivery['restaurant'];
     if (restaurant is Map) {
-      return restaurant['name']?.toString() ?? 'Restaurant';
+      return restaurant['name']?.toString() ?? tr('Restaurant');
     }
-    return _delivery['restaurantName']?.toString() ?? 'Restaurant';
+    return _delivery['restaurantName']?.toString() ?? tr('Restaurant');
   }
 
   String? get _restaurantContact {
@@ -178,7 +178,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           threadId: _deliveryId,
           senderRole: role,
           text: text,
-          peerLabel: 'Client',
+          peerLabel: tr('Client'),
           messageId: payload['id']?.toString(),
         );
       },
@@ -196,7 +196,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
           deliveryId: _deliveryId,
           starterId: payload['starterId']?.toString() ?? '',
           myUserId: _userId,
-          peerLabel: 'Client',
+          peerLabel: tr('Client'),
           kind: payload['kind']?.toString() == 'ride' ? 'ride' : 'delivery',
           fromRealtime: true,
         ));
@@ -488,7 +488,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
         return switch (result) {
           Success(:final data) => (
               ok: true,
-              message: data['message']?.toString() ?? 'Litige enregistré',
+              message: data['message']?.toString() ?? tr('Litige enregistré'),
             ),
           Failure(:final error) => (ok: false, message: error.message),
         };
@@ -651,7 +651,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
             threadId: _deliveryId,
           ),
           tooltip: tr('Chat client'),
-          onPressed: _deliveryId.isEmpty ? null : () => _openChat(peerLabel: 'Client'),
+          onPressed: _deliveryId.isEmpty ? null : () => _openChat(peerLabel: tr('Client')),
         ),
         IconButton(
           icon: const Icon(Icons.refresh),
@@ -787,7 +787,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
                 label: n > 0 ? trf('Chat avec le client ({n})', {'n': n}) : 'Chat avec le client',
                 isSecondary: true,
                 icon: Icons.chat_bubble_outline,
-                onPressed: _deliveryId.isEmpty ? null : () => _openChat(peerLabel: 'Client'),
+                onPressed: _deliveryId.isEmpty ? null : () => _openChat(peerLabel: tr('Client')),
               );
             },
           ),
@@ -851,7 +851,7 @@ class _ErrandPurchaseTotalDialogState extends State<_ErrandPurchaseTotalDialog> 
   void _submit() {
     final parsed = int.tryParse(_controller.text.trim());
     if (parsed == null || parsed < 0) {
-      setState(() => _error = 'Saisissez un montant valide (0 ou plus).');
+      setState(() => _error = tr('Saisissez un montant valide (0 ou plus).'));
       return;
     }
     FocusScope.of(context).unfocus();

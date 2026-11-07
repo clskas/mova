@@ -205,7 +205,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         threadId: _rideId,
         senderRole: role,
         text: payload['text']?.toString() ?? '',
-        peerLabel: 'Passager',
+        peerLabel: tr('Passager'),
         messageId: payload['id']?.toString(),
       );
     };
@@ -223,7 +223,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         deliveryId: _rideId,
         starterId: payload['starterId']?.toString() ?? '',
         myUserId: _userId,
-        peerLabel: 'Passager',
+        peerLabel: tr('Passager'),
         kind: 'ride',
         fromRealtime: true,
       ));
@@ -246,7 +246,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         builder: (_) => DeliveryVoiceCallScreen(
           threadId: _rideId,
           kind: VoiceCallKind.ride,
-          peerLabel: 'Passager',
+          peerLabel: tr('Passager'),
           announce: true,
         ),
       ),
@@ -434,7 +434,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     setState(() => _loading = false);
     switch (result) {
       case Success(:final data):
-        final msg = data['message']?.toString() ?? 'Course annulée';
+        final msg = data['message']?.toString() ?? tr('Course annulée');
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
         Navigator.popUntil(context, (r) => r.isFirst);
       case Failure(:final error):
@@ -631,7 +631,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                 builder: (_) => RideChatScreen(
                   rideId: _rideId,
                   myRole: 'driver',
-                  peerLabel: 'Passager',
+                  peerLabel: tr('Passager'),
                 ),
               ),
             );
@@ -670,7 +670,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _ride['pickupAddress']?.toString() ?? 'Point de prise en charge',
+                    _ride['pickupAddress']?.toString() ?? tr('Point de prise en charge'),
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
@@ -724,18 +724,18 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                 if (!headingToPickup)
                   Text(
                     _isRoundTripReturn
-                        ? (_ride['dropoffAddress']?.toString() ?? 'Destination aller')
-                        : (_ride['pickupAddress']?.toString() ?? 'Départ'),
+                        ? (_ride['dropoffAddress']?.toString() ?? tr('Destination aller'))
+                        : (_ride['pickupAddress']?.toString() ?? tr('Départ')),
                     style: const TextStyle(fontWeight: FontWeight.bold),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 Text(
                   headingToPickup
-                      ? 'Destination : ${_ride['dropoffAddress']?.toString() ?? 'Arrivée'}'
+                      ? 'Destination : ${_ride['dropoffAddress']?.toString() ?? tr('Arrivée')}'
                       : _isRoundTripReturn
-                          ? '→ ${_ride['activeDestinationAddress']?.toString() ?? _ride['pickupAddress']?.toString() ?? 'Retour au départ'}'
-                          : '→ ${_ride['dropoffAddress']?.toString() ?? 'Arrivée'}',
+                          ? '→ ${_ride['activeDestinationAddress']?.toString() ?? _ride['pickupAddress']?.toString() ?? tr('Retour au départ')}'
+                          : '→ ${_ride['dropoffAddress']?.toString() ?? tr('Arrivée')}',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -786,7 +786,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                     showCallWhatsAppSheet(
                       context,
                       phone: phone,
-                      peerLabel: 'le passager',
+                      peerLabel: tr('le passager'),
                     );
                   },
                 ),
@@ -850,7 +850,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${p['pickupAddress'] ?? 'Prise'} → ${p['dropoffAddress'] ?? 'Dépose'}',
+                        '${p['pickupAddress'] ?? tr('Prise')} → ${p['dropoffAddress'] ?? tr('Dépose')}',
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 4),
@@ -937,7 +937,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                     builder: (_) => RideChatScreen(
                       rideId: _rideId,
                       myRole: 'driver',
-                      peerLabel: 'Passager',
+                      peerLabel: tr('Passager'),
                     ),
                   ),
                 );
@@ -1066,7 +1066,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         return switch (r) {
           Success(:final data) => (
               ok: true,
-              message: data['message']?.toString() ?? 'Litige enregistré',
+              message: data['message']?.toString() ?? tr('Litige enregistré'),
             ),
           Failure(:final error) => (ok: false, message: error.message),
         };

@@ -429,7 +429,7 @@ class DriverJobAlertService {
   }
 
   static String rideOfferMessage(Map<String, dynamic> offer) {
-    final pickup = offer['pickupAddress']?.toString() ?? 'près de vous';
+    final pickup = offer['pickupAddress']?.toString() ?? tr('près de vous');
     final driverNet = DriverEarningsDisplay.netFromMap(offer);
     final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();
     final dist = pickupKm != null ? ' · ${GeoUtils.formatDistanceKm(pickupKm)}' : '';
@@ -438,7 +438,7 @@ class DriverJobAlertService {
   }
 
   static String deliveryOfferMessage(Map<String, dynamic> offer) {
-    final kind = offer['type']?.toString() ?? offer['deliveryType']?.toString() ?? 'Livraison';
+    final kind = offer['type']?.toString() ?? offer['deliveryType']?.toString() ?? tr('Livraison');
     final pickup = offer['pickupAddress']?.toString() ?? '';
     final driverNet = DriverEarningsDisplay.netFromMap(offer);
     final pickupKm = (offer['distanceToPickupKm'] as num?)?.toDouble();

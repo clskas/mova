@@ -189,7 +189,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       setState(() {
         _loadingGps = false;
         _validationError =
-            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+            tr('Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.');
       });
       return;
     }
@@ -423,7 +423,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             _estimatedPrice = null;
             _estimateBreakdown = null;
           } else {
-            _aiNote = data['message']?.toString() ?? 'Estimation automatique indisponible.';
+            _aiNote = data['message']?.toString() ?? tr('Estimation automatique indisponible.');
           }
         case Failure(:final error):
           _aiNote = 'Estimation automatique indisponible : ${error.message}';
@@ -614,7 +614,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
           const SizedBox(height: 8),
           ..._volumeOptions.map((v) {
             return RadioListTile<String>(
-              title: Text(v.$2),
+              title: Text(tr(v.$2)),
               subtitle: Text(v.$3, style: const TextStyle(fontSize: 12)),
               value: v.$1,
               groupValue: _volume,
@@ -677,7 +677,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
             return RadioListTile<String>(
               title: Row(
                 children: [
-                  Expanded(child: Text(v.$2)),
+                  Expanded(child: Text(tr(v.$2))),
                   if (isRecommended)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -784,7 +784,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
               child: MovaCard(
                 child: Row(
                   children: [
-                    Expanded(child: Text(_items[i], maxLines: 2, overflow: TextOverflow.ellipsis)),
+                    Expanded(child: Text(tr(_items[i]), maxLines: 2, overflow: TextOverflow.ellipsis)),
                     IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => _removeItem(i)),
                   ],
                 ),

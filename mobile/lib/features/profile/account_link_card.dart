@@ -107,7 +107,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
       if (idToken == null || idToken.isEmpty) {
         setState(() {
           _busy = false;
-          _error = 'Liaison Google annulée.';
+          _error = tr('Liaison Google annulée.');
         });
         return;
       }
@@ -147,7 +147,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
       if (apple == null || apple.identityToken.isEmpty) {
         setState(() {
           _busy = false;
-          _error = 'Liaison Apple annulée.';
+          _error = tr('Liaison Apple annulée.');
         });
         return;
       }
@@ -190,7 +190,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
     if (!MarketConfig.validatePhone(phone)) {
       setState(() {
         _busy = false;
-        _error = 'Numéro invalide. Format: +243XXXXXXXXX';
+        _error = tr('Numéro invalide. Format: +243XXXXXXXXX');
       });
       return;
     }
@@ -308,7 +308,7 @@ class _AccountLinkCardState extends ConsumerState<AccountLinkCard> {
       case Success(:final data):
         await _applyAuth(data);
         setState(() => _busy = false);
-        _snack(data['message']?.toString() ?? 'Compte mis à jour.');
+        _snack(data['message']?.toString() ?? tr('Compte mis à jour.'));
         await widget.onChanged();
       case Failure(:final error):
         setState(() {

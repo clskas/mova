@@ -204,7 +204,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
               return;
             }
           }
-          setState(() => _error = 'Course annulée ou déjà prise.');
+          setState(() => _error = tr('Course annulée ou déjà prise.'));
           return;
         }
         setState(() => _error = msg);
@@ -258,8 +258,8 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
   Widget build(BuildContext context) {
     final driverNet = DriverEarningsDisplay.netFromMap(widget.offer);
     final distance = widget.offer['tripDistanceKm'] as num? ?? widget.offer['distanceKm'] as num?;
-    final pickup = widget.offer['pickupAddress']?.toString() ?? 'Point de départ';
-    final dropoff = widget.offer['dropoffAddress']?.toString() ?? 'Destination';
+    final pickup = widget.offer['pickupAddress']?.toString() ?? tr('Point de départ');
+    final dropoff = widget.offer['dropoffAddress']?.toString() ?? tr('Destination');
     final vehicleType = widget.offer['vehicleType']?.toString() ?? 'Moto-taxi';
     final progress = _countdown / 30.0;
 

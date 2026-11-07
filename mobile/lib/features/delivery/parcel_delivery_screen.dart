@@ -196,7 +196,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       setState(() {
         _loadingGps = false;
         _validationError =
-            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+            tr('Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.');
       });
       return;
     }
@@ -226,7 +226,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       setState(() {
         _loadingDropoffGps = false;
         _validationError =
-            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+            tr('Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.');
       });
       return;
     }
@@ -615,7 +615,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                   ..._weightCategories.map((cat) {
                     return RadioListTile<String>(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(cat.$2),
+                      title: Text(tr(cat.$2)),
                       subtitle: Text(cat.$3, style: const TextStyle(fontSize: 12)),
                       value: cat.$1,
                       groupValue: _weightCategory,
@@ -659,7 +659,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                       totalCdf: _estimatedPrice!,
                       discountCdf: null,
                       priceBreakdown: _priceBreakdown,
-                      totalLabel: 'Frais de livraison',
+                      totalLabel: tr('Frais de livraison'),
                     ),
                     if (_distanceKm != null || _durationMin != null) ...[
                       const SizedBox(height: 8),

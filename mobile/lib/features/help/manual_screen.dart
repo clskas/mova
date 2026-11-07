@@ -47,7 +47,7 @@ class ManualScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            subtitle ?? 'Guide pas à pas — ${MarketConfig.coverageLabel}, ${MarketConfig.currency}',
+            subtitle ?? trf('Guide pas à pas — {coverageLabel}, {currency}', {'coverageLabel': MarketConfig.coverageLabel, 'currency': MarketConfig.currency}),
             style: theme.textTheme.bodyMedium?.copyWith(color: MovaColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -107,7 +107,7 @@ class _ChapterTile extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            e.value,
+                            tr(e.value),
                             style: const TextStyle(height: 1.4),
                           ),
                         ),
@@ -131,7 +131,7 @@ class _ChapterTile extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            chapter.tip!,
+                            tr(chapter.tip!),
                             style: const TextStyle(fontSize: 13, color: MovaColors.midnight),
                           ),
                         ),

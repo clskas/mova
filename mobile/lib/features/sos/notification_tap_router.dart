@@ -96,7 +96,7 @@ class NotificationTapRouter {
       openSos(
         SosOpenRequest(
           incidentId: data['incidentId']?.toString(),
-          title: title ?? data['title']?.toString() ?? 'Alerte SOS',
+          title: title ?? data['title']?.toString() ?? tr('Alerte SOS'),
           body: body ?? data['body']?.toString(),
           lat: _asDouble(data['lat']),
           lng: _asDouble(data['lng']),

@@ -122,7 +122,7 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
         return switch (result) {
           Success(:final data) => (
               ok: true,
-              message: data['message']?.toString() ?? 'Litige enregistré',
+              message: data['message']?.toString() ?? tr('Litige enregistré'),
             ),
           Failure(:final error) => (ok: false, message: error.message),
         };

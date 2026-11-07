@@ -71,8 +71,8 @@ class ChatPollService {
 
         final type = n['type']?.toString() ?? '';
         if (type == 'INCIDENT_CREATED') {
-          final title = n['title']?.toString() ?? 'Alerte SOS';
-          final body = n['body']?.toString() ?? 'Urgence signalée sur SENGA';
+          final title = n['title']?.toString() ?? tr('Alerte SOS');
+          final body = n['body']?.toString() ?? tr('Urgence signalée sur SENGA');
           final data = (n['data'] is Map) ? Map<String, dynamic>.from(n['data'] as Map) : const <String, dynamic>{};
           final lat = data['lat'] is num ? (data['lat'] as num).toDouble() : double.tryParse('${data['lat'] ?? ''}');
           final lng = data['lng'] is num ? (data['lng'] as num).toDouble() : double.tryParse('${data['lng'] ?? ''}');
@@ -152,7 +152,7 @@ class ChatPollService {
           kind: kind,
           threadId: threadId,
           messageId: messageId,
-          title: n['title']?.toString() ?? 'Message SENGA',
+          title: n['title']?.toString() ?? tr('Message SENGA'),
           body: body,
         );
       }

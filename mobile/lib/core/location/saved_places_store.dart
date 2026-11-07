@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../cache/unified_history_cache.dart';
 import '../storage/local_cache.dart';
+import '../../core/i18n/i18n.dart';
 
 /// Lieux nommés et récents GPS (historique de courses).
 class SavedPlace {
@@ -38,7 +39,7 @@ class SavedPlace {
   factory SavedPlace.fromJson(Map<String, dynamic> json) {
     return SavedPlace(
       id: json['id']?.toString() ?? '',
-      name: json['name']?.toString() ?? 'Lieu',
+      name: json['name']?.toString() ?? tr('Lieu'),
       kind: json['kind']?.toString() ?? 'named',
       lat: (json['lat'] as num?)?.toDouble() ?? 0,
       lng: (json['lng'] as num?)?.toDouble() ?? 0,
@@ -155,7 +156,7 @@ class SavedPlacesStore {
       final name = meta['dropoffAddress']?.toString() ??
           item['dropoffAddress']?.toString() ??
           item['title']?.toString() ??
-          'Récent';
+          tr('Récent');
       if (name.trim().isEmpty) continue;
       out.add(
         SavedPlace(

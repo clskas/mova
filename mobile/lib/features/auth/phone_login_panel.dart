@@ -94,7 +94,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
 
   bool _ensureLegalAccepted() {
     if (!_needsLegalAcceptance || _legalAccepted) return true;
-    setState(() => _error = 'Acceptez les CGU et la Politique de confidentialité pour continuer.');
+    setState(() => _error = tr('Acceptez les CGU et la Politique de confidentialité pour continuer.'));
     return false;
   }
 
@@ -186,7 +186,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       if (!MarketConfig.validatePhone(phone)) {
         setState(() {
           _loading = false;
-          _error = 'Numéro invalide. Format: +243XXXXXXXXX';
+          _error = tr('Numéro invalide. Format: +243XXXXXXXXX');
         });
         return;
       }
@@ -211,7 +211,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         } else if (isEmailIdentity(identity)) {
           setState(() {
             _loading = false;
-            _error = 'Aucun PIN pour cet e-mail. Connectez-vous avec Google.';
+            _error = tr('Aucun PIN pour cet e-mail. Connectez-vous avec Google.');
           });
         } else {
           setState(() => _step = PhoneLoginStep.otp);
@@ -221,7 +221,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         if (isEmailIdentity(identity)) {
           setState(() {
             _loading = false;
-            _error = 'Impossible de vérifier le PIN. Utilisez Continuer avec Google.';
+            _error = tr('Impossible de vérifier le PIN. Utilisez Continuer avec Google.');
           });
           return;
         }
@@ -241,7 +241,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     final phone = _normalizedPhone ?? MarketConfig.normalizePhone(_phoneController.text);
     if (!MarketConfig.validatePhone(phone)) {
       setState(() {
-        _error = 'Numéro invalide. Format: +243XXXXXXXXX';
+        _error = tr('Numéro invalide. Format: +243XXXXXXXXX');
         _loading = false;
       });
       return;
@@ -280,7 +280,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   Future<void> _loginWithPin() async {
     final pin = _pinController.text.trim();
     if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
-      setState(() => _error = 'Le code PIN doit contenir 6 chiffres.');
+      setState(() => _error = tr('Le code PIN doit contenir 6 chiffres.'));
       return;
     }
     if (_pinSubmitLock) return;
@@ -313,7 +313,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     if (phone == null) {
       setState(() {
         _loading = false;
-        _error = 'Numéro manquant. Recommencez.';
+        _error = tr('Numéro manquant. Recommencez.');
       });
       return;
     }
@@ -343,7 +343,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       if (idToken == null || idToken.isEmpty) {
         setState(() {
           _loading = false;
-          _error = 'Connexion Google annulée.';
+          _error = tr('Connexion Google annulée.');
         });
         return;
       }
@@ -379,7 +379,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       if (apple == null || apple.identityToken.isEmpty) {
         setState(() {
           _loading = false;
-          _error = 'Connexion Apple annulée.';
+          _error = tr('Connexion Apple annulée.');
         });
         return;
       }
@@ -440,7 +440,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     final challengeId = _googleChallengeId;
     final providerLabel = _socialProvider == 'apple' ? 'Apple' : 'Google';
     if (challengeId == null || challengeId.isEmpty) {
-      setState(() => _error = 'Session $providerLabel expirée. Recommencez.');
+      setState(() => _error = trf('Session {providerLabel} expirée. Recommencez.', {'providerLabel': providerLabel}));
       return;
     }
     setState(() {
@@ -474,7 +474,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
         FocusManager.instance.primaryFocus?.unfocus();
         final token = data['accessToken'] as String?;
         if (token == null) {
-          setState(() => _error = 'Connexion impossible. Veuillez réessayer.');
+          setState(() => _error = tr('Connexion impossible. Veuillez réessayer.'));
           return;
         }
         final api = ref.read(apiClientProvider);
@@ -583,12 +583,12 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     // Only the SMS destination matters — do not block on a stale Google e-mail
     // left in `_normalizedPhone` after the user typed a real +243 number.
     if (isEmailIdentity(raw)) {
-      setState(() => _error = 'Pas de SMS pour un e-mail. Utilisez Continuer avec Google.');
+      setState(() => _error = tr('Pas de SMS pour un e-mail. Utilisez Continuer avec Google.'));
       return;
     }
     final phone = MarketConfig.normalizePhone(raw);
     if (!MarketConfig.validatePhone(phone)) {
-      setState(() => _error = 'Numéro invalide. Format: +243XXXXXXXXX');
+      setState(() => _error = tr('Numéro invalide. Format: +243XXXXXXXXX'));
       return;
     }
     _normalizedPhone = phone;

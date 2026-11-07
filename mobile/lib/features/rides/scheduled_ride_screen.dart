@@ -219,7 +219,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
         _estimateBreakdown = null;
       } else if (!silent) {
         _validationError =
-            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+            tr('Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.');
       }
     });
   }
@@ -322,7 +322,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
             children: [
               Text(trf('Réf. {v1}', {'v1': _shortRef(id)}), style: const TextStyle(color: MovaColors.violet, fontSize: 12)),
               const SizedBox(height: 8),
-              Text(live['dropoffAddress']?.toString() ?? 'Destination',
+              Text(live['dropoffAddress']?.toString() ?? tr('Destination'),
                   style: const TextStyle(fontWeight: FontWeight.w600)),
               Text('Départ : ${live['pickupAddress'] ?? 'Ma position'}',
                   style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary)),
@@ -334,7 +334,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
               const SizedBox(height: 8),
               ServicePriceDisplay.passengerCard(
                 {...live, 'type': 'SCHEDULED'},
-                totalLabel: 'Tarif réservation',
+                totalLabel: tr('Tarif réservation'),
               ),
               if (live['lateCancelWarning'] != null) ...[
                 const SizedBox(height: 8),
@@ -459,7 +459,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
         title: Text(tr('Annuler la réservation ?')),
         content: Text(
           warning ??
-              'Votre réservation sera annulée. Aucun frais si plus de 24 h avant le départ.',
+              tr('Votre réservation sera annulée. Aucun frais si plus de 24 h avant le départ.'),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
@@ -493,7 +493,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
 
     final combined = DateTime(date.year, date.month, date.day, time.hour, time.minute);
     if (combined.isBefore(DateTime.now())) {
-      setState(() => _validationError = 'La date doit être dans le futur.');
+      setState(() => _validationError = tr('La date doit être dans le futur.'));
       return;
     }
     setState(() {
@@ -705,7 +705,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        map['dropoffAddress']?.toString() ?? 'Destination',
+                        map['dropoffAddress']?.toString() ?? tr('Destination'),
                         style: const TextStyle(fontWeight: FontWeight.w600),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -718,7 +718,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                       const SizedBox(height: 4),
                       ServicePriceDisplay.passengerCard(
                         {...map, 'type': 'SCHEDULED'},
-                        totalLabel: 'Tarif réservation',
+                        totalLabel: tr('Tarif réservation'),
                       ),
                       Text(
                         historyStatusLabel(map['status']?.toString()),
@@ -906,7 +906,7 @@ class _ScheduledRideScreenState extends ConsumerState<ScheduledRideScreen> {
                 if (_discountCdf != null) 'discountCdf': _discountCdf,
                 if (_appliedPromoCode != null) 'promoCode': _appliedPromoCode,
               },
-              totalLabel: 'Total estimé',
+              totalLabel: tr('Total estimé'),
             ),
             if (_estimateBreakdown?['distanceKm'] != null) ...[
               const SizedBox(height: 6),

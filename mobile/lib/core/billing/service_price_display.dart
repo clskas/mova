@@ -60,7 +60,7 @@ class ServicePriceDisplay {
       totalCdf: data['estimatedPriceCdf'] as int? ?? data['passengerTotalCdf'] as int? ?? 0,
       discountCdf: data['discountCdf'] as int?,
       priceBreakdown: breakdown.isEmpty ? null : breakdown,
-      totalLabel: 'Total estimé',
+      totalLabel: tr('Total estimé'),
     );
   }
 

@@ -116,7 +116,7 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
         builder: (_) => RideChatScreen(
           rideId: rideId,
           myRole: 'driver',
-          peerLabel: 'Passager',
+          peerLabel: tr('Passager'),
         ),
       ),
     );
@@ -160,7 +160,7 @@ class _DriverRideHistoryScreenState extends ConsumerState<DriverRideHistoryScree
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      ride['pickupAddress']?.toString() ?? 'Course',
+                                      ride['pickupAddress']?.toString() ?? tr('Course'),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(fontWeight: FontWeight.w600),

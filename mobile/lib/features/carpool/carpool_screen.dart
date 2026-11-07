@@ -107,7 +107,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
       'toAddress': ride['dropoffAddress'] ?? ride['toAddress'] ?? '',
       'availableSeats': seats,
       'pricePerSeatCdf': perSeat ?? 0,
-      'driverName': ride['driverName']?.toString() ?? 'Conducteur',
+      'driverName': ride['driverName']?.toString() ?? tr('Conducteur'),
       'passengerCount': ride['passengerCount'] as int? ?? passengers.length,
       'passengers': passengers,
     };
@@ -151,7 +151,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
 
   Future<void> _search() async {
     if (_toController.text.trim().isEmpty) {
-      setState(() => _validationError = 'Indiquez la destination.');
+      setState(() => _validationError = tr('Indiquez la destination.'));
       return;
     }
     setState(() {
@@ -236,12 +236,12 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
 
   Future<void> _estimateCreate() async {
     if (_toController.text.trim().isEmpty) {
-      setState(() => _validationError = 'Indiquez la destination.');
+      setState(() => _validationError = tr('Indiquez la destination.'));
       return;
     }
     final seats = int.tryParse(_seatsController.text.trim()) ?? 0;
     if (seats < 1 || seats > 6) {
-      setState(() => _validationError = 'Nombre de places : entre 1 et 6.');
+      setState(() => _validationError = tr('Nombre de places : entre 1 et 6.'));
       return;
     }
     setState(() {
@@ -274,22 +274,22 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
 
   Future<void> _createRide() async {
     if (_toController.text.trim().isEmpty) {
-      setState(() => _validationError = 'Indiquez la destination.');
+      setState(() => _validationError = tr('Indiquez la destination.'));
       return;
     }
     final seats = int.tryParse(_seatsController.text.trim()) ?? 0;
     if (seats < 1 || seats > 6) {
-      setState(() => _validationError = 'Nombre de places : entre 1 et 6.');
+      setState(() => _validationError = tr('Nombre de places : entre 1 et 6.'));
       return;
     }
     final customPrice = int.tryParse(_priceController.text.trim());
     final price = customPrice ?? _pricePerSeat;
     if (price == null || price < 500) {
-      setState(() => _validationError = 'Indiquez un prix par place (min. 500 CDF).');
+      setState(() => _validationError = tr('Indiquez un prix par place (min. 500 CDF).'));
       return;
     }
     if (_departureAt.isBefore(DateTime.now())) {
-      setState(() => _validationError = 'La date de départ doit être dans le futur.');
+      setState(() => _validationError = tr('La date de départ doit être dans le futur.'));
       return;
     }
     setState(() {
@@ -345,7 +345,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
 
   Future<void> _bookRide(Map<String, dynamic> ride, {int seats = 1}) async {
     final id = ride['id']?.toString() ?? '';
-    final driver = ride['driverName']?.toString() ?? 'Conducteur';
+    final driver = ride['driverName']?.toString() ?? tr('Conducteur');
     final perSeat = ride['pricePerSeatCdf'] as int? ?? 0;
     setState(() {
       _loading = true;
@@ -398,7 +398,7 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
   Widget _rideCard(Map<String, dynamic> ride) {
     final perSeat = ride['pricePerSeatCdf'] as int? ?? 0;
     final seats = ride['availableSeats'] as int? ?? 1;
-    final driver = ride['driverName']?.toString() ?? 'Conducteur';
+    final driver = ride['driverName']?.toString() ?? tr('Conducteur');
     final rating = ride['driverRating']?.toString();
     final kyc = ride['kycVerified'] == true;
     final eta = ride['etaLabel']?.toString() ?? '';
@@ -782,11 +782,11 @@ class _CarpoolScreenState extends ConsumerState<CarpoolScreen>
             tabs: widget.forDriver
                 ? [
                     Tab(text: tr('Publier')),
-                    Tab(text: 'Mes trajets'),
+                    Tab(text: tr('Mes trajets')),
                   ]
                 : [
                     Tab(text: tr('Rechercher')),
-                    Tab(text: 'Mes réservations'),
+                    Tab(text: tr('Mes réservations')),
                   ],
           ),
           const SizedBox(height: 8),

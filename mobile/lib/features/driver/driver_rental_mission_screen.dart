@@ -19,7 +19,7 @@ List<Map<String, dynamic>> rentalTimelineSteps(String? status) {
     ('RETURNED', 'Véhicule rendu'),
   ];
   if (status == 'CLOSED') {
-    return [{'label': 'Réservation annulée', 'done': true}];
+    return [{'label': tr('Réservation annulée'), 'done': true}];
   }
   final order = steps.map((s) => s.$1).toList();
   final idx = order.indexOf(status ?? 'CONFIRMED');
@@ -149,7 +149,7 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
         _inquiry?['vehicle']?['name']?.toString() ??
         _inquiry?['vehicleName']?.toString() ??
         widget.initialMission?['vehicleName']?.toString() ??
-        'Véhicule';
+        tr('Véhicule');
     final pickup = _inquiry?['pickupAddress']?.toString() ??
         _inquiry?['pickupCity']?.toString() ??
         widget.initialMission?['pickupAddress']?.toString() ??
@@ -279,7 +279,7 @@ class _DriverRentalMissionScreenState extends ConsumerState<DriverRentalMissionS
               MovaCard(
                 child: Text(
                   _inquiry?['nextStepHint']?.toString() ??
-                      'En attente de confirmation du propriétaire avant la remise.',
+                      tr('En attente de confirmation du propriétaire avant la remise.'),
                   style: const TextStyle(fontSize: 13, color: MovaColors.textSecondary),
                 ),
               ),

@@ -110,7 +110,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
       setState(() {
         _loadingGps = false;
         _validationError =
-            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+            tr('Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.');
       });
       return;
     }
@@ -133,7 +133,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
   Map<String, dynamic> _errandPayload({bool requireBudget = false}) {
     final budget = int.tryParse(_budgetController.text.trim());
     if (requireBudget && (budget == null || budget <= 0)) {
-      throw StateError('Budget achats max obligatoire.');
+      throw StateError(tr('Budget achats max obligatoire.'));
     }
     return {
       'pickupAddress': _pickupController.text.trim(),
@@ -379,7 +379,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           _estimatedPurchaseCdf = _readCdf(estimate['estimatedPurchaseCdf']);
           _minimumBudgetCdf = _readCdf(estimate['minimumBudgetCdf'] ?? estimate['estimatedPurchaseCdf']);
           if (_estimatedPrice == null) {
-            _error = 'Estimation indisponible — réessayez dans un instant.';
+            _error = tr('Estimation indisponible — réessayez dans un instant.');
           }
         case Failure(:final error):
           _error = error.message;
@@ -601,7 +601,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          _items[i],
+                          tr(_items[i]),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: compact ? const TextStyle(fontSize: 13) : null,
@@ -626,7 +626,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
                 'purchaseTotalCdf': _estimatedPurchaseCdf ?? 0,
                 'totalPriceCdf': _estimatedPrice! + (_estimatedPurchaseCdf ?? 0),
               },
-              totalLabel: 'Total estimé',
+              totalLabel: tr('Total estimé'),
             ),
           ],
           if (_validationError != null) ...[

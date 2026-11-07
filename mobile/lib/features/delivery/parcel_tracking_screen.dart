@@ -463,8 +463,8 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    '${_delivery?['pickupAddress'] ?? 'Enlèvement'} → '
-                                    '${_delivery?['dropoffAddress'] ?? 'Livraison'}',
+                                    '${_delivery?['pickupAddress'] ?? tr('Enlèvement')} → '
+                                    '${_delivery?['dropoffAddress'] ?? tr('Livraison')}',
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -483,7 +483,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                               const SizedBox(height: 12),
                               ServicePriceDisplay.passengerCard(
                                 _delivery,
-                                totalLabel: 'Frais de livraison',
+                                totalLabel: tr('Frais de livraison'),
                               ),
                             ],
                             const SizedBox(height: 20),
@@ -543,7 +543,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
                                         builder: (_) => DeliveryChatScreen(
                                           deliveryId: widget.parcelId,
                                           myRole: 'passenger',
-                                          peerLabel: courier?['firstName']?.toString() ?? 'Livreur',
+                                          peerLabel: courier?['firstName']?.toString() ?? tr('Livreur'),
                                         ),
                                       ),
                                     );

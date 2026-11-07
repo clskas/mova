@@ -139,7 +139,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
     if (loc == null) {
       setState(() {
         _loadingGps = false;
-        _error = 'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+        _error = tr('Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.');
       });
       return;
     }
@@ -147,7 +147,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
     setState(() {
       _loadingGps = false;
       _city = city;
-      _locationHint = 'Position : ${loc.label} → $city';
+      _locationHint = trf('Position : {label} → {city}', {'label': loc.label, 'city': city});
     });
     await _search();
   }
@@ -328,7 +328,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        v['name']?.toString() ?? 'Véhicule',
+                        v['name']?.toString() ?? tr('Véhicule'),
                         style: const TextStyle(fontWeight: FontWeight.w600),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -603,7 +603,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
             children: _categories.map((c) {
               final selected = _category == c.$1;
               return FilterChip(
-                label: Text(c.$2),
+                label: Text(tr(c.$2)),
                 selected: selected,
                 onSelected: (selected) {
                   setState(() => _category = selected ? c.$1 : '');
@@ -617,7 +617,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
             value: _fuel.isEmpty ? null : _fuel,
             decoration: InputDecoration(labelText: tr('Carburant'), isDense: true),
             items: _fuelOptions
-                .map((f) => DropdownMenuItem<String?>(value: f.$1.isEmpty ? null : f.$1, child: Text(f.$2)))
+                .map((f) => DropdownMenuItem<String?>(value: f.$1.isEmpty ? null : f.$1, child: Text(tr(f.$2))))
                 .toList(),
             onChanged: (v) {
               setState(() => _fuel = v ?? '');
@@ -842,7 +842,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
                   children: [
                     Expanded(
                       child: Text(
-                        vehicle?['name']?.toString() ?? inq['vehicleType']?.toString() ?? 'Location',
+                        vehicle?['name']?.toString() ?? inq['vehicleType']?.toString() ?? tr('Location'),
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
@@ -928,7 +928,7 @@ class _RentalScreenState extends ConsumerState<RentalScreen> with SingleTickerPr
             labelColor: MovaColors.violet,
             tabs: [
               Tab(text: tr('Rechercher')),
-              Tab(text: 'Mes locations'),
+              Tab(text: tr('Mes locations')),
             ],
           ),
           Expanded(

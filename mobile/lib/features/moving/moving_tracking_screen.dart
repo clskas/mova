@@ -216,7 +216,7 @@ class _MovingTrackingScreenState extends ConsumerState<MovingTrackingScreen> {
                       if (_request != null)
                         ServicePriceDisplay.passengerCard(
                           {..._request!, 'type': 'MOVING'},
-                          totalLabel: 'Total déménagement',
+                          totalLabel: tr('Total déménagement'),
                         ),
                       Text(
                         isPaid ? tr('Payé') : historyStatusLabel(status),

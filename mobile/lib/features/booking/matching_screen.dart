@@ -163,7 +163,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
           _pollTimer?.cancel();
           setState(() {
             _searching = false;
-            _error = 'Course annulée.';
+            _error = tr('Course annulée.');
           });
         }
       case Failure():

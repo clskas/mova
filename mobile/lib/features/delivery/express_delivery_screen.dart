@@ -385,7 +385,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
       setState(() {
         _loadingDropoffGps = false;
         _validationError =
-            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+            tr('Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.');
       });
       return;
     }
@@ -657,7 +657,7 @@ class _ExpressDeliveryScreenState extends ConsumerState<ExpressDeliveryScreen> {
                     ServicePriceDisplay.estimateCard(
                       totalCdf: _estimatedPrice!,
                       priceBreakdown: _priceBreakdown,
-                      totalLabel: 'Tarif express',
+                      totalLabel: tr('Tarif express'),
                     ),
                   ],
                   if (_validationError != null) ...[

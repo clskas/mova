@@ -16,6 +16,7 @@ import '../error/user_friendly_error.dart';
 import '../offline/connectivity_service.dart';
 import '../offline/sync_queue.dart';
 import 'mock_data.dart';
+import '../../core/i18n/i18n.dart';
 
 Uint8List _readFileBytesSync(String path) => File(path).readAsBytesSync();
 
@@ -346,7 +347,7 @@ class ApiClient {
         path.contains('/auth/unlink-phone')) {
       return Success({
         'success': true,
-        'message': 'Compte mis à jour.',
+        'message': tr('Compte mis à jour.'),
         ...MockData.currentUser(),
       });
     }
@@ -633,9 +634,9 @@ class ApiClient {
     if (path.contains('/wallet/withdraw') && method == 'POST') {
       final otp = body?['otp']?.toString() ?? '';
       if (!RegExp(r'^\d{6}$').hasMatch(otp)) {
-        return const Failure(
+        return Failure(
           ValidationFailure(
-            'Code OTP requis (6 chiffres envoyé au numéro Mobile Money).',
+            tr('Code OTP requis (6 chiffres envoyé au numéro Mobile Money).'),
           ),
         );
       }
@@ -650,7 +651,7 @@ class ApiClient {
           {
             'referenceType': 'RIDE',
             'referenceId': 'demo-ride-1',
-            'label': 'Gombe → Lingwala',
+            'label': tr('Gombe → Lingwala'),
             'driverNetCdf': 8500,
             'completedAt': DateTime.now().toIso8601String(),
           },
@@ -666,7 +667,7 @@ class ApiClient {
       final amount = body?['amountCdf'] as int? ?? 5000;
       return Success({
         'success': true,
-        'message': 'Retrait de $amount FC en cours vers +243 *** 0020',
+        'message': trf('Retrait de {amount} FC en cours vers +243 *** 0020', {'amount': amount}),
         'amountCdf': amount,
         'provider': 'ORANGE_MONEY',
         'phoneMasked': '+243 *** 0020',
@@ -777,7 +778,7 @@ class ApiClient {
           'tripId': tripId,
           'seats': seats,
           'totalCdf': perSeat * seats,
-          'driverName': base['driverName'] ?? 'Paul M.',
+          'driverName': base['driverName'] ?? tr('Paul M.'),
           'contactPhone': '+243900000001',
           'departureAt': base['departureAt'],
         },
@@ -905,7 +906,7 @@ class ApiClient {
         'data': [
           {
             ...MockData.movingDetail('moving-assigned-1', status: 'ASSIGNED'),
-            'label': 'Déménagement',
+            'label': tr('Déménagement'),
           },
         ],
       });
@@ -970,8 +971,8 @@ class ApiClient {
           SyncQueue.optimisticResponse(path, body, pendingId),
         );
       }
-      return const Failure(
-        NetworkFailure('Action impossible hors ligne.'),
+      return Failure(
+        NetworkFailure(tr('Action impossible hors ligne.')),
       );
     }
 
@@ -1031,8 +1032,8 @@ class ApiClient {
           SyncQueue.optimisticResponse(path, body, pendingId),
         );
       }
-      return const Failure(
-        NetworkFailure('Action impossible hors ligne.'),
+      return Failure(
+        NetworkFailure(tr('Action impossible hors ligne.')),
       );
     }
 
@@ -1450,9 +1451,9 @@ class ApiClient {
   /// Régler toutes les dettes espèces depuis le portefeuille chauffeur.
   Future<Result<Map<String, dynamic>>> settleCashDebts() async {
     if (isMockMode) {
-      return const Success({
+      return Success({
         'settled': false,
-        'message': 'Aucune dette espèces ouverte',
+        'message': tr('Aucune dette espèces ouverte'),
       });
     }
     final result = await post('/payments/cash-debts/settle', {});
@@ -2143,7 +2144,7 @@ class ApiClient {
     await ensureReady();
     final bytes = await _readUploadBytes(file);
     if (bytes.length > 3 * 1024 * 1024) {
-      return const Failure(ServerFailure('Photo trop volumineuse (max 3 Mo).'));
+      return Failure(ServerFailure(tr('Photo trop volumineuse (max 3 Mo).')));
     }
     final mock = _mockFor('POST', '/uploads/moving-photo', {});
     if (mock != null) {
@@ -2174,7 +2175,7 @@ class ApiClient {
     await ensureReady();
     final bytes = await _readUploadBytes(file);
     if (bytes.length > 3 * 1024 * 1024) {
-      return const Failure(ServerFailure('Photo trop volumineuse (max 3 Mo).'));
+      return Failure(ServerFailure(tr('Photo trop volumineuse (max 3 Mo).')));
     }
     final result = await post('/uploads/kyc-photo', {
       'imageBase64': base64Encode(bytes),
@@ -2201,7 +2202,7 @@ class ApiClient {
     await ensureReady();
     final bytes = await _readUploadBytes(file);
     if (bytes.length > 3 * 1024 * 1024) {
-      return const Failure(ServerFailure('Photo trop volumineuse (max 3 Mo).'));
+      return Failure(ServerFailure(tr('Photo trop volumineuse (max 3 Mo).')));
     }
     final mock = _mockFor('POST', '/deliveries/parcel/photo', {});
     if (mock != null) {
@@ -2232,7 +2233,7 @@ class ApiClient {
     await ensureReady();
     final bytes = await _readUploadBytes(file);
     if (bytes.length > 3 * 1024 * 1024) {
-      return const Failure(ServerFailure('Photo trop volumineuse (max 3 Mo).'));
+      return Failure(ServerFailure(tr('Photo trop volumineuse (max 3 Mo).')));
     }
     final result = await post('/uploads/vehicle-photo', {
       'imageBase64': base64Encode(bytes),

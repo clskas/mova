@@ -7,13 +7,14 @@ import '../../core/error/result.dart';
 import '../sos/notification_tap_router.dart';
 import 'driver_job_alert_service.dart';
 import 'native_job_wake.dart';
+import '../../core/i18n/i18n.dart';
 
 String? _sosPayloadFromFcm(Map<String, dynamic> data, {String? title, String? body}) {
   final type = data['type']?.toString() ?? '';
   if (type != 'INCIDENT_CREATED' && type != 'SOS') return null;
   return NotificationTapRouter.encodeSosPayload(
     incidentId: data['incidentId']?.toString(),
-    title: title ?? data['title']?.toString() ?? 'Alerte SOS',
+    title: title ?? data['title']?.toString() ?? tr('Alerte SOS'),
     body: body ?? data['body']?.toString(),
     lat: double.tryParse(data['lat']?.toString() ?? ''),
     lng: double.tryParse(data['lng']?.toString() ?? ''),
@@ -73,7 +74,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       'SENGA Driver';
   final body = message.notification?.body ??
       message.data['body']?.toString() ??
-      'Nouvelle alerte';
+      tr('Nouvelle alerte');
   final jobKind = message.data['jobKind']?.toString() ?? message.data['type']?.toString() ?? '';
   final sosPayload = _sosPayloadFromFcm(message.data, title: title, body: body);
   final refId = message.data['referenceId']?.toString() ??
@@ -176,7 +177,7 @@ class DriverPushService {
           return;
         }
         final title = message.notification?.title ?? message.data['title']?.toString() ?? 'SENGA Driver';
-        final body = message.notification?.body ?? message.data['body']?.toString() ?? 'Nouvelle alerte';
+        final body = message.notification?.body ?? message.data['body']?.toString() ?? tr('Nouvelle alerte');
         final jobKind = message.data['jobKind']?.toString() ?? message.data['type']?.toString() ?? '';
         final sosPayload = _sosPayloadFromFcm(message.data, title: title, body: body);
         final refId = message.data['referenceId']?.toString() ??

@@ -1,6 +1,13 @@
+import '../i18n/i18n.dart';
+
 sealed class MovaFailure {
-  const MovaFailure(this.message);
-  final String message;
+  const MovaFailure(this.messageFr);
+
+  /// Message as written in the code or sent by the server (French).
+  final String messageFr;
+
+  /// Message in the app language (falls back to French when no translation exists).
+  String get message => tr(messageFr);
 }
 
 class NetworkFailure extends MovaFailure {

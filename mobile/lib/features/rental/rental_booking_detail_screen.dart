@@ -201,7 +201,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
     if (b == null) {
       return MovaScreen(
         title: tr('Réservation'),
-        child: MovaErrorBanner(message: _error ?? 'Réservation introuvable', onRetry: _loadBooking),
+        child: MovaErrorBanner(message: _error ?? tr('Réservation introuvable'), onRetry: _loadBooking),
       );
     }
 
@@ -211,7 +211,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
         b['priceCdf'] as int? ??
         0;
     final ownerPhone = b['ownerContactPhone']?.toString();
-    final statusLabel = b['statusLabel']?.toString() ?? b['status']?.toString() ?? 'En attente';
+    final statusLabel = b['statusLabel']?.toString() ?? b['status']?.toString() ?? tr('En attente');
     final status = b['status']?.toString().toUpperCase();
     final isPaid = b['isPaid'] == true || status == 'PAID';
     final escrowHeld = b['escrowHeld'] == true;
@@ -253,7 +253,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  vehicle?['name']?.toString() ?? b['vehicleType']?.toString() ?? 'Véhicule',
+                  vehicle?['name']?.toString() ?? b['vehicleType']?.toString() ?? tr('Véhicule'),
                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                 ),
                 const SizedBox(height: 8),
@@ -347,7 +347,7 @@ class _RentalBookingDetailScreenState extends ConsumerState<RentalBookingDetailS
                     builder: (_) => RentalChatScreen(
                       inquiryId: b['inquiryId'].toString(),
                       myRole: 'passenger',
-                      peerLabel: 'Loueur',
+                      peerLabel: tr('Loueur'),
                     ),
                   ),
                 );

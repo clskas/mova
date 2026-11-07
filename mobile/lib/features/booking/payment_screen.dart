@@ -248,8 +248,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     setState(() {
       _awaitingMobileMoney = false;
       _error =
-          'Paiement Mobile Money annulé. Si le PIN réapparaît encore une fois, refusez-le ; '
-          'puis réessayez le paiement dans l\'app.';
+          tr('Paiement Mobile Money annulé. Si le PIN réapparaît encore une fois, refusez-le ; '
+          'puis réessayez le paiement dans l\'app.');
     });
     final api = ref.read(apiClientProvider);
     if (widget.rideId != null) {
@@ -283,7 +283,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       setState(() {
         _awaitingMobileMoney = false;
         _error =
-            'Toujours en attente de confirmation Mobile Money. Vérifiez votre téléphone, puis réessayez.';
+            tr('Toujours en attente de confirmation Mobile Money. Vérifiez votre téléphone, puis réessayez.');
       });
       return;
     }
@@ -338,7 +338,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     if (_needsPhone) {
       final phone = MarketConfig.normalizePhone(_phoneController.text);
       if (!MarketConfig.validatePhone(phone)) {
-        setState(() => _error = 'Numéro mobile money invalide (+243XXXXXXXXX).');
+        setState(() => _error = tr('Numéro mobile money invalide (+243XXXXXXXXX).'));
         return;
       }
     }

@@ -14,7 +14,7 @@ Future<void> showCashClaimResult({
     Success(:final data) => () {
         onClaimed();
         return data['message']?.toString() ??
-            'Déclaration enregistrée. Le chauffeur ou le livreur doit confirmer « J’ai reçu les espèces ».';
+            tr('Déclaration enregistrée. Le chauffeur ou le livreur doit confirmer « J’ai reçu les espèces ».');
       }(),
     Failure(:final error) => error.message,
   };

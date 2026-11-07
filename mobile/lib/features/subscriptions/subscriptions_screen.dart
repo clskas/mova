@@ -79,7 +79,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
     switch (result) {
       case Success(:final data):
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message']?.toString() ?? 'Abonnement annulé')),
+          SnackBar(content: Text(data['message']?.toString() ?? tr('Abonnement annulé'))),
         );
         await _load();
       case Failure(:final error):
@@ -95,7 +95,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
     switch (result) {
       case Success(:final data):
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message']?.toString() ?? 'Abonnement activé')),
+          SnackBar(content: Text(data['message']?.toString() ?? tr('Abonnement activé'))),
         );
         await _load();
       case Failure(:final error):

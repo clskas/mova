@@ -145,7 +145,7 @@ class DriverBackgroundService {
     await FlutterForegroundTask.startService(
       serviceId: 1001,
       notificationTitle: 'SENGA Driver',
-      notificationText: 'En ligne — recherche de courses et missions',
+      notificationText: tr('En ligne — recherche de courses et missions'),
       callback: driverBackgroundStartCallback,
     );
   }

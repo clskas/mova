@@ -441,7 +441,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       setState(() {
         _loadingGps = false;
         _validationError =
-            'Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.';
+            tr('Impossible d\'obtenir votre position. Activez le GPS et autorisez la localisation.');
       });
       return;
     }
@@ -651,7 +651,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         }
       }
       if (selectedData == null) {
-        errorMessage ??= 'Estimation indisponible. Réessayez.';
+        errorMessage ??= tr('Estimation indisponible. Réessayez.');
       }
 
       setState(() {
@@ -665,7 +665,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       setState(() {
         _loadingEstimate = false;
         _estimates = {};
-        _error = 'Estimation indisponible. Réessayez.';
+        _error = tr('Estimation indisponible. Réessayez.');
       });
     }
   }
@@ -715,7 +715,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     if (_selectedEstimate == null) {
       await _fetchAllEstimates();
       if (_selectedEstimate == null) {
-        setState(() => _validationError = 'Estimation indisponible. Réessayez.');
+        setState(() => _validationError = tr('Estimation indisponible. Réessayez.'));
         return;
       }
     }
@@ -858,7 +858,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8, bottom: 8),
                     child: FilterChip(
-                      label: Text(f.$2),
+                      label: Text(tr(f.$2)),
                       selected: selected,
                       onSelected: (on) {
                         setState(() => _poiCategoryFilter = on ? f.$1 : null);

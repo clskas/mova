@@ -159,12 +159,12 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
 
   Future<void> _confirm() async {
     if (!MarketConfig.validatePhone(_phoneController.text.trim())) {
-      setState(() => _error = 'Numéro de téléphone invalide (+243…).');
+      setState(() => _error = tr('Numéro de téléphone invalide (+243…).'));
       return;
     }
     if (_logisticsMode == 'PASSENGER_DRIVER' &&
         !MarketConfig.validatePhone(_passengerDriverPhoneController.text.trim())) {
-      setState(() => _error = 'Téléphone du chauffeur passager invalide (+243…).');
+      setState(() => _error = tr('Téléphone du chauffeur passager invalide (+243…).'));
       return;
     }
     setState(() {
@@ -196,10 +196,10 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
                 if (data['quote'] != null) 'totalCdf': (data['quote'] as Map)['totalCdf'],
                 'timeline': inquiry?['timeline'] ??
                     [
-                      {'label': 'Demande', 'completed': true, 'current': true},
-                      {'label': 'Confirmée', 'completed': false, 'current': false},
-                      {'label': 'En cours', 'completed': false, 'current': false},
-                      {'label': 'Retournée', 'completed': false, 'current': false},
+                      {'label': tr('Demande'), 'completed': true, 'current': true},
+                      {'label': tr('Confirmée'), 'completed': false, 'current': false},
+                      {'label': tr('En cours'), 'completed': false, 'current': false},
+                      {'label': tr('Retournée'), 'completed': false, 'current': false},
                     ],
               },
             ),
@@ -470,7 +470,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
     if (v == null) {
       return MovaScreen(
         title: tr('Détail véhicule'),
-        child: MovaErrorBanner(message: _error ?? 'Véhicule introuvable', onRetry: _loadVehicle),
+        child: MovaErrorBanner(message: _error ?? tr('Véhicule introuvable'), onRetry: _loadVehicle),
       );
     }
 
@@ -478,7 +478,7 @@ class _RentalDetailScreenState extends ConsumerState<RentalDetailScreen> {
     final preview = _previewEstimate;
 
     return MovaScreen(
-      title: v['name']?.toString() ?? 'Véhicule',
+      title: v['name']?.toString() ?? tr('Véhicule'),
       scrollable: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

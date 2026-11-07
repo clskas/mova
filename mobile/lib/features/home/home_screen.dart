@@ -169,7 +169,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           errandId: id,
           deliveryAddress: errand['deliveryAddress']?.toString() ??
               errand['dropoffAddress']?.toString() ??
-              'Livraison',
+              tr('Livraison'),
           items: items,
           totalCdf: total,
         ),
@@ -205,7 +205,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         orderId: id,
         restaurantName: delivery['restaurantName']?.toString() ??
             delivery['restaurant']?['name']?.toString() ??
-            'Restaurant',
+            tr('Restaurant'),
         totalCdf: (delivery['priceCdf'] ?? delivery['estimatedPriceCdf'] ?? 0) as int,
         deliveryAddress: delivery['dropoffAddress']?.toString() ??
             delivery['deliveryAddress']?.toString(),
@@ -255,8 +255,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     } else {
       screen = MatchingScreen(
         rideId: rideId,
-        pickupAddress: ride['pickupAddress']?.toString() ?? 'Départ',
-        dropoffAddress: ride['dropoffAddress']?.toString() ?? 'Destination',
+        pickupAddress: ride['pickupAddress']?.toString() ?? tr('Départ'),
+        dropoffAddress: ride['dropoffAddress']?.toString() ?? tr('Destination'),
         estimatedFareCdf: fare,
       );
     }

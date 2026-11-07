@@ -76,7 +76,7 @@ class _PubliciteCarouselState extends State<PubliciteCarousel> {
 
   void _showDetail(Map<String, dynamic> item) {
     final imageUrl = MarketConfig.resolveMediaUrl(item['imageUrl']?.toString() ?? '');
-    final titre = item['titre']?.toString() ?? 'Publicité';
+    final titre = item['titre']?.toString() ?? tr('Publicité');
     final description = item['description']?.toString();
     final lien = item['lien']?.toString();
 
@@ -154,7 +154,7 @@ class _PubliciteCarouselState extends State<PubliciteCarousel> {
 
   Widget _buildSlide(Map<String, dynamic> item) {
     final imageUrl = MarketConfig.resolveMediaUrl(item['imageUrl']?.toString() ?? '');
-    final titre = item['titre']?.toString() ?? 'Publicité';
+    final titre = item['titre']?.toString() ?? tr('Publicité');
     final description = item['description']?.toString();
 
     return Padding(

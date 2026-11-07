@@ -299,7 +299,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                data['message']?.toString() ?? 'Retrait de ${MarketConfig.formatCdf(amountCdf)} en cours',
+                data['message']?.toString() ?? trf('Retrait de {v1} en cours', {'v1': MarketConfig.formatCdf(amountCdf)}),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -336,7 +336,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               SnackBar(
                 content: Text(
                   data['message']?.toString() ??
-                      'Enregistré hors ligne, synchronisation à la reconnexion',
+                      tr('Enregistré hors ligne, synchronisation à la reconnexion'),
                 ),
               ),
             );
@@ -348,7 +348,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           if (providerRef == null || providerRef.isEmpty) {
             setState(() {
               _topUpLoading = false;
-              _error = 'Recharge initiée mais référence manquante. Réessayez.';
+              _error = tr('Recharge initiée mais référence manquante. Réessayez.');
             });
             return;
           }
@@ -384,7 +384,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
             SnackBar(
               content: Text(
                 data['message']?.toString() ??
-                    'Recharge de ${MarketConfig.formatCdf(amountCdf)} effectuée',
+                    trf('Recharge de {v1} effectuée', {'v1': MarketConfig.formatCdf(amountCdf)}),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -411,7 +411,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           setState(() {
             _topUpLoading = false;
             _error =
-                'Toujours en attente de confirmation Mobile Money. Vérifiez votre téléphone, puis réessayez.';
+                tr('Toujours en attente de confirmation Mobile Money. Vérifiez votre téléphone, puis réessayez.');
           });
         }
         return true;
@@ -441,7 +441,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           if (data['status']?.toString() == 'FAILED') {
             setState(() {
               _topUpLoading = false;
-              _error = 'Recharge Mobile Money refusée ou annulée.';
+              _error = tr('Recharge Mobile Money refusée ou annulée.');
             });
             return true;
           }
@@ -551,7 +551,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                         _topUpLoading = false;
                         _pendingTopUpRef = null;
                         _error =
-                            'Recharge annulée. Si le PIN réapparaît, refusez-le puis réessayez.';
+                            tr('Recharge annulée. Si le PIN réapparaît, refusez-le puis réessayez.');
                       });
                       if (pendingRef != null && pendingRef.isNotEmpty) {
                         await ref.read(apiClientProvider).post(
@@ -855,21 +855,21 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
   ({int amount, String phone})? _validatedAmountPhone() {
     final amount = parseWithdrawAmountCdf(_amountController.text);
     if (amount == null) {
-      setState(() => _formError = 'Montant invalide. Entrez un nombre entier en FC.');
+      setState(() => _formError = tr('Montant invalide. Entrez un nombre entier en FC.'));
       return null;
     }
     if (amount < 2300) {
       setState(() => _formError =
-          'Montant minimum : 2 300 FC. Vous pouvez retirer une partie du solde si ce montant reste ≥ 2 300 FC.');
+          tr('Montant minimum : 2 300 FC. Vous pouvez retirer une partie du solde si ce montant reste ≥ 2 300 FC.'));
       return null;
     }
     if (amount > widget.maxAmount) {
-      setState(() => _formError = 'Maximum : ${MarketConfig.formatCdf(widget.maxAmount)}');
+      setState(() => _formError = trf('Maximum : {v1}', {'v1': MarketConfig.formatCdf(widget.maxAmount)}));
       return null;
     }
     final phone = MarketConfig.normalizePhone(_phoneController.text.trim());
     if (!MarketConfig.validatePhone(phone)) {
-      setState(() => _formError = 'Numéro Mobile Money invalide. Format : +243XXXXXXXXX');
+      setState(() => _formError = tr('Numéro Mobile Money invalide. Format : +243XXXXXXXXX'));
       return null;
     }
     final mismatch = MarketConfig.mmPrefixMismatchFr(_providerId, phone);
@@ -1020,7 +1020,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
             Text(
               _otpSent
                   ? (_otpDeliveryHint ??
-                      'Code envoyé. Saisissez les 6 chiffres (SMS ou e-mail) pour confirmer le versement.')
+                      tr('Code envoyé. Saisissez les 6 chiffres (SMS ou e-mail) pour confirmer le versement.'))
                   : 'Le code à 6 chiffres s’affiche ici après envoi — ce n’est pas une erreur.',
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),

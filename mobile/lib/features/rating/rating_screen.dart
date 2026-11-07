@@ -125,7 +125,7 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
       if (toUserId == null || toUserId.isEmpty) {
         setState(() {
           _loading = false;
-          _error = 'Chauffeur introuvable pour cette course.';
+          _error = tr('Chauffeur introuvable pour cette course.');
         });
         return;
       }

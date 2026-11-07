@@ -69,7 +69,7 @@ class _LocalPinSetupScreenState extends ConsumerState<LocalPinSetupScreen> {
     final pin = _pinController.text.trim();
     final confirm = _confirmController.text.trim();
     if (pin.length != 6 || confirm.length != 6) {
-      setState(() => _error = 'Le code PIN doit contenir 6 chiffres.');
+      setState(() => _error = tr('Le code PIN doit contenir 6 chiffres.'));
       return;
     }
     setState(() {

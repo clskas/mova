@@ -251,7 +251,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             const SizedBox(height: 4),
             Text(
               item['title']?.toString() ??
-                  '${meta['pickupAddress'] ?? 'Enlèvement'} → ${meta['dropoffAddress'] ?? 'Livraison'}',
+                  '${meta['pickupAddress'] ?? tr('Enlèvement')} → ${meta['dropoffAddress'] ?? tr('Livraison')}',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -317,7 +317,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              meta['restaurantName']?.toString() ?? item['title']?.toString() ?? 'Restaurant',
+              meta['restaurantName']?.toString() ?? item['title']?.toString() ?? tr('Restaurant'),
               style: const TextStyle(fontWeight: FontWeight.w600),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -382,7 +382,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              item['title']?.toString() ?? 'Destination',
+              item['title']?.toString() ?? tr('Destination'),
               style: const TextStyle(fontWeight: FontWeight.w600),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

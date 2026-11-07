@@ -362,8 +362,8 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
       initialDate: initial.isBefore(DateTime.now()) ? DateTime.now().add(const Duration(days: 30)) : initial,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365 * 15)),
-      helpText: 'Choisir une date',
-      cancelText: 'Annuler',
+      helpText: tr('Choisir une date'),
+      cancelText: tr('Annuler'),
       confirmText: 'OK',
     );
     if (picked != null && mounted) {
@@ -472,7 +472,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         if (data.isEmpty) {
           setState(() {
             _uploadingDoc = null;
-            _error = 'Échec envoi photo — réessayez.';
+            _error = tr('Échec envoi photo — réessayez.');
           });
           return;
         }
@@ -513,7 +513,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
 
   Future<void> _finishOnboarding() async {
     if (!_isEditingDossier && !_activationConsentsAccepted) {
-      setState(() => _error = 'Cochez la formation sécurité, la charte et les CGU.');
+      setState(() => _error = tr('Cochez la formation sécurité, la charte et les CGU.'));
       return;
     }
     setState(() {
@@ -603,7 +603,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         if (url.isEmpty) {
           setState(() {
             _uploadingDoc = null;
-            _error = 'Échec envoi photo — réessayez.';
+            _error = tr('Échec envoi photo — réessayez.');
           });
           return;
         }

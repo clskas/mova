@@ -67,7 +67,7 @@ String historyTypeLabel(String? type) => switch (type) {
       'ERRAND' => tr('Courses'),
       'RENTAL' => tr('Location véhicule'),
       'CARPOOL' => tr('Covoiturage'),
-      _ => type ?? 'Service',
+      _ => type ?? tr('Service'),
     };
 
 List<Map<String, dynamic>> scheduledTimelineSteps(String? status) {
@@ -78,7 +78,7 @@ List<Map<String, dynamic>> scheduledTimelineSteps(String? status) {
     ('COMPLETED', 'Terminée'),
   ];
   if (status == 'CANCELLED') {
-    return [{'label': 'Réservation annulée', 'done': true}];
+    return [{'label': tr('Réservation annulée'), 'done': true}];
   }
   final order = steps.map((s) => s.$1).toList();
   final idx = order.indexOf(status ?? 'SCHEDULED');
@@ -97,7 +97,7 @@ List<Map<String, dynamic>> movingTimelineSteps(String? status) {
     ('COMPLETED', 'Déménagement terminé'),
   ];
   if (status == 'CANCELLED') {
-    return [{'label': 'Demande annulée', 'done': true}];
+    return [{'label': tr('Demande annulée'), 'done': true}];
   }
   final order = steps.map((s) => s.$1).toList();
   final idx = order.indexOf(status ?? 'PENDING');

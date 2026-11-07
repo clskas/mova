@@ -154,7 +154,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                 tripId: widget.tripId,
                 fromAddress: trip['fromAddress']?.toString() ?? '',
                 toAddress: trip['toAddress']?.toString() ?? '',
-                driverName: trip['driverName']?.toString() ?? 'Conducteur',
+                driverName: trip['driverName']?.toString() ?? tr('Conducteur'),
                 pricePerSeatCdf: trip['pricePerSeatCdf'] as int? ?? 0,
                 seats: _bookSeats,
                 departureAt: trip['departureAt']?.toString(),
@@ -324,7 +324,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                         child: Text(
                           rating != null
                               ? '${trip['driverName']} · ★ $rating'
-                              : trip['driverName']?.toString() ?? 'Conducteur',
+                              : trip['driverName']?.toString() ?? tr('Conducteur'),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -369,18 +369,18 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                     ServicePriceDisplay.carpoolBookingCard(
                       pricePerSeatCdf: trip['pricePerSeatCdf'] as int? ?? 0,
                       seats: _bookSeats,
-                      totalLabel: 'Total réservation',
+                      totalLabel: tr('Total réservation'),
                     )
                   else if (_isPassenger && (trip['mySeats'] as int? ?? 0) > 0)
                     ServicePriceDisplay.carpoolBookingCard(
                       pricePerSeatCdf: trip['pricePerSeatCdf'] as int? ?? 0,
                       seats: trip['mySeats'] as int? ?? 1,
-                      totalLabel: 'Votre réservation',
+                      totalLabel: tr('Votre réservation'),
                     )
                   else
                     ServicePriceDisplay.passengerCard(
                       {...trip, 'type': 'CARPOOL'},
-                      totalLabel: 'Prix par place',
+                      totalLabel: tr('Prix par place'),
                       seats: 1,
                     ),
                   Padding(
@@ -446,7 +446,7 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                       (p) => ListTile(
                         dense: true,
                         leading: const Icon(Icons.person_outline),
-                        title: Text(p['label']?.toString() ?? 'Passager'),
+                        title: Text(p['label']?.toString() ?? tr('Passager')),
                         trailing: Text('${p['seats']} pl.'),
                       ),
                     ),
@@ -615,7 +615,7 @@ class _Timeline extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                steps[stepIdx],
+                tr(steps[stepIdx]),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

@@ -51,7 +51,7 @@ class _DestinationCoordPanelState extends State<DestinationCoordPanel> {
   void _apply() {
     final coords = DestinationCoords.fromFields(_latController.text, _lngController.text);
     if (coords == null) {
-      setState(() => _error = 'Coordonnées invalides.');
+      setState(() => _error = tr('Coordonnées invalides.'));
       return;
     }
     if (!ServiceAreaLocation.isInBounds(coords)) {

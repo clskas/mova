@@ -1399,13 +1399,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       final gpsReady = await _ensureGpsPosition();
       if (!gpsReady) {
         setState(() => _availabilityError =
-            'Activez le GPS pour recevoir des courses près de vous.');
+            tr('Activez le GPS pour recevoir des courses près de vous.'));
         return;
       }
       final located = await _pushLocationRequired();
       if (!located) {
         locationWarning =
-            'Position non synchronisée — les offres peuvent être limitées tant que le réseau est instable.';
+            tr('Position non synchronisée — les offres peuvent être limitées tant que le réseau est instable.');
       }
     }
     final api = ref.read(apiClientProvider);
@@ -1445,7 +1445,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     }
     if (ridePayload['documentsBlocked'] == true || deliveryPayload['documentsBlocked'] == true) {
       return _documentsBlockReason ??
-          'Documents expirés ou incomplets — mettez à jour votre enregistrement.';
+          tr('Documents expirés ou incomplets — mettez à jour votre enregistrement.');
     }
     return null;
   }
@@ -1760,8 +1760,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                       _documentsRenewalPending
                           ? tr('Renouvellement de documents en cours de validation SENGA. Mettez à jour vos justificatifs dans Enregistrement si nécessaire.')
                           : (_documentsBlockReason ??
-                              'Permis, assurance ou visite technique expiré(s) ou incomplet(s). '
-                                  'Mettez à jour vos dates dans Enregistrement avant de recevoir des missions.'),
+                              tr('Permis, assurance ou visite technique expiré(s) ou incomplet(s). '
+                                  'Mettez à jour vos dates dans Enregistrement avant de recevoir des missions.')),
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1841,7 +1841,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                   onChanged: (value) {
                     if (value && _kycStatus != 'APPROVED') {
                       setState(() => _availabilityError =
-                          'Documents KYC approuvés requis pour passer en ligne.');
+                          tr('Documents KYC approuvés requis pour passer en ligne.'));
                       return;
                     }
                     final typeStatus = _vehicleTypeApprovalStatus;
@@ -1854,7 +1854,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                     if (value && !_documentsCanOperate) {
                       setState(() => _availabilityError =
                           _documentsBlockReason ??
-                              'Documents expirés ou incomplets — mettez à jour vos dates d\'expiration.');
+                              tr('Documents expirés ou incomplets — mettez à jour vos dates d\'expiration.'));
                       return;
                     }
                     _toggleAvailability(value);
@@ -2105,7 +2105,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                       _ => Icons.event,
                     };
                     final subtitle = m['type']?.toString() == 'RENTAL'
-                        ? '${m['vehicleName'] ?? m['label'] ?? 'Location'} · ${m['pickupAddress'] ?? m['pickupCity'] ?? ''}'
+                        ? '${m['vehicleName'] ?? m['label'] ?? tr('Location')} · ${m['pickupAddress'] ?? m['pickupCity'] ?? ''}'
                         : '${m['pickupAddress'] ?? ''} → ${m['dropoffAddress'] ?? m['deliveryAddress'] ?? ''}';
                     final extra = m['startDate'] != null
                         ? '\n${DateTime.tryParse(m['startDate'].toString())?.toLocal().toString().substring(0, 16) ?? ''}'
@@ -2129,7 +2129,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      m['label']?.toString() ?? 'Mission',
+                                      m['label']?.toString() ?? tr('Mission'),
                                       style: const TextStyle(fontWeight: FontWeight.w600),
                                     ),
                                     const SizedBox(height: 4),
@@ -2218,7 +2218,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         ),
                         const SizedBox(height: _cardLineGap),
                         Text(
-                          _pendingCashRide!['pickupAddress']?.toString() ?? 'Course terminée',
+                          _pendingCashRide!['pickupAddress']?.toString() ?? tr('Course terminée'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -2262,7 +2262,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         Text(
                           _pendingCashDelivery!['pickupAddress']?.toString() ??
                               _pendingCashDelivery!['dropoffAddress']?.toString() ??
-                              'Livraison terminée',
+                              tr('Livraison terminée'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -2377,7 +2377,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                         contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 0),
                         minVerticalPadding: 12,
                         title: Text(
-                          offer['pickupAddress']?.toString() ?? 'Course',
+                          offer['pickupAddress']?.toString() ?? tr('Course'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -2486,10 +2486,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
                             : null,
                         title: Text(
                           assigned
-                              ? 'Mission assignée — ${type == 'ERRAND' ? (offer['description']?.toString() ?? 'Courses & commissions') : (offer['pickupAddress']?.toString() ?? 'Livraison $typeLabel')}'
+                              ? 'Mission assignée — ${type == 'ERRAND' ? (offer['description']?.toString() ?? tr('Courses & commissions')) : (offer['pickupAddress']?.toString() ?? trf('Livraison {typeLabel}', {'typeLabel': typeLabel}))}'
                               : type == 'ERRAND'
-                                  ? (offer['description']?.toString() ?? 'Courses & commissions')
-                                  : (offer['pickupAddress']?.toString() ?? 'Livraison $typeLabel'),
+                                  ? (offer['description']?.toString() ?? tr('Courses & commissions'))
+                                  : (offer['pickupAddress']?.toString() ?? trf('Livraison {typeLabel}', {'typeLabel': typeLabel})),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),

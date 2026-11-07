@@ -65,7 +65,7 @@ class ServiceAreaSelector extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
-                  sheetTitle ?? 'Choisir votre ville préférée',
+                  sheetTitle ?? tr('Choisir votre ville préférée'),
                   style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ),

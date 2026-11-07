@@ -77,7 +77,7 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
     }
     setState(() {
       _submitting = false;
-      _error = result.message ?? 'Confirmation impossible.';
+      _error = result.message ?? tr('Confirmation impossible.');
     });
   }
 
@@ -116,7 +116,7 @@ class _DriverCashReceivedDialogState extends State<DriverCashReceivedDialog> {
     }
     setState(() {
       _submitting = false;
-      _error = result.message ?? 'Impossible d’enregistrer le litige.';
+      _error = result.message ?? tr('Impossible d’enregistrer le litige.');
     });
   }
 

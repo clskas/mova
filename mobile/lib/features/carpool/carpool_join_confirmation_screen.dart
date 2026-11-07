@@ -116,7 +116,7 @@ class _CarpoolJoinConfirmationScreenState extends ConsumerState<CarpoolJoinConfi
                 ServicePriceDisplay.carpoolBookingCard(
                   pricePerSeatCdf: widget.pricePerSeatCdf,
                   seats: widget.seats,
-                  totalLabel: 'Total réservation',
+                  totalLabel: tr('Total réservation'),
                 ),
                 Text(
                   trf('Réf. {tripId}', {'tripId': widget.tripId}),

@@ -496,7 +496,7 @@ describe('WalletService', () => {
     (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
     try {
       await expect(
-        service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000001'),
+        service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000001', '+243890000001'),
       ).rejects.toMatchObject({
         response: { message: expect.stringMatching(/Trop de codes|une minute|e-mail/i) },
       });
@@ -540,7 +540,7 @@ describe('WalletService', () => {
     });
     (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
     try {
-      const otp = await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000001');
+      const otp = await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000001', '+243890000001');
       expect(otp.channel).toBe('email');
       expect(otp.message).toMatch(/e-mail/i);
       expect(otp.deliveryHint).toMatch(/fo\*\*\*@example\.com|fondateur|example/i);
@@ -618,5 +618,110 @@ describe('WalletService', () => {
     expect(second.amountCdf).toBe(0);
     expect(second.balanceCdf).toBe(12_000);
     expect(tx.wallet.update).not.toHaveBeenCalled();
+  });
+  describe('payment holes (audit 2026-11)', () => {
+    const hubEnv = (key: string) => {
+      if (key === 'NODE_ENV') return 'test';
+      if (key === 'AFRISOFT_HUB_API_KEY') return 'test-key';
+      if (key === 'AFRISOFT_HUB_APP_ID') return 'senga';
+      if (key === 'AFRISOFT_PAY_HUB_URL') return 'https://pay.test.local';
+      if (key === 'AFRISOFT_SMS_HUB_URL') return 'https://sms.test.local';
+      return undefined;
+    };
+
+    it('sends the withdrawal code to the account phone, not to the payout number', async () => {
+      configGet.mockImplementation(hubEnv);
+      const prevFetch = global.fetch;
+      const fetchMock = jest.fn(async (_url: unknown, _init?: unknown) => ({ ok: true, status: 200, json: async () => ({ success: true }) }));
+      (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+      try {
+        const otp = await service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000009', '+243890000001');
+        expect(otp.channel).toBe('sms');
+        expect(otp.message).toMatch(/243890000001/);
+        const smsCall = fetchMock.mock.calls.find((c: unknown[]) => String(c[0]).includes('/sms'));
+        const body = JSON.parse(String((smsCall?.[1] as { body?: string })?.body ?? '{}'));
+        expect(JSON.stringify(body)).toContain('890000001');
+        expect(JSON.stringify(body.phone ?? body.to ?? '')).not.toContain('890000009');
+      } finally {
+        (global as unknown as { fetch: typeof fetch | undefined }).fetch = prevFetch;
+      }
+    });
+
+    it('driver app: no code only towards the account own number', async () => {
+      tx.$queryRaw.mockResolvedValue([{ id: 'w1', balanceCdf: 5000, heldBalanceCdf: 0 }]);
+      tx.wallet.update.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 2700 });
+      const own = await service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000001', {
+        accountPhone: '+243890000001',
+        ownNumberWithoutOtp: true,
+      });
+      expect(own.success).toBe(true);
+      await expect(
+        service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000009', {
+          accountPhone: '+243890000001',
+          ownNumberWithoutOtp: true,
+        }),
+      ).rejects.toMatchObject({ response: { message: expect.stringMatching(/Code OTP requis/i) } });
+    });
+
+    it('keeps the debit when the hub answer is lost (no double payout)', async () => {
+      configGet.mockImplementation(hubEnv);
+      tx.$queryRaw.mockResolvedValue([{ id: 'w1', balanceCdf: 5000, heldBalanceCdf: 0 }]);
+      tx.wallet.update.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 2700 });
+      prisma.walletTransaction.updateMany.mockResolvedValue({ count: 1 });
+      const prevFetch = global.fetch;
+      (global as unknown as { fetch: typeof fetch }).fetch = jest.fn(async () => {
+        throw new Error('socket hang up');
+      }) as unknown as typeof fetch;
+      try {
+        const result = await service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000001', {
+          skipOtp: true,
+        });
+        expect(result).toMatchObject({ success: true, unconfirmed: true, pendingMobileMoney: true });
+        // one debit, no rollback credit
+        expect(tx.wallet.update).toHaveBeenCalledTimes(1);
+        expect(tx.wallet.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { balanceCdf: { decrement: 2300 } } }),
+        );
+        expect(prisma.walletTransaction.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: { description: expect.stringContaining('à vérifier auprès du hub') },
+          }),
+        );
+      } finally {
+        (global as unknown as { fetch: typeof fetch | undefined }).fetch = prevFetch;
+      }
+    });
+
+    it('credits a top-up confirmed after the user tapped Annuler', async () => {
+      prisma.walletTransaction.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        id: 'tx1',
+        walletId: 'w1',
+        amountCdf: 5000,
+        type: 'TOPUP_FAILED',
+        reference: 'pay_late',
+        description: "Recharge ORANGE_MONEY en attente — annulée par l'utilisateur",
+        wallet: { balanceCdf: 0 },
+      });
+      tx.walletTransaction.updateMany.mockResolvedValue({ count: 1 });
+      tx.wallet.update.mockResolvedValue({ id: 'w1', balanceCdf: 5000 });
+      const result = await service.completePendingTopUp('pay_late', 'COMPLETED', undefined, [], 5000);
+      expect(result).toMatchObject({ found: true, status: 'COMPLETED', balanceCdf: 5000 });
+      expect(tx.wallet.update).toHaveBeenCalledWith({ where: { id: 'w1' }, data: { balanceCdf: { increment: 5000 } } });
+    });
+
+    it('does not credit a top-up the operator refused', async () => {
+      prisma.walletTransaction.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        id: 'tx2',
+        walletId: 'w1',
+        amountCdf: 5000,
+        type: 'TOPUP_FAILED',
+        reference: 'pay_refused',
+        description: 'Solde insuffisant',
+        wallet: { balanceCdf: 0 },
+      });
+      const result = await service.completePendingTopUp('pay_refused', 'COMPLETED', undefined, [], 5000);
+      expect(result).toMatchObject({ alreadyFinal: true, status: 'FAILED' });
+      expect(tx.wallet.update).not.toHaveBeenCalled();
+    });
   });
 });

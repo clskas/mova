@@ -109,12 +109,24 @@ export class DriversController {
     });
   }
 
+  @Post('withdraw/otp')
+  @ApiOperation({ summary: 'Envoyer le code de retrait au téléphone du compte' })
+  withdrawOtp(@Request() req: { user: { id: string; phone?: string } }, @Body() dto: DriverWithdrawDto) {
+    return this.driversService.withdrawOtp(req.user.id, dto.amountCdf, {
+      provider: dto.provider,
+      phone: dto.phone,
+      accountPhone: req.user.phone,
+    });
+  }
+
   @Post('withdraw')
   @ApiOperation({ summary: 'Retrait Mobile Money vers le numéro configuré dans le dossier' })
-  withdraw(@Request() req: { user: { id: string } }, @Body() dto: DriverWithdrawDto) {
+  withdraw(@Request() req: { user: { id: string; phone?: string } }, @Body() dto: DriverWithdrawDto) {
     return this.driversService.withdraw(req.user.id, dto.amountCdf, {
       provider: dto.provider,
       phone: dto.phone,
+      otp: dto.otp,
+      accountPhone: req.user.phone,
     });
   }
 

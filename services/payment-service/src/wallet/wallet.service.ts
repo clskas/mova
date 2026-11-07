@@ -57,6 +57,10 @@ const WITHDRAW_OTP_TTL_SEC = 10 * 60;
 const WITHDRAW_OTP_COOLDOWN_SEC = 45;
 const WITHDRAW_OTP_HOUR_LIMIT = 5;
 const STALE_PAYOUT_MIN_AGE_MS = 15 * 60 * 1000;
+/** Marks a withdrawal whose hub answer was lost: refunded only once the hub confirms it failed or never got it. */
+export const PAYOUT_UNCONFIRMED_MARK = '(à vérifier auprès du hub)';
+/** Marks a top-up the user cancelled in the app: a late operator success still credits it. */
+export const TOPUP_USER_CANCEL_MARK = "— annulée par l'utilisateur";
 
 /**
  * Temporary founder mode while SMS credits are unavailable:
@@ -840,8 +844,13 @@ export class WalletService {
 
     await this.assertWithdrawOtpRateLimit(userId, normalizedPhone);
 
+    // The code proves the account owner agrees: it goes to the account's phone (or e-mail),
+    // never to the payout number, which a stolen session could choose freely.
+    const accountNormalized = accountPhone?.trim() ? normalizePhoneRdc(accountPhone) : '';
+    const smsTo = accountNormalized && validatePhoneRdc(accountNormalized) ? accountNormalized : null;
+
     const useTestOtp =
-      isTestOtpAllowedForPhone(normalizedPhone) ||
+      (smsTo != null && isTestOtpAllowedForPhone(smsTo)) ||
       isMockOtpAllowed() ||
       (this.isMockPayments() && !this.isProductionLike());
     const liveCode = useTestOtp ? TEST_OTP_CODE : randomInt(100000, 999999).toString();
@@ -854,12 +863,12 @@ export class WalletService {
     await this.storeWithdrawOtp(userId, challenge);
 
     if (useTestOtp) {
-      this.logger.warn(`TEST OTP retrait pour ${normalizedPhone.slice(0, 6)}…`);
+      this.logger.warn(`TEST OTP retrait pour ${(smsTo ?? normalizedPhone).slice(0, 6)}…`);
       return {
         success: true,
         skipOtp: false,
         otpRequired: true,
-        message: `Code envoyé au ${normalizedPhone} pour confirmer le retrait.`,
+        message: `Code envoyé au ${smsTo ?? normalizedPhone} pour confirmer le retrait.`,
         channel: 'sms' as const,
         phone: normalizedPhone,
         amountCdf: amount,
@@ -872,15 +881,17 @@ export class WalletService {
     const amountLabel = amount.toLocaleString('fr-FR');
     let smsError: string | undefined;
 
-    if (isAfrisoftSmsHubClientConfigured(this.envGetter)) {
+    if (smsTo && isAfrisoftSmsHubClientConfigured(this.envGetter)) {
       const text = serdiPaySanitizeSmsText(
         translateServerText(
-          `SENGA : code ${liveCode} pour confirmer le retrait de ${amountLabel} FC vers ce numero Valable 10 min`,
+          smsTo === normalizedPhone
+            ? `SENGA : code ${liveCode} pour confirmer le retrait de ${amountLabel} FC vers ce numero Valable 10 min`
+            : `SENGA : code ${liveCode} pour confirmer le retrait de ${amountLabel} FC vers le ${normalizedPhone} Valable 10 min`,
           currentRequestLanguage(),
         ),
       );
       const sms = await afrisoftSmsHubSendSms(this.envGetter, {
-        phone: normalizedPhone,
+        phone: smsTo,
         text,
         purpose: 'withdraw-otp',
         idempotencyKey: `senga:withdraw-otp:${userId}:${normalizedPhone}:${amount}`,
@@ -890,7 +901,7 @@ export class WalletService {
           success: true,
           skipOtp: false,
           otpRequired: true,
-          message: `Code envoyé au ${normalizedPhone} pour confirmer le retrait.`,
+          message: `Code envoyé au ${smsTo} pour confirmer le retrait.`,
           channel: 'sms' as const,
           phone: normalizedPhone,
           amountCdf: amount,
@@ -900,6 +911,9 @@ export class WalletService {
       }
       smsError = sms.message;
       this.logger.error(`Withdraw OTP SMS failed: ${sms.message}`);
+    } else if (!smsTo) {
+      smsError = 'Ajoutez votre numéro de téléphone au compte (profil) pour recevoir le code de retrait.';
+      this.logger.warn('Withdraw OTP: compte sans téléphone — tentative e-mail');
     } else {
       smsError = SMS_UNAVAILABLE_USER_MESSAGE;
       this.logger.warn('Withdraw OTP: hub SMS non configuré — tentative e-mail');
@@ -933,7 +947,13 @@ export class WalletService {
     amountCdf: number,
     provider: string,
     phone: string,
-    opts: { otp?: string; skipOtp?: boolean; accountPhone?: string | null } = {},
+    opts: {
+      otp?: string;
+      skipOtp?: boolean;
+      accountPhone?: string | null;
+      /** Without a code, pay out only to the account's own phone (older driver apps). */
+      ownNumberWithoutOtp?: boolean;
+    } = {},
   ) {
     const { amount, normalizedProvider, normalizedPhone } = this.assertWithdrawParams(
       amountCdf,
@@ -943,9 +963,15 @@ export class WalletService {
     await this.assertMmOperatorAllowed(userId, normalizedProvider, 'withdraw');
     const standing = this.getWithdrawStandingOtp();
     const otpDigits = String(opts.otp ?? '').replace(/\s/g, '');
+    const ownNumberNoCode =
+      Boolean(opts.ownNumberWithoutOtp) &&
+      !otpDigits &&
+      Boolean(opts.accountPhone?.trim()) &&
+      normalizePhoneRdc(opts.accountPhone as string) === normalizedPhone;
     const skipOtp =
       Boolean(opts.skipOtp) ||
       this.isWithdrawOtpSkipped() ||
+      ownNumberNoCode ||
       (standing != null && otpDigits === standing);
     // Server-side callers (opts.skipOtp) pick the destination themselves; end-user
     // withdrawals without a real OTP may only pay out to the account's own number.
@@ -1249,6 +1275,31 @@ export class WalletService {
         purpose: 'withdraw',
         idempotencyKey: `senga:withdraw:${reference}`,
       });
+      if (!mm.success && mm.ambiguous) {
+        // No answer / hub error: the payout may still go through. Refunding now could pay
+        // twice; reconcileStalePayouts refunds once the hub says FAILED or never got it.
+        this.logger.error(`Withdraw ${reference}: hub answer lost (${mm.message ?? '?'}) — kept for reconciliation`);
+        await this.prisma.walletTransaction.updateMany({
+          where: { reference, type: 'DEBIT' },
+          data: { description: `Retrait ${normalizedProvider} vers ${normalizedPhone} ${PAYOUT_UNCONFIRMED_MARK}` },
+        });
+        return {
+          success: true,
+          simulated: false,
+          pendingMobileMoney: true,
+          unconfirmed: true,
+          message:
+            `Retrait de ${formatCdf(amountCdf)} en cours de vérification. ` +
+            `S'il n'aboutit pas, le montant revient automatiquement sur votre solde.`,
+          amountCdf,
+          provider: normalizedProvider,
+          phone: normalizedPhone,
+          balanceCdf: wallet.balanceCdf,
+          formattedBalance: formatCdf(wallet.balanceCdf),
+          reference,
+          providerRef: reference,
+        };
+      }
       if (!mm.success) {
         await this.credit(userId, amountCdf, `Annulation retrait échoué ${reference}`, `rollback_${reference}`);
         throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, mm.message ?? 'Retrait Mobile Money échoué.');
@@ -1543,6 +1594,36 @@ export class WalletService {
         orderBy: { createdAt: 'desc' },
         include: { wallet: true },
       });
+      if (
+        done &&
+        outcome === 'COMPLETED' &&
+        done.type === 'TOPUP_FAILED' &&
+        done.description?.endsWith(TOPUP_USER_CANCEL_MARK)
+      ) {
+        // The user tapped « Annuler » in the app but still validated the PIN: the money was
+        // taken, so the top-up is credited (amount checks as for a normal completion).
+        const decision = mobileMoneyAmountDecision(done.amountCdf, confirmedAmountCdf);
+        if (decision !== 'under' && decision !== 'over') {
+          const lateWallet = await this.prisma.$transaction(async (tx) => {
+            const claimed = await tx.walletTransaction.updateMany({
+              where: { id: done.id, type: 'TOPUP_FAILED' },
+              data: {
+                type: 'TOPUP_COMPLETED',
+                description: done.description!.replace(TOPUP_USER_CANCEL_MARK, '— confirmée après annulation').trim(),
+              },
+            });
+            if (claimed.count !== 1) return null;
+            return tx.wallet.update({
+              where: { id: done.walletId },
+              data: { balanceCdf: { increment: done.amountCdf } },
+            });
+          });
+          if (lateWallet) {
+            this.logger.warn(`Top-up ${done.reference} confirmed after user cancel — credited`);
+            return { found: true, status: 'COMPLETED', balanceCdf: lateWallet.balanceCdf };
+          }
+        }
+      }
       if (done) {
         return {
           found: true,
@@ -1633,7 +1714,7 @@ export class WalletService {
       where: { id: pending.id },
       data: {
         type: 'TOPUP_FAILED',
-        description: `${pending.description ?? 'Recharge'} — annulée par l'utilisateur`,
+        description: `${pending.description ?? 'Recharge'} ${TOPUP_USER_CANCEL_MARK}`,
       },
     });
     return { success: true, cancelled: true, balanceCdf: wallet.balanceCdf };
@@ -1835,8 +1916,12 @@ export class WalletService {
       });
       if (already) continue;
       const remote = await afrisoftPayHubGetPayment(this.envGetter, debit.reference);
-      if (remote.status === 'FAILED') {
-        await this.refundFailedPayout([debit.reference], remote.message);
+      const neverReachedHub = Boolean(remote.notFound) && Boolean(debit.description?.includes(PAYOUT_UNCONFIRMED_MARK));
+      if ((remote.success && remote.status === 'FAILED') || neverReachedHub) {
+        await this.refundFailedPayout(
+          [debit.reference],
+          neverReachedHub ? `Annulation retrait non transmis ${debit.reference}` : remote.message,
+        );
       }
     }
   }

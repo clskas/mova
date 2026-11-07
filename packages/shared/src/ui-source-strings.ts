@@ -1925,5 +1925,7 @@ export const UI_SOURCE_STRINGS: readonly string[] = [
  "Vérifier mon identité",
  "Photographiez votre carte d'électeur, passeport ou permis, puis prenez un selfie. Cela prend 2 minutes.",
  "Recommencer la vérification",
- "Commencer la vérification"
+ "Commencer la vérification",
+ "Code de confirmation",
+ "Entrez le code à 6 chiffres reçu pour confirmer le retrait."
 ];

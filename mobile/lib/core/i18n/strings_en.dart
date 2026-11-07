@@ -1907,4 +1907,9 @@ const Map<String, String> kStringsEn = {
   "Octobre": "October",
   "Novembre": "November",
   "Décembre": "December",
+  "Documents : {done}/{required} obligatoires": "Documents: {done}/{required} required",
+  "Téléchargement de la langue…": "Downloading the language…",
+  "Cette langue n’a pas pu être téléchargée. Vérifiez votre connexion et réessayez.": "This language could not be downloaded. Check your connection and try again.",
+  "Traduction en cours de préparation : certains textes restent en français pour le moment.": "Translation being prepared: some texts stay in French for now.",
+  "Kiswahili et Lingala : traduits automatiquement, signalez-nous toute erreur.": "Kiswahili and Lingala: translated automatically, let us know about any mistake.",
 };

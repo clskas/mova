@@ -29,6 +29,8 @@ import { MovingVehiclePricingService } from '../moving/moving-vehicle-pricing.se
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { ParcelWeightBandService } from '../platform/parcel-weight-band.service';
 import { ClientAppsConfigService } from '../platform/client-apps-config.service';
+import { ContentTranslationService } from '../content-translation/content-translation.service';
+import { GENERATED_LANGUAGES, normalizeAppLanguage } from '@mova/shared';
 import { PlatformVendorsService } from '../platform/platform-vendors.service';
 import { PaymentInfoService } from './payment-info.service';
 import { PricingAdminService } from '../rides/pricing-admin.service';
@@ -67,6 +69,7 @@ export class InternalController {
     private platformConfig: PlatformConfigService,
     private parcelWeightBands: ParcelWeightBandService,
     private clientAppsConfig: ClientAppsConfigService,
+    private translations: ContentTranslationService,
     private platformVendors: PlatformVendorsService,
     private rental: RentalService,
     private tracking: TrackingService,
@@ -569,6 +572,14 @@ export class InternalController {
   @Patch('platform-config')
   updatePlatformConfig(@Body() body: Record<string, unknown>) {
     return this.platformConfig.update(body as never);
+  }
+
+  /** Server texts in Swahili / Lingala for the gateway and the other services. */
+  @Get('i18n/:lang/server')
+  serverDictionary(@Param('lang') lang: string) {
+    const code = normalizeAppLanguage(lang);
+    if (!GENERATED_LANGUAGES.includes(code)) return { lang: code, strings: {}, total: 0, done: 0 };
+    return this.translations.dictionary(code, 'server');
   }
 
   @Get('client-apps-config')

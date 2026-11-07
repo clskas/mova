@@ -2,6 +2,8 @@ import {
   DEFAULT_SOS_SMS_CONFIG,
   normalizeSosSmsConfig,
   type SosSmsConfig,
+  type AppLanguage,
+  normalizeAppLanguage,
   INTERNAL_API_KEY,
   resolveSosAlertUserIds,
   rolesForSosAudiences,
@@ -9,7 +11,7 @@ import {
   type SosAlertAudience,
 } from '@mova/shared';
 
-export type UserBrief = { name?: string; phone?: string; language?: 'fr' | 'en' };
+export type UserBrief = { name?: string; phone?: string; language?: AppLanguage };
 
 export async function fetchAuthUserBrief(userId: string): Promise<UserBrief | null> {
   try {
@@ -19,7 +21,7 @@ export async function fetchAuthUserBrief(userId: string): Promise<UserBrief | nu
     if (!res.ok) return null;
     const user = (await res.json()) as { firstName?: string; lastName?: string; phone?: string; language?: string };
     const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
-    return { name: name || undefined, phone: user.phone, language: user.language === 'en' ? 'en' : 'fr' };
+    return { name: name || undefined, phone: user.phone, language: normalizeAppLanguage(user.language) };
   } catch {
     return null;
   }

@@ -16,6 +16,7 @@ import {
   mapSmsDeliveryFailureToUserMessage,
   SMS_UNAVAILABLE_USER_MESSAGE,
   currentRequestLanguage,
+  normalizeAppLanguage,
   translateServerText,
   type AppLanguage,
 } from '@mova/shared';
@@ -46,8 +47,17 @@ export function sanitizeAndroidSmsHash(raw?: string | null): string | undefined 
  * `androidAppHash` is accepted by the API but ignored in the SMS body.
  */
 export function otpSmsText(brand: string, code: string, _androidAppHash?: string): string {
-  // Language chosen in the app that asked for the code (x-app-language).
-  return currentRequestLanguage() === 'en' ? `Your ${brand} code ${code}` : `Votre code ${brand} ${code}`;
+  // Language chosen in the app that asked for the code (x-app-language). No punctuation (SerdiPay).
+  switch (currentRequestLanguage()) {
+    case 'en':
+      return `Your ${brand} code ${code}`;
+    case 'sw':
+      return `Nambari yako ya ${brand} ni ${code}`;
+    case 'ln':
+      return `Code na yo ya ${brand} ezali ${code}`;
+    default:
+      return `Votre code ${brand} ${code}`;
+  }
 }
 
 @Injectable()
@@ -229,8 +239,7 @@ export class SmsService {
   private async recipientLanguage(phone: string): Promise<AppLanguage> {
     try {
       const user = await this.prisma?.user.findFirst({ where: { phone }, select: { language: true } });
-      if (user?.language === 'en') return 'en';
-      if (user) return 'fr';
+      if (user) return normalizeAppLanguage(user.language);
     } catch {
       /* French by default */
     }

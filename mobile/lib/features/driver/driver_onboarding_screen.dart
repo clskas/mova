@@ -792,8 +792,15 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         const SizedBox(height: 8),
         Text(
           _requiredDocCount > 0
-              ? 'Documents : ${_state!['kyc']['checklist'] is List ? (_state!['kyc']['checklist'] as List).where((i) => i is Map && i['required'] == true && i['uploaded'] == true).length : 0}/$_requiredDocCount obligatoires'
-              : 'Documents : tous optionnels pour le moment — SENGA peut les rendre obligatoires plus tard pour continuer à recevoir des courses.',
+              ? trf('Documents : {done}/{required} obligatoires', {
+                  'done': _state!['kyc']['checklist'] is List
+                      ? (_state!['kyc']['checklist'] as List)
+                          .where((i) => i is Map && i['required'] == true && i['uploaded'] == true)
+                          .length
+                      : 0,
+                  'required': _requiredDocCount,
+                })
+              : tr('Documents : tous optionnels pour le moment — SENGA peut les rendre obligatoires plus tard pour continuer à recevoir des courses.'),
           style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
         ),
       ],
@@ -945,7 +952,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
                       child: MovaButton(
                         label: _step == _steps.length - 1
                             ? (_isEditingDossier ? tr('Enregistrer') : tr('Envoyer le dossier'))
-                            : 'Continuer',
+                            : tr('Continuer'),
                         icon: Icons.arrow_forward_rounded,
                         isLoading: _loading,
                         onPressed: _continueEnabled ? _next : null,

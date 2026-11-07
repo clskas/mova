@@ -8,6 +8,7 @@ import {
   normalizeServiceBaseUrl,
   languageFromHeaders,
   translateResponseBody,
+  type AppLanguage,
 } from '@mova/shared';
 
 const ROUTES: Record<string, keyof typeof SERVICE_PORTS> = {
@@ -47,22 +48,22 @@ const ROUTES: Record<string, keyof typeof SERVICE_PORTS> = {
 /** JSON responses above this size are passed through untranslated. */
 const MAX_TRANSLATED_BYTES = 3 * 1024 * 1024;
 
-/** Only the mobile apps' English users; portals stay in French and files are binary. */
+/** Only the mobile apps' non-French users; portals stay in French and files are binary. */
 export function wantsTranslation(req: Pick<Request, 'headers' | 'url' | 'originalUrl'>): boolean {
-  if (languageFromHeaders(req.headers as Record<string, unknown>) !== 'en') return false;
+  if (languageFromHeaders(req.headers as Record<string, unknown>) === 'fr') return false;
   const path = req.originalUrl ?? req.url;
   if (/^\/api\/(admin|restaurant|rental-partner|uploads)(\/|\?|$)/.test(path)) return false;
   return !/\.(pdf|png|jpe?g|webp)(\?|$)/i.test(path) && !/\/pdf(\?|$)/.test(path);
 }
 
-/** Translates French server texts in a JSON body for an English-speaking user. */
-export function translateJsonBuffer(buffer: Buffer, contentType: string | undefined): Buffer | string {
+/** Translates French server texts in a JSON body for a user who chose [lang]. */
+export function translateJsonBuffer(buffer: Buffer, contentType: string | undefined, lang: AppLanguage = 'en'): Buffer | string {
   if (!contentType?.includes('application/json') || buffer.length === 0 || buffer.length > MAX_TRANSLATED_BYTES) {
     return buffer;
   }
   try {
     const parsed = JSON.parse(buffer.toString('utf8'));
-    return JSON.stringify(translateResponseBody(parsed, 'en'));
+    return JSON.stringify(translateResponseBody(parsed, lang));
   } catch {
     return buffer;
   }
@@ -110,8 +111,12 @@ export class ProxyMiddleware implements NestMiddleware {
           selfHandleResponse: true,
           on: {
             proxyReq: forwardRequestId,
-            proxyRes: responseInterceptor(async (buffer, proxyRes) =>
-              translateJsonBuffer(buffer, proxyRes.headers['content-type']),
+            proxyRes: responseInterceptor(async (buffer, proxyRes, req) =>
+              translateJsonBuffer(
+                buffer,
+                proxyRes.headers['content-type'],
+                languageFromHeaders((req as Request).headers as Record<string, unknown>),
+              ),
             ),
           },
         }),

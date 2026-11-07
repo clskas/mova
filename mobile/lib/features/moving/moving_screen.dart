@@ -235,7 +235,7 @@ class _MovingScreenState extends ConsumerState<MovingScreen> with SingleTickerPr
       _pickup = pickupFromText;
     } else if ((_pickupFromGps || _pickupFromSuggestion) && ServiceAreaLocation.isInBounds(_pickup)) {
       // Coordonnées déjà fixées par GPS ou autocomplétion.
-    } else if (pickupText.isNotEmpty && pickupText != 'Ma position') {
+    } else if (pickupText.isNotEmpty && !isMyPositionText(pickupText)) {
       final api = ref.read(apiClientProvider);
       final pickupResult = await api.geoAutocomplete(
         pickupText,

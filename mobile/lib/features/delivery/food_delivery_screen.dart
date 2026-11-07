@@ -127,7 +127,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       _deliveryLng = area.center.longitude;
       if (updateAddress &&
           (_addressController.text.trim().isEmpty ||
-              _addressController.text.trim() == 'Ma position')) {
+              isMyPositionText(_addressController.text.trim()))) {
         _addressController.text = 'Centre-ville, ${area.name}';
       }
       _estimatedTotal = null;
@@ -243,7 +243,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
         _deliveryLat = coords.latitude;
         _deliveryLng = coords.longitude;
         if (_addressController.text.trim().isEmpty ||
-            _addressController.text.trim() == 'Ma position') {
+            isMyPositionText(_addressController.text.trim())) {
           _addressController.text = ServiceAreaLocation.isInBounds(result.position)
               ? result.label
               : LocationService.coordsLabel(coords);
@@ -258,7 +258,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
     if (_addressCoordsResolved) return null;
     final text = _addressController.text.trim();
     if (text.isEmpty) return tr('Indiquez l\'adresse de livraison.');
-    if (text == 'Ma position') {
+    if (isMyPositionText(text)) {
       await _resolveDeliveryCoords(reloadAfter: true);
       return null;
     }
@@ -282,7 +282,7 @@ class _FoodDeliveryScreenState extends ConsumerState<FoodDeliveryScreen> {
       _deliveryLat = safe.latitude;
       _deliveryLng = safe.longitude;
       _addressCoordsResolved = true;
-      if (_addressController.text.trim().isEmpty || _addressController.text == 'Ma position') {
+      if (_addressController.text.trim().isEmpty || isMyPositionText(_addressController.text)) {
         _addressController.text = label;
       }
       _estimatedTotal = null;

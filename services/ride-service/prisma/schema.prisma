@@ -1232,14 +1232,19 @@ model UploadedMedia {
   @@map("uploaded_media")
 }
 
-/// English version of a partner text (menu item, listing, ad), translated once by Claude.
+/// Translation of a French text, made once by Claude: partner content (menus, listings, ads)
+/// and the app / server dictionaries for Swahili and Lingala.
 model ContentTranslation {
-  /// sha1 of the French source text
+  /// sha1 of the French text (English) or of "<lang>:<text>" (other languages)
   id        String   @id
+  /// 'en' | 'sw' | 'ln'
+  lang      String   @default("en")
   source    String
+  /// Translated text (whatever the language; the column predates sw / ln).
   en        String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([lang])
   @@map("content_translations")
 }

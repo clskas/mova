@@ -13,8 +13,8 @@ class RegisterPushTokenDto {
   @IsString()
   @IsIn(['driver', 'passenger', 'restaurant', 'rental_partner'])
   appFlavor?: string;
-  /** App language on this device: 'fr' or 'en'. */
-  @IsOptional() @IsIn(['fr', 'en']) language?: 'fr' | 'en';
+  /** App language on this device: 'fr', 'en', 'sw' or 'ln'. */
+  @IsOptional() @IsIn(['fr', 'en', 'sw', 'ln']) language?: 'fr' | 'en' | 'sw' | 'ln';
 }
 
 @ApiTags('notifications')

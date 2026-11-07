@@ -172,7 +172,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           ? tr('Indiquez le lieu de livraison (nom du quartier ou adresse).')
           : tr('Indiquez l\'adresse du commerce ou point de retrait.');
     }
-    if (text == 'Ma position') {
+    if (isMyPositionText(text)) {
       if (isDelivery) {
         final result = await LocationService.getCurrentLocation();
         if (result != null) {
@@ -182,7 +182,7 @@ class _ErrandScreenState extends ConsumerState<ErrandScreen> {
           );
           _deliveryLat = coords.latitude;
           _deliveryLng = coords.longitude;
-          if (_dropoffController.text.trim() == 'Ma position') {
+          if (isMyPositionText(_dropoffController.text.trim())) {
             _dropoffController.text = ServiceAreaLocation.isInBounds(result.position)
                 ? result.label
                 : LocationService.coordsLabel(coords);

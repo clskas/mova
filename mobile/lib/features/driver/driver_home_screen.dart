@@ -1,3 +1,4 @@
+import '../../core/i18n/i18n_remote.dart';
 import '../../core/safety/sos_follow_up.dart';
 import '../../core/i18n/i18n.dart';
 import 'dart:async';
@@ -271,6 +272,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     await DriverPushService.init(ref.read(apiClientProvider));
     unawaited(ref.read(apiClientProvider).syncLanguageToProfile());
     unawaited(SosConfigCache.refresh(ref.read(apiClientProvider)));
+    unawaited(refreshLanguageSettings(ref.read(apiClientProvider)));
     if (mounted) {
       setState(() => _bootstrapping = false);
       _startAssignmentsPolling();

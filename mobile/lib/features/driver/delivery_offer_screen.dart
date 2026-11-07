@@ -368,7 +368,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
                           data: widget.offer,
                           type: widget.offer['type']?.toString(),
                         )
-                      : 'Revenu net indisponible',
+                      : tr('Revenu net indisponible'),
                   style: TextStyle(color: MovaColors.textSecondary.withValues(alpha: 0.9), fontSize: 12),
                 ),
                 const SizedBox(height: 10),

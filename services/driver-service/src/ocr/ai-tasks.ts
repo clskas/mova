@@ -226,7 +226,7 @@ export const AI_TEXT_TASKS: Record<
   },
   /** Partner content (menu items, listings, ads) → English, shown to users who chose English. */
   TRANSLATE_CONTENT: {
-    maxTokens: 4000,
+    maxTokens: 8000,
     schema: {
       type: 'object',
       properties: {
@@ -246,15 +246,25 @@ export const AI_TEXT_TASKS: Record<
       required: ['items'],
       additionalProperties: false,
     },
-    prompt: (ctx) =>
-      [
-        'Traduis en anglais les textes ci-dessous, écrits par des partenaires SENGA en RDC (menus de restaurants, magasins, annonces de location de véhicules, publicités).',
-        'Garde tels quels les noms propres, les marques, les noms de plats locaux sans équivalent (ex. pondu, liboke, fufu, chikwangue, makayabu) et les montants.',
-        'Traduction naturelle et courte, à peu près de même longueur, sans rien ajouter ni commenter. Si un texte est déjà en anglais, recopie-le.',
-        'Renvoie un élément par clé reçue, avec la même clé.',
+    prompt: (ctx) => {
+      const target = TRANSLATION_TARGETS[String(ctx.target ?? 'en')] ?? TRANSLATION_TARGETS.en;
+      return [
+        `Traduis du français vers ${target} les textes ci-dessous. Ce sont des textes de SENGA, application de transport, livraison et paiement en RDC : boutons, messages et écrans de l'app, ou contenus de partenaires (menus, annonces de location, publicités).`,
+        'Garde tels quels les noms propres, les marques (SENGA, M-Pesa, Airtel Money, Orange Money…), les noms de plats locaux sans équivalent (pondu, liboke, fufu, chikwangue, makayabu), les montants et les numéros.',
+        'Recopie exactement les marqueurs entre accolades ({name}, {0}…) et garde les retours à la ligne.',
+        'Traduction naturelle, courte et polie, comme dans une application, sans rien ajouter ni commenter. Si un texte est déjà dans la langue cible, recopie-le.',
+        'Renvoie un élément par clé reçue, avec la même clé ; le champ « en » contient la traduction.',
         `Textes (JSON clé → texte) : ${JSON.stringify(ctx.texts ?? {}).slice(0, 12000)}`,
-      ].join('\n'),
+      ].join('\n');
+    },
   },
+};
+
+/** Target languages of TRANSLATE_CONTENT (as said to Claude). */
+const TRANSLATION_TARGETS: Record<string, string> = {
+  en: 'l’anglais',
+  sw: 'le swahili (kiswahili tel qu’on l’écrit dans l’est de la RDC, simple et courant)',
+  ln: 'le lingala (tel qu’on l’écrit à Kinshasa, simple et courant ; garde les mots français d’usage courant quand le lingala les emprunte)',
 };
 
 export function isAiTextTask(task: unknown): task is AiTextTask {

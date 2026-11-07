@@ -6,7 +6,7 @@ export class PushTokensService {
   constructor(private prisma: PrismaService) {}
 
   async register(userId: string, token: string, platform?: string, appFlavor = 'driver', language?: string) {
-    const lang = language === 'en' ? 'en' : language === 'fr' ? 'fr' : undefined;
+    const lang = ['fr', 'en', 'sw', 'ln'].includes(language ?? '') ? language : undefined;
     return this.prisma.pushDevice.upsert({
       where: { token },
       create: { userId, token, platform, appFlavor, ...(lang ? { language: lang } : {}) },
@@ -14,14 +14,14 @@ export class PushTokensService {
     });
   }
 
-  /** Tokens whose device runs the app in English. */
-  async englishTokens(tokens: string[]): Promise<Set<string>> {
-    if (tokens.length === 0) return new Set();
+  /** Language of each device that does not run the app in French (token → 'en' | 'sw' | 'ln'). */
+  async nonFrenchTokens(tokens: string[]): Promise<Map<string, string>> {
+    if (tokens.length === 0) return new Map();
     const rows = await this.prisma.pushDevice.findMany({
-      where: { token: { in: tokens }, language: 'en' },
-      select: { token: true },
+      where: { token: { in: tokens }, language: { not: 'fr' } },
+      select: { token: true, language: true },
     });
-    return new Set(rows.map((r) => r.token));
+    return new Map(rows.map((r) => [r.token, r.language]));
   }
 
   async tokensForUsers(

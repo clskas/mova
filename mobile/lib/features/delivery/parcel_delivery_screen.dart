@@ -208,7 +208,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       );
       _pickupController.text = ServiceAreaLocation.isInBounds(result.position)
           ? result.label
-          : 'Ma position';
+          : tr('Ma position');
       _pickupFromSuggestion = false;
       _pickupFromGps = true;
       _estimatedPrice = null;
@@ -277,7 +277,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       _pickup = pickupFromText;
     } else if ((_pickupFromGps || _pickupFromSuggestion) && ServiceAreaLocation.isInBounds(_pickup)) {
       // Coordonnées déjà fixées par GPS ou autocomplétion.
-    } else if (pickupText.isNotEmpty && pickupText != 'Ma position') {
+    } else if (pickupText.isNotEmpty && !isMyPositionText(pickupText)) {
       final api = ref.read(apiClientProvider);
       final pickupResult = await api.geoAutocomplete(
         pickupText,

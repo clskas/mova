@@ -1021,7 +1021,7 @@ class _WalletWithdrawSheetState extends ConsumerState<_WalletWithdrawSheet> {
               _otpSent
                   ? (_otpDeliveryHint ??
                       tr('Code envoyé. Saisissez les 6 chiffres (SMS ou e-mail) pour confirmer le versement.'))
-                  : 'Le code à 6 chiffres s’affiche ici après envoi — ce n’est pas une erreur.',
+                  : tr('Le code à 6 chiffres s’affiche ici après envoi — ce n’est pas une erreur.'),
               style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 8),

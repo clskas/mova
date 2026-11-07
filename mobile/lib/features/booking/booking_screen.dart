@@ -245,7 +245,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             cashDispute
                 ? tr('Le chauffeur a signalé ne pas avoir reçu les espèces de cette course. '
                     'Ce n’est pas une alerte SOS. Réglez ce litige (ou contactez le support) avant de commander.')
-                : 'Un paiement est encore dû sur une course terminée. Réglez-le avant de commander.',
+                : tr('Un paiement est encore dû sur une course terminée. Réglez-le avant de commander.'),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Fermer'))),
@@ -1067,7 +1067,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                               (_selectedEstimate!['savingsCdf'] is num &&
                                       (_selectedEstimate!['savingsCdf'] as num) > 0)
                                   ? trf('Pool · économie {v1} vs course seule', {'v1': MarketConfig.formatCdf((_selectedEstimate!['savingsCdf'] as num).round())})
-                                  : 'Pool · tarif partagé',
+                                  : tr('Pool · tarif partagé'),
                               style: const TextStyle(fontSize: 12, color: MovaColors.green),
                             ),
                           ],

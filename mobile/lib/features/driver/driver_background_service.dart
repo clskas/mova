@@ -55,7 +55,7 @@ class _DriverJobTaskHandler extends TaskHandler {
     final headers = {
       'Authorization': 'Bearer $token',
       'Content-Type': 'application/json',
-      'X-App-Language': prefs.getString('app_language') == 'en' ? 'en' : 'fr',
+      'X-App-Language': prefs.getString('app_language') ?? 'fr',
     };
 
     final known = (prefs.getStringList(_prefsKnownJobs) ?? []).toSet();

@@ -221,6 +221,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/services-senga", label: "Services SENGA", short: "Serv.", section: "systeme" },
   { href: "/abonnements-externes", label: "Hébergements & plateformes", short: "Échéances", section: "systeme" },
   { href: "/alertes-sos", label: "Alertes SOS", short: "SOS", section: "systeme" },
+  { href: "/langues", label: "Langues des apps", short: "Lang.", section: "systeme" },
   { href: "/maintenance", label: "Mode maintenance", short: "Maint.", section: "systeme" },
   { href: "/courses", label: "Courses", short: "Courses", section: "courses" },
   { href: "/livraisons", label: "Livraisons", short: "Livr.", section: "livraisons" },

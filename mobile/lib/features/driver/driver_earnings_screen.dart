@@ -865,7 +865,7 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                     hintText: tr('08X XXX XXXX'),
                     helperText: _payoutConfigured
                         ? trf('Laissez vide pour utiliser le numéro du dossier ({_payoutLabel})', {'_payoutLabel': _payoutLabel})
-                        : 'Numéro qui recevra le Mobile Money',
+                        : tr('Numéro qui recevra le Mobile Money'),
                     prefixIcon: const Icon(Icons.phone_iphone),
                   ),
                   onChanged: (_) => setState(() {}),

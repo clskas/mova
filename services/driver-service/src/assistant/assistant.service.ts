@@ -33,9 +33,16 @@ export function systemPromptFor(app: AssistantApp): string {
 
 /** Language block sent after the cached manual, so the cache stays shared by all users. */
 export function languageInstruction(lang: AppLanguage): string {
-  return lang === 'en'
-    ? 'The user chose English in the app. Answer in English, unless their last message is clearly in another language.'
-    : 'L’utilisateur a choisi le français dans l’app. Réponds en français, sauf si son dernier message est clairement dans une autre langue.';
+  switch (lang) {
+    case 'en':
+      return 'The user chose English in the app. Answer in English, unless their last message is clearly in another language.';
+    case 'sw':
+      return 'L’utilisateur a choisi le swahili dans l’app. Réponds en swahili simple (kiswahili de l’est de la RDC), sauf si son dernier message est clairement dans une autre langue.';
+    case 'ln':
+      return 'L’utilisateur a choisi le lingala dans l’app. Réponds en lingala simple (comme à Kinshasa), sauf si son dernier message est clairement dans une autre langue.';
+    default:
+      return 'L’utilisateur a choisi le français dans l’app. Réponds en français, sauf si son dernier message est clairement dans une autre langue.';
+  }
 }
 
 /** Last messages only, valid roles, trimmed text, starting with the user. */

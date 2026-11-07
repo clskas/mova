@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Max, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsIn, IsNumber, IsOptional, IsString, IsUUID, Max, Min, ValidateNested } from 'class-validator';
 import { DeliveryStatus, WeightCategory } from '@prisma/client';
 
 export class CreateParcelDeliveryDto {
@@ -19,8 +19,16 @@ export class CreateParcelDeliveryDto {
   @IsOptional()
   @IsNumber()
   @Min(0.1)
-  @Max(50)
+  @Max(3000)
   weightKg?: number;
+  @ApiProperty({
+    required: false,
+    enum: ['MOTO_TAXI', 'STANDARD', 'TRIPOTEUR', 'UTILITAIRE', 'CAMION'],
+    description: 'Véhicule choisi par le client (absent = ancien calcul, voiture).',
+  })
+  @IsOptional()
+  @IsIn(['MOTO_TAXI', 'STANDARD', 'TRIPOTEUR', 'UTILITAIRE', 'CAMION'])
+  vehicleType?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() promoCode?: string;
   @ApiProperty({
     required: false,

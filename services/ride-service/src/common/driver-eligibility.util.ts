@@ -268,6 +268,20 @@ export async function assertDriverEligibleForRentalLogistics(userId: string): Pr
   return profile;
 }
 
+/** Active, known vehicle types of a driver profile. */
+export function activeVehicleTypes(profile: DriverProfileSnapshot): VehicleTypeValue[] {
+  return (profile.vehicles ?? [])
+    .filter((v) => v.isActive !== false)
+    .map((v) => {
+      try {
+        return normalizeVehicleType(v.type) as VehicleTypeValue;
+      } catch {
+        return null;
+      }
+    })
+    .filter((t): t is VehicleTypeValue => t != null);
+}
+
 export async function assertDriverEligibleForParcel(
   userId: string,
   weightCategory: string | null | undefined,

@@ -380,6 +380,7 @@ export function formatParcelDelivery(
     dropoffCommune: detectCommune(delivery.dropoffLat ?? 0, delivery.dropoffLng ?? 0, delivery.dropoffAddress ?? undefined),
     photoUrl: delivery.photoUrl,
     weightCategory: delivery.weightCategory,
+    vehicleType: (delivery as Delivery & { vehicleType?: string | null }).vehicleType ?? null,
     estimatedPriceCdf: delivery.estimatedPriceCdf,
     finalPriceCdf: delivery.finalPriceCdf,
     priceCdf,

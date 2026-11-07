@@ -60,8 +60,9 @@ Sur **Taxi** (voiture uniquement, pas moto), activez le bascule **Partagé (Pool
 2. Renseignez l'adresse d'enlèvement et de livraison.
 3. Sélectionnez la catégorie de poids (documents, petit, moyen, grand).
 4. Ajoutez une photo (optionnel).
-5. Estimez, confirmez, puis suivez votre colis.
-6. Sur l'écran de suivi, la **trace GPS** (ligne sur la carte) montre le parcours du livreur.
+5. Appuyez sur **Estimer le prix** : l'application propose le véhicule adapté à votre colis (moto pour les documents et petits colis, voiture pour un colis moyen, tripoteur pour un gros colis, camionnette ou camion pour les très gros), marqué **Recommandé**, avec le prix de chaque véhicule. Vous pouvez choisir un autre véhicule de la liste ; un véhicule trop petit pour le colis n'est pas proposé.
+6. Confirmez, puis suivez votre colis. Seuls les livreurs ayant le véhicule choisi reçoivent la demande.
+7. Sur l'écran de suivi, la **trace GPS** (ligne sur la carte) montre le parcours du livreur.
 
 ## 4. Réservation planifiée
 

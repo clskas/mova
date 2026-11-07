@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType, PartnerKycStatus, PartnerKycSubject, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory, CommissionServiceType } from '@prisma/client';
-import { driverEligibleForParcelWeight, INTERNAL_API_KEY, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, estimateTripDurationMin, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue, checklistSatisfiesJobsGate, JOBS_GATE_RESTAURANT_KYC_TYPES } from '@mova/shared';
+import { driverEligibleForParcelWeight, driverFitsParcelVehicle, isParcelVehicleAllowed, parcelVehicleOptions, recommendedParcelVehicle, PARCEL_VEHICLE_LABELS, PARCEL_VEHICLE_FALLBACK_FACTOR, type ParcelVehicleType, INTERNAL_API_KEY, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, estimateTripDurationMin, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue, checklistSatisfiesJobsGate, JOBS_GATE_RESTAURANT_KYC_TYPES } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
@@ -30,7 +30,7 @@ import {
   formatParcelDelivery,
   generateDeliveryPin,
 } from './parcel.util';
-import { assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverAcceptsDeliveries, driverApprovedVehicleTypes, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
+import { activeVehicleTypes, assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverAcceptsDeliveries, driverApprovedVehicleTypes, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 import { fetchDriverDebtStatus } from '../common/driver-debt.util';
 import { isCommerceType, stubRestaurantCreateData } from '../restaurant/restaurant-profile.util';
 import { isRestaurantOpenNow } from '../common/restaurant-hours.util';
@@ -112,6 +112,7 @@ export class DeliveriesService {
       pickupLat?: number | null;
       pickupLng?: number | null;
       pickupAddress?: string | null;
+      vehicleType?: VehicleType | null;
       restaurant?: { name?: string | null; lat?: number | null; lng?: number | null; address?: string | null } | null;
     },
     opts?: { notifyAllDrivers?: boolean },
@@ -130,8 +131,11 @@ export class DeliveriesService {
       pickupAddress: pickup,
       title: 'Nouvelle livraison SENGA',
       body: `${label} · ${pickup}`,
-      vehicleTypes: DELIVERY_ALERT_VEHICLE_TYPES,
-      data: { deliveryType: delivery.type },
+      // A parcel booked for one vehicle is offered to that vehicle only.
+      vehicleTypes: delivery.vehicleType
+        ? [delivery.vehicleType as unknown as (typeof DELIVERY_ALERT_VEHICLE_TYPES)[number]]
+        : DELIVERY_ALERT_VEHICLE_TYPES,
+      data: { deliveryType: delivery.type, ...(delivery.vehicleType ? { vehicleType: delivery.vehicleType } : {}) },
     };
     if (delivery.type === DeliveryType.FOOD && delivery.restaurantId) {
       const restaurant = await this.prisma.restaurant.findUnique({
@@ -283,16 +287,43 @@ export class DeliveriesService {
       dto.dropoffLng,
     );
     const weightCategory = await this.resolveWeightCategory(dto);
+    if (dto.vehicleType && !isParcelVehicleAllowed(dto.vehicleType, weightCategory, dto.weightKg)) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Ce véhicule est trop petit pour ce colis. Choisissez un véhicule proposé.',
+      );
+    }
     const route = await this.routing.resolveRoadDistance(dto.pickupLat, dto.pickupLng, dto.dropoffLat, dto.dropoffLng);
     const distanceKm = route.distanceKm;
     const durationMin = route.durationMin ?? estimateTripDurationMin(distanceKm, this.tripSpeedDelivery());
-    const fare = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin, pickupArea.name);
-    const withInterCity = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const multiplier = await this.weightMultiplier(weightCategory, dto.weightKg);
+    const promoContext = { context: { serviceType: 'PARCEL' as const, city: pickupArea.name } };
+    // Without a chosen vehicle (older apps) the price stays the car price, as before.
+    const fare = await this.parcelFare(dto.vehicleType ?? 'STANDARD', distanceKm, durationMin, pickupArea.name);
+    const withInterCity = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
     const beforePromo = Math.ceil(withInterCity.estimatedFareCdf * multiplier);
-    const promoApplied = await applyPromoCode(this.promo, beforePromo, dto.promoCode, redeemPromo, {
-      context: { serviceType: 'PARCEL', city: pickupArea.name },
-    });
+    const promoApplied = await applyPromoCode(this.promo, beforePromo, dto.promoCode, redeemPromo, promoContext);
+    // Every vehicle that fits, with its price: the app shows the recommended one first.
+    const vehicleOptions = await Promise.all(
+      parcelVehicleOptions(weightCategory, dto.weightKg).map(async (option) => {
+        const optionFare = this.pricing.withInterCitySurcharge(
+          await this.parcelFare(option.vehicleType, distanceKm, durationMin, pickupArea.name),
+          isInterCity,
+          distanceKm,
+        );
+        const optionBefore = Math.ceil(optionFare.estimatedFareCdf * multiplier);
+        const optionPrice = (await applyPromoCode(this.promo, optionBefore, dto.promoCode, false, promoContext))
+          .estimatedPriceCdf;
+        return {
+          vehicleType: option.vehicleType,
+          label: PARCEL_VEHICLE_LABELS[option.vehicleType],
+          recommended: option.recommended,
+          estimatedPriceCdf: optionPrice,
+          formatted: formatCdf(optionPrice),
+        };
+      }),
+    );
     const estimatedPriceCdf = promoApplied.estimatedPriceCdf;
     const pickupCommune = detectCommune(dto.pickupLat, dto.pickupLng, dto.pickupAddress);
     const dropoffCommune = detectCommune(dto.dropoffLat, dto.dropoffLng, dto.dropoffAddress);
@@ -301,6 +332,9 @@ export class DeliveriesService {
       weightCategory,
       weightKg: dto.weightKg,
       weightMultiplier: multiplier,
+      vehicleType: dto.vehicleType ?? null,
+      recommendedVehicleType: recommendedParcelVehicle(weightCategory, dto.weightKg),
+      vehicleOptions,
       estimatedPriceCdf,
       priceCdf: estimatedPriceCdf,
       formatted: formatCdf(estimatedPriceCdf),
@@ -326,6 +360,34 @@ export class DeliveriesService {
     };
   }
 
+  /**
+   * Fare of one vehicle from the admin tariffs (Tarifs page). A goods vehicle without a tariff
+   * yet costs the car fare × a default factor, so the parcel can still be booked.
+   */
+  private async parcelFare(vehicleType: string, distanceKm: number, durationMin: number, city: string) {
+    try {
+      return await this.pricing.estimateFare(vehicleType as VehicleType, distanceKm, durationMin, city);
+    } catch (e) {
+      if (vehicleType === 'STANDARD') throw e;
+      const car = await this.pricing.estimateFare(VehicleType.STANDARD, distanceKm, durationMin, city);
+      const factor = PARCEL_VEHICLE_FALLBACK_FACTOR[vehicleType as ParcelVehicleType] ?? 1;
+      const scale = (n: number) => Math.ceil(n * factor);
+      const total = scale(car.totalCdf);
+      return {
+        ...car,
+        baseFareCdf: scale(car.baseFareCdf),
+        distanceFareCdf: scale(car.distanceFareCdf),
+        durationFareCdf: scale(car.durationFareCdf),
+        surchargeCdf: scale(car.surchargeCdf),
+        totalCdf: total,
+        estimatedFareCdf: total,
+        estimatedPriceCdf: total,
+        formatted: formatCdf(total),
+        totalFormatted: formatCdf(total),
+      };
+    }
+  }
+
   async createParcel(userId: string, dto: CreateParcelDeliveryDto) {
     await this.assertNoUnpaidCompletedDelivery(userId);
     const estimate = await this.estimateParcel(dto, true);
@@ -348,6 +410,7 @@ export class DeliveriesService {
         dropoffAddress: dto.dropoffAddress.trim(),
         photoUrl: dto.photoUrl,
         weightCategory,
+        vehicleType: (dto.vehicleType as VehicleType | undefined) ?? null,
         estimatedPriceCdf: estimate.estimatedPriceCdf,
         promoCode: estimate.promoCode,
         discountCdf: estimate.discountCdf || undefined,
@@ -1523,6 +1586,9 @@ export class DeliveriesService {
         if (o.type !== DeliveryType.FOOD && !driverEligibleForParcelWeight(driverTypes, o.weightCategory as string | undefined)) {
           return false;
         }
+        if (o.type !== DeliveryType.FOOD && !driverFitsParcelVehicle(driverTypes, (o as { vehicleType?: string | null }).vehicleType)) {
+          return false;
+        }
         if (o.type === DeliveryType.FOOD) {
           return o.pickupCity === operatingCity || (hasGps && o.distanceToPickupKm <= radiusKm);
         }
@@ -1553,7 +1619,14 @@ export class DeliveriesService {
     const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (delivery.type !== DeliveryType.FOOD) {
-      await assertDriverEligibleForParcel(driverUserId, delivery.weightCategory);
+      const eligible = await assertDriverEligibleForParcel(driverUserId, delivery.weightCategory);
+      if (delivery.vehicleType && !driverFitsParcelVehicle(activeVehicleTypes(eligible), delivery.vehicleType)) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          HttpStatus.FORBIDDEN,
+          `Le client a demandé un véhicule de type ${PARCEL_VEHICLE_LABELS[delivery.vehicleType as ParcelVehicleType] ?? delivery.vehicleType}.`,
+        );
+      }
     } else {
       await assertDriverCanReceiveJobs(driverUserId);
     }

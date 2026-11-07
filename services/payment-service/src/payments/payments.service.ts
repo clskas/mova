@@ -1,3 +1,4 @@
+import { planDriverPayout } from '../payouts/payout-plan';
 import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CashDebtCategory, PaymentMethod, PaymentStatus } from '@prisma/client';
@@ -340,38 +341,43 @@ export class PaymentsService {
     passengerPaidCdf?: number | null,
     customerRefund?: { userId: string; amountCdf: number },
   ) {
-    const net = Math.max(0, Math.round(driverNetCdf));
     const paid =
       passengerPaidCdf != null && Number.isFinite(passengerPaidCdf)
         ? Math.max(0, Math.round(passengerPaidCdf))
-        : Math.max(0, Math.round(grossCdf ?? net));
+        : Math.max(0, Math.round(grossCdf ?? driverNetCdf));
+    const cash = paymentMethod === PaymentMethod.CASH;
+    // Who gets what: see payouts/payout-plan.ts (checked by the balance tests).
+    const plan = planDriverPayout({
+      driverNetCdf,
+      paidCdf: paid,
+      refundCdf: customerRefund?.amountCdf,
+      cash,
+    });
+    const type = referenceType.toUpperCase();
+
     // Errand budget paid upfront but not spent belongs to the customer, not to SENGA.
-    const refund = Math.max(0, Math.min(paid, Math.round(customerRefund?.amountCdf ?? 0)));
-    if (refund > 0 && customerRefund && paymentMethod !== PaymentMethod.CASH) {
+    if (plan.customerRefundCredit > 0 && customerRefund) {
       await this.walletService.credit(
         customerRefund.userId,
-        refund,
+        plan.customerRefundCredit,
         `Budget non dépensé rendu — ${referenceType} ${referenceId.slice(0, 8)}`,
-        `BUDGET_REFUND:${referenceType.toUpperCase()}:${referenceId}`,
+        `BUDGET_REFUND:${type}:${referenceId}`,
       );
     }
-    const collected = paid - refund;
-    const platformFee = Math.max(0, collected - net);
-    const cashPromoTopUp = paymentMethod === PaymentMethod.CASH ? Math.max(0, net - collected) : 0;
-
-    if (paymentMethod !== PaymentMethod.CASH) {
+    if (plan.driverWalletCredit > 0) {
       await this.driverPayouts.creditPayout(driverId, {
-        referenceType: referenceType.toUpperCase(),
+        referenceType: type,
         referenceId,
-        driverNetCdf: net,
+        driverNetCdf: plan.driverWalletCredit,
       });
-    } else if (cashPromoTopUp > 0) {
+    }
+    if (plan.driverPromoTopUp > 0) {
       // Promo > marge commission : le cash reçu ne couvre pas le net — SENGA complète.
       // Réf. PROMO_TOPUP (pas *_PAYOUT) pour éviter le clawback sync espèces.
       await this.driverPayouts.creditCashPromoTopUp(driverId, {
-        referenceType: referenceType.toUpperCase(),
+        referenceType: type,
         referenceId,
-        amountCdf: cashPromoTopUp,
+        amountCdf: plan.driverPromoTopUp,
       });
       // Si dettes ouvertes : le top-up réduit la dette (FIFO, partiel OK).
       try {
@@ -384,26 +390,27 @@ export class PaymentsService {
       }
     }
     // SENGA-funded promo larger than its commission: the extra paid to the driver is a cost.
-    if (net > collected) {
+    if (plan.promoCost > 0) {
       await this.walletService.recordPlatformPromoCost(
-        net - collected,
+        plan.promoCost,
         `Promo financée par SENGA — ${referenceType} ${referenceId.slice(0, 8)}`,
-        `PROMO_COST:${referenceType.toUpperCase()}:${referenceId}`,
+        `PROMO_COST:${type}:${referenceId}`,
       );
     }
-    if (paymentMethod === PaymentMethod.CASH && platformFee > 0) {
+    if (plan.driverDebt > 0) {
       // Espèces : dette seulement — la trésorerie est créditée au règlement guichet.
       await this.debtLedger.recordDebt({
         driverUserId: driverId,
         referenceType,
         referenceId,
         category: CashDebtCategory.PLATFORM_FEE,
-        amountCdf: platformFee,
+        amountCdf: plan.driverDebt,
         description: `Commission espèces à reverser — ${referenceType} ${referenceId.slice(0, 8)}`,
       });
-    } else if (paymentMethod !== PaymentMethod.CASH && platformFee > 0) {
+    }
+    if (plan.platformFeeCredit > 0) {
       await this.walletService.creditPlatformFee(
-        platformFee,
+        plan.platformFeeCredit,
         `Commission SENGA ${referenceType} ${referenceId}`,
         `PLATFORM_FEE:${referenceType}:${referenceId}`,
       );

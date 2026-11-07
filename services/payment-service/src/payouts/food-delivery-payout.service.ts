@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
 import { DriverPayoutService } from './driver-payout.service';
 import { DriverDebtLedgerService } from '../ledger/driver-debt-ledger.service';
+import { planFoodSettlement } from './payout-plan';
 
 type FoodSettlement = {
   referenceType: string;
@@ -165,12 +166,14 @@ export class FoodDeliveryPayoutService {
     // SENGA-funded promo larger than its margin: restaurants + courier get more than the
     // customer paid. SENGA pays the difference (and records it as a promo cost). In cash the
     // courier holds only what the customer paid, so the gap is credited to the courier.
-    const restaurantNetTotal = settlement.restaurants.reduce(
-      (sum, r) => sum + (r.ownerUserId ? Math.max(0, Math.round(r.netCdf)) : 0),
-      0,
-    );
-    const courierNet = Math.max(0, Math.round(settlement.driver?.netCdf ?? 0));
-    const shortfall = Math.max(0, restaurantNetTotal + courierNet - Math.round(settlement.totalPaidCdf ?? 0));
+    const plan = planFoodSettlement({
+      totalPaidCdf: settlement.totalPaidCdf ?? 0,
+      restaurantNets: settlement.restaurants.filter((r) => r.ownerUserId).map((r) => r.netCdf),
+      courierNetCdf: settlement.driver?.netCdf ?? 0,
+      platformFeeCdf: platformFee,
+      cash: isCash,
+    });
+    const shortfall = plan.promoCost;
     if (shortfall > 0) {
       if (isCash && driverUserId) {
         results.courierPromoTopUp = await this.driverPayouts.creditCashPromoTopUp(driverUserId, {

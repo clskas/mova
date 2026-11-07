@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
 import { DriverPayoutService } from './driver-payout.service';
 import { DriverDebtLedgerService } from '../ledger/driver-debt-ledger.service';
+import { planRentalOwner } from './payout-plan';
 
 type RentalSettlement = {
   referenceType: string;
@@ -162,7 +163,12 @@ export class RentalPayoutService {
     // paid for the rental. SENGA pays the gap (credited in cash, where the owner holds only
     // what was paid) and records it as a promo cost.
     if (settlement.ownerUserId && settlement.rentalPaidCdf != null) {
-      const ownerShortfall = Math.max(0, ownerNet - Math.round(settlement.rentalPaidCdf));
+      const ownerShortfall = planRentalOwner({
+        rentalPaidCdf: settlement.rentalPaidCdf,
+        ownerNetCdf: ownerNet,
+        platformFeeCdf: rentalPlatformFee,
+        cash: isCash,
+      }).promoCost;
       if (ownerShortfall > 0) {
         if (isCash) {
           const ref = `PROMO_TOPUP:RENTAL:${bookingId}`;

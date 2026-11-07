@@ -27,7 +27,7 @@ import {
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { parseOrderPlacedMetadata, computeFoodSettlementPools, applyOwnCourierRouting } from '../deliveries/food-delivery-settlement.util';
+import { parseOrderPlacedMetadata, computeFoodSettlementPools, applyOwnCourierRouting, computeFoodShares } from '../deliveries/food-delivery-settlement.util';
 import { deliveryDriverGross } from '../deliveries/delivery-driver-gross.util';
 import { computeRentalPartnerDisplay } from '../billing/partner-display.util';
 import { PricingService } from './pricing.service';
@@ -1642,47 +1642,33 @@ export class RidesService {
                 ))),
         ));
 
-    for (const share of pools.shares) {
-      const restaurantId = share.restaurantId ?? d.restaurantId;
-      if (!restaurantId || share.itemsGrossCdf <= 0) continue;
-      const row = restaurantRows.find((r) => r.id === restaurantId);
-      const gross = share.itemsGrossCdf;
-      if (useCatalogMarkupModel) {
-        // Modèle A : le resto reçoit 100 % du catalogue ; le markup est dans le résidu plateforme.
-        restaurants.push({
-          restaurantId,
-          ownerUserId: row?.ownerUserId ?? null,
-          grossCdf: Math.round(gross),
-          netCdf: Math.round(gross),
-          platformFeeCdf: 0,
-        });
-      } else {
-        // Commandes legacy : commission FOOD prélevée sur le prix catalogue.
-        const split = this.commission.splitGross(gross, foodRule.platformPercent);
-        restaurants.push({
-          restaurantId,
-          ownerUserId: row?.ownerUserId ?? null,
-          grossCdf: Math.round(gross),
-          netCdf: Math.round(split.driverNetCdf),
-          platformFeeCdf: split.platformFeeCdf,
-        });
-      }
+    const shares = computeFoodShares({
+      totalPaidCdf,
+      restaurants: pools.shares
+        .map((share) => ({ restaurantId: share.restaurantId ?? d.restaurantId, itemsGrossCdf: share.itemsGrossCdf }))
+        .filter((share): share is { restaurantId: string; itemsGrossCdf: number } =>
+          Boolean(share.restaurantId) && share.itemsGrossCdf > 0,
+        ),
+      catalogMarkupModel: useCatalogMarkupModel,
+      foodPercent: foodRule.platformPercent,
+      deliveryPercent: deliveryRule.platformPercent,
+      partnerDiscountCdf: partnerDiscount,
+      discountRestaurantId: d.restaurantId,
+      deliveryFeeGrossCdf: pools.deliveryFeeGross,
+      // A restaurant fleet earns the delivery fee even without a SENGA courier on the order.
+      hasCourier: Boolean(d.driverId) || d.courierSource === 'RESTAURANT',
+    });
+    for (const share of shares.restaurants) {
+      const row = restaurantRows.find((r) => r.id === share.restaurantId);
+      restaurants.push({ ...share, ownerUserId: row?.ownerUserId ?? null });
     }
-
-    // La remise partenaire réduit le net du restaurant concerné (imputée au 1er si multi-restaurants).
-    if (partnerDiscount > 0 && restaurants.length > 0) {
-      const targetId = d.restaurantId ?? restaurants[0]?.restaurantId;
-      const target = restaurants.find((r) => r.restaurantId === targetId) ?? restaurants[0];
-      target.netCdf = Math.max(0, target.netCdf - partnerDiscount);
-    }
-
     const deliveryGross = pools.deliveryFeeGross;
-    const driverSplit = this.commission.splitGross(deliveryGross, deliveryRule.platformPercent);
-    const driverNet = Math.round(driverSplit.driverNetCdf);
-    const restaurantNetTotal = restaurants.reduce((sum, r) => sum + r.netCdf, 0);
-    // Commission plateforme = résidu (absorbe automatiquement une remise PLATFORM/SHARED,
-    // car totalPaidCdf est déjà net de la promo tandis que restaurants/livreur sont au brut).
-    const platformFeeCdf = Math.max(0, totalPaidCdf - restaurantNetTotal - driverNet);
+    const driverSplit = { platformFeeCdf: shares.courierPlatformFeeCdf };
+    const driverNet = shares.courierNetCdf;
+    const platformFeeCdf = shares.platformFeeCdf;
+    if (!d.driverId && d.courierSource === 'RESTAURANT' && restaurants.length > 0) {
+      restaurants[0] = { ...restaurants[0], netCdf: restaurants[0].netCdf + driverNet };
+    }
 
     const raw = {
       referenceType: 'DELIVERY' as const,

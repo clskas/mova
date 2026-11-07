@@ -87,6 +87,16 @@ Des champs OCR (nom, numéro permis…) peuvent apparaître si le service d’an
 
 **Smile ID dans l'application chauffeur** : dans **Règles plateforme**, la section **Vérification d'identité Smile ID** contient un interrupteur. Activé, l'application chauffeur affiche une carte **« Vérifier mon identité »** dans l'étape « Informations personnelles » du dossier. Le chauffeur lance lui-même la vérification et voit seulement où elle en est : en cours, vérifiée, ou non validée. Le détail du résultat reste dans la fiche admin. Après un refus, seul l'admin peut envoyer un nouveau lien, car chaque vérification est facturée. Désactivé, la carte est masquée.
 
+### Contrôle des comptes
+
+La page **Contrôle des comptes** (menu Portefeuille) montre le résultat du contrôle fait chaque nuit vers 1 h. Il vérifie trois choses :
+
+- le solde de chaque portefeuille est égal à la somme de ses mouvements ;
+- pour chaque commande payée en ligne dans les dernières 48 h, ce qui a été versé est égal à ce que le client a payé ;
+- chaque bénéficiaire (chauffeur, livreur, restaurant, loueur, SENGA) a reçu exactement sa part.
+
+Chaque anomalie indique la commande ou l'utilisateur, le montant attendu, le montant constaté et l'écart. Le bouton **Lancer le contrôle maintenant** refait la vérification. Ce contrôle ne déplace jamais d'argent : il signale seulement. Une caution de location encore chez SENGA apparaît « pour information ».
+
 ### Exiger des documents pour les jobs
 
 Dans **Règles plateforme** (SUPER_ADMIN, ADMIN, **CITY_ADMIN** — section documents uniquement pour l’admin ville) :

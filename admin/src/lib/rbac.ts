@@ -234,6 +234,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/abonnements", label: "Abonnements", short: "Abos", section: "abonnements" },
   { href: "/pnl", label: "P&L / commissions", short: "P&L", section: "pnl" },
   { href: "/portefeuille", label: "Portefeuille", short: "Portef.", section: "portefeuille" },
+  { href: "/controle-comptes", label: "Contrôle des comptes", short: "Contrôle", section: "portefeuille" },
   { href: "/litiges", label: "Litiges", short: "Litiges", section: "litiges" },
   { href: "/fraude", label: "Fraude", short: "Fraude", section: "fraude" },
   { href: "/blacklist", label: "Liste noire", short: "Blacklist", section: "blacklist" },

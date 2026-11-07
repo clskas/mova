@@ -156,6 +156,7 @@ export default function ReglesPlateformePage() {
   const [poolMaxPassengers, setPoolMaxPassengers] = useState("");
   const [poolMaxDetourKm, setPoolMaxDetourKm] = useState("");
   const [requireDocsForJobs, setRequireDocsForJobs] = useState(false);
+  const [smileIdInApp, setSmileIdInApp] = useState(false);
   const [docsGraceDays, setDocsGraceDays] = useState("7");
   const [requiredDocs, setRequiredDocs] = useState<Record<(typeof DOCUMENT_CATALOG)[number]["field"], string[]>>({
     requiredDriverDocuments: [],
@@ -199,6 +200,7 @@ export default function ReglesPlateformePage() {
     setPoolMaxPassengers(String(c.carpool.maxPassengers ?? 3));
     setPoolMaxDetourKm(String(c.carpool.maxDetourKm ?? 2.5));
     setRequireDocsForJobs(c.driverOps?.requireDocumentsForJobs === true);
+    setSmileIdInApp(c.identityVerification?.smileIdInApp === true);
     setDocsGraceDays(String(c.driverOps?.documentsGracePeriodDays ?? 7));
     setRequiredDocs({
       requiredDriverDocuments: c.driverOps?.requiredDriverDocuments ?? [],
@@ -447,6 +449,44 @@ export default function ReglesPlateformePage() {
 
           {!cityAdminDocsOnly && (
           <>
+          <section>
+            <h2 className="font-semibold text-[#1A1A2E] mb-3">Vérification d&apos;identité Smile ID</h2>
+            <Card className="p-4 space-y-3 max-w-xl">
+              <p className="text-sm text-gray-600">
+                Affiche dans l&apos;application chauffeur une carte « Vérifier mon identité » : le chauffeur
+                photographie sa pièce et prend un selfie, Smile ID contrôle le document et le visage. Le résultat
+                arrive dans la fiche chauffeur. Désactivé, la carte est masquée ; l&apos;admin peut toujours
+                envoyer le lien depuis la fiche chauffeur. Chaque vérification est facturée par Smile ID.
+              </p>
+              <label className="flex items-center gap-3 text-sm">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={smileIdInApp}
+                  disabled={readOnly || savingSection === "identityVerification"}
+                  onClick={() => {
+                    const next = !smileIdInApp;
+                    setSmileIdInApp(next);
+                    void savePlatform("identityVerification", { identityVerification: { smileIdInApp: next } });
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition disabled:opacity-50 ${
+                    smileIdInApp ? "bg-green-600" : "bg-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                      smileIdInApp ? "translate-x-5" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+                <span>
+                  {smileIdInApp ? "Affichée dans l'application chauffeur" : "Masquée dans l'application chauffeur"}
+                  {savingSection === "identityVerification" ? " …" : ""}
+                </span>
+              </label>
+            </Card>
+          </section>
+
           <section>
             <h2 className="font-semibold text-[#1A1A2E] mb-3">Paiements espèces (timeout)</h2>
             <Card className="p-4 space-y-4 max-w-xl">

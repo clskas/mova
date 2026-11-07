@@ -1911,5 +1911,19 @@ export const UI_SOURCE_STRINGS: readonly string[] = [
  "Téléchargement de la langue…",
  "Cette langue n’a pas pu être téléchargée. Vérifiez votre connexion et réessayez.",
  "Traduction en cours de préparation : certains textes restent en français pour le moment.",
- "Kiswahili et Lingala : traduits automatiquement, signalez-nous toute erreur."
+ "Kiswahili et Lingala : traduits automatiquement, signalez-nous toute erreur.",
+ "Vérification indisponible pour le moment. Réessayez plus tard.",
+ "Impossible d'ouvrir la page de vérification.",
+ "Identité vérifiée",
+ "Merci : votre identité a été vérifiée.",
+ "Vérification en cours",
+ "Votre vérification est en cours d'examen. Vous serez informé du résultat.",
+ "Vérification non validée",
+ "Votre vérification n'a pas été validée. Contactez le support SENGA.",
+ "Vérification interrompue",
+ "Un problème technique a interrompu la vérification. Vous pouvez recommencer.",
+ "Vérifier mon identité",
+ "Photographiez votre carte d'électeur, passeport ou permis, puis prenez un selfie. Cela prend 2 minutes.",
+ "Recommencer la vérification",
+ "Commencer la vérification"
 ];

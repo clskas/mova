@@ -172,6 +172,26 @@ export class SmileIdService {
     return 'ok';
   }
 
+  /**
+   * What the driver app shows: only the step to do and a short status, never the details of
+   * the verdict (those stay in the admin file).
+   */
+  async driverView(userId: string, visible: boolean) {
+    if (!visible || !this.configured()) return { visible: false as const };
+    const row = await this.prisma.smileIdVerification.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } });
+    const status = row?.status ?? null;
+    return {
+      visible: true as const,
+      status,
+      link: status === 'PENDING' ? row!.link : null,
+      /**
+       * The driver may start (or reopen) a check when there is none, or retry after a technical
+       * error. After a refusal only the admin can send a new link (each check is paid).
+       */
+      canStart: !row || status === 'PENDING' || status === 'error',
+    };
+  }
+
   /** Asks Smile ID again for the verdict (when a webhook was missed). */
   async refresh(userId: string) {
     const config = this.requireConfig();

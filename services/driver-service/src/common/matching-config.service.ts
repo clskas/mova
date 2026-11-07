@@ -27,6 +27,7 @@ export class MatchingConfigService implements OnModuleInit {
     scoreWeights: { ...MARKET_RDC.matching.scoreWeights },
   };
   private driverOps: Required<DocumentsOpsConfig> = { ...DEFAULT_DRIVER_OPS };
+  private smileIdInAppFlag = false;
 
   async onModuleInit() {
     await this.refresh().catch(() => undefined);
@@ -47,6 +48,11 @@ export class MatchingConfigService implements OnModuleInit {
     return this.driverOps.requireDocumentsForJobs === true;
   }
 
+  /** Admin PlatformConfig.identityVerification.smileIdInApp: Smile ID card in the driver app. */
+  smileIdInApp(): boolean {
+    return this.smileIdInAppFlag;
+  }
+
   documentsGracePeriodDays(): number {
     return this.driverOps.documentsGracePeriodDays;
   }
@@ -65,6 +71,7 @@ export class MatchingConfigService implements OnModuleInit {
         config?: {
           matching?: MatchingConfig;
           driverOps?: DocumentsOpsConfig;
+          identityVerification?: { smileIdInApp?: boolean };
         };
       };
       if (body.config?.matching) {
@@ -73,6 +80,7 @@ export class MatchingConfigService implements OnModuleInit {
           scoreWeights: { ...body.config.matching.scoreWeights },
         };
       }
+      this.smileIdInAppFlag = body.config?.identityVerification?.smileIdInApp === true;
       const ops = body.config?.driverOps ?? {};
       this.driverOps = {
         requireDocumentsForJobs: ops.requireDocumentsForJobs === true,

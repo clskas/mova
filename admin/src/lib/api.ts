@@ -648,6 +648,8 @@ export type PlatformConfigData = {
     autoConfirmHours: number;
     autoConfirmMaxCdf: number;
   };
+  /** Smile ID verification card in the driver app (shown / hidden). */
+  identityVerification?: { smileIdInApp: boolean };
 };
 
 export type PlatformConfigResponse = {

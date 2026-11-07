@@ -17,6 +17,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../help/legal_screen.dart';
 import '../profile/profile_screen.dart';
 import 'driver_home_screen.dart';
+import 'widgets/smile_id_verification_card.dart';
 
 /// Parcours d'enregistrement chauffeur — 6 étapes SENGA.
 class DriverOnboardingScreen extends ConsumerStatefulWidget {
@@ -987,6 +988,7 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
         const SizedBox(height: 20),
         _docButton('ID_PHOTO', 'Carte d\'identité / passeport'),
         _docButton('SELFIE', 'Photo récente (profil)'),
+        const SmileIdVerificationCard(),
       ],
     );
   }

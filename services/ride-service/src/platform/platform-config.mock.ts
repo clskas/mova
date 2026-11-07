@@ -40,6 +40,7 @@ export function mockPlatformConfig(
       autoConfirmHours: 24,
       autoConfirmMaxCdf: 150_000,
     },
+    identityVerification: { smileIdInApp: false },
   };
   return {
     get: () => ({ ...base, ...overrides }),

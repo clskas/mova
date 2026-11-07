@@ -368,6 +368,8 @@ model Delivery {
   dropoffAddress    String?
   photoUrl          String?
   weightCategory    WeightCategory?
+  /// Parcel: vehicle chosen by the customer (offered to that vehicle only). Null = any.
+  vehicleType       VehicleType?
   restaurantId      String?
   restaurant        Restaurant?      @relation(fields: [restaurantId], references: [id])
   items             Json?

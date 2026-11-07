@@ -1927,5 +1927,10 @@ export const UI_SOURCE_STRINGS: readonly string[] = [
  "Recommencer la vérification",
  "Commencer la vérification",
  "Code de confirmation",
- "Entrez le code à 6 chiffres reçu pour confirmer le retrait."
+ "Entrez le code à 6 chiffres reçu pour confirmer le retrait.",
+ "Moto",
+ "Voiture",
+ "Tripoteur",
+ "Camionnette",
+ "Nous proposons le véhicule adapté à votre colis. Vous pouvez en choisir un autre."
 ];

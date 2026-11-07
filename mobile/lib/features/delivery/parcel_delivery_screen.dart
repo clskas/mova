@@ -64,6 +64,9 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
   bool _dropoffFromManualCoords = false;
   File? _photoFile;
   int? _estimatedPrice;
+  /// Vehicle chosen for the parcel (the recommended one until the customer picks another).
+  String? _vehicleType;
+  List<Map<String, dynamic>> _vehicleOptions = const [];
   Map<String, dynamic>? _priceBreakdown;
   double? _distanceKm;
   double? _durationMin;
@@ -357,6 +360,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
       'dropoffLat': dropoff.latitude,
       'dropoffLng': dropoff.longitude,
       if (_promoController.text.trim().isNotEmpty) 'promoCode': _promoController.text.trim(),
+      if (_vehicleType != null) 'vehicleType': _vehicleType,
     };
     if (includePhoto && _photoFile != null) {
       payload['photoUrl'] = _photoFile!.path;
@@ -446,10 +450,21 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
     await api.checkHealth();
     final result = await api.post('/deliveries/parcel/estimate', _parcelPayload());
     if (!mounted) return;
+    String? needsVehicle;
     setState(() {
       _loading = false;
       switch (result) {
         case Success(:final data):
+          final options = data['vehicleOptions'];
+          _vehicleOptions = options is List
+              ? options.whereType<Map>().map((o) => Map<String, dynamic>.from(o)).toList()
+              : const [];
+          final recommended = data['recommendedVehicleType']?.toString();
+          // First estimate: the server proposes the vehicle that fits; ask the price for it.
+          if (data['vehicleType'] == null && recommended != null && _vehicleOptions.isNotEmpty) {
+            _vehicleType = recommended;
+            needsVehicle = recommended;
+          }
           _estimatedPrice = (data['estimatedPriceCdf'] as num?)?.toInt();
           _priceBreakdown = data['priceBreakdown'] is Map
               ? Map<String, dynamic>.from(data['priceBreakdown'] as Map)
@@ -460,6 +475,65 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
           _error = error.message;
       }
     });
+    if (needsVehicle != null) await _estimate();
+  }
+
+  void _chooseVehicle(String vehicleType) {
+    if (vehicleType == _vehicleType || _loading) return;
+    setState(() => _vehicleType = vehicleType);
+    _estimate();
+  }
+
+  static const _vehicleIcons = {
+    'MOTO_TAXI': '🏍️',
+    'STANDARD': '🚗',
+    'TRIPOTEUR': '🛺',
+    'UTILITAIRE': '🚐',
+    'CAMION': '🚚',
+  };
+
+  Widget _vehiclePicker(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text(tr('Véhicule'), style: theme.textTheme.titleSmall),
+        const SizedBox(height: 2),
+        Text(
+          tr('Nous proposons le véhicule adapté à votre colis. Vous pouvez en choisir un autre.'),
+          style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+        ),
+        const SizedBox(height: 6),
+        ..._vehicleOptions.map((o) {
+          final type = o['vehicleType']?.toString() ?? '';
+          final price = (o['estimatedPriceCdf'] as num?)?.toInt();
+          final recommended = o['recommended'] == true;
+          return RadioListTile<String>(
+            contentPadding: EdgeInsets.zero,
+            value: type,
+            groupValue: _vehicleType,
+            onChanged: _loading ? null : (v) => _chooseVehicle(v!),
+            title: Row(
+              children: [
+                Text('${_vehicleIcons[type] ?? '🚗'}  ${tr(o['label']?.toString() ?? type)}'),
+                if (recommended) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: MovaColors.green.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(tr('Recommandé'), style: const TextStyle(fontSize: 11, color: MovaColors.green)),
+                  ),
+                ],
+              ],
+            ),
+            subtitle: price != null ? Text(MarketConfig.formatCdf(price)) : null,
+          );
+        }),
+      ],
+    );
   }
 
   Future<void> _confirm() async {
@@ -623,6 +697,9 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                         setState(() {
                           _weightCategory = val!;
                           _estimatedPrice = null;
+                          // A new weight: propose the vehicle again.
+                          _vehicleType = null;
+                          _vehicleOptions = const [];
                         });
                       },
                     );
@@ -653,6 +730,7 @@ class _ParcelDeliveryScreenState extends ConsumerState<ParcelDeliveryScreen> {
                       ),
                     ),
                   ],
+                  if (_estimatedPrice != null && _vehicleOptions.isNotEmpty) _vehiclePicker(theme),
                   if (_estimatedPrice != null) ...[
                     const SizedBox(height: 16),
                     ServicePriceDisplay.estimateCard(

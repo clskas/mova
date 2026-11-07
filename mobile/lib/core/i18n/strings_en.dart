@@ -1928,4 +1928,9 @@ const Map<String, String> kStringsEn = {
   "Commencer la vérification": "Start the verification",
   "Code de confirmation": "Confirmation code",
   "Entrez le code à 6 chiffres reçu pour confirmer le retrait.": "Enter the 6-digit code you received to confirm the withdrawal.",
+  "Moto": "Motorbike",
+  "Voiture": "Car",
+  "Tripoteur": "Cargo tricycle",
+  "Camionnette": "Van",
+  "Nous proposons le véhicule adapté à votre colis. Vous pouvez en choisir un autre.": "We suggest the vehicle that suits your parcel. You can choose another one.",
 };

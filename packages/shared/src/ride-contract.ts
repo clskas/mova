@@ -151,6 +151,23 @@ export function driverVehicleTypesForRide(rideType: VehicleTypeValue | string): 
   }
 }
 
+/**
+ * Vehicles searched for one requested type. Passenger types follow the ride rules; goods
+ * vehicles (utility van, truck, tripoteur) are searched as themselves — they get parcels and
+ * moves, never passenger rides (no ride is requested with those types).
+ */
+export function driverVehicleTypesForSearch(vehicleType: VehicleTypeValue | string): VehicleTypeValue[] {
+  const forRide = driverVehicleTypesForRide(vehicleType);
+  if (forRide.length) return forRide;
+  let normalized: VehicleTypeValue;
+  try {
+    normalized = normalizeVehicleType(String(vehicleType));
+  } catch {
+    return [];
+  }
+  return normalized === 'UTILITAIRE' || normalized === 'CAMION' || normalized === 'TRIPOTEUR' ? [normalized] : [];
+}
+
 export type MovingVehicleCategoryValue =
   | 'CAMIONNETTE'
   | 'CAMION_15M3'

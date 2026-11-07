@@ -17,6 +17,7 @@ import {
   allDriverJustificatifsApproved,
   kycDocumentLabel,
   driverVehicleTypesForRide,
+  driverVehicleTypesForSearch,
   findServiceAreaByName,
   formatMovaPublicId,
   maskPhoneRdc,
@@ -228,7 +229,8 @@ export class DriversService {
       matching.maxRadiusKm,
     );
     const pickupCity = city ?? resolveCityFromCoords(lat, lng);
-    const compatibleTypes = driverVehicleTypesForRide(vehicleType) as VehicleType[];
+    // Goods vehicles (utility van, truck, tripoteur) are found for parcels and moves too.
+    const compatibleTypes = driverVehicleTypesForSearch(vehicleType) as VehicleType[];
     if (!compatibleTypes.length) return [];
     const drivers = await this.prisma.driverProfile.findMany({
       where: {
@@ -238,7 +240,12 @@ export class DriversService {
         currentLat: { not: null },
         currentLng: { not: null },
         // Livraisons : livreurs (BOTH / DELIVERIES_ONLY). Courses : chauffeurs (BOTH / RIDES_ONLY).
-        ...(opts?.forDelivery ? { acceptsDeliveries: true } : { acceptsRides: true }),
+        // Goods vehicles never take passenger rides: a move does not depend on « accepte les courses ».
+        ...(opts?.forDelivery
+          ? { acceptsDeliveries: true }
+          : compatibleTypes.every((t) => t === 'UTILITAIRE' || t === 'CAMION' || t === 'TRIPOTEUR')
+            ? {}
+            : { acceptsRides: true }),
         vehicles: { some: { type: { in: compatibleTypes }, isActive: true, typeApprovalStatus: KycStatus.APPROVED } },
       },
       include: { vehicles: { where: { type: { in: compatibleTypes }, isActive: true, typeApprovalStatus: KycStatus.APPROVED } } },

@@ -3,6 +3,8 @@ import {
   buildFareBreakdown,
   driverEligibleForMoving,
   driverVehicleTypesForRide,
+  driverVehicleTypesForSearch,
+  driverEligibleForParcelWeight,
   fromMobileRideStatus,
   normalizeVehicleType,
   rideTypesDriverCanServe,
@@ -114,5 +116,21 @@ describe('tricycle and tripoteur', () => {
     expect(driverEligibleForMoving(['TRIPOTEUR'], 'CAMIONNETTE')).toBe(true);
     expect(driverEligibleForMoving(['TRIPOTEUR'], 'CAMION_15M3')).toBe(false);
     expect(driverEligibleForMoving(['TRICYCLE'], 'CAMIONNETTE')).toBe(false);
+  });
+});
+
+describe('driverVehicleTypesForSearch', () => {
+  it('finds goods vehicles for parcels and moves', () => {
+    expect(driverVehicleTypesForSearch('TRIPOTEUR')).toEqual(['TRIPOTEUR']);
+    expect(driverVehicleTypesForSearch('UTILITAIRE')).toEqual(['UTILITAIRE']);
+    expect(driverVehicleTypesForSearch('CAMION')).toEqual(['CAMION']);
+  });
+  it('keeps the passenger ride rules', () => {
+    expect(driverVehicleTypesForSearch('STANDARD')).toEqual(['STANDARD', 'FAMILIALE']);
+    expect(driverVehicleTypesForSearch('TRICYCLE')).toEqual(['TRICYCLE']);
+    expect(driverVehicleTypesForSearch('???')).toEqual([]);
+  });
+  it('a tripoteur can take a large parcel', () => {
+    expect(driverEligibleForParcelWeight(['TRIPOTEUR'], 'LARGE')).toBe(true);
   });
 });

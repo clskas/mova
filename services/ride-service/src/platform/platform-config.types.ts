@@ -13,6 +13,12 @@ export type DriverOpsConfig = {
   requiredRentalIndividualDocuments: string[];
 };
 
+/** Identity checks offered to drivers in the app. */
+export type IdentityVerificationConfig = {
+  /** Shows the Smile ID verification card (document + live selfie) in the driver app. */
+  smileIdInApp: boolean;
+};
+
 /** Timeout / garde-fous paiements espèces (courses & livraisons). */
 export type CashPaymentConfig = {
   /** Auto-clôturer les PENDING sans litige après ce délai. */
@@ -45,6 +51,7 @@ export type PlatformConfigOverrides = {
   };
   driverOps?: Partial<DriverOpsConfig>;
   cashPayment?: Partial<CashPaymentConfig>;
+  identityVerification?: Partial<IdentityVerificationConfig>;
 };
 
 export type MergedPlatformConfig = {
@@ -93,6 +100,7 @@ export type MergedPlatformConfig = {
   };
   driverOps: DriverOpsConfig;
   cashPayment: CashPaymentConfig;
+  identityVerification: IdentityVerificationConfig;
 };
 
 export const PLATFORM_CONFIG_DEFAULTS: MergedPlatformConfig = {
@@ -129,7 +137,18 @@ export const PLATFORM_CONFIG_DEFAULTS: MergedPlatformConfig = {
     autoConfirmHours: 24,
     autoConfirmMaxCdf: 150_000,
   },
+  identityVerification: { smileIdInApp: false },
 };
+
+export function mergeIdentityVerification(
+  base: IdentityVerificationConfig,
+  patch?: Partial<IdentityVerificationConfig>,
+): IdentityVerificationConfig {
+  if (!patch) return base;
+  return {
+    smileIdInApp: patch.smileIdInApp !== undefined ? patch.smileIdInApp === true : base.smileIdInApp,
+  };
+}
 
 export function mergeCashPayment(
   base: CashPaymentConfig,

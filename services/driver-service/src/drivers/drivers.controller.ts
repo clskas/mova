@@ -4,6 +4,8 @@ import { IsBoolean, IsNumber, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DriversService } from './drivers.service';
+import { SmileIdService } from '../smile-id/smile-id.service';
+import { MatchingConfigService } from '../common/matching-config.service';
 import { ActivationPinDto, DriverWithdrawDto, KycUploadDto, UpdateOnboardingDto } from './drivers.dto';
 
 class AvailabilityDto { @ApiProperty() @IsBoolean() isAvailable: boolean; }
@@ -15,7 +17,26 @@ class LocationDto { @ApiProperty() @IsNumber() lat: number; @ApiProperty() @IsNu
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class DriversController {
-  constructor(private driversService: DriversService) {}
+  constructor(
+    private driversService: DriversService,
+    private smileId: SmileIdService,
+    private platformRules: MatchingConfigService,
+  ) {}
+
+  @Get('smile-id')
+  @ApiOperation({ summary: 'Vérification d’identité Smile ID : faut-il l’afficher, et où en est-elle' })
+  smileIdStatus(@Request() req: { user: { id: string } }) {
+    return this.smileId.driverView(req.user.id, this.platformRules.smileIdInApp());
+  }
+
+  @Post('smile-id/link')
+  @ApiOperation({ summary: 'Lien Smile ID du chauffeur (créé s’il n’existe pas)' })
+  async smileIdLink(@Request() req: { user: { id: string } }) {
+    const view = await this.smileId.driverView(req.user.id, this.platformRules.smileIdInApp());
+    if (!view.visible || !view.canStart) return view;
+    await this.smileId.createLink(req.user.id, { force: view.status != null && view.status !== 'PENDING' });
+    return this.smileId.driverView(req.user.id, true);
+  }
 
   @Patch('availability')
   availability(@Request() req: { user: { id: string } }, @Body() dto: AvailabilityDto) {

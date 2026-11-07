@@ -3,9 +3,10 @@ import { DriversController } from './drivers.controller';
 import { DriversService } from './drivers.service';
 import { OcrModule } from '../ocr/ocr.module';
 import { MatchingConfigService } from '../common/matching-config.service';
+import { SmileIdModule } from '../smile-id/smile-id.module';
 
 @Module({
-  imports: [OcrModule],
+  imports: [OcrModule, SmileIdModule],
   controllers: [DriversController],
   providers: [DriversService, MatchingConfigService],
   exports: [DriversService],

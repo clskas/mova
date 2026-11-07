@@ -7,6 +7,7 @@ import {
   PlatformConfigOverrides,
   mergeCashPayment,
   mergeDriverOps,
+  mergeIdentityVerification,
 } from './platform-config.types';
 
 function mergeConfig(overrides: PlatformConfigOverrides): MergedPlatformConfig {
@@ -29,6 +30,7 @@ function mergeConfig(overrides: PlatformConfigOverrides): MergedPlatformConfig {
     carpool: { ...d.carpool, ...o.carpool },
     driverOps: mergeDriverOps(d.driverOps, o.driverOps),
     cashPayment: mergeCashPayment(d.cashPayment, o.cashPayment),
+    identityVerification: mergeIdentityVerification(d.identityVerification, o.identityVerification),
   };
 }
 
@@ -131,6 +133,12 @@ export class PlatformConfigService implements OnModuleInit {
             patch.cashPayment,
           )
         : this.overrides.cashPayment,
+      identityVerification: patch.identityVerification
+        ? mergeIdentityVerification(
+            { smileIdInApp: this.overrides.identityVerification?.smileIdInApp === true },
+            patch.identityVerification,
+          )
+        : this.overrides.identityVerification,
     };
     this.validate(next);
     const row = await this.prisma.platformConfig.update({

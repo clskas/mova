@@ -115,9 +115,11 @@ Pour les véhicules **VIP**, **Confort** ou autres catégories réglementées :
 
 ### Services SENGA — nombre de passagers et gamme Familiale
 
+**Nombre de places par gamme** (Administrateur et Super admin) : maximum de passagers en Standard / Confort / VIP, minimum et maximum de places Familiale, maximum de places Tricycle (ex. 4 ou 5 pour les grands tricycles). Les déclarations des chauffeurs, l'envoi des courses et le choix du nombre de passagers suivent ces valeurs ; les apps les appliquent à leur prochaine ouverture.
+
 - **Activer le choix du nombre de passagers** : le passager indique combien de personnes voyagent ; seules les voitures avec assez de places reçoivent la course. Désactivé, chaque course compte pour 1 passager.
-- **Gamme Familiale (6–8 places)** : affiche la gamme dans l'app passager ; Standard, Confort et VIP sont alors limités à 4 personnes. N'activez qu'avec des véhicules Familiale validés. Tarif : **Tarifs → Familiale**.
-- **Gamme Tricycle (1–3 places)** : affiche la gamme Tricycle (tricycle à passagers) dans l'app passager. Activez-la ville par ville une fois assez de tricycles validés (10 à 20 conseillés). Tarif de départ ≈ Standard − 30 % : **Tarifs → Tricycle**. Les **tripoteurs** (marchandises) n'en dépendent pas : ils reçoivent colis, commissions et déménagements « camionnette » dès la validation de leur type d'engin.
+- **Gamme Familiale** (par défaut 5–8 places) : affiche la gamme dans l'app passager ; Standard, Confort et VIP sont alors limités au maximum voiture (4 par défaut). N'activez qu'avec des véhicules Familiale validés. Tarif : **Tarifs → Familiale**.
+- **Gamme Tricycle** (par défaut 1–3 places) : affiche la gamme Tricycle (tricycle à passagers) dans l'app passager. Activez-la ville par ville une fois assez de tricycles validés (10 à 20 conseillés). Tarif de départ ≈ Standard − 30 % : **Tarifs → Tricycle**. Les **tripoteurs** (marchandises) n'en dépendent pas : ils reçoivent colis, commissions et déménagements « camionnette » dès la validation de leur type d'engin.
 
 ## Opérations (lecture + mise à jour)
 

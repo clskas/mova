@@ -1,3 +1,4 @@
+import { startSeatLimitsRefresh } from '@mova/shared';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
@@ -20,6 +21,8 @@ async function bootstrap() {
   app.enableCors({ origin: resolveCorsOrigin(), credentials: true });
   app.setGlobalPrefix('api', { exclude: ['health', 'internal/(.*)'] });
   const port = process.env.PORT ?? 3004;
+  // Seat limits set in the admin (tricycle, Familiale…) for seat declarations.
+  startSeatLimitsRefresh();
   await app.listen(port);
   console.log('SENGA driver-service on port ' + port);
 }

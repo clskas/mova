@@ -1,3 +1,4 @@
+import { DEFAULT_SEAT_LIMITS, normalizeSeatLimits, type SeatLimits } from './passenger-seats';
 /** Client apps that can be toggled for MM visibility / maintenance. */
 export const CLIENT_APP_IDS = ['senga', 'senga_driver', 'resto', 'location'] as const;
 export type ClientAppId = (typeof CLIENT_APP_IDS)[number];
@@ -118,6 +119,8 @@ export type LanguagesConfig = {
 
 export const DEFAULT_LANGUAGES_CONFIG: LanguagesConfig = { en: true, sw: true, ln: true, pickerVisible: true };
 
+export type { SeatLimits } from './passenger-seats';
+
 export type ClientAppsConfig = {
   mobileMoney: MmVisibilityByApp;
   maintenance: MaintenanceConfig;
@@ -140,6 +143,8 @@ export type ClientAppsConfig = {
   sosSms: SosSmsConfig;
   /** Language buttons in the apps (super admin). */
   languages: LanguagesConfig;
+  /** Seat limits per vehicle range (admin and super admin). */
+  seatLimits: SeatLimits;
 };
 
 export const DEFAULT_MAINTENANCE_MESSAGE_FR =
@@ -192,6 +197,7 @@ export const DEFAULT_CLIENT_APPS_CONFIG: ClientAppsConfig = {
   sosEmergencyContacts: structuredClone(DEFAULT_SOS_EMERGENCY_CONTACTS),
   sosSms: { ...DEFAULT_SOS_SMS_CONFIG },
   languages: { ...DEFAULT_LANGUAGES_CONFIG },
+  seatLimits: { ...DEFAULT_SEAT_LIMITS },
 };
 
 export const CLIENT_APP_LABELS_FR: Record<ClientAppId, string> = {
@@ -330,6 +336,7 @@ export function mergeClientAppsConfig(raw: unknown): ClientAppsConfig {
 
   base.sosSms = normalizeSosSmsConfig((src as { sosSms?: unknown }).sosSms, base.sosSms);
   base.languages = normalizeLanguagesConfig((src as { languages?: unknown }).languages, base.languages);
+  base.seatLimits = normalizeSeatLimits((src as { seatLimits?: unknown }).seatLimits, base.seatLimits);
 
   return base;
 }

@@ -1034,10 +1034,10 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             DropdownMenuItem(value: 'STANDARD', child: Text(tr('Standard'))),
             DropdownMenuItem(value: 'COMFORT', child: Text(tr('Confort'))),
             DropdownMenuItem(value: 'VIP', child: Text('VIP')),
-            DropdownMenuItem(value: 'FAMILIALE', child: Text(tr('Familiale (6 à 8 places)'))),
+            DropdownMenuItem(value: 'FAMILIALE', child: Text(trf('Familiale ({min} à {max} places)', {'min': kFamilialeMinSeats, 'max': kFamilialeMaxSeats}))),
             DropdownMenuItem(value: 'UTILITAIRE', child: Text(tr('Utilitaire'))),
             DropdownMenuItem(value: 'CAMION', child: Text(tr('Camion'))),
-            DropdownMenuItem(value: 'TRICYCLE', child: Text(tr('Tricycle passagers (1 à 3 places)'))),
+            DropdownMenuItem(value: 'TRICYCLE', child: Text(trf('Tricycle passagers (1 à {max} places)', {'max': kTricyclePassengerLimit}))),
             DropdownMenuItem(value: 'TRIPOTEUR', child: Text(tr('Tripoteur marchandises'))),
           ],
           onChanged: (v) => setState(() {
@@ -1058,9 +1058,9 @@ class _DriverOnboardingScreenState extends ConsumerState<DriverOnboardingScreen>
             decoration: InputDecoration(
               labelText: tr('Places passagers (sans compter le chauffeur)'),
               helperText: _vehicleType == 'FAMILIALE'
-                  ? tr('Familiale : 5 à 8 places. Vous recevez aussi les courses Standard.')
+                  ? trf('Familiale : {min} à {max} places. Vous recevez aussi les courses Standard.', {'min': kFamilialeMinSeats, 'max': kFamilialeMaxSeats})
                   : _vehicleType == 'TRICYCLE'
-                      ? tr('Tricycle : 1 à 3 places. Vous recevez les courses de la gamme Tricycle et des petits colis.')
+                      ? trf('Tricycle : 1 à {max} places. Vous recevez les courses de la gamme Tricycle et des petits colis.', {'max': kTricyclePassengerLimit})
                   : tr('Les groupes plus grands que vos places ne vous seront pas proposés. '
                       '6 places ou plus ? Choisissez la catégorie Familiale.'),
               helperMaxLines: 3,

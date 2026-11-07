@@ -8,6 +8,7 @@ import {
   type PassengerServiceId,
 } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
+import { DEFAULT_SEAT_LIMITS, SeatLimitsEditor } from "@/components/SeatLimitsEditor";
 import { BtnPrimary, ErrorBanner, LoadingState, PageHeader } from "@/components/ui";
 
 const SERVICES: { id: PassengerServiceId; label: string }[] = [
@@ -29,6 +30,8 @@ export default function ServicesSengaPage() {
   const canEditSengaPlus =
     canWrite("systeme") && (role === "SUPER_ADMIN" || role === "ADMIN");
   const [config, setConfig] = useState<ClientAppsConfig | null>(null);
+  const canEditSeats = role === "SUPER_ADMIN" || role === "ADMIN";
+  const seats = { ...DEFAULT_SEAT_LIMITS, ...(config?.seatLimits ?? {}) };
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,10 +186,13 @@ export default function ServicesSengaPage() {
         </label>
         <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3">
           <span className="text-sm text-slate-800">
-            <span className="font-medium block">Gamme Familiale (6–8 places)</span>
+            <span className="font-medium block">
+              Gamme Familiale ({seats.familialeMinSeats}–{seats.familialeMaxSeats} places)
+            </span>
             <span className="text-xs text-slate-500">
               Affiche la gamme Familiale dans l&apos;app passager. Avec le nombre de passagers activé,
-              Standard, Confort et VIP sont limités à 4 personnes et l&apos;app passe en Familiale dès 5.
+              Standard, Confort et VIP sont limités à {seats.carMaxPassengers} personnes et l&apos;app passe en
+              Familiale dès {seats.carMaxPassengers + 1}.
               N&apos;activez qu&apos;une fois des véhicules Familiale validés (Chauffeurs → type d&apos;engin).
               Tarif : Tarifs → Familiale.
             </span>
@@ -200,9 +206,11 @@ export default function ServicesSengaPage() {
         </label>
         <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3">
           <span className="text-sm text-slate-800">
-            <span className="font-medium block">Gamme Tricycle (tricycle à passagers, 1–3 places)</span>
+            <span className="font-medium block">
+              Gamme Tricycle (tricycle à passagers, 1–{seats.tricycleMaxSeats} places)
+            </span>
             <span className="text-xs text-slate-500">
-              Affiche la gamme Tricycle dans l&apos;app passager (3 passagers maximum). N&apos;activez qu&apos;une fois
+              Affiche la gamme Tricycle dans l&apos;app passager ({seats.tricycleMaxSeats} passagers maximum). N&apos;activez qu&apos;une fois
               assez de tricycles validés dans la ville (Chauffeurs → type d&apos;engin). Tarif : Tarifs → Tricycle.
               Les tripoteurs (marchandises) reçoivent colis et petits déménagements sans cet interrupteur.
             </span>
@@ -214,6 +222,11 @@ export default function ServicesSengaPage() {
             onChange={toggleTricycle}
           />
         </label>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-slate-800">Nombre de places</h2>
+        {config && <SeatLimitsEditor config={config} canEdit={canEditSeats} onSaved={setConfig} />}
       </section>
 
       <section className="space-y-2">

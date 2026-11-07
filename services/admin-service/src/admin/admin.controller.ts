@@ -1560,6 +1560,14 @@ export class AdminController {
     return this.adminService.updateClientAppsConfig(body);
   }
 
+  @Patch('seat-limits')
+  @RequirePermissions(AdminPermission.PRICING_WRITE)
+  @ApiOperation({ summary: 'Nombre de places par gamme (voiture, Familiale, tricycle) — Admin / Super admin' })
+  updateSeatLimits(@Request() req: { user: AdminJwtUser }, @Body() body: Record<string, unknown>) {
+    this.assertOpsAdmin(req.user);
+    return this.adminService.updateClientAppsConfig({ seatLimits: body ?? {} });
+  }
+
   @Get('platform-vendors')
   @RequirePermissions(AdminPermission.SYSTEM_READ)
   @ApiOperation({ summary: 'Abonnements / hébergements externes — SuperAdmin' })

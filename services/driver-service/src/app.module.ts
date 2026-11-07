@@ -8,7 +8,8 @@ import { DriversModule } from './drivers/drivers.module';
 import { IncidentsModule } from './incidents/incidents.module';
 import { InternalModule } from './internal/internal.module';
 import { AuthModule } from './auth/auth.module';
+import { SmileIdModule } from './smile-id/smile-id.module';
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, HealthModule, AuthModule, DriversModule, IncidentsModule, InternalModule, AssistantModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, HealthModule, AuthModule, DriversModule, IncidentsModule, InternalModule, AssistantModule, SmileIdModule],
 })
 export class AppModule {}

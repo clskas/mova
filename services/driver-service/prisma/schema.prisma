@@ -110,6 +110,33 @@ model Vehicle {
   @@map("vehicles")
 }
 
+/// Identity check by Smile ID (document authenticity + live selfie), one row per verification link.
+model SmileIdVerification {
+  id          String    @id @default(uuid())
+  userId      String
+  /// sandbox or production
+  env         String
+  /// Smile Link id (ref_id)
+  refId       String    @unique
+  smileUserId String?
+  jobId       String?
+  link        String
+  /// PENDING (link not used yet), processing, clear, attention, block, error
+  status      String    @default("PENDING")
+  message     String?
+  reason      String?
+  /// Trimmed verdict for the admin (identity read, fraud summary, receipt link).
+  result      Json?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([smileUserId])
+  @@index([jobId])
+  @@map("smile_id_verifications")
+}
+
 model KycDocument {
   id                 String        @id @default(uuid())
   userId             String

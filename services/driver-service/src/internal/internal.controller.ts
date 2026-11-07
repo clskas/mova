@@ -7,6 +7,7 @@ import { normalizeVehicleType } from '@mova/shared';
 import { DriversService } from '../drivers/drivers.service';
 import { IncidentsService } from '../incidents/incidents.service';
 import { InternalApiGuard } from '../common/internal-api.guard';
+import { SmileIdService } from '../smile-id/smile-id.service';
 
 class CreateProfileDto { @IsString() userId: string; }
 class NearbyQuery {
@@ -39,6 +40,7 @@ class VehicleCargoVolumeDto {
   @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsInt() @Min(1) @Max(100) cargoVolumeM3: number | null;
 }
 class RatingDto { @IsNumber() ratingAvg: number; }
+class SmileIdLinkDto { @IsOptional() @IsBoolean() force?: boolean; }
 class ReviewKycDto {
   @IsBoolean() approved: boolean;
   @IsOptional() @IsString() notes?: string;
@@ -101,7 +103,7 @@ class CreateIncidentDto {
 @Controller('internal')
 @UseGuards(InternalApiGuard)
 export class InternalController {
-  constructor(private drivers: DriversService, private incidents: IncidentsService) {}
+  constructor(private drivers: DriversService, private incidents: IncidentsService, private smileId: SmileIdService) {}
   @Post('profiles') createProfile(@Body() dto: CreateProfileDto) { return this.drivers.createProfile(dto.userId); }
   @Get('drivers/nearby') nearby(@Query() q: NearbyQuery) {
     return this.drivers.findNearby(
@@ -183,6 +185,15 @@ export class InternalController {
   }
   @Get('drivers/:userId/detail')
   getDriverDetail(@Param('userId') userId: string) { return this.drivers.getDriverAdminDetail(userId); }
+  @Get('drivers/:userId/smile-id')
+  smileIdLatest(@Param('userId') userId: string) { return this.smileId.latest(userId); }
+  @Post('drivers/:userId/smile-id/link')
+  async smileIdLink(@Param('userId') userId: string, @Body() dto: SmileIdLinkDto) {
+    await this.smileId.createLink(userId, { force: dto?.force === true });
+    return this.smileId.latest(userId);
+  }
+  @Post('drivers/:userId/smile-id/refresh')
+  smileIdRefresh(@Param('userId') userId: string) { return this.smileId.refresh(userId); }
   @Get('drivers/:userId')
   getDriver(@Param('userId') userId: string) { return this.drivers.getProfileWithUser(userId); }
   @Patch('drivers/:userId/status')

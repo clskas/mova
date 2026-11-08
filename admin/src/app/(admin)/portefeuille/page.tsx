@@ -134,22 +134,37 @@ export default function PortefeuillePage() {
     return transactions;
   }, [transactions, txFilter]);
 
-  const rechargeCount = useMemo(() => transactions.filter(isWalletRecharge).length, [transactions]);
-  const withdrawCount = useMemo(() => transactions.filter(isWalletWithdraw).length, [transactions]);
+  // Counts over every transaction (server totals), not only the rows loaded on screen.
+  const [kindTotals, setKindTotals] = useState<{ all: number; recharge: number; withdraw: number }>({
+    all: 0,
+    recharge: 0,
+    withdraw: 0,
+  });
+  const rechargeCount = kindTotals.recharge;
+  const withdrawCount = kindTotals.withdraw;
+  const txKind = txFilter === "all" ? undefined : txFilter;
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const userId = filterUserId.trim() || selectedUser?.id || undefined;
-      const [m, w, tx, debts, policy, treasury] = await Promise.all([
+      const [m, w, tx, debts, policy, treasury, allTx, rechargeTx, withdrawTx] = await Promise.all([
         apiFetch<AdminMetrics>("/api/admin/metrics"),
         fetchWalletOverview(),
-        fetchWalletTransactions(userId, 0, TX_PAGE_SIZE),
+        fetchWalletTransactions(userId, 0, TX_PAGE_SIZE, txKind),
         fetchCashDebts(userId),
         fetchDebtPolicy(),
         fetchUserWallet(MOVA_PLATFORM_USER_ID).catch(() => null),
+        fetchWalletTransactions(userId, 0, 1).catch(() => null),
+        fetchWalletTransactions(userId, 0, 1, "recharge").catch(() => null),
+        fetchWalletTransactions(userId, 0, 1, "withdraw").catch(() => null),
       ]);
+      setKindTotals({
+        all: allTx?.total ?? 0,
+        recharge: rechargeTx?.total ?? 0,
+        withdraw: withdrawTx?.total ?? 0,
+      });
       setMetrics(m);
       setWallet(w);
       setTransactions(tx.data ?? []);
@@ -163,7 +178,7 @@ export default function PortefeuillePage() {
     } finally {
       setLoading(false);
     }
-  }, [filterUserId, selectedUser]);
+  }, [filterUserId, selectedUser, txKind]);
 
   const loadMoreTransactions = useCallback(async () => {
     if (txLoadingMore || transactions.length >= txTotal) return;
@@ -171,7 +186,7 @@ export default function PortefeuillePage() {
     setError(null);
     try {
       const userId = filterUserId.trim() || selectedUser?.id || undefined;
-      const tx = await fetchWalletTransactions(userId, transactions.length, TX_PAGE_SIZE);
+      const tx = await fetchWalletTransactions(userId, transactions.length, TX_PAGE_SIZE, txKind);
       setTransactions((prev) => [...prev, ...(tx.data ?? [])]);
       setTxTotal(tx.total ?? transactions.length + (tx.data?.length ?? 0));
     } catch (e) {
@@ -179,7 +194,7 @@ export default function PortefeuillePage() {
     } finally {
       setTxLoadingMore(false);
     }
-  }, [filterUserId, selectedUser, transactions.length, txLoadingMore, txTotal]);
+  }, [filterUserId, selectedUser, transactions.length, txLoadingMore, txTotal, txKind]);
 
   useEffect(() => {
     load();
@@ -1140,7 +1155,7 @@ export default function PortefeuillePage() {
             </div>
             <div className="flex flex-wrap gap-2 mb-3">
               {([
-                ["all", `Toutes (${transactions.length})`],
+                ["all", `Toutes (${kindTotals.all})`],
                 ["recharge", `Recharges (${rechargeCount})`],
                 ["withdraw", `Retraits (${withdrawCount})`],
               ] as const).map(([id, label]) => (

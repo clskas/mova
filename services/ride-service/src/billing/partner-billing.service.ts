@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType } from '@prisma/client';
-import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { parseDayBoundary, MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import {
   fetchPartnerTransactions,
@@ -196,8 +196,8 @@ export class PartnerBillingService {
     query?: { from?: string; to?: string; q?: string; skip?: number; take?: number },
   ) {
     const prefix = this.partnerTxPrefix(partnerType);
-    const from = query?.from ? new Date(query.from) : undefined;
-    const to = query?.to ? new Date(query.to) : undefined;
+    const from = parseDayBoundary(query?.from, 'start');
+    const to = parseDayBoundary(query?.to, 'end');
     const skip = Math.max(query?.skip ?? 0, 0);
     const take = Math.min(Math.max(query?.take ?? 50, 1), 500);
     const wallet = await fetchPartnerTransactions(ownerUserId, {

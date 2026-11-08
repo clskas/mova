@@ -722,4 +722,20 @@ describe('DeliveriesService', () => {
     });
     expect(prisma.restaurant.delete).not.toHaveBeenCalled();
   });
+
+  describe('listForAdmin (filtres admin Livraisons)', () => {
+    it('un statut de courses/commissions ne fait pas planter la liste : aucune livraison', async () => {
+      await expect(service.listForAdmin({ status: 'ASSIGNED' })).resolves.toEqual([]);
+      expect(prisma.delivery.findMany).not.toHaveBeenCalled();
+    });
+
+    it('la date « au » couvre toute la journée choisie (Kinshasa)', async () => {
+      prisma.delivery.findMany.mockResolvedValue([]);
+      await service.listForAdmin({ from: '2026-11-08', to: '2026-11-08', status: 'DELIVERED' });
+      const where = prisma.delivery.findMany.mock.calls[0][0].where;
+      expect(where.status).toBe('DELIVERED');
+      expect(where.createdAt.gte.toISOString()).toBe('2026-11-07T23:00:00.000Z');
+      expect(where.createdAt.lte.toISOString()).toBe('2026-11-08T22:59:59.999Z');
+    });
+  });
 });

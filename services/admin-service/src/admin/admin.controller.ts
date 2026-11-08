@@ -1424,8 +1424,13 @@ export class AdminController {
   @Get('wallet/transactions')
   @RequirePermissions(AdminPermission.WALLETS_READ)
   @ApiOperation({ summary: 'Transactions portefeuille' })
-  walletTransactions(@Query('skip') skip?: string, @Query('take') take?: string, @Query('userId') userId?: string) {
-    return this.adminService.listWalletTransactions(Number(skip ?? 0), Number(take ?? 50), userId);
+  walletTransactions(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('userId') userId?: string,
+    @Query('kind') kind?: string,
+  ) {
+    return this.adminService.listWalletTransactions(Number(skip ?? 0), Number(take ?? 50), userId, kind);
   }
 
   @Get('wallet/cash-debts')

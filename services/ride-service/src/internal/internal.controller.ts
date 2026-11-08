@@ -250,7 +250,7 @@ export class InternalController {
       skip: Number(skip ?? 0),
       take: Number(take ?? 50),
     };
-    const limit = Math.min(opts.take, 100);
+    const limit = Math.min(opts.take, 200);
 
     if (type === 'ERRAND') {
       return this.errands.listForAdmin({ status, from, to, search, skip: opts.skip, take: limit });

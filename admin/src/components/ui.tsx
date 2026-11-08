@@ -263,6 +263,36 @@ export function BtnDanger({ children, onClick, disabled }: { children: React.Rea
   );
 }
 
+/**
+ * Under a list: « Charger plus » while the page is full, and a hint once the 200-row
+ * maximum is reached (narrow the dates to see older rows).
+ */
+export function ListMoreFooter({
+  shown,
+  limit,
+  onMore,
+  max = 200,
+}: {
+  shown: number;
+  limit: number;
+  onMore: () => void;
+  max?: number;
+}) {
+  if (shown < limit) return null;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t p-3 text-xs text-gray-500">
+      <span>{shown} lignes affichées (les plus récentes).</span>
+      {limit < max ? (
+        <button type="button" onClick={onMore} className="px-3 py-1.5 rounded-lg text-sm text-[#6C63FF] hover:bg-violet-50">
+          Charger plus
+        </button>
+      ) : (
+        <span>Maximum atteint : réduisez la période pour voir les plus anciennes.</span>
+      )}
+    </div>
+  );
+}
+
 export function BtnGhost({ children, onClick, disabled }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} className="px-3 py-1.5 rounded-lg text-sm text-[#6C63FF] hover:bg-violet-50 disabled:opacity-60">

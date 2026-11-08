@@ -2,7 +2,7 @@ import { errandDriverNetCdf } from '../common/ride-driver-gross.util';
 import { receiptVerdict, runAiVision } from '../common/ai-vision.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, ErrandCategory, ErrandOrder, ErrandOrderStatus, Prisma, TrackingReferenceType, VehicleType } from '@prisma/client';
-import { INTERNAL_API_KEY, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateTripDurationMin, resolveCityFromCoords, serviceUrl } from '@mova/shared';
+import { dayRangeFilter, INTERNAL_API_KEY, MovaErrorCode, MovaHttpException, MOVA_EVENTS, canCancelErrand, estimateTripDurationMin, resolveCityFromCoords, serviceUrl } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { DEFAULT_PICKUP } from '../common/address.util';
 import { fetchServicePaymentStatus } from '../common/payment-status.util';
@@ -884,16 +884,13 @@ export class ErrandsService {
     take?: number;
   } = {}) {
     const where: Prisma.ErrandOrderWhereInput = {};
-    if (opts.status) where.status = opts.status as ErrandOrderStatus;
-    if (opts.from || opts.to) {
-      where.createdAt = {};
-      if (opts.from) where.createdAt.gte = new Date(opts.from);
-      if (opts.to) {
-        const toDate = new Date(opts.to);
-        toDate.setHours(23, 59, 59, 999);
-        where.createdAt.lte = toDate;
-      }
+    if (opts.status) {
+      // A delivery-only status (RESTAURANT_CONFIRMED, DELIVERED…) matches no errand.
+      if (!(Object.values(ErrandOrderStatus) as string[]).includes(opts.status)) return [];
+      where.status = opts.status as ErrandOrderStatus;
     }
+    const createdAt = dayRangeFilter(opts.from, opts.to);
+    if (createdAt) where.createdAt = createdAt;
     const search = opts.search?.trim();
     if (search) {
       where.OR = [
@@ -905,7 +902,7 @@ export class ErrandsService {
         { userId: { contains: search, mode: 'insensitive' } },
       ];
     }
-    const take = Math.min(opts.take ?? 50, 100);
+    const take = Math.min(opts.take ?? 50, 200);
     const rows = await this.prisma.errandOrder.findMany({
       where,
       orderBy: { createdAt: 'desc' },

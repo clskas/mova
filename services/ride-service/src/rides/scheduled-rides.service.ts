@@ -450,12 +450,26 @@ export class ScheduledRidesService {
     return drivers[0]?.userId ?? null;
   }
 
+  /**
+   * Admin list: every booking still to do (soonest first, never hidden by old ones), then the
+   * most recently finished. The old list took the 50 oldest — completed trips pushed the
+   * upcoming bookings out of view.
+   */
   async listForAdmin(take = 50) {
-    const rows = await this.prisma.scheduledRide.findMany({
-      where: { status: { not: ScheduledRideStatus.CANCELLED } },
-      orderBy: { scheduledAt: 'asc' },
-      take,
-    });
+    const limit = Math.min(Math.max(Number(take) || 50, 1), 500);
+    const [active, done] = await Promise.all([
+      this.prisma.scheduledRide.findMany({
+        where: { status: { in: [ScheduledRideStatus.SCHEDULED, ScheduledRideStatus.CONFIRMED, ScheduledRideStatus.IN_PROGRESS] } },
+        orderBy: { scheduledAt: 'asc' },
+        take: 500,
+      }),
+      this.prisma.scheduledRide.findMany({
+        where: { status: ScheduledRideStatus.COMPLETED },
+        orderBy: { scheduledAt: 'desc' },
+        take: limit,
+      }),
+    ]);
+    const rows = [...active, ...done];
     return Promise.all(
       rows.map(async (r) => {
         const passenger = await fetchAuthUserBrief(r.passengerId);

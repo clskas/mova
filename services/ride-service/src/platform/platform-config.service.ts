@@ -34,6 +34,28 @@ function mergeConfig(overrides: PlatformConfigOverrides): MergedPlatformConfig {
   };
 }
 
+/**
+ * Platform rules are counts, amounts, distances, delays, percentages and weights: a negative
+ * value is always a typo (it would e.g. make a cancellation fee pay the customer).
+ */
+export function assertNoNegativeSettings(value: unknown, path = ''): void {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value < 0) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        `Valeur invalide${path ? ` (${path})` : ''} : un nombre positif est attendu.`,
+      );
+    }
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      assertNoNegativeSettings(v, path ? `${path}.${k}` : k);
+    }
+  }
+}
+
 @Injectable()
 export class PlatformConfigService implements OnModuleInit {
   private readonly logger = new Logger(PlatformConfigService.name);
@@ -82,6 +104,7 @@ export class PlatformConfigService implements OnModuleInit {
   }
 
   async update(patch: PlatformConfigOverrides) {
+    assertNoNegativeSettings(patch);
     await this.ensureRow();
     const next: PlatformConfigOverrides = {
       ...this.overrides,

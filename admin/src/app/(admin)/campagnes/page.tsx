@@ -53,11 +53,17 @@ export default function CampagnesPage() {
 
   async function create() {
     if (readOnly || !code.trim()) return;
+    const pct = Number(percent);
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+      setError("La réduction doit être comprise entre 1 et 100 %.");
+      return;
+    }
     setSaving(true);
+    setError(null);
     try {
       await createPromoCode({
         code: code.trim().toUpperCase(),
-        discountPercent: Number(percent) || 10,
+        discountPercent: pct,
       });
       setCode("");
       await load();
@@ -151,8 +157,13 @@ export default function CampagnesPage() {
                     {!readOnly && c.isActive !== false && (
                       <BtnDanger
                         onClick={async () => {
-                          await deactivatePromoCode(c.id);
-                          await load();
+                          if (!window.confirm(`Désactiver le code ${c.code} ? Il ne sera plus accepté.`)) return;
+                          try {
+                            await deactivatePromoCode(c.id);
+                            await load();
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "Désactivation impossible");
+                          }
                         }}
                       >
                         Désactiver

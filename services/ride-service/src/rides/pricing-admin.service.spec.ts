@@ -1,4 +1,4 @@
-import { PricingAdminService } from './pricing-admin.service';
+import { PricingAdminService, assertPricingValues } from './pricing-admin.service';
 import { SurchargeType, VehicleType } from '@prisma/client';
 import { MovaHttpException } from '@mova/shared';
 
@@ -6,12 +6,19 @@ describe('PricingAdminService', () => {
   const prisma = {
     pricingRule: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn(), upsert: jest.fn() },
     serviceSurcharge: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
-    promoCode: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+    promoCode: { findMany: jest.fn(), findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null), create: jest.fn(), update: jest.fn() },
   };
 
   const service = new PricingAdminService(prisma as never);
 
   beforeEach(() => jest.clearAllMocks());
+
+  it('refuse un tarif négatif ou un coefficient absurde', () => {
+    expect(() => assertPricingValues({ baseFareCdf: -5000 })).toThrow(MovaHttpException);
+    expect(() => assertPricingValues({ perKmCdf: 12.5 })).toThrow(MovaHttpException);
+    expect(() => assertPricingValues({ peakMultiplier: 100 })).toThrow(MovaHttpException);
+    expect(() => assertPricingValues({ baseFareCdf: 2500, perKmCdf: 900, peakMultiplier: 1.3, multiplier: 1 })).not.toThrow();
+  });
 
   it('liste les règles tarifaires', async () => {
     prisma.pricingRule.findMany.mockResolvedValue([{ vehicleType: VehicleType.STANDARD }]);
@@ -27,6 +34,15 @@ describe('PricingAdminService', () => {
 
   it('rejette un code promo sans réduction', async () => {
     await expect(service.createPromoCode({ code: 'SENGA' })).rejects.toBeInstanceOf(MovaHttpException);
+  });
+
+  it('refuse une réduction absurde (500 %, montant négatif, 0 utilisation) et un code en double', async () => {
+    await expect(service.createPromoCode({ code: 'X', discountPercent: 500 })).rejects.toBeInstanceOf(MovaHttpException);
+    await expect(service.createPromoCode({ code: 'X', discountCdf: -1000 })).rejects.toBeInstanceOf(MovaHttpException);
+    await expect(service.createPromoCode({ code: 'X', discountPercent: 10, maxUses: 0 })).rejects.toBeInstanceOf(MovaHttpException);
+    prisma.promoCode.findFirst.mockResolvedValueOnce({ id: 'p1', code: 'X' });
+    await expect(service.createPromoCode({ code: 'x', discountPercent: 10 })).rejects.toThrow('existe déjà');
+    expect(prisma.promoCode.create).not.toHaveBeenCalled();
   });
 
   it('crée un code promo valide', async () => {

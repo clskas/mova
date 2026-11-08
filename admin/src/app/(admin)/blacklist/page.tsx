@@ -119,8 +119,13 @@ export default function BlacklistPage() {
                     {!readOnly && (
                       <BtnDanger
                         onClick={async () => {
-                          await deactivateBlacklist(r.id);
-                          await load();
+                          if (!window.confirm(`Lever le blocage de ${r.value} ?`)) return;
+                          try {
+                            await deactivateBlacklist(r.id);
+                            await load();
+                          } catch (e) {
+                            setError(e instanceof Error ? e.message : "Action impossible");
+                          }
                         }}
                       >
                         Lever

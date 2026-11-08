@@ -528,9 +528,19 @@ export default function UtilisateursPage() {
                 {users.length > 0 && (
                   <BtnGhost
                     onClick={async () => {
-                      if (!window.confirm(`Suspendre les ${users.length} utilisateurs de cette page ?`)) return;
-                      await bulkSuspendUsers(users.map((u) => u.id));
-                      await load();
+                      if (!window.confirm(`Suspendre les ${users.length} utilisateurs de cette page ?
+
+Votre propre compte et (sauf Super admin) les comptes de l'équipe ne seront pas suspendus.`)) return;
+                      try {
+                        const res = (await bulkSuspendUsers(users.map((u) => u.id))) as {
+                          results?: Array<{ ok: boolean }>;
+                        };
+                        const failed = (res.results ?? []).filter((r) => !r.ok).length;
+                        if (failed > 0) setError(`${failed} compte(s) non suspendu(s) (votre compte, équipe ou erreur).`);
+                        await load();
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Suspension impossible");
+                      }
                     }}
                   >
                     Suspendre page

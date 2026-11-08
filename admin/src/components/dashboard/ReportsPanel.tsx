@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { AdminReports } from "@/lib/api";
-import { formatCdf } from "@/lib/api";
+import { fetchAdminReports, formatCdf } from "@/lib/api";
 import { Card } from "@/components/ui";
 
 type ReportsPanelProps = {
@@ -13,9 +14,32 @@ function pct(n: number) {
   return `${Math.round(n * 1000) / 10} %`;
 }
 
-export function ReportsPanel({ reports, onExport }: ReportsPanelProps) {
+export function ReportsPanel({ reports: baseReports, onExport }: ReportsPanelProps) {
+  // Same period and city, with test / demo / staff accounts counted too (on request).
+  const [includeTests, setIncludeTests] = useState(false);
+  const [withTests, setWithTests] = useState<AdminReports | null>(null);
+  const [loadingTests, setLoadingTests] = useState(false);
+  useEffect(() => {
+    setWithTests(null);
+    if (!includeTests || !baseReports) return;
+    setLoadingTests(true);
+    fetchAdminReports({
+      days: baseReports.periodDays,
+      city: baseReports.city ?? null,
+      from: baseReports.periodFrom ?? null,
+      to: baseReports.periodTo ?? null,
+      includeTests: true,
+    })
+      .then(setWithTests)
+      .catch(() => setIncludeTests(false))
+      .finally(() => setLoadingTests(false));
+  }, [includeTests, baseReports]);
+  const reports = includeTests && withTests ? withTests : baseReports;
   if (!reports) return null;
   const { kpis, serviceBreakdown, periodDays, periodFrom, periodTo, commissionsByCity, city } = reports;
+  const excluded = baseReports?.excludedTests;
+  const excludedTotal = excluded ? excluded.rides + excluded.deliveries + excluded.errands : 0;
+  const cancel = reports.cancellations;
   const periodLabel =
     periodFrom && periodTo ? `${periodFrom} → ${periodTo} (${periodDays} j)` : `${periodDays} jours`;
 
@@ -59,6 +83,27 @@ export function ReportsPanel({ reports, onExport }: ReportsPanelProps) {
         </button>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--mova-border)] bg-[#fafaff] px-3 py-2 text-xs text-gray-600">
+        <span>
+          {includeTests
+            ? "Comptes de test inclus : essais de l'équipe, comptes de démonstration Apple / Google et robots de test Google."
+            : `Activité réelle uniquement${
+                excludedTotal > 0
+                  ? ` — ${excluded!.rides} course(s), ${excluded!.deliveries} livraison(s) et ${excluded!.errands} commande(s) de comptes de test non comptées`
+                  : ""
+              } (personnel SENGA, démonstrations Apple / Google, robots de test Google).`}
+        </span>
+        <label className="flex items-center gap-2 whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={includeTests}
+            disabled={loadingTests}
+            onChange={(e) => setIncludeTests(e.target.checked)}
+          />
+          {loadingTests ? "Chargement…" : "Inclure les comptes de test"}
+        </label>
+      </div>
+
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {rows.map((r) => (
           <div key={r.label} className="rounded-xl border border-[var(--mova-border)] p-3 bg-[#fafaff]">
@@ -68,6 +113,47 @@ export function ReportsPanel({ reports, onExport }: ReportsPanelProps) {
           </div>
         ))}
       </div>
+
+      {cancel && kpis.cancelledRides > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">
+            Pourquoi les courses sont annulées ({kpis.cancelledRides})
+          </h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              {
+                label: "Client, avant qu'un chauffeur accepte",
+                value: cancel.passengerBeforeAccept,
+                desc: "Souvent : personne n'a accepté assez vite (manque de chauffeurs en ligne)",
+              },
+              { label: "Client, après acceptation", value: cancel.passengerAfterAccept, desc: "Le client a changé d'avis ou attendu trop longtemps" },
+              { label: "Chauffeur", value: cancel.driver, desc: "Annulée par le chauffeur après avoir accepté" },
+              { label: "Admin / système", value: cancel.adminOrSystem, desc: "Annulée par l'équipe ou automatiquement" },
+            ].map((c) => (
+              <div key={c.label} className="rounded-xl border border-[var(--mova-border)] p-3 bg-[#fafaff]">
+                <p className="text-xs text-gray-500">{c.label}</p>
+                <p className="text-xl font-bold text-[#0d0d1a] mt-1 tabular-nums">
+                  {c.value}
+                  <span className="text-sm font-normal text-gray-400"> · {pct(c.value / kpis.cancelledRides)}</span>
+                </p>
+                <p className="text-[11px] text-gray-400 mt-0.5">{c.desc}</p>
+              </div>
+            ))}
+          </div>
+          {cancel.topReasons.length > 0 && (
+            <div className="mt-3 text-xs text-gray-600">
+              <p className="font-medium mb-1">Raisons les plus données :</p>
+              <ul className="list-disc pl-5 space-y-0.5">
+                {cancel.topReasons.map((r) => (
+                  <li key={r.reason}>
+                    {r.reason} — {r.count}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Commissions SENGA par ville</h3>

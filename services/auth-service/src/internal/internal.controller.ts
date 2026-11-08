@@ -120,6 +120,11 @@ export class InternalController {
     );
   }
 
+  @Get('users/report-test-accounts')
+  reportTestAccounts() {
+    return this.users.reportTestAccountIds();
+  }
+
   @Get('users/play-prelaunch')
   listPlayPrelaunch() {
     return this.users.listPlayPrelaunchUsers();

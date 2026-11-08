@@ -796,6 +796,43 @@ describe('RidesService', () => {
     expect(report.daily).toHaveLength(7);
   });
 
+  it('getReportAnalytics leaves test accounts out and explains cancellations', async () => {
+    const now = new Date();
+    const ride = (o: Record<string, unknown>) => ({
+      createdAt: now, vehicleType: VehicleType.STANDARD, finalFareCdf: 5000, estimatedFareCdf: 5000, discountCdf: 0,
+      pickupLat: -4.32, pickupLng: 15.31, driverId: null, cancelledBy: null, cancelReason: null, ...o,
+    });
+    prisma.ride.findMany.mockResolvedValue([
+      ride({ status: RideStatus.COMPLETED, passengerId: 'real1', driverId: 'd1' }),
+      ride({ status: RideStatus.CANCELLED, passengerId: 'real2', cancelledBy: 'real2', cancelReason: 'Trop long' }),
+      ride({ status: RideStatus.CANCELLED, passengerId: 'real3', driverId: 'd2', cancelledBy: 'd2' }),
+      ride({ status: RideStatus.CANCELLED, passengerId: 'apple-demo', cancelledBy: 'apple-demo' }),
+    ]);
+    prisma.delivery.findMany.mockResolvedValue([]);
+    prisma.errandOrder.findMany.mockResolvedValue([]);
+    prisma.movingRequest.count.mockResolvedValue(0);
+    prisma.scheduledRide.count.mockResolvedValue(0);
+    prisma.carpoolTrip.count.mockResolvedValue(0);
+    const prevFetch = global.fetch;
+    // Earlier tests may have cached another answer for 5 minutes.
+    (service as unknown as { testAccountsCache?: unknown }).testAccountsCache = undefined;
+    (global as unknown as { fetch: unknown }).fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ids: ['apple-demo'] }),
+    });
+    try {
+      const report = await service.getReportAnalytics(30);
+      expect(report.kpis.totalRides).toBe(3);
+      expect(report.excludedTests).toEqual({ rides: 1, deliveries: 0, errands: 0 });
+      expect(report.cancellations).toMatchObject({ passengerBeforeAccept: 1, driver: 1, passengerAfterAccept: 0 });
+      expect(report.cancellations.topReasons[0]).toEqual({ reason: 'Trop long', count: 1 });
+      const all = await service.getReportAnalytics(30, null, undefined, { includeTests: true });
+      expect(all.kpis.totalRides).toBe(4);
+    } finally {
+      (global as unknown as { fetch: typeof fetch | undefined }).fetch = prevFetch;
+    }
+  });
+
   describe('nombre de passagers (voiture)', () => {
     const flags = { passengerCountEnabled: true, familialeEnabled: false };
     const clientApps = { get: () => ({ features: { sengaPlusVisible: true, ...flags } }) };

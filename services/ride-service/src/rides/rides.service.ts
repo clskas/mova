@@ -2225,10 +2225,30 @@ export class RidesService {
   }
 
   /** Séries temporelles et KPIs pour rapports admin (1–366 j, ou plage from/to). */
+  private testAccountsCache?: { at: number; ids: Set<string> };
+
+  /** Test / demo / staff account ids (auth-service), cached 5 minutes. Empty if unreachable. */
+  private async reportTestAccountIds(): Promise<Set<string>> {
+    if (this.testAccountsCache && Date.now() - this.testAccountsCache.at < 300_000) return this.testAccountsCache.ids;
+    try {
+      const res = await fetch(serviceUrl('auth', '/internal/users/report-test-accounts'), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return this.testAccountsCache?.ids ?? new Set();
+      const body = (await res.json()) as { ids?: string[] };
+      this.testAccountsCache = { at: Date.now(), ids: new Set(body.ids ?? []) };
+      return this.testAccountsCache.ids;
+    } catch {
+      return this.testAccountsCache?.ids ?? new Set();
+    }
+  }
+
   async getReportAnalytics(
     days = 30,
     cityFilter?: string | null,
     range?: { from?: string; to?: string },
+    opts?: { includeTests?: boolean },
   ) {
     /** Calendrier RDC (évite le décalage UTC qui fausse ville+période). */
     const tz = 'Africa/Kinshasa';
@@ -2304,6 +2324,10 @@ export class RidesService {
             discountCdf: true,
             pickupLat: true,
             pickupLng: true,
+            passengerId: true,
+            driverId: true,
+            cancelledBy: true,
+            cancelReason: true,
           },
         }),
         this.prisma.delivery.findMany({
@@ -2316,11 +2340,12 @@ export class RidesService {
             estimatedPriceCdf: true,
             pickupLat: true,
             pickupLng: true,
+            userId: true,
           },
         }),
         this.prisma.errandOrder.findMany({
           where: { createdAt: createdAtFilter },
-          select: { createdAt: true, status: true, finalPriceCdf: true, pickupLat: true, pickupLng: true },
+          select: { createdAt: true, status: true, finalPriceCdf: true, pickupLat: true, pickupLng: true, userId: true },
         }),
         this.prisma.movingRequest.count({ where: { createdAt: createdAtFilter } }),
         this.prisma.scheduledRide.count({ where: { createdAt: createdAtFilter } }),
@@ -2342,9 +2367,50 @@ export class RidesService {
       return normalizeCity(cityOf(lat, lng)) === cityKey;
     };
 
-    const filteredRides = rides.filter((r) => inCity(r.pickupLat, r.pickupLng));
-    const filteredDeliveries = deliveries.filter((d) => inCity(d.pickupLat, d.pickupLng));
-    const filteredErrands = errands.filter((e) => inCity(e.pickupLat, e.pickupLng));
+    // Real customer activity only: store-review demos, Google test robots and staff are left
+    // out (their orders are tests), unless the admin asks to include them.
+    const testIds = opts?.includeTests ? new Set<string>() : await this.reportTestAccountIds();
+    const isTest = (...ids: (string | null | undefined)[]) => ids.some((id) => id != null && testIds.has(id));
+    const cityRides = rides.filter((r) => inCity(r.pickupLat, r.pickupLng));
+    const cityDeliveries = deliveries.filter((d) => inCity(d.pickupLat, d.pickupLng));
+    const cityErrands = errands.filter((e) => inCity(e.pickupLat, e.pickupLng));
+    const filteredRides = cityRides.filter((r) => !isTest(r.passengerId));
+    const filteredDeliveries = cityDeliveries.filter((d) => !isTest(d.userId));
+    const filteredErrands = cityErrands.filter((e) => !isTest(e.userId));
+    const excludedTests = {
+      rides: cityRides.length - filteredRides.length,
+      deliveries: cityDeliveries.length - filteredDeliveries.length,
+      errands: cityErrands.length - filteredErrands.length,
+    };
+
+    // Why rides were cancelled: by the customer before / after a driver accepted, by the
+    // driver, or by the admin / system — and the most frequent reasons given.
+    const cancellations = {
+      passengerBeforeAccept: 0,
+      passengerAfterAccept: 0,
+      driver: 0,
+      adminOrSystem: 0,
+      topReasons: [] as { reason: string; count: number }[],
+    };
+    const reasonCounts = new Map<string, number>();
+    for (const r of filteredRides) {
+      if (r.status !== RideStatus.CANCELLED) continue;
+      const by = r.cancelledBy ?? '';
+      if (by && by === r.passengerId) {
+        if (r.driverId) cancellations.passengerAfterAccept++;
+        else cancellations.passengerBeforeAccept++;
+      } else if (by && r.driverId && by === r.driverId) {
+        cancellations.driver++;
+      } else {
+        cancellations.adminOrSystem++;
+      }
+      const reason = (r.cancelReason ?? '').trim() || 'Sans raison indiquée';
+      reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
+    }
+    cancellations.topReasons = [...reasonCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([reason, count]) => ({ reason, count }));
 
     const dailyMap = new Map<
       string,
@@ -2483,6 +2549,9 @@ export class RidesService {
         totalPlatformCommissionCdf,
       },
       commissionsByCity,
+      testsIncluded: Boolean(opts?.includeTests),
+      excludedTests,
+      cancellations,
     };
   }
 

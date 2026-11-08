@@ -162,9 +162,10 @@ export class AdminController {
     @Query('city') city?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('includeTests') includeTests?: string,
   ) {
     const scoped = resolveManagedCityScope(req.user) ?? city;
-    return this.adminService.getReports(Number(days ?? 30), scoped, { from, to });
+    return this.adminService.getReports(Number(days ?? 30), scoped, { from, to }, includeTests === 'true');
   }
 
   @Get('users')

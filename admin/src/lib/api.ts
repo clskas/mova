@@ -80,6 +80,18 @@ export type AdminReports = {
     totalDeliveries: number;
     totalPlatformCommissionCdf?: number;
   };
+  /** True when test / demo / staff accounts are counted. */
+  testsIncluded?: boolean;
+  /** Orders of test / demo / staff accounts left out of the figures. */
+  excludedTests?: { rides: number; deliveries: number; errands: number };
+  /** Why rides were cancelled. */
+  cancellations?: {
+    passengerBeforeAccept: number;
+    passengerAfterAccept: number;
+    driver: number;
+    adminOrSystem: number;
+    topReasons: { reason: string; count: number }[];
+  };
   commissionsByCity?: {
     city: string;
     ridesCdf: number;
@@ -1594,6 +1606,8 @@ export type AdminReportsQuery = {
   city?: string | null;
   from?: string | null;
   to?: string | null;
+  /** Count test / demo / staff accounts too (off by default). */
+  includeTests?: boolean;
 };
 
 export async function fetchAdminReports(
@@ -1607,6 +1621,7 @@ export async function fetchAdminReports(
   if (opts.city?.trim()) params.set("city", opts.city.trim());
   if (opts.from?.trim()) params.set("from", opts.from.trim());
   if (opts.to?.trim()) params.set("to", opts.to.trim());
+  if (opts.includeTests) params.set("includeTests", "true");
   return apiFetch<AdminReports>(`/api/admin/reports?${params}`);
 }
 

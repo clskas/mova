@@ -470,8 +470,12 @@ export default function ParametresPage() {
                           className="text-red-600 hover:underline"
                           onClick={async () => {
                             if (!confirm("Supprimer cette province ?")) return;
-                            await deleteProvince(p.id);
-                            load();
+                            try {
+                              await deleteProvince(p.id);
+                              load();
+                            } catch (e) {
+                              setError(e instanceof Error ? e.message : "Suppression impossible");
+                            }
                           }}
                         >
                           Supprimer
@@ -554,8 +558,12 @@ export default function ParametresPage() {
                           className="text-red-600 hover:underline"
                           onClick={async () => {
                             if (!confirm("Supprimer cette ville ?")) return;
-                            await deleteCity(c.id);
-                            load();
+                            try {
+                              await deleteCity(c.id);
+                              load();
+                            } catch (e) {
+                              setError(e instanceof Error ? e.message : "Suppression impossible");
+                            }
                           }}
                         >
                           Supprimer
@@ -609,8 +617,12 @@ export default function ParametresPage() {
                         className="text-red-600 hover:underline"
                         onClick={async () => {
                           if (!confirm("Supprimer cette commune ?")) return;
-                          await deleteCommune(c.id);
-                          load();
+                          try {
+                            await deleteCommune(c.id);
+                            load();
+                          } catch (e) {
+                            setError(e instanceof Error ? e.message : "Suppression impossible");
+                          }
                         }}
                       >
                         Supprimer

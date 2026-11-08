@@ -2016,26 +2016,38 @@ export class AdminController {
   @Post('bulk/drivers/operating-city')
   @RequirePermissions(AdminPermission.DRIVERS_WRITE)
   @ApiOperation({ summary: 'Bulk: ville d’opération chauffeurs' })
-  bulkDriverCity(
+  async bulkDriverCity(
     @Request() req: { user: AdminJwtUser },
     @Body() body: { userIds?: string[]; operatingCity?: string },
   ) {
-    return this.opsService.bulkDriverCity(
-      body.userIds ?? [],
-      body.operatingCity ?? '',
-      String(req.user.id ?? 'admin'),
+    const managedCity = resolveManagedCityScope(req.user);
+    if (managedCity && (body.operatingCity ?? '').trim().toLowerCase() !== managedCity.toLowerCase()) {
+      throw new ForbiddenException('Un administrateur de ville ne peut affecter des chauffeurs qu’à sa ville.');
+    }
+    const ids = await this.driversInScope(body.userIds ?? [], managedCity);
+    return this.opsService.bulkDriverCity(ids, body.operatingCity ?? '', String(req.user.id ?? 'admin'));
+  }
+
+  /** Bulk actions: at most 200 accounts, and for a city admin only drivers of their city. */
+  private async driversInScope(userIds: string[], managedCity: string | null): Promise<string[]> {
+    const ids = [...new Set(userIds.filter((id) => typeof id === 'string' && id))].slice(0, 200);
+    if (!managedCity) return ids;
+    const checks = await Promise.all(
+      ids.map((id) => this.adminService.getDriver(id, managedCity).then(() => id).catch(() => null)),
     );
+    return checks.filter((id): id is string => id != null);
   }
 
   @Post('bulk/kyc/review')
   @RequirePermissions(AdminPermission.KYC_WRITE)
   @ApiOperation({ summary: 'Bulk: revue KYC chauffeurs' })
-  bulkKyc(
+  async bulkKyc(
     @Request() req: { user: AdminJwtUser },
     @Body() body: { userIds?: string[]; approved?: boolean; notes?: string },
   ) {
+    const ids = await this.driversInScope(body.userIds ?? [], resolveManagedCityScope(req.user));
     return this.opsService.bulkKycReview(
-      body.userIds ?? [],
+      ids,
       body.approved === true,
       body.notes,
       String(req.user.id ?? 'admin'),
@@ -2045,7 +2057,23 @@ export class AdminController {
   @Post('bulk/users/suspend')
   @RequirePermissions(AdminPermission.USERS_WRITE)
   @ApiOperation({ summary: 'Bulk: suspendre utilisateurs' })
-  bulkSuspend(@Request() req: { user: AdminJwtUser }, @Body() body: { userIds?: string[] }) {
-    return this.opsService.bulkSuspendUsers(body.userIds ?? [], String(req.user.id ?? 'admin'));
+  async bulkSuspend(@Request() req: { user: AdminJwtUser }, @Body() body: { userIds?: string[] }) {
+    // Same protections as one by one: never yourself, staff accounts only by a SUPER_ADMIN.
+    const actorId = String(req.user.id ?? '');
+    const isSuper = String(req.user.role ?? '').toUpperCase() === 'SUPER_ADMIN';
+    const ids = [...new Set((body.userIds ?? []).filter((id) => typeof id === 'string' && id && id !== actorId))].slice(0, 200);
+    const allowed: string[] = [];
+    const skipped: Array<{ userId: string; ok: false; error: string }> = [];
+    await Promise.all(
+      ids.map(async (id) => {
+        const target = (await this.adminService.getUser(id).catch(() => null)) as { role?: string } | null;
+        const role = String(target?.role ?? '').toUpperCase();
+        const staff = ['SUPER_ADMIN', 'ADMIN', 'SUPPORT', 'FINANCE', 'CONTENT', 'CITY_ADMIN'].includes(role);
+        if (!target || (staff && !isSuper)) skipped.push({ userId: id, ok: false, error: 'Compte de l’équipe : réservé au Super admin.' });
+        else allowed.push(id);
+      }),
+    );
+    const res = await this.opsService.bulkSuspendUsers(allowed, actorId || 'admin');
+    return { results: [...res.results, ...skipped] };
   }
 }

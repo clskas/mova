@@ -47,16 +47,24 @@ export default function AlertesStaffPage() {
           <div className="flex flex-wrap gap-2">
             <BtnGhost
               onClick={async () => {
-                await evaluateStaffAlerts(city || null);
-                await load();
+                try {
+                  await evaluateStaffAlerts(city || null);
+                  await load();
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Action impossible");
+                }
               }}
             >
               Évaluer règles
             </BtnGhost>
             <BtnPrimary
               onClick={async () => {
-                await markAllStaffAlertsRead();
-                await load();
+                try {
+                  await markAllStaffAlertsRead();
+                  await load();
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Action impossible");
+                }
               }}
             >
               Tout marquer lu
@@ -91,8 +99,12 @@ export default function AlertesStaffPage() {
                     type="button"
                     className="text-sm text-gray-500 hover:underline"
                     onClick={async () => {
-                      await markStaffAlertRead(r.id);
-                      await load();
+                      try {
+                        await markStaffAlertRead(r.id);
+                        await load();
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Action impossible");
+                      }
                     }}
                   >
                     Marquer lu

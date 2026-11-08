@@ -29,6 +29,7 @@ import {
   EmptyState,
   ErrorBanner,
   FieldLabel,
+  ListMoreFooter,
   LoadingState,
   Modal,
   PageHeader,
@@ -42,10 +43,15 @@ const STATUSES = [
   { value: "REQUESTED", label: "Demandée" },
   { value: "SEARCHING", label: "Recherche" },
   { value: "ACCEPTED", label: "Acceptée" },
+  { value: "DRIVER_ARRIVED", label: "Chauffeur arrivé" },
   { value: "IN_PROGRESS", label: "En cours" },
   { value: "COMPLETED", label: "Terminée" },
   { value: "CANCELLED", label: "Annulée" },
 ];
+
+/** Rows per « Charger plus » step, and the most the list shows (then narrow the dates). */
+const LIST_STEP = 50;
+const LIST_MAX = 200;
 
 const RIDE_STATUS_OPTIONS = [
   { value: "REQUESTED", label: "Demandée" },
@@ -66,6 +72,7 @@ export default function CoursesPage() {
   const [status, setStatus] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [limit, setLimit] = useState(LIST_STEP);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<RideOverview | null>(null);
@@ -131,6 +138,7 @@ export default function CoursesPage() {
       if (status) params.set("status", status);
       if (dateFrom) params.set("from", dateFrom);
       if (dateTo) params.set("to", dateTo);
+      params.set("take", String(limit));
       const [data, driverList] = await Promise.all([
         apiFetch<RideOverview[]>(`/api/admin/rides?${params}`),
         isOpsAdmin ? fetchDriversForAssignment().catch(() => [] as AdminDriver[]) : Promise.resolve([] as AdminDriver[]),
@@ -142,7 +150,12 @@ export default function CoursesPage() {
     } finally {
       setLoading(false);
     }
-  }, [status, dateFrom, dateTo, isOpsAdmin]);
+  }, [status, dateFrom, dateTo, isOpsAdmin, limit]);
+
+  // A new filter starts again from the first rows.
+  useEffect(() => {
+    setLimit(LIST_STEP);
+  }, [status, dateFrom, dateTo]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -286,6 +299,7 @@ export default function CoursesPage() {
               ))}
             </tbody>
           </table>
+          <ListMoreFooter shown={rides.length} limit={limit} onMore={() => setLimit((l) => Math.min(LIST_MAX, l + LIST_STEP))} />
         </Card>
       )}
 

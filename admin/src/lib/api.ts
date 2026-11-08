@@ -2121,9 +2121,15 @@ export async function deletePricingRule(vehicleType: string, city?: string) {
   return apiFetch(`/api/admin/pricing-rules/${vehicleType}${q}`, { method: "DELETE" });
 }
 
-export async function fetchWalletTransactions(userId?: string, skip = 0, take = 50): Promise<WalletTransactionsPage> {
+export async function fetchWalletTransactions(
+  userId?: string,
+  skip = 0,
+  take = 50,
+  kind?: "recharge" | "withdraw",
+): Promise<WalletTransactionsPage> {
   const params = new URLSearchParams({ skip: String(skip), take: String(take) });
   if (userId) params.set("userId", userId);
+  if (kind) params.set("kind", kind);
   return apiFetch<WalletTransactionsPage>(`/api/admin/wallet/transactions?${params}`);
 }
 

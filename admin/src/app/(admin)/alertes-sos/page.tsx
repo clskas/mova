@@ -43,12 +43,15 @@ export default function SosAlertesPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [cfg, usersRes] = await Promise.all([
+      // One request per staff role: staff accounts are found even among thousands of users.
+      const [cfg, ...staffPages] = await Promise.all([
         fetchClientAppsConfig(),
-        fetchUsers(0, 200),
+        ...Array.from(OPS_ROLES).map((role) => fetchUsers(0, 500, undefined, false, undefined, { role })),
       ]);
       setConfig(cfg);
-      const ops = (usersRes.data ?? []).filter((u) => OPS_ROLES.has(String(u.role ?? "").toUpperCase()));
+      const ops = staffPages
+        .flatMap((res) => res.data ?? [])
+        .filter((u) => OPS_ROLES.has(String(u.role ?? "").toUpperCase()));
       setStaff(ops);
       setSelected(new Set(cfg.sosAlertUserIds ?? []));
       setAudiences(new Set((cfg.sosAlertAudiences ?? []) as SosAudience[]));

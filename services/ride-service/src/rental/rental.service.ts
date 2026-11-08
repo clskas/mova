@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, PartnerKycStatus, RentalInquiryStatus, RentalLogisticsMode, RentalVehicleApprovalStatus } from '@prisma/client';
-import { MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelRentalBooking, formatCdf, formatRentalRemaining, isRentalCancelBlockedByStatus, shouldChargeGpsAddOn, vehicleHasBuiltInGps, type RentalBookingEventKind, resolveVehiclePhotos, vehiclePhotoList } from '@mova/shared';
+import { parseDayBoundary, MARKET_RDC, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelRentalBooking, formatCdf, formatRentalRemaining, isRentalCancelBlockedByStatus, shouldChargeGpsAddOn, vehicleHasBuiltInGps, type RentalBookingEventKind, resolveVehiclePhotos, vehiclePhotoList } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { fetchServicePaymentStatus } from '../common/payment-status.util';
@@ -1344,8 +1344,8 @@ export class RentalService {
     const statuses = query?.status
       ? query.status.split(',').map((s) => s.trim()).filter(Boolean)
       : undefined;
-    const from = query?.from ? new Date(query.from) : undefined;
-    const to = query?.to ? new Date(query.to) : undefined;
+    const from = parseDayBoundary(query?.from, 'start');
+    const to = parseDayBoundary(query?.to, 'end');
     const q = query?.q?.trim().toLowerCase();
     const skip = Math.max(query?.skip ?? 0, 0);
     const take = Math.min(Math.max(query?.take ?? 50, 1), 100);
@@ -1369,8 +1369,32 @@ export class RentalService {
     });
     let filtered = rows;
     if (q) {
+      // "Passager, véhicule, ville…": the customer's name / phone count too.
+      const passengers = new Map<string, { name?: string; phone?: string } | null>();
+      await Promise.all(
+        [...new Set(rows.map((r) => r.userId))].map(async (id) => {
+          passengers.set(id, await fetchAuthUserBrief(id).catch(() => null));
+        }),
+      );
       filtered = rows.filter((r) => {
-        const hay = `${r.id} ${r.pickupCity ?? ''} ${r.returnCity ?? ''} ${r.pickupAddress ?? ''} ${r.vehicle?.name ?? ''}`.toLowerCase();
+        const p = passengers.get(r.userId);
+        const hay = [
+          r.id,
+          r.pickupCity,
+          r.returnCity,
+          r.pickupAddress,
+          r.vehicle?.name,
+          r.contactPhone,
+          r.passengerDriverName,
+          r.passengerDriverPhone,
+          r.ownerDriverName,
+          r.ownerDriverPhone,
+          p?.name,
+          p?.phone,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
         return hay.includes(q);
       });
     }

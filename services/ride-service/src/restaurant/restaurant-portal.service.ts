@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType, PartnerKycStatus, Prisma } from '@prisma/client';
-import {
+import { parseDayBoundary,
   INTERNAL_API_KEY,
   MOVA_EVENTS,
   MovaErrorCode,
@@ -169,8 +169,8 @@ export class RestaurantPortalService {
           DeliveryStatus.PICKED_UP,
           DeliveryStatus.IN_TRANSIT,
         ];
-    const from = query?.from ? new Date(query.from) : undefined;
-    const to = query?.to ? new Date(query.to) : undefined;
+    const from = parseDayBoundary(query?.from, 'start');
+    const to = parseDayBoundary(query?.to, 'end');
     const q = query?.q?.trim().toLowerCase();
     const skip = Math.max(query?.skip ?? 0, 0);
     const take = Math.min(Math.max(query?.take ?? 50, 1), 100);

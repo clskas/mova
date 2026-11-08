@@ -3,6 +3,7 @@ export * from './ride-contract';
 export * from './passenger-seats';
 export * from './photo-urls';
 export * from './cargo-volume';
+export * from './date-range';
 export * from './mova-error-codes';
 export * from './enums';
 export * from './admin-rbac';

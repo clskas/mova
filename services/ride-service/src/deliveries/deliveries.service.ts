@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DeliveryStatus, DeliveryType, PartnerKycStatus, PartnerKycSubject, Prisma, SurchargeType, TrackingReferenceType, VehicleType, WeightCategory, CommissionServiceType } from '@prisma/client';
-import { driverEligibleForParcelWeight, driverFitsParcelVehicle, isParcelVehicleAllowed, parcelVehicleOptions, recommendedParcelVehicle, PARCEL_VEHICLE_LABELS, PARCEL_VEHICLE_FALLBACK_FACTOR, type ParcelVehicleType, INTERNAL_API_KEY, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, estimateTripDurationMin, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue, checklistSatisfiesJobsGate, JOBS_GATE_RESTAURANT_KYC_TYPES } from '@mova/shared';
+import { dayRangeFilter, driverEligibleForParcelWeight, driverFitsParcelVehicle, isParcelVehicleAllowed, parcelVehicleOptions, recommendedParcelVehicle, PARCEL_VEHICLE_LABELS, PARCEL_VEHICLE_FALLBACK_FACTOR, type ParcelVehicleType, INTERNAL_API_KEY, MOVA_EVENTS, MovaErrorCode, MovaHttpException, canCancelDelivery, estimateTripDurationMin, formatCdf, normalizeVehicleType, resolveCityFromCoords, serviceUrl, VehicleTypeValue, checklistSatisfiesJobsGate, JOBS_GATE_RESTAURANT_KYC_TYPES } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
@@ -1924,17 +1924,17 @@ export class DeliveriesService {
     take?: number;
   } = {}) {
     const where: Prisma.DeliveryWhereInput = {};
-    if (opts.status) where.status = opts.status as DeliveryStatus;
-    if (opts.type && opts.type !== 'ERRAND') where.type = opts.type as DeliveryType;
-    if (opts.from || opts.to) {
-      where.createdAt = {};
-      if (opts.from) where.createdAt.gte = new Date(opts.from);
-      if (opts.to) {
-        const toDate = new Date(opts.to);
-        toDate.setHours(23, 59, 59, 999);
-        where.createdAt.lte = toDate;
-      }
+    if (opts.status) {
+      // A courses/commissions status (ASSIGNED, IN_PROGRESS, COMPLETED) matches no delivery.
+      if (!(Object.values(DeliveryStatus) as string[]).includes(opts.status)) return [];
+      where.status = opts.status as DeliveryStatus;
     }
+    if (opts.type && opts.type !== 'ERRAND') {
+      if (!(Object.values(DeliveryType) as string[]).includes(opts.type)) return [];
+      where.type = opts.type as DeliveryType;
+    }
+    const createdAt = dayRangeFilter(opts.from, opts.to);
+    if (createdAt) where.createdAt = createdAt;
     const search = opts.search?.trim();
     if (search) {
       where.OR = [
@@ -1947,7 +1947,7 @@ export class DeliveriesService {
         { restaurant: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
-    const take = Math.min(opts.take ?? 50, 100);
+    const take = Math.min(opts.take ?? 50, 200);
     const rows = await this.prisma.delivery.findMany({
       where,
       orderBy: { createdAt: 'desc' },

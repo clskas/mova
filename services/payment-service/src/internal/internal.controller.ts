@@ -154,8 +154,9 @@ export class InternalController {
     @Query('skip') skip?: string,
     @Query('take') take?: string,
     @Query('userId') userId?: string,
+    @Query('kind') kind?: string,
   ) {
-    return this.wallet.listTransactionsAdmin(Number(skip ?? 0), Number(take ?? 50), userId);
+    return this.wallet.listTransactionsAdmin(Number(skip ?? 0), Number(take ?? 50), userId, kind);
   }
 
   @Post('wallets/:userId/adjust')

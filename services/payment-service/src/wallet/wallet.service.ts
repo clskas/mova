@@ -1346,8 +1346,29 @@ export class WalletService {
     };
   }
 
-  async listTransactionsAdmin(skip = 0, take = 50, userId?: string) {
-    const where = userId ? { wallet: { userId } } : {};
+  async listTransactionsAdmin(skip = 0, take = 50, userId?: string, kind?: string) {
+    // Same rules as the admin « Recharges » / « Retraits » buttons, applied to every row.
+    const kindWhere =
+      kind === 'recharge'
+        ? {
+            OR: [
+              { type: { in: ['TOPUP_PENDING', 'TOPUP_COMPLETED', 'TOPUP_FAILED'] } },
+              { description: { startsWith: 'Recharge' } },
+              { reference: { startsWith: 'topup_' } },
+              { reference: { startsWith: 'senga_topup_' } },
+              { description: { contains: 'Annulation retrait' } },
+            ],
+          }
+        : kind === 'withdraw'
+          ? {
+              OR: [
+                { description: { startsWith: 'Retrait' } },
+                { reference: { startsWith: 'withdraw_' } },
+                { reference: { startsWith: 'senga_withdraw_' } },
+              ],
+            }
+          : {};
+    const where = { ...(userId ? { wallet: { userId } } : {}), ...kindWhere };
     const [data, total] = await Promise.all([
       this.prisma.walletTransaction.findMany({
         where,

@@ -1964,9 +1964,10 @@ export class AdminService {
     return this.proxy('ride', `/internal/rental-vehicles/${id}`, { method: 'DELETE' });
   }
 
-  listWalletTransactions(skip = 0, take = 50, userId?: string) {
+  listWalletTransactions(skip = 0, take = 50, userId?: string, kind?: string) {
     const params = new URLSearchParams({ skip: String(skip), take: String(take) });
     if (userId) params.set('userId', userId);
+    if (kind === 'recharge' || kind === 'withdraw') params.set('kind', kind);
     return this.enrichWalletTransactions(params);
   }
   private formatUserDisplayName(user: {

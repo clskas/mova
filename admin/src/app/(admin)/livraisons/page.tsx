@@ -30,6 +30,7 @@ import {
   EmptyState,
   ErrorBanner,
   FieldLabel,
+  ListMoreFooter,
   LoadingState,
   Modal,
   PageHeader,
@@ -67,6 +68,10 @@ const ERRAND_STATUSES = [
 
 const PAID_OPTION = { value: "PAID", label: "Payé" };
 
+/** Rows per « Charger plus » step, and the most the list shows (then narrow the dates). */
+const LIST_STEP = 50;
+const LIST_MAX = 200;
+
 const FILTER_STATUSES = [
   { value: "", label: "Tous les statuts" },
   ...DELIVERY_STATUSES,
@@ -90,6 +95,7 @@ export default function LivraisonsPage() {
   const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [limit, setLimit] = useState(LIST_STEP);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<DeliveryOverview | null>(null);
@@ -156,6 +162,7 @@ export default function LivraisonsPage() {
           from: dateFrom || undefined,
           to: dateTo || undefined,
           search: searchQuery || undefined,
+          take: limit,
         }),
         fetchDriversForAssignment(),
       ]);
@@ -166,6 +173,11 @@ export default function LivraisonsPage() {
     } finally {
       setLoading(false);
     }
+  }, [status, type, dateFrom, dateTo, searchQuery, limit]);
+
+  // A new filter starts again from the first rows.
+  useEffect(() => {
+    setLimit(LIST_STEP);
   }, [status, type, dateFrom, dateTo, searchQuery]);
 
   function applySearch() {
@@ -369,6 +381,7 @@ export default function LivraisonsPage() {
               ))}
             </tbody>
           </table>
+          <ListMoreFooter shown={deliveries.length} limit={limit} onMore={() => setLimit((l) => Math.min(LIST_MAX, l + LIST_STEP))} />
         </Card>
       )}
 

@@ -127,7 +127,7 @@ export default function CatalogueLocationPage() {
     setLoading(true);
     setError(null);
     try {
-      const [data, usersRes] = await Promise.all([fetchRentalVehicles(), fetchUsers(0, 200)]);
+      const [data, usersRes] = await Promise.all([fetchRentalVehicles(), fetchUsers(0, 500, undefined, false, undefined, { role: "RENTAL_PARTNER" })]);
       setVehicles(data);
       setPartnerUsers((usersRes.data ?? []).filter((u) => u.role === "RENTAL_PARTNER" && u.status !== "INACTIVE"));
     } catch (e) {

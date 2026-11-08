@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, CarpoolStatus, DeliveryStatus, DeliveryType, ErrandOrderStatus, MovingRequestStatus, RentalInquiryStatus, RideSharePassengerStatus, RideStatus, RoundTripLeg, ScheduledRideStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
-import {
+import { dayRangeFilter,
   formatCdf,
   fromMobileRideStatus,
   canCancelRide,
@@ -2560,18 +2560,9 @@ export class RidesService {
     if (opts.status && Object.values(RideStatus).includes(opts.status as RideStatus)) {
       where.status = opts.status as RideStatus;
     }
-    if (opts.from || opts.to) {
-      where.createdAt = {};
-      if (opts.from) {
-        const from = new Date(opts.from);
-        if (!Number.isNaN(from.getTime())) where.createdAt.gte = from;
-      }
-      if (opts.to) {
-        const to = new Date(opts.to);
-        if (!Number.isNaN(to.getTime())) where.createdAt.lte = to;
-      }
-      if (!where.createdAt.gte && !where.createdAt.lte) delete where.createdAt;
-    }
+    // A picked day covers the whole day (Kinshasa): "au 8 novembre" includes the 8th.
+    const createdAt = dayRangeFilter(opts.from, opts.to);
+    if (createdAt) where.createdAt = createdAt;
     const skip = Number.isFinite(opts.skip) ? Math.max(0, opts.skip ?? 0) : 0;
     const take = Number.isFinite(opts.take) ? Math.min(200, Math.max(1, opts.take ?? 50)) : 50;
     const rides = await this.prisma.ride.findMany({

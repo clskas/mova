@@ -525,8 +525,22 @@ export class MovingService {
     return cancelled;
   }
 
+  /** Admin list: every open request (never hidden by newer closed ones), then the latest closed. */
   async listForAdmin(take = 50) {
-    const rows = await this.prisma.movingRequest.findMany({ orderBy: { createdAt: 'desc' }, take });
+    const limit = Math.min(Math.max(Number(take) || 50, 1), 500);
+    const [open, closed] = await Promise.all([
+      this.prisma.movingRequest.findMany({
+        where: { status: { in: [MovingRequestStatus.PENDING, MovingRequestStatus.ASSIGNED, MovingRequestStatus.IN_PROGRESS] } },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      }),
+      this.prisma.movingRequest.findMany({
+        where: { status: { in: [MovingRequestStatus.COMPLETED, MovingRequestStatus.CANCELLED] } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      }),
+    ]);
+    const rows = [...open, ...closed];
     return Promise.all(
       rows.map(async (r) => {
         const passenger = await fetchAuthUserBrief(r.userId);

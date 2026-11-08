@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { UseInterceptors, Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { AdminAuditInterceptor } from '../common/admin-audit.interceptor';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { AdminPermission, VehicleType, normalizeVehicleType } from '@mova/shared';
 import { IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min, ValidateIf } from 'class-validator';
@@ -122,6 +123,8 @@ class DriverOperatingCityDto {
 @ApiTags('admin')
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
+// Every change made in the admin is written to the audit log (who, what, target).
+@UseInterceptors(AdminAuditInterceptor)
 @ApiBearerAuth()
 export class AdminController {
   constructor(
@@ -1131,21 +1134,26 @@ export class AdminController {
   @Patch('communes/:id')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Modifier commune' })
-  updateCommune(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.updateCommune(id, body);
+  async updateCommune(@Request() req: { user: AdminJwtUser }, @Param('id') id: string, @Body() body: Record<string, unknown>) {
+    const city = resolveManagedCityScope(req.user);
+    await this.adminService.assertCommuneInScope(id, city);
+    return this.adminService.updateCommune(id, city ? { ...body, city } : body);
   }
 
   @Post('communes')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Créer une commune' })
-  createCommune(@Body() body: Record<string, unknown>) {
-    return this.adminService.createCommune(body);
+  createCommune(@Request() req: { user: AdminJwtUser }, @Body() body: Record<string, unknown>) {
+    // CITY_ADMIN: always in their own city.
+    const city = resolveManagedCityScope(req.user);
+    return this.adminService.createCommune(city ? { ...body, city } : body);
   }
 
   @Delete('communes/:id')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Supprimer une commune' })
-  deleteCommune(@Param('id') id: string) {
+  async deleteCommune(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    await this.adminService.assertCommuneInScope(id, resolveManagedCityScope(req.user));
     return this.adminService.deleteCommune(id);
   }
 
@@ -1159,28 +1167,36 @@ export class AdminController {
   @Post('provinces')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Créer une province' })
-  createProvince(@Body('name') name: string) {
+  createProvince(@Request() req: { user: AdminJwtUser }, @Body('name') name: string) {
+    // Nationwide setting: not for a city admin (it would change every city).
+    this.assertOpsAdmin(req.user);
     return this.adminService.createProvince(name);
   }
 
   @Patch('provinces/:id')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Modifier une province' })
-  updateProvince(@Param('id') id: string, @Body() body: { name?: string; isActive?: boolean }) {
+  updateProvince(@Request() req: { user: AdminJwtUser }, @Param('id') id: string, @Body() body: { name?: string; isActive?: boolean }) {
+    // Nationwide setting: not for a city admin (it would change every city).
+    this.assertOpsAdmin(req.user);
     return this.adminService.updateProvince(id, body);
   }
 
   @Delete('provinces/:id')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Supprimer une province' })
-  deleteProvince(@Param('id') id: string) {
+  deleteProvince(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    // Nationwide setting: not for a city admin (it would change every city).
+    this.assertOpsAdmin(req.user);
     return this.adminService.deleteProvince(id);
   }
 
   @Post('provinces/bulk-active')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Activer ou désactiver toutes les provinces SENGA' })
-  setAllProvincesActive(@Body() body: { isActive: boolean }) {
+  setAllProvincesActive(@Request() req: { user: AdminJwtUser }, @Body() body: { isActive: boolean }) {
+    // Nationwide setting: not for a city admin (it would change every city).
+    this.assertOpsAdmin(req.user);
     return this.adminService.setAllProvincesActive(body.isActive === true);
   }
 
@@ -1250,28 +1266,36 @@ export class AdminController {
   @Post('cities')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Créer une ville' })
-  createCity(@Body() body: Record<string, unknown>) {
+  createCity(@Request() req: { user: AdminJwtUser }, @Body() body: Record<string, unknown>) {
+    // Nationwide setting: not for a city admin (it would change every city).
+    this.assertOpsAdmin(req.user);
     return this.adminService.createCity(body);
   }
 
   @Patch('cities/:id')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Modifier une ville' })
-  updateCity(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+  updateCity(@Request() req: { user: AdminJwtUser }, @Param('id') id: string, @Body() body: Record<string, unknown>) {
+    // Nationwide setting: not for a city admin (it would change every city).
+    this.assertOpsAdmin(req.user);
     return this.adminService.updateCity(id, body);
   }
 
   @Delete('cities/:id')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Supprimer une ville' })
-  deleteCity(@Param('id') id: string) {
+  deleteCity(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    // Nationwide setting: not for a city admin (it would change every city).
+    this.assertOpsAdmin(req.user);
     return this.adminService.deleteCity(id);
   }
 
   @Post('cities/bulk-active')
   @RequirePermissions(AdminPermission.ZONES_WRITE)
   @ApiOperation({ summary: 'Activer ou désactiver toutes les villes SENGA' })
-  setAllCitiesActive(@Body() body: { isActive: boolean }) {
+  setAllCitiesActive(@Request() req: { user: AdminJwtUser }, @Body() body: { isActive: boolean }) {
+    // Nationwide setting: not for a city admin (it would change every city).
+    this.assertOpsAdmin(req.user);
     return this.adminService.setAllCitiesActive(body.isActive === true);
   }
 
@@ -1388,25 +1412,29 @@ export class AdminController {
   @Post('rental-inquiries/:id/cancel')
   @RequirePermissions(AdminPermission.RENTALS_WRITE)
   @ApiOperation({ summary: 'Annuler demande location' })
-  cancelRental(@Param('id') id: string) {
+  async cancelRental(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    await this.adminService.assertRentalInquiryInScope(id, resolveManagedCityScope(req.user));
     return this.adminService.cancelRentalInquiry(id);
   }
 
   @Patch('rental-inquiries/:id/status')
   @RequirePermissions(AdminPermission.RENTALS_WRITE)
   @ApiOperation({ summary: 'Statut demande location' })
-  rentalStatus(
+  async rentalStatus(
+    @Request() req: { user: AdminJwtUser },
     @Param('id') id: string,
     @Body('status') status: string,
     @Body('forceOverride') forceOverride?: boolean,
   ) {
+    await this.adminService.assertRentalInquiryInScope(id, resolveManagedCityScope(req.user));
     return this.adminService.updateRentalInquiryStatus(id, status, forceOverride === true);
   }
 
   @Patch('rental-inquiries/:id/assign')
   @RequirePermissions(AdminPermission.RENTALS_WRITE)
   @ApiOperation({ summary: 'Assigner chauffeur location (remise véhicule)' })
-  assignRentalDriver(@Param('id') id: string, @Body('driverId') driverId: string) {
+  async assignRentalDriver(@Request() req: { user: AdminJwtUser }, @Param('id') id: string, @Body('driverId') driverId: string) {
+    await this.adminService.assertRentalInquiryInScope(id, resolveManagedCityScope(req.user));
     return this.adminService.assignRentalDriver(id, driverId);
   }
 
@@ -1420,21 +1448,25 @@ export class AdminController {
   @Post('rental-vehicles')
   @RequirePermissions(AdminPermission.RENTALS_WRITE)
   @ApiOperation({ summary: 'Ajouter véhicule au catalogue location' })
-  createRentalVehicle(@Body() body: Record<string, unknown>) {
-    return this.adminService.createRentalVehicle(body);
+  createRentalVehicle(@Request() req: { user: AdminJwtUser }, @Body() body: Record<string, unknown>) {
+    const city = resolveManagedCityScope(req.user);
+    return this.adminService.createRentalVehicle(city ? { ...body, city } : body);
   }
 
   @Patch('rental-vehicles/:id')
   @RequirePermissions(AdminPermission.RENTALS_WRITE)
   @ApiOperation({ summary: 'Modifier véhicule catalogue location' })
-  updateRentalVehicle(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.adminService.updateRentalVehicle(id, body);
+  async updateRentalVehicle(@Request() req: { user: AdminJwtUser }, @Param('id') id: string, @Body() body: Record<string, unknown>) {
+    const city = resolveManagedCityScope(req.user);
+    await this.adminService.assertRentalVehicleInScope(id, city);
+    return this.adminService.updateRentalVehicle(id, city ? { ...body, city } : body);
   }
 
   @Delete('rental-vehicles/:id')
   @RequirePermissions(AdminPermission.RENTALS_WRITE)
   @ApiOperation({ summary: 'Désactiver véhicule catalogue location' })
-  deleteRentalVehicle(@Param('id') id: string) {
+  async deleteRentalVehicle(@Request() req: { user: AdminJwtUser }, @Param('id') id: string) {
+    await this.adminService.assertRentalVehicleInScope(id, resolveManagedCityScope(req.user));
     return this.adminService.deleteRentalVehicle(id);
   }
 
@@ -1699,7 +1731,9 @@ export class AdminController {
   @Patch('cancellation-policies/:vehicleType')
   @RequirePermissions(AdminPermission.RULES_WRITE)
   @ApiOperation({ summary: 'Modifier politique annulation' })
-  updateCancellationPolicy(@Param('vehicleType') vehicleType: string, @Body() body: Record<string, unknown>) {
+  updateCancellationPolicy(@Request() req: { user: AdminJwtUser }, @Param('vehicleType') vehicleType: string, @Body() body: Record<string, unknown>) {
+    // Nationwide setting: not for a city admin (it would change every city).
+    this.assertOpsAdmin(req.user);
     return this.adminService.updateCancellationPolicy(vehicleType, body);
   }
 
@@ -1713,7 +1747,9 @@ export class AdminController {
   @Patch('parcel-weight-bands/:category')
   @RequirePermissions(AdminPermission.RULES_WRITE)
   @ApiOperation({ summary: 'Modifier bande de poids colis' })
-  updateParcelWeightBand(@Param('category') category: string, @Body() body: Record<string, unknown>) {
+  updateParcelWeightBand(@Request() req: { user: AdminJwtUser }, @Param('category') category: string, @Body() body: Record<string, unknown>) {
+    // Nationwide setting: not for a city admin (it would change every city).
+    this.assertOpsAdmin(req.user);
     return this.adminService.updateParcelWeightBand(category, body);
   }
 
@@ -1801,9 +1837,38 @@ export class AdminController {
   @Get('inbox')
   @RequirePermissions(AdminPermission.METRICS_READ)
   @ApiOperation({ summary: 'File ops unifiée À traiter' })
-  inbox(@Request() req: { user: AdminJwtUser }, @Query('city') city?: string) {
+  async inbox(@Request() req: { user: AdminJwtUser }, @Query('city') city?: string) {
     const scoped = resolveManagedCityScope(req.user) ?? city;
-    return this.opsService.getInbox(scoped);
+    const role = String(req.user?.role ?? '').toUpperCase();
+    const canSeeFraud = role === 'SUPER_ADMIN' || role === 'ADMIN';
+    const [inbox, fraud] = await Promise.all([
+      this.opsService.getInbox(scoped),
+      // High-risk fraud alerts still to review (the inbox used to read a field that never existed: always 0).
+      canSeeFraud
+        ? this.fraudService.getAlerts({ days: 7, autoCreate: false }).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+    if (!fraud) return inbox;
+    const items = inbox.items.filter((i) => i.kind !== 'FRAUDE');
+    for (const a of fraud.alerts) {
+      const reviewed = (a as { reviewed?: boolean }).reviewed === true;
+      if (a.severity !== 'HIGH' || reviewed || a.incidentCreated) continue;
+      const name = (a as { entityName?: string | null }).entityName;
+      items.push({
+        id: `fraud-${a.entityType}-${a.entityId}`,
+        kind: 'FRAUDE',
+        priority: 2,
+        title: a.entityType === 'DRIVER' ? 'Fraude possible — chauffeur' : 'Fraude possible — client',
+        subtitle: `${name || a.entityId} · score ${a.score}`,
+        href: '/fraude',
+      });
+    }
+    items.sort((x, y) => x.priority - y.priority || String(y.createdAt ?? '').localeCompare(String(x.createdAt ?? '')));
+    return {
+      ...inbox,
+      items,
+      counts: { ...inbox.counts, total: items.length, fraude: items.filter((i) => i.kind === 'FRAUDE').length },
+    };
   }
 
   @Get('search')
@@ -1825,7 +1890,10 @@ export class AdminController {
   @Get('drivers/:userId/score')
   @RequirePermissions(AdminPermission.DRIVERS_READ)
   @ApiOperation({ summary: 'Score chauffeur enrichi' })
-  driverScore(@Param('userId') userId: string) {
+  async driverScore(@Request() req: { user: AdminJwtUser }, @Param('userId') userId: string) {
+    // CITY_ADMIN: drivers of their city only (getDriver throws otherwise).
+    const city = resolveManagedCityScope(req.user);
+    if (city) await this.adminService.getDriver(userId, city);
     return this.opsService.driverScore(userId);
   }
 
@@ -1859,6 +1927,7 @@ export class AdminController {
   @RequirePermissions(AdminPermission.USERS_READ)
   @ApiOperation({ summary: 'Journal d’audit admin' })
   audit(
+    @Request() req: { user: AdminJwtUser },
     @Query('skip') skip?: string,
     @Query('take') take?: string,
     @Query('actorUserId') actorUserId?: string,
@@ -1867,6 +1936,8 @@ export class AdminController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
+    // The audit log covers every admin's actions nationwide.
+    this.assertOpsAdmin(req.user);
     const qs = new URLSearchParams({ skip: String(skip ?? 0), take: String(take ?? 50) });
     if (actorUserId) qs.set('actorUserId', actorUserId);
     if (action) qs.set('action', action);

@@ -107,6 +107,17 @@ export default function AbonnementsPage() {
   }
 
   async function toggleActive(plan: SubscriptionPlan) {
+    // Benefits are not applied automatically yet: an active plan would charge customers for nothing.
+    if (
+      !plan.isActive &&
+      !window.confirm(
+        `Activer « ${plan.name} » ?
+
+Attention : les avantages des abonnements ne sont pas encore appliqués automatiquement aux courses. Les clients pourront payer ce plan sans recevoir ses avantages.`,
+      )
+    ) {
+      return;
+    }
     try {
       await updateSubscriptionPlan(plan.id, { isActive: !plan.isActive });
       load();
@@ -124,6 +135,10 @@ export default function AbonnementsPage() {
         subtitle={`${totalSubs} abonnés actifs · plans SENGA Plus`}
         action={!readOnly ? <BtnPrimary onClick={openCreate}>Nouveau plan</BtnPrimary> : undefined}
       />
+      <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">
+        Les avantages listés ne sont pas encore appliqués automatiquement aux courses et livraisons. Gardez les plans
+        désactivés tant que ce n’est pas le cas : sinon les clients paient sans recevoir les avantages.
+      </p>
       {error && <ErrorBanner message={error} onRetry={load} />}
 
       <Card className="p-4 bg-violet-50 border-violet-100 text-sm text-gray-700 space-y-2">

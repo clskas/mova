@@ -1659,12 +1659,25 @@ export class RentalService {
     return this.enrichInquiry(updated);
   }
 
+  /** Admin list: every open request (never hidden by newer closed ones), then the latest closed. */
   async listForAdmin(take = 50) {
-    const rows = await this.prisma.rentalInquiry.findMany({
-      orderBy: { createdAt: 'desc' },
-      take,
-      include: { vehicle: true },
-    });
+    const limit = Math.min(Math.max(Number(take) || 50, 1), 500);
+    const closedStatuses = [RentalInquiryStatus.PAID, RentalInquiryStatus.CLOSED];
+    const [open, closed] = await Promise.all([
+      this.prisma.rentalInquiry.findMany({
+        where: { status: { notIn: closedStatuses } },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+        include: { vehicle: true },
+      }),
+      this.prisma.rentalInquiry.findMany({
+        where: { status: { in: closedStatuses } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: { vehicle: true },
+      }),
+    ]);
+    const rows = [...open, ...closed];
     return Promise.all(
       rows.map(async (r) => {
         const passenger = await fetchAuthUserBrief(r.userId);

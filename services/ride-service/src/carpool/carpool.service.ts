@@ -779,12 +779,25 @@ export class CarpoolService {
     return { trip: formatted, paymentReady: true };
   }
 
+  /** Admin list: every trip still open or ongoing, then the latest finished ones. */
   async listForAdmin(take = 50) {
-    const rows = await this.prisma.carpoolTrip.findMany({
-      orderBy: { createdAt: 'desc' },
-      take,
-      include: { passengers: { select: { id: true, userId: true, seats: true } } },
-    });
+    const limit = Math.min(Math.max(Number(take) || 50, 1), 500);
+    const include = { passengers: { select: { id: true, userId: true, seats: true } } };
+    const [open, closed] = await Promise.all([
+      this.prisma.carpoolTrip.findMany({
+        where: { status: { in: ['OPEN', 'MATCHED', 'IN_PROGRESS'] as CarpoolStatus[] } },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+        include,
+      }),
+      this.prisma.carpoolTrip.findMany({
+        where: { status: { in: ['COMPLETED', 'CANCELLED'] as CarpoolStatus[] } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include,
+      }),
+    ]);
+    const rows = [...open, ...closed];
     return Promise.all(
       rows.map(async (t) => {
         const profile = await this.fetchDriverProfile(t.driverId);

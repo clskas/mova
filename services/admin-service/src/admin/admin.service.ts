@@ -895,6 +895,10 @@ export class AdminService {
       );
     }
     const target = await this.getUser(id).catch(() => null) as { role?: string } | null;
+    // Unknown target (lookup failed): only a SUPER_ADMIN may go on — never skip the staff check.
+    if (!target && actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte introuvable ou inaccessible.');
+    }
     if (target?.role && STAFF_ROLES.has(target.role) && actorRole !== UserRole.SUPER_ADMIN) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
@@ -916,11 +920,17 @@ export class AdminService {
   }
   async deactivateUser(id: string, actorRole: string) {
     const target = await this.getUser(id).catch(() => null) as { role?: string } | null;
-    if (target?.role === UserRole.SUPER_ADMIN && actorRole !== UserRole.SUPER_ADMIN) {
+    // Unknown target (lookup failed): only a SUPER_ADMIN may go on — never skip the staff check.
+    if (!target && actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte introuvable ou inaccessible.');
+    }
+    // Same rule as editing: only a SUPER_ADMIN may switch off a staff account (an ADMIN could
+    // otherwise lock out other admins or the finance / support team).
+    if (target?.role && STAFF_ROLES.has(target.role) && actorRole !== UserRole.SUPER_ADMIN) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,
         HttpStatus.FORBIDDEN,
-        'Seul un SUPER_ADMIN peut désactiver un compte SUPER_ADMIN.',
+        'Seul un SUPER_ADMIN peut désactiver un compte de l’équipe (staff).',
       );
     }
     return this.proxy('auth', `/internal/users/${id}`, { method: 'DELETE' });
@@ -1852,7 +1862,34 @@ export class AdminService {
   }
 
   listCommunes(city?: string) {
-    return this.fetchJson('ride', `/internal/communes${city ? `?city=${city}` : ''}`);
+    return this.fetchJson('ride', `/internal/communes${city ? `?city=${encodeURIComponent(city)}` : ''}`);
+  }
+
+  /** CITY_ADMIN: a commune of their own city only. */
+  async assertCommuneInScope(id: string, managedCity?: string | null) {
+    if (!managedCity) return;
+    const rows = (await this.listCommunes(managedCity).catch(() => [])) as Array<{ id?: string }>;
+    if (!(Array.isArray(rows) ? rows : []).some((r) => String(r.id ?? '') === id)) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Commune hors de votre ville gérée.');
+    }
+  }
+
+  /** CITY_ADMIN: a rental request of their own city only. */
+  async assertRentalInquiryInScope(id: string, managedCity?: string | null) {
+    if (!managedCity) return;
+    const rows = await this.listRentalInquiries(500, managedCity).catch(() => []);
+    if (!rows.some((r) => String(r.id ?? '') === id)) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Demande de location hors de votre ville gérée.');
+    }
+  }
+
+  /** CITY_ADMIN: a rental vehicle of their own city only. */
+  async assertRentalVehicleInScope(id: string, managedCity?: string | null) {
+    if (!managedCity) return;
+    const rows = await this.listRentalVehicles(managedCity).catch(() => []);
+    if (!rows.some((r) => String(r.id ?? '') === id)) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Véhicule hors de votre ville gérée.');
+    }
   }
   updateCommune(id: string, body: Record<string, unknown>) {
     return this.proxy('ride', `/internal/communes/${id}`, { method: 'PATCH', body: JSON.stringify(body) });

@@ -428,11 +428,26 @@ export default function PortefeuillePage() {
 
   async function submitAdjust() {
     if (!activeUserId || !adjustAmount.trim()) return;
+    const amount = Number(adjustAmount);
+    if (!Number.isInteger(amount) || amount <= 0) {
+      setError("Montant invalide : un nombre entier de francs, supérieur à 0.");
+      return;
+    }
+    // Money moves at once: say who, how much and which way before doing it.
+    if (
+      !window.confirm(
+        `${adjustType === "CREDIT" ? "Créditer" : "Débiter"} ${formatCdf(amount)} sur le portefeuille de ${filterLabel ?? activeUserId} ?
+
+Cette opération est enregistrée à votre nom dans le journal d'audit.`,
+      )
+    ) {
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
       await adjustWallet(activeUserId, {
-        amountCdf: Number(adjustAmount),
+        amountCdf: amount,
         type: adjustType,
         description: adjustDesc.trim() || "Ajustement manuel admin",
       });
@@ -453,6 +468,15 @@ export default function PortefeuillePage() {
     const amount = Number(withdrawAmount);
     if (!Number.isFinite(amount) || amount < SERDIPAY_MIN_AMOUNT_CDF) {
       setError(`Montant minimum SerdiPay : ${SERDIPAY_MIN_AMOUNT_CDF.toLocaleString("fr-FR")} FC`);
+      return;
+    }
+    if (
+      !window.confirm(
+        `Envoyer ${formatCdf(amount)} (${withdrawProvider}) au ${withdrawPhone.trim()} depuis le portefeuille de ${filterLabel ?? activeUserId} ?
+
+L'argent part réellement. Opération enregistrée à votre nom.`,
+      )
+    ) {
       return;
     }
     withdrawInFlight.current = true;

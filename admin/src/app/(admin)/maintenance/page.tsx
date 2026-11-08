@@ -61,6 +61,18 @@ export default function MaintenancePage() {
 
   async function save() {
     if (!config || readOnly) return;
+    const blocked = Object.entries(config.maintenance.apps)
+      .filter(([, on]) => on)
+      .map(([app]) => app);
+    // Maintenance blocks every user of those apps at once: confirm first.
+    if (
+      blocked.length > 0 &&
+      !window.confirm(`Mettre en maintenance : ${blocked.join(", ")} ?
+
+Tous les utilisateurs de ces applications seront bloqués jusqu'à ce que vous la coupiez.`)
+    ) {
+      return;
+    }
     setSaving(true);
     setError(null);
     setOk(null);

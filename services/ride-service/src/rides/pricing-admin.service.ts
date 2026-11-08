@@ -15,6 +15,26 @@ const DELIVERY_TYPE_TO_CATEGORY: Partial<Record<SurchargeType, string>> = {
   [SurchargeType.DELIVERY_EXPRESS]: 'EXPRESS',
 };
 
+/**
+ * Tariff values must make sense: whole francs, never negative; peak / night coefficients
+ * between 0.5 and 5. A typo (-5000, 100×) would otherwise reach every customer's price.
+ */
+export function assertPricingValues(data: Record<string, unknown>) {
+  const bad = (msg: string) => new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, msg);
+  for (const key of ['baseFareCdf', 'perKmCdf', 'perMinuteCdf', 'minFareCdf', 'baseFeeCdf', 'perUnitCdf']) {
+    const v = data[key];
+    if (v == null) continue;
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 0 || n > 10_000_000) throw bad(`Valeur invalide pour ${key} : un nombre entier de francs, 0 ou plus.`);
+  }
+  for (const key of ['peakMultiplier', 'nightMultiplier', 'multiplier']) {
+    const v = data[key];
+    if (v == null) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0.5 || n > 5) throw bad(`Le coefficient ${key} doit être compris entre 0,5 et 5.`);
+  }
+}
+
 @Injectable()
 export class PricingAdminService {
   constructor(private prisma: PrismaService) {}
@@ -41,6 +61,7 @@ export class PricingAdminService {
     if (!data.city) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Ville requise.');
     }
+    assertPricingValues(data as Record<string, unknown>);
     const city = data.city;
     return this.prisma.pricingRule.upsert({
       where: { vehicleType_city: { vehicleType, city } },
@@ -88,6 +109,7 @@ export class PricingAdminService {
     if (!data.city) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Ville requise.');
     }
+    assertPricingValues(data as Record<string, unknown>);
     const city = data.city;
     const existing = await this.prisma.pricingRule.findUnique({
       where: { vehicleType_city: { vehicleType, city } },
@@ -114,6 +136,7 @@ export class PricingAdminService {
     data: Partial<{ baseFeeCdf: number; multiplier: number; perUnitCdf: number | null; description: string; isActive: boolean }>,
   ) {
     await this.getSurcharge(type);
+    assertPricingValues(data as Record<string, unknown>);
     return this.prisma.serviceSurcharge.update({ where: { type }, data });
   }
 
@@ -146,6 +169,23 @@ export class PricingAdminService {
     return this.prisma.promoCode.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
+  /** A discount must make sense: 1–100 %, a positive whole amount, at least one use. */
+  private assertPromoValues(data: { discountPercent?: number | null; discountCdf?: number | null; maxUses?: number | null }) {
+    const bad = (msg: string) => new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, msg);
+    if (data.discountPercent != null) {
+      const p = Number(data.discountPercent);
+      if (!Number.isFinite(p) || p <= 0 || p > 100) throw bad('La réduction en pourcentage doit être comprise entre 1 et 100 %.');
+    }
+    if (data.discountCdf != null) {
+      const c = Number(data.discountCdf);
+      if (!Number.isInteger(c) || c <= 0) throw bad('Le montant de réduction doit être un nombre entier de francs, supérieur à 0.');
+    }
+    if (data.maxUses != null) {
+      const m = Number(data.maxUses);
+      if (!Number.isInteger(m) || m < 1) throw bad('Le nombre d’utilisations doit être au moins 1.');
+    }
+  }
+
   async createPromoCode(data: {
     code: string;
     discountPercent?: number;
@@ -165,6 +205,11 @@ export class PricingAdminService {
         undefined,
         'Choisissez soit un pourcentage, soit un montant fixe — pas les deux.',
       );
+    }
+    this.assertPromoValues(data);
+    const existing = await this.prisma.promoCode.findFirst({ where: { code } });
+    if (existing) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, `Le code ${code} existe déjà.`);
     }
     const cityNames = Array.isArray(data.cityNames)
       ? [...new Set(data.cityNames.map((c) => String(c).trim()).filter(Boolean))]
@@ -193,6 +238,7 @@ export class PricingAdminService {
     }>,
   ) {
     await this.getPromoCode(id);
+    this.assertPromoValues(data);
     const patch: Record<string, unknown> = { ...data };
     if (data.cityNames !== undefined) {
       patch.cityNames = [...new Set(data.cityNames.map((c) => String(c).trim()).filter(Boolean))];

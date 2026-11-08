@@ -28,6 +28,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # Full history: compares mobile/ with the last Android build (internal track step).
+          fetch-depth: 0
 
       - name: Run production smoke tests
         run: |
@@ -76,8 +78,42 @@ jobs:
       # Mobile Release would be a 4th level of workflow_run chaining, which GitHub
       # silently ignores. Dispatch it explicitly: AAB to the Play internal track only
       # (no production promotion, no banner change). Production releases use a v* tag.
-      - name: Trigger Mobile Release (internal track)
+      # Only when the mobile app changed since the last Android build: a web / server
+      # change alone does not need a new app build.
+      - name: Did the mobile app change since the last Android build?
+        id: mobile_changed
         if: ${{ success() && github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet --no-tags origin main
+          # Last Mobile Release run whose « Build Android (AAB) » job succeeded.
+          LAST=""
+          for run in $(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/mobile-release.yml/runs?status=success&per_page=30" \
+              --jq '.workflow_runs[] | "\(.id):\(.head_sha)"'); do
+            id="${run%%:*}"; sha="${run##*:}"
+            built=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs?per_page=50" \
+              --jq '[.jobs[] | select(.name | startswith("Build Android")) | select(.conclusion == "success")] | length')
+            if [ "${built:-0}" -gt 0 ]; then LAST="$sha"; break; fi
+          done
+          if [ -z "$LAST" ] || ! git cat-file -e "$LAST^{commit}" 2>/dev/null; then
+            echo "No previous Android build found — building."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --quiet "$LAST" "$HEAD_SHA" -- mobile/ .github/workflows/mobile-release.yml; then
+            echo "Mobile app unchanged since ${LAST:0:8} — no internal build."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Mobile app changed since ${LAST:0:8} — internal build."
+            git diff --stat "$LAST" "$HEAD_SHA" -- mobile/ .github/workflows/mobile-release.yml | tail -5
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger Mobile Release (internal track)
+        if: ${{ success() && github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' && steps.mobile_changed.outputs.changed == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run mobile-release.yml --repo "$GITHUB_REPOSITORY" --ref main

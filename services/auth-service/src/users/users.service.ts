@@ -420,6 +420,10 @@ export class UsersService {
    * in a single column.
    */
   private userSearchWhere(q: string, role?: UserRole) {
+    // An account id (links from Litiges / Fraude « Fiche ↗ ») finds that exact account.
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q.trim())) {
+      return { id: q.trim() };
+    }
     const fieldOr = (token: string) => ({
       OR: [
         { phone: { contains: token, mode: 'insensitive' as const } },

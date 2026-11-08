@@ -109,6 +109,10 @@ export interface IncidentUpdatePayload {
   byName?: string;
   lat?: number;
   lng?: number;
+  /** FRAUD_AUTO = opened by the team about a suspect: the user is not told. */
+  referenceType?: string;
+  /** Closing outcome text (« Le client a payé… »), shown to the reporter. */
+  outcome?: string;
 }
 
 export interface DeliveryCreatedPayload {

@@ -79,6 +79,33 @@ describe('IncidentsService', () => {
     expect(redis.publish).toHaveBeenCalledWith(MOVA_EVENTS.INCIDENT_ESCALATED, expect.anything());
   });
 
+  it('closes with an outcome: timeline note + outcome sent to the reporter', async () => {
+    const { svc, prisma, redis } = setup();
+    prisma.incident.findUnique.mockResolvedValue({ id: 'c1', status: 'OPEN', notes: [], referenceType: 'RIDE' });
+    await svc.resolve('c1', 'RESOLVED', 'Marie K.', { outcome: 'CUSTOMER_PAID', comment: 'reçu vérifié' });
+    const data = prisma.incident.update.mock.calls[0][0].data;
+    expect(data.status).toBe('RESOLVED');
+    expect(data.notes[0].text).toBe('Le client a payé — paiement confirmé — reçu vérifié');
+    const payload = redis.publish.mock.calls.find((c: unknown[]) => c[0] === MOVA_EVENTS.INCIDENT_RESOLVED)?.[1];
+    expect(payload.outcome).toBe('Le client a payé — paiement confirmé');
+  });
+
+  it('reopening clears the « pris en charge » and tells nobody', async () => {
+    const { svc, prisma, redis } = setup();
+    prisma.incident.findUnique.mockResolvedValue({ id: 'c1', status: 'RESOLVED', notes: [] });
+    await svc.resolve('c1', 'OPEN', 'Marie K.');
+    const data = prisma.incident.update.mock.calls[0][0].data;
+    expect(data).toMatchObject({ status: 'OPEN', resolvedAt: null, acknowledgedAt: null });
+    expect(redis.publish).not.toHaveBeenCalled();
+  });
+
+  it('an unknown status is stored as RESOLVED', async () => {
+    const { svc, prisma } = setup();
+    prisma.incident.findUnique.mockResolvedValue({ id: 'c1', status: 'OPEN', notes: [] });
+    await svc.resolve('c1', 'WHATEVER');
+    expect(prisma.incident.update.mock.calls[0][0].data.status).toBe('RESOLVED');
+  });
+
   it('keeps at most 3 valid emergency contacts', async () => {
     const { svc, prisma } = setup();
     await expect(svc.setTrustedContacts('u1', [1, 2, 3, 4].map((n) => ({ name: `C${n}`, phone: `081234567${n}` })))).rejects.toThrow('Maximum 3');

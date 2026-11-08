@@ -543,7 +543,7 @@ export class AdminController {
   @RequirePermissions(AdminPermission.INCIDENTS_READ)
   @ApiOperation({ summary: 'Liste incidents' })
   incidents(@Request() req: { user: AdminJwtUser }) {
-    return this.adminService.listIncidents(resolveManagedCityScope(req.user));
+    return this.adminService.listIncidentsDetailed(resolveManagedCityScope(req.user));
   }
 
   @Post('incidents/:id/resolve')
@@ -552,9 +552,31 @@ export class AdminController {
   resolve(
     @Request() req: { user: AdminJwtUser },
     @Param('id') id: string,
-    @Body('status') status: string,
+    @Body() body: { status?: string; outcome?: string; comment?: string },
   ) {
-    return this.adminService.resolveIncident(id, status ?? 'RESOLVED', resolveManagedCityScope(req.user), req.user.id);
+    return this.adminService.resolveIncident(id, body?.status ?? 'RESOLVED', resolveManagedCityScope(req.user), req.user.id, {
+      outcome: body?.outcome,
+      comment: body?.comment,
+    });
+  }
+
+  @Post('incidents/:id/cash-decision')
+  @RequirePermissions(AdminPermission.INCIDENTS_WRITE)
+  @ApiOperation({ summary: 'Litige espèces : le client a payé / n’a pas payé / sans suite' })
+  cashDecision(
+    @Request() req: { user: AdminJwtUser },
+    @Param('id') id: string,
+    @Body() body: { decision?: string; comment?: string },
+  ) {
+    // Confirming a payment moves money: platform operators only (as « marquer payé »).
+    if (body?.decision === 'CUSTOMER_PAID') this.assertOpsAdmin(req.user);
+    return this.adminService.decideCashDispute(
+      id,
+      String(body?.decision ?? ''),
+      req.user.id,
+      resolveManagedCityScope(req.user),
+      body?.comment,
+    );
   }
 
   @Post('incidents/:id/acknowledge')
@@ -579,11 +601,27 @@ export class AdminController {
     @Query('threshold') threshold?: string,
     @Query('autoCreate') autoCreate?: string,
   ) {
+    // Viewing never creates disputes (autoCreate kept for compatibility, ignored).
+    void autoCreate;
     return this.fraudService.getAlerts({
       days: days ? Number(days) : undefined,
       threshold: threshold ? Number(threshold) : undefined,
-      autoCreate: autoCreate !== 'false',
     });
+  }
+
+  @Post('fraud/dismiss')
+  @RequirePermissions(AdminPermission.FRAUD_WRITE)
+  @ApiOperation({ summary: 'Classer une alerte fraude comme faux positif (la personne n’est pas prévenue)' })
+  async dismissFraudAlert(
+    @Request() req: { user: AdminJwtUser },
+    @Body() body: { entityId: string; entityType: 'DRIVER' | 'PASSENGER'; reasons?: string[]; score?: number; comment?: string },
+  ) {
+    const actorName = await this.adminService.actorDisplayName(req.user.id);
+    return this.fraudService.dismissAlert(
+      { entityId: body.entityId, entityType: body.entityType, reasons: body.reasons ?? [], score: body.score ?? 0 },
+      actorName,
+      body.comment,
+    );
   }
 
   @Post('fraud/incident')

@@ -227,8 +227,7 @@ export default function OrdersPage() {
     // Refusing cancels the customer's order (and refunds it): confirm, and say why.
     let reason = "Indisponible";
     if (action === "reject") {
-      const typed = window.prompt("Refuser cette commande ? Le client sera prévenu (et remboursé s’il a payé en ligne).
-Raison (facultatif) :", "Indisponible");
+      const typed = window.prompt("Refuser cette commande ? Le client sera prévenu (et remboursé s’il a payé en ligne).\nRaison (facultatif) :", "Indisponible");
       if (typed === null) return;
       reason = typed.trim() || "Indisponible";
     }

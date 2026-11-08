@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import {
+import { incidentStatusForOutcome,
   INTERNAL_API_KEY,
   MovaErrorCode,
   MovaHttpException,
@@ -1187,6 +1187,95 @@ export class AdminService {
       return filterRowsByManagedCity(rows, managedCity ?? null, (r) => ({ lat: r.lat, lng: r.lng }));
     });
   }
+
+  private incidentBriefCache = new Map<string, { at: number; brief: { name: string | null; phone: string | null } }>();
+
+  private async incidentUserBrief(id: string): Promise<{ name: string | null; phone: string | null }> {
+    const hit = this.incidentBriefCache.get(id);
+    if (hit && Date.now() - hit.at < 5 * 60_000) return hit.brief;
+    try {
+      const u = await this.fetchJson<{ firstName?: string; lastName?: string; phone?: string; email?: string }>(
+        'auth',
+        `/internal/users/${id}`,
+      );
+      const brief = { name: [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.email || null, phone: u.phone ?? null };
+      this.incidentBriefCache.set(id, { at: Date.now(), brief });
+      return brief;
+    } catch {
+      return { name: null, phone: null };
+    }
+  }
+
+  /** Incidents with the names / phones of both people (Litiges page: call them, open the trip). */
+  async listIncidentsDetailed(managedCity?: string | null) {
+    const rows = await this.listIncidents(managedCity);
+    const ids = new Set<string>();
+    for (const r of rows) {
+      if (typeof r.userId === 'string') ids.add(r.userId);
+      if (typeof r.counterpartyUserId === 'string') ids.add(r.counterpartyUserId);
+    }
+    const briefs = new Map<string, { name: string | null; phone: string | null }>();
+    await Promise.all([...ids].map(async (id) => briefs.set(id, await this.incidentUserBrief(id))));
+    return rows.map((r) => {
+      const user = typeof r.userId === 'string' ? briefs.get(r.userId) : undefined;
+      const other = typeof r.counterpartyUserId === 'string' ? briefs.get(r.counterpartyUserId) : undefined;
+      return {
+        ...r,
+        userName: user?.name ?? null,
+        userPhone: user?.phone ?? null,
+        counterpartyName: other?.name ?? null,
+        counterpartyPhone: other?.phone ?? null,
+      };
+    });
+  }
+
+  /**
+   * Cash dispute (« espèces non reçues »): the team decides.
+   * - CUSTOMER_PAID: the payment is confirmed (driver paid as usual), dispute closed.
+   * - CUSTOMER_DID_NOT_PAY: the payment stays due — the customer must settle it before the next order.
+   * - NO_ACTION: closed without changing the payment.
+   */
+  async decideCashDispute(
+    id: string,
+    decision: string,
+    actorId: string,
+    managedCity?: string | null,
+    comment?: string,
+  ) {
+    const rows = await this.listIncidents(managedCity);
+    const incident = rows.find((r) => String(r.id ?? '') === id) as
+      | { id: string; type?: string; status?: string; referenceType?: string; referenceId?: string; rideId?: string }
+      | undefined;
+    if (!incident) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.NOT_FOUND, 'Litige introuvable.');
+    }
+    if (incident.type !== 'CASH_NOT_RECEIVED') {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Ce litige ne concerne pas un paiement en espèces.');
+    }
+    if (!['CUSTOMER_PAID', 'CUSTOMER_DID_NOT_PAY', 'NO_ACTION'].includes(decision)) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Décision inconnue.');
+    }
+    if (decision === 'CUSTOMER_PAID') {
+      const refType = String(incident.referenceType ?? 'RIDE').toUpperCase();
+      const refId = String(incident.referenceId ?? incident.rideId ?? '');
+      if (!refId) {
+        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Course ou livraison introuvable sur ce litige.');
+      }
+      if (refType === 'RIDE') await this.markRidePaid(refId, actorId, managedCity);
+      else if (refType === 'DELIVERY' || refType === 'ERRAND') await this.markDeliveryPaid(refId, actorId, refType, managedCity);
+      else {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'Course partagée : confirmez le paiement de la réservation dans Courses, puis clôturez le litige.',
+        );
+      }
+    }
+    return this.resolveIncident(id, decision === 'NO_ACTION' ? 'DISMISSED' : 'RESOLVED', managedCity, actorId, {
+      outcome: decision,
+      comment,
+    });
+  }
   private async assertIncidentInScope(id: string, managedCity?: string | null) {
     if (!managedCity) return;
     const scoped = await this.listIncidents(managedCity);
@@ -1211,10 +1300,24 @@ export class AdminService {
     }
   }
 
-  async resolveIncident(id: string, status: string, managedCity?: string | null, actorId?: string) {
+  async resolveIncident(
+    id: string,
+    status: string,
+    managedCity?: string | null,
+    actorId?: string,
+    opts?: { outcome?: string; comment?: string },
+  ) {
     await this.assertIncidentInScope(id, managedCity);
     const actorName = await this.actorName(actorId);
-    return this.proxy('driver', `/internal/incidents/${id}/resolve`, { method: 'POST', body: JSON.stringify({ status, actorName }) });
+    const finalStatus = status === 'OPEN' ? 'OPEN' : opts?.outcome ? incidentStatusForOutcome(opts.outcome) : status;
+    return this.proxy('driver', `/internal/incidents/${id}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ status: finalStatus, actorName, outcome: opts?.outcome, comment: opts?.comment }),
+    });
+  }
+
+  actorDisplayName(actorId?: string) {
+    return this.actorName(actorId);
   }
 
   async acknowledgeIncident(id: string, actorId: string, managedCity?: string | null) {

@@ -246,6 +246,15 @@ export default function UtilisateursPage() {
     setSearchQuery(search.trim());
   }
 
+  // ?focus=<userId> (links from Litiges / Fraude): show that account.
+  useEffect(() => {
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    if (!focus) return;
+    setSearch(focus);
+    setPage(0);
+    setSearchQuery(focus);
+  }, []);
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   async function openDetail(u: AdminUser) {

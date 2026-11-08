@@ -1,6 +1,6 @@
 import { BadRequestException, HttpException, HttpStatus, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { IncidentType, Prisma } from '@prisma/client';
-import { MOVA_EVENTS, IncidentCreatedPayload, IncidentUpdatePayload } from '@mova/shared';
+import { INCIDENT_OUTCOMES, IncidentOutcome, MOVA_EVENTS, IncidentCreatedPayload, IncidentUpdatePayload } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -117,8 +117,23 @@ export class IncidentsService implements OnModuleInit, OnModuleDestroy {
     return incident;
   }
 
+  /** Every open incident, plus the 500 most recent closed ones. */
   async list() {
-    return this.prisma.incident.findMany({ orderBy: { createdAt: 'desc' } });
+    const [open, recent] = await Promise.all([
+      this.prisma.incident.findMany({ where: { status: 'OPEN' }, orderBy: { createdAt: 'desc' } }),
+      this.prisma.incident.findMany({ where: { status: { not: 'OPEN' } }, orderBy: { createdAt: 'desc' }, take: 500 }),
+    ]);
+    return [...open, ...recent].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  /** Anti-fraud incidents (open and closed) — the fraud page shows which alerts were reviewed. */
+  async listByReferenceType(referenceType: string) {
+    return this.prisma.incident.findMany({
+      where: { referenceType },
+      orderBy: { createdAt: 'desc' },
+      take: 1000,
+      select: { id: true, referenceId: true, status: true, resolvedAt: true, createdAt: true, notes: true },
+    });
   }
 
   private readonly publicSelect = {
@@ -206,20 +221,34 @@ export class IncidentsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async resolve(id: string, status: string, actorName?: string) {
+  /**
+   * Close (RESOLVED / DISMISSED) or reopen (OPEN) an incident. `outcome` (INCIDENT_OUTCOMES key)
+   * and `comment` go into the timeline; the reporter is told the outcome.
+   */
+  async resolve(id: string, status: string, actorName?: string, opts?: { outcome?: string; comment?: string }) {
     const row = await this.prisma.incident.findUnique({ where: { id } });
     if (!row) throw new NotFoundException('Signalement introuvable.');
     const by = (actorName ?? '').trim() || 'Équipe SENGA';
+    const clean = ['OPEN', 'RESOLVED', 'DISMISSED'].includes(status) ? status : 'RESOLVED';
+    const outcomeKey = opts?.outcome && opts.outcome in INCIDENT_OUTCOMES ? (opts.outcome as IncidentOutcome) : undefined;
+    const outcomeText = outcomeKey ? INCIDENT_OUTCOMES[outcomeKey] : undefined;
+    const comment = String(opts?.comment ?? '').trim().slice(0, 1000);
+    const noteText =
+      clean === 'OPEN'
+        ? `Rouvert${comment ? ` — ${comment}` : ''}`
+        : `${outcomeText ?? (clean === 'DISMISSED' ? 'Classé sans suite' : 'Résolu')}${comment ? ` — ${comment}` : ''}`;
     const updated = await this.prisma.incident.update({
       where: { id },
       data: {
-        status,
-        resolvedAt: status !== 'OPEN' ? new Date() : null,
-        notes: this.appendNote(row.notes, by, status === 'OPEN' ? 'Rouvert' : 'Résolu'),
+        status: clean,
+        resolvedAt: clean !== 'OPEN' ? new Date() : null,
+        // Reopened: the team must take it in charge again.
+        ...(clean === 'OPEN' ? { acknowledgedAt: null, acknowledgedBy: null, acknowledgedByName: null } : {}),
+        notes: this.appendNote(row.notes, by, noteText),
       },
     });
-    if (status !== 'OPEN' && row.status === 'OPEN') {
-      await this.publish(MOVA_EVENTS.INCIDENT_RESOLVED, this.updatePayload(updated, by));
+    if (clean !== 'OPEN' && row.status === 'OPEN') {
+      await this.publish(MOVA_EVENTS.INCIDENT_RESOLVED, this.updatePayload(updated, by, outcomeText));
     }
     return updated;
   }
@@ -293,8 +322,17 @@ export class IncidentsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private updatePayload(
-    row: { id: string; userId: string; type: string; isEmergency: boolean; lat: number | null; lng: number | null },
+    row: {
+      id: string;
+      userId: string;
+      type: string;
+      isEmergency: boolean;
+      lat: number | null;
+      lng: number | null;
+      referenceType?: string | null;
+    },
     byName?: string,
+    outcome?: string,
   ): IncidentUpdatePayload {
     return {
       incidentId: row.id,
@@ -304,6 +342,8 @@ export class IncidentsService implements OnModuleInit, OnModuleDestroy {
       byName,
       lat: row.lat ?? undefined,
       lng: row.lng ?? undefined,
+      referenceType: row.referenceType ?? undefined,
+      outcome,
     };
   }
 }

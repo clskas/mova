@@ -245,17 +245,18 @@ export class PaymentsService {
           'x-internal-api-key': INTERNAL_API_KEY,
           'content-type': 'application/json',
         },
+        // The driver / courier REPORTS the dispute (they are told when it is handled);
+        // the customer is the other party (never told « votre signalement… »).
         body: JSON.stringify({
-          userId: input.userId,
+          userId: input.counterpartyUserId ?? input.userId,
           type: 'CASH_NOT_RECEIVED',
           description:
-            `Litige espèces non reçues — ${input.amountCdf} FC. ` +
-            `Passager ${input.userId}. Chauffeur/livreur ${input.counterpartyUserId ?? 'inconnu'}. ` +
+            `Espèces non reçues — ${input.amountCdf} FC, déclaré par le chauffeur/livreur. ` +
             `Ce n’est pas une alerte SOS.`,
           rideId: input.rideId,
           referenceType: input.referenceType,
           referenceId: input.referenceId,
-          counterpartyUserId: input.counterpartyUserId,
+          counterpartyUserId: input.counterpartyUserId ? input.userId : undefined,
         }),
       });
       if (!res.ok) {

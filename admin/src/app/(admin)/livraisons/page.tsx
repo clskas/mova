@@ -193,6 +193,16 @@ export default function LivraisonsPage() {
     return () => clearInterval(timer);
   }, [load, loading, saving]);
 
+  // ?id=<livraison> (links from Litiges / Fraude): open that delivery directly.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("id");
+    if (!id) return;
+    fetchDelivery(id)
+      .then((d) => openDetail(d))
+      .catch(() => setError("Livraison introuvable"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function openDetail(d: DeliveryOverview) {
     setSelected(d);
     setNewStatus(d.status ?? "PENDING");

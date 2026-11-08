@@ -217,8 +217,17 @@ export class InternalController {
       counterpartyUserId: dto.counterpartyUserId,
     });
   }
-  @Post('incidents/:id/resolve') resolve(@Param('id') id: string, @Body() body: { status?: string; actorName?: string }) {
-    return this.incidents.resolve(id, body?.status ?? 'RESOLVED', body?.actorName);
+  @Get('incidents/by-reference-type') incidentsByReferenceType(@Query('referenceType') referenceType: string) {
+    return this.incidents.listByReferenceType(String(referenceType ?? ''));
+  }
+  @Post('incidents/:id/resolve') resolve(
+    @Param('id') id: string,
+    @Body() body: { status?: string; actorName?: string; outcome?: string; comment?: string },
+  ) {
+    return this.incidents.resolve(id, body?.status ?? 'RESOLVED', body?.actorName, {
+      outcome: body?.outcome,
+      comment: body?.comment,
+    });
   }
   /** Ops agent takes the SOS / incident in charge (the user is notified). */
   @Post('incidents/:id/acknowledge') acknowledge(@Param('id') id: string, @Body() body: { actorId?: string; actorName?: string }) {

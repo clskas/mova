@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import {
+import { incidentNotifiesReporter,
   MOVA_EVENTS,
   CashDisputedPayload,
   ChatMessagePayload,
@@ -259,17 +259,21 @@ export class NotificationsService implements OnModuleInit {
   async onIncidentCreated(payload: IncidentCreatedPayload) {
     const isSos = payload.isEmergency || payload.type === 'SOS';
     const title = isSos ? 'Alerte SOS' : 'Nouvel incident';
-    await this.create(
-      payload.userId,
-      title,
-      'Votre signalement a été transmis à l\'équipe SENGA.',
-      'INCIDENT_CREATED',
-      payload,
-    );
+    // The reporter is told; a suspect named in an anti-fraud alert never is.
+    if (incidentNotifiesReporter(payload)) {
+      await this.create(
+        payload.userId,
+        title,
+        'Votre signalement a été transmis à l\'équipe SENGA.',
+        'INCIDENT_CREATED',
+        payload,
+      );
+    }
 
-    // Ops + audiences (PASSENGER/DRIVER/PARTNER) depuis la config admin Alertes SOS.
+    // Ops always; the extra audiences (passengers / drivers / partners chosen in Alertes SOS)
+    // only for a real SOS — never for an ordinary dispute or a fraud alert.
     const staff = await fetchOpsStaffForAlerts();
-    const recipients = staff.filter((s) => s.id !== payload.userId);
+    const recipients = staff.filter((s) => s.id !== payload.userId && (isSos || !s.audienceOnly));
     const maps =
       payload.lat != null && payload.lng != null
         ? ` https://maps.google.com/?q=${payload.lat},${payload.lng}`
@@ -399,6 +403,7 @@ export class NotificationsService implements OnModuleInit {
 
   /** The user is told that someone is handling their SOS / report. */
   async onIncidentAcknowledged(payload: IncidentUpdatePayload) {
+    if (!incidentNotifiesReporter(payload)) return;
     const title = payload.isEmergency ? 'Alerte SOS prise en charge' : 'Signalement pris en charge';
     const body = payload.isEmergency
       ? `L'équipe SENGA (${payload.byName ?? 'support'}) s'occupe de votre alerte. Restez joignable.`
@@ -413,8 +418,11 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async onIncidentResolved(payload: IncidentUpdatePayload) {
+    if (!incidentNotifiesReporter(payload)) return;
     const title = 'Signalement clôturé';
-    const body = 'Votre signalement a été traité par l’équipe SENGA. Merci de nous avoir prévenus.';
+    const body = payload.outcome
+      ? `Votre signalement a été traité par l’équipe SENGA : ${payload.outcome}. Merci de nous avoir prévenus.`
+      : 'Votre signalement a été traité par l’équipe SENGA. Merci de nous avoir prévenus.';
     await this.create(payload.userId, title, body, 'INCIDENT_RESOLVED', payload);
     await this.pushToUsersAnyFlavor([payload.userId], title, body, {
       type: 'INCIDENT_RESOLVED',

@@ -440,6 +440,12 @@ export default function ChauffeursPage() {
     return () => { cancelled = true; };
   }, [selectedId]);
 
+  // ?focus=<userId> (links from Fraude / Litiges): open that driver directly.
+  useEffect(() => {
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    if (focus) setSelectedId(focus);
+  }, []);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return drivers.filter((d) => {

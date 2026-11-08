@@ -332,7 +332,20 @@ export type Incident = {
   trail?: Array<{ lat: number; lng: number; at: string }> | null;
   /** Ops timeline: [{ at, by, text }]. */
   notes?: Array<{ at: string; by: string; text: string }> | null;
+  /** Reporter (userId) and other party, from their accounts. */
+  userName?: string | null;
+  userPhone?: string | null;
+  counterpartyName?: string | null;
+  counterpartyPhone?: string | null;
 };
+
+/** Outcome chosen when closing a dispute (same keys as @mova/shared INCIDENT_OUTCOMES). */
+export const INCIDENT_OUTCOME_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "RESOLVED", label: "Résolu" },
+  { value: "REFUNDED", label: "Remboursé / geste commercial" },
+  { value: "SANCTIONED", label: "Sanction appliquée" },
+  { value: "NO_ACTION", label: "Classé sans suite" },
+];
 
 export type FraudSeverity = "LOW" | "MEDIUM" | "HIGH";
 
@@ -345,9 +358,16 @@ export type FraudAlert = {
   unpaidCompleted: number;
   recurringPairs: number;
   counterpartIds: string[];
+  counterparts?: Array<{ id: string; name?: string | null; phone?: string | null }>;
   reasons: string[];
   sampleRideIds: string[];
+  samples?: Array<{ id: string; serviceType: "RIDE" | "DELIVERY" }>;
   incidentCreated: boolean;
+  entityName?: string | null;
+  entityPhone?: string | null;
+  review?: { incidentId: string; status: string; resolvedAt: string | null; outcome?: string | null } | null;
+  reviewed?: boolean;
+  latestSignalAt?: string | null;
 };
 
 export type FraudAlertsResponse = {
@@ -361,6 +381,8 @@ export type FraudAlertsResponse = {
     unpaidCompleted: number;
     recurringPairs: number;
     incidentsCreated: number;
+    reviewed?: number;
+    testAccountsExcluded?: number;
   };
   alerts: FraudAlert[];
 };
@@ -2679,8 +2701,20 @@ export async function cancelDelivery(id: string, reason?: string) {
   return apiFetch(`/api/admin/deliveries/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason }) });
 }
 
-export async function resolveIncident(id: string, status = "RESOLVED") {
-  return apiFetch(`/api/admin/incidents/${id}/resolve`, { method: "POST", body: JSON.stringify({ status }) });
+/** Close a dispute with an outcome (shown to the reporter), or reopen it (status OPEN). */
+export async function resolveIncident(id: string, status = "RESOLVED", opts?: { outcome?: string; comment?: string }) {
+  return apiFetch(`/api/admin/incidents/${id}/resolve`, {
+    method: "POST",
+    body: JSON.stringify({ status, outcome: opts?.outcome, comment: opts?.comment }),
+  });
+}
+
+/** Cash dispute decision: CUSTOMER_PAID (payment confirmed) / CUSTOMER_DID_NOT_PAY / NO_ACTION. */
+export async function decideCashDispute(id: string, decision: string, comment?: string) {
+  return apiFetch(`/api/admin/incidents/${id}/cash-decision`, {
+    method: "POST",
+    body: JSON.stringify({ decision, comment }),
+  });
 }
 
 /** « Je prends en charge » : the user is told someone handles their SOS / report. */
@@ -2709,9 +2743,21 @@ export function sosTrailMapsUrl(trail: Array<{ lat: number; lng: number }>): str
   return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
 
-export async function fetchFraudAlerts(days = 30, autoCreate = true): Promise<FraudAlertsResponse> {
-  const params = new URLSearchParams({ days: String(days), autoCreate: autoCreate ? "true" : "false" });
+/** Viewing the alerts never opens disputes: an admin decides alert by alert. */
+export async function fetchFraudAlerts(days = 30): Promise<FraudAlertsResponse> {
+  const params = new URLSearchParams({ days: String(days) });
   return apiFetch<FraudAlertsResponse>(`/api/admin/fraud/alerts?${params}`);
+}
+
+/** « Faux positif » : recorded as reviewed; the person is never told. */
+export async function dismissFraudAlert(
+  alert: Pick<FraudAlert, "entityId" | "entityType" | "reasons" | "score">,
+  comment?: string,
+) {
+  return apiFetch<{ dismissed: boolean; incidentId?: string; message: string }>("/api/admin/fraud/dismiss", {
+    method: "POST",
+    body: JSON.stringify({ ...alert, comment }),
+  });
 }
 
 export async function createFraudIncident(alert: Pick<FraudAlert, "entityId" | "entityType" | "reasons" | "score">) {

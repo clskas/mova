@@ -159,6 +159,19 @@ export default function CoursesPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // ?id=<course> (links from Litiges / Fraude): open that course directly.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("id");
+    if (!id) return;
+    fetchRide(id)
+      .then((r) => {
+        setSelected(r);
+        setNewStatus(r.isPaid ? "PAID" : (r.status ?? ""));
+        setAssignDriverId(r.driverId ?? "");
+      })
+      .catch(() => setError("Course introuvable"));
+  }, []);
+
   useEffect(() => {
     const timer = setInterval(() => {
       if (!loading && !saving) load();

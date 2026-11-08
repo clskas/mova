@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { rentalBookingDepositCdf } from '../rental/rental-escrow.util';
 import { DeliveryStatus, DeliveryType } from '@prisma/client';
 import { parseDayBoundary, MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
@@ -128,7 +129,7 @@ export class PartnerBillingService {
   async buildRentalPartnerReceipt(ownerUserId: string, inquiryId: string): Promise<MovaReceipt> {
     const inquiry = await this.assertRentalBooking(ownerUserId, inquiryId);
     const passenger = await fetchAuthUserBrief(inquiry.userId);
-    const depositCdf = inquiry.vehicle?.depositCdf ?? 0;
+    const depositCdf = rentalBookingDepositCdf(inquiry as Parameters<typeof rentalBookingDepositCdf>[0]);
     const amounts = computeRentalPartnerDisplay({
       totalCdf: inquiry.totalCdf,
       estimatedPriceCdf: inquiry.estimatedPriceCdf,

@@ -224,12 +224,20 @@ export default function OrdersPage() {
     action: "confirm" | "ready" | "reject",
     opts?: { notifyAllDrivers?: boolean },
   ) {
+    // Refusing cancels the customer's order (and refunds it): confirm, and say why.
+    let reason = "Indisponible";
+    if (action === "reject") {
+      const typed = window.prompt("Refuser cette commande ? Le client sera prévenu (et remboursé s’il a payé en ligne).
+Raison (facultatif) :", "Indisponible");
+      if (typed === null) return;
+      reason = typed.trim() || "Indisponible";
+    }
     setBusyId(id);
     setError(null);
     try {
       if (action === "confirm") await confirmOrder(id);
       else if (action === "ready") await markOrderReady(id, { notifyAllDrivers: opts?.notifyAllDrivers });
-      else await rejectOrder(id, "Indisponible");
+      else await rejectOrder(id, reason);
       await load();
     } catch (e) {
       setError(toUserErrorMessage(e, "Action impossible"));

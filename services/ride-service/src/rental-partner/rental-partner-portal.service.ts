@@ -1,4 +1,5 @@
 import { runAiVision } from '../common/ai-vision.util';
+import { rentalBookingDepositCdf } from '../rental/rental-escrow.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { PartnerKycStatus, RentalDepositStatus, RentalInquiryStatus, RentalLogisticsMode, RentalVehicleApprovalStatus } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, INTERNAL_API_KEY, MOVA_EVENTS, serviceUrl } from '@mova/shared';
@@ -616,31 +617,41 @@ export class RentalPartnerPortalService {
     bookingId: string,
     data: { km?: number; photos?: string[]; signature?: string; holdDeposit?: boolean },
   ) {
-    const booking = await this.rental.ownerGetBooking(ownerUserId, bookingId);
-    if ((booking as { checkInAt?: Date | null }).checkInAt) {
+    const row = await this.prisma.rentalInquiry.findFirst({
+      where: { id: bookingId, vehicle: { ownerUserId } },
+      include: { vehicle: true },
+    });
+    if (!row) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (row.checkInAt) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Check-in déjà effectué.');
     }
-    const vehicleDep =
-      (booking as { vehicle?: { depositCdf?: number }; depositCdf?: number }).vehicle?.depositCdf ??
-      (booking as { depositCdf?: number }).depositCdf ??
-      null;
-    const depositCdf = vehicleDep;
-    const updated = await this.prisma.rentalInquiry.update({
+    // Only a confirmed (or just started) rental can be handed over.
+    if (row.status !== RentalInquiryStatus.CONFIRMED && row.status !== RentalInquiryStatus.IN_PROGRESS) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Le check-in est possible pour une réservation confirmée uniquement.',
+      );
+    }
+    // Start through the normal flow first (notifications, logistics): if it is refused, nothing is half done.
+    if (row.status === RentalInquiryStatus.CONFIRMED) {
+      await this.rental.ownerUpdateBookingStatus(ownerUserId, bookingId, 'start');
+    }
+    // The deposit held = the one charged at booking, never an amount typed later.
+    const depositCdf = rentalBookingDepositCdf(row);
+    await this.prisma.rentalInquiry.update({
       where: { id: bookingId },
       data: {
         checkInAt: new Date(),
         checkInKm: data.km ?? null,
         checkInPhotos: data.photos ?? [],
         checkInSignature: data.signature?.trim() || null,
-        status:
-          booking.status === RentalInquiryStatus.CONFIRMED ? RentalInquiryStatus.IN_PROGRESS : booking.status,
-        ...(data.holdDeposit !== false && depositCdf
+        ...(data.holdDeposit !== false && depositCdf > 0
           ? { depositStatus: RentalDepositStatus.HELD, depositHeldCdf: depositCdf }
           : {}),
       },
-      include: { vehicle: true },
     });
-    return updated;
+    return this.prisma.rentalInquiry.findUnique({ where: { id: bookingId }, include: { vehicle: true } });
   }
 
   async checkOutBooking(
@@ -658,20 +669,26 @@ export class RentalPartnerPortalService {
     if (row.checkOutAt) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Check-out déjà effectué.');
     }
-    if (row.completionPin && data.pin && data.pin.trim() !== row.completionPin) {
-      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'PIN de retour incorrect.');
+    if (row.status !== RentalInquiryStatus.IN_PROGRESS) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'La location doit être en cours pour enregistrer le retour.',
+      );
     }
-    return this.prisma.rentalInquiry.update({
+    // Same as « Retour » : completion PIN, payment released to the owner, customer told.
+    // (The bare status change used to skip all three.) Done first: refused = nothing saved.
+    await this.rental.ownerUpdateBookingStatus(ownerUserId, bookingId, 'return');
+    await this.prisma.rentalInquiry.update({
       where: { id: bookingId },
       data: {
         checkOutAt: new Date(),
         checkOutKm: data.km ?? null,
         checkOutPhotos: data.photos ?? [],
         checkOutSignature: data.signature?.trim() || null,
-        status: RentalInquiryStatus.RETURNED,
       },
-      include: { vehicle: true },
     });
+    return this.prisma.rentalInquiry.findUnique({ where: { id: bookingId }, include: { vehicle: true } });
   }
 
   /**
@@ -690,6 +707,9 @@ export class RentalPartnerPortalService {
       include: { vehicle: true },
     });
     if (!booking) throw new MovaHttpException(MovaErrorCode.RENTAL_INQUIRY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (!(Object.values(RentalDepositStatus) as string[]).includes(String(data.status))) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Statut de caution inconnu.');
+    }
     const current = booking.depositStatus;
     if (current === RentalDepositStatus.RELEASED || current === RentalDepositStatus.PARTIAL) {
       throw new MovaHttpException(
@@ -698,12 +718,9 @@ export class RentalPartnerPortalService {
         'Caution déjà réglée : contactez le support SENGA pour la modifier.',
       );
     }
-    const deposit = Math.max(
-      0,
-      Math.round(
-        booking.depositHeldCdf ?? booking.vehicle?.depositCdf ?? 0,
-      ),
-    );
+    // The deposit = what the customer was charged at booking. Never an amount typed by the owner
+    // (« HELD » with any heldCdf used to raise it, then « PARTIAL » paid it out).
+    const deposit = rentalBookingDepositCdf(booking);
     let retainedCdf = 0;
     if (data.status === RentalDepositStatus.PARTIAL) {
       retainedCdf = Math.round(Number(data.heldCdf));
@@ -744,8 +761,8 @@ export class RentalPartnerPortalService {
         ...(data.note !== undefined ? { depositNote: data.note.trim() || null } : {}),
         ...(data.status === RentalDepositStatus.PARTIAL
           ? { depositHeldCdf: retainedCdf }
-          : data.heldCdf !== undefined && data.status !== RentalDepositStatus.RELEASED
-            ? { depositHeldCdf: data.heldCdf }
+          : data.status === RentalDepositStatus.HELD
+            ? { depositHeldCdf: deposit }
             : {}),
       },
     });

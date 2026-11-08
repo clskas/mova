@@ -131,6 +131,7 @@ function CashReceivedConfirm({
   if (booking.isPaid || booking.status === "PAID") return null;
 
   async function submit() {
+    if (!window.confirm("Confirmer que vous avez reçu le paiement en espèces ? La commission SENGA sera due sur cette location.")) return;
     setSaving(true);
     setLocalError(null);
     try {
@@ -464,19 +465,47 @@ export default function ReservationsPage() {
                           disabled={busyId === b.id}
                           className="px-3 py-1.5 rounded-lg text-sm border hover:bg-gray-50 disabled:opacity-50"
                           onClick={async () => {
-                            const status = window
+                            // Plain French choices + a summary before a final decision that moves money.
+                            const deposit = Number(
+                              (b as { depositHeldCdf?: number | null }).depositHeldCdf ??
+                                (b as { depositCdf?: number | null }).depositCdf ??
+                                0,
+                            );
+                            const choice = window
                               .prompt(
-                                "Statut caution : HELD (gardée) / RELEASED (rendue au client) / PARTIAL (retenue en partie) / DISPUTED (litige)",
-                                b.depositStatus ?? "HELD",
+                                `Caution de ${formatCdf(deposit)} — que faire ?
+1 = La rendre entièrement au client
+2 = En retenir une partie (dégâts…)
+3 = Signaler un litige au support`,
+                                "1",
                               )
-                              ?.trim()
-                              .toUpperCase();
-                            if (!status) return;
+                              ?.trim();
+                            if (!choice) return;
+                            let status: string;
                             let heldCdf: number | undefined;
-                            if (status === "PARTIAL") {
-                              const raw = window.prompt("Montant retenu sur la caution (FC) — le reste est rendu au client");
+                            if (choice === "1") {
+                              status = "RELEASED";
+                              if (!window.confirm(`Rendre ${formatCdf(deposit)} au client ? Cette décision est définitive.`)) return;
+                            } else if (choice === "2") {
+                              status = "PARTIAL";
+                              const raw = window.prompt(`Montant retenu (FC), entre 1 et ${deposit} — le reste est rendu au client`);
                               if (!raw) return;
                               heldCdf = Number(raw.replace(/\s/g, ""));
+                              if (!Number.isFinite(heldCdf) || heldCdf <= 0 || heldCdf > deposit) {
+                                setError(`Montant invalide : entre 1 et ${formatCdf(deposit)}.`);
+                                return;
+                              }
+                              if (
+                                !window.confirm(
+                                  `Retenir ${formatCdf(heldCdf)} et rendre ${formatCdf(deposit - heldCdf)} au client ? Cette décision est définitive.`,
+                                )
+                              )
+                                return;
+                            } else if (choice === "3") {
+                              status = "DISPUTED";
+                            } else {
+                              setError("Choix invalide : tapez 1, 2 ou 3.");
+                              return;
                             }
                             setBusyId(b.id);
                             try {
@@ -529,7 +558,9 @@ export default function ReservationsPage() {
                         <button
                           type="button"
                           disabled={busyId === b.id}
-                          onClick={() => act(b.id, "decline")}
+                          onClick={() => {
+                            if (window.confirm("Refuser cette réservation ? Le client sera prévenu.")) void act(b.id, "decline");
+                          }}
                           className="px-3 py-1.5 rounded-lg text-sm border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
                         >
                           Refuser

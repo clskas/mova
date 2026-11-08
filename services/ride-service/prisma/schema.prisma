@@ -873,6 +873,8 @@ model RentalInquiry {
   checkOutSignature       String?
   depositStatus           RentalDepositStatus @default(NONE)
   depositHeldCdf          Int?
+  /// Deposit charged at booking (part of totalCdf). The vehicle's deposit may change later.
+  bookedDepositCdf        Int?
   depositNote             String?
   movaDriverRequestedAt   DateTime?
   createdAt         DateTime            @default(now())

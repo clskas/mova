@@ -39,3 +39,18 @@ describe('computeRentalEscrowFlags', () => {
     expect(flags.cashAllowed).toBe(true);
   });
 });
+
+describe('rentalBookingDepositCdf', () => {
+  const { rentalBookingDepositCdf } = jest.requireActual('./rental-escrow.util') as typeof import('./rental-escrow.util');
+
+  it('uses the deposit charged at booking, not the vehicle deposit changed afterwards', () => {
+    expect(rentalBookingDepositCdf({ bookedDepositCdf: 50000, totalCdf: 200000, vehicle: { depositCdf: 900000 } })).toBe(50000);
+    expect(rentalBookingDepositCdf({ bookedDepositCdf: 50000, totalCdf: 200000, vehicle: { depositCdf: 0 } })).toBe(50000);
+  });
+
+  it('older bookings: the vehicle deposit, never more than what the customer paid', () => {
+    expect(rentalBookingDepositCdf({ totalCdf: 120000, vehicle: { depositCdf: 50000 } })).toBe(50000);
+    expect(rentalBookingDepositCdf({ totalCdf: 30000, vehicle: { depositCdf: 50000 } })).toBe(30000);
+    expect(rentalBookingDepositCdf({ totalCdf: 30000, vehicle: { depositCdf: -500 } })).toBe(0);
+  });
+});

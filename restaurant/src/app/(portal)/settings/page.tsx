@@ -556,6 +556,7 @@ export default function SettingsPage() {
                       type="button"
                       disabled={fleetBusy}
                       onClick={async () => {
+                        if (!window.confirm("Retirer ce livreur de votre flotte ? Il ne recevra plus vos commandes.")) return;
                         setFleetBusy(true);
                         try {
                           await removeRestaurantDriver(d.driverUserId);

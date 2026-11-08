@@ -303,6 +303,34 @@ function missingDriverDocLabels(docs: Array<{ type?: string; status?: string | n
   return missingDriverDocTypes(docs).map((type) => kycDocLabel(type));
 }
 
+/**
+ * Documents sent but not approved yet (latest version of each type). The dossier can be
+ * approved only once every document sent has been approved one by one.
+ */
+function unapprovedSentDocs(
+  docs: Array<{ type?: string; status?: string | null; createdAt?: string | null }>,
+): number {
+  const latest = new Map<string, { status?: string | null; createdAt?: string | null }>();
+  for (const d of docs) {
+    const type = String(d.type ?? "").toUpperCase();
+    const prev = latest.get(type);
+    if (!prev || String(d.createdAt ?? "") >= String(prev.createdAt ?? "")) latest.set(type, d);
+  }
+  return Array.from(latest.values()).filter((d) => String(d.status ?? "").toUpperCase() !== "APPROVED").length;
+}
+
+function unapprovedChecklistItems(
+  items: Array<{ uploaded?: boolean; status?: string | null }> | undefined,
+): number {
+  return (items ?? []).filter((i) => i.uploaded && String(i.status ?? "").toUpperCase() !== "APPROVED").length;
+}
+
+function waitingDocsMessage(n: number): string {
+  return n === 1
+    ? "1 document envoyé n'est pas encore approuvé : approuvez-le (ou rejetez-le) avant d'approuver le dossier."
+    : `${n} documents envoyés ne sont pas encore approuvés : approuvez-les (ou rejetez-les) avant d'approuver le dossier.`;
+}
+
 function allDriverDocsApproved(
   docs: Array<{ type?: string; status?: string | null }>,
   driver?: { kycAllJustificatifsApproved?: boolean } | null,
@@ -831,7 +859,8 @@ export default function KycPage() {
               {driverDossiers.map((dossier) => {
                 const driver = driversByUserId.get(dossier.userId);
                 const reviewDocs = dossier.allDocs;
-                const docsApproved = allDriverDocsApproved(reviewDocs, driver);
+                const waitingDocs = unapprovedSentDocs(reviewDocs);
+                const docsApproved = waitingDocs === 0 && allDriverDocsApproved(reviewDocs, driver);
                 const missingLabels = missingDriverDocLabels(reviewDocs);
                 const missingMsg = missingDocsMessage(missingLabels);
                 const absentTypes = absentDriverDocTypes(reviewDocs);
@@ -876,11 +905,14 @@ export default function KycPage() {
                     {showDossierActions && (
                       <div className="flex flex-col items-end gap-1">
                         <div className="flex gap-2">
-                          <BtnSuccess onClick={() => reviewDriver(dossier.userId, true)}>
+                          <BtnSuccess onClick={() => reviewDriver(dossier.userId, true)} disabled={waitingDocs > 0}>
                             {docsApproved ? "Documents OK — Approuver le dossier" : "Approuver le dossier"}
                           </BtnSuccess>
                           <BtnDanger onClick={() => reviewDriver(dossier.userId, false)}>Rejeter le dossier</BtnDanger>
                         </div>
+                        {waitingDocs > 0 && (
+                          <p className="text-xs text-amber-800 max-w-xs text-right">{waitingDocsMessage(waitingDocs)}</p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1024,11 +1056,19 @@ export default function KycPage() {
                       {canWrite("kyc") && r.userId && r.kycStatus !== "APPROVED" && (
                         <div className="flex flex-col items-end gap-1">
                           <div className="flex gap-2">
-                            <BtnSuccess onClick={() => reviewPartner("RESTAURANT", r.userId!, true)}>
+                            <BtnSuccess
+                              onClick={() => reviewPartner("RESTAURANT", r.userId!, true)}
+                              disabled={unapprovedChecklistItems(checklist) > 0}
+                            >
                               {docsOk ? "Documents OK — Approuver le dossier" : "Approuver le dossier"}
                             </BtnSuccess>
                             <BtnDanger onClick={() => reviewPartner("RESTAURANT", r.userId!, false)}>Rejeter le dossier</BtnDanger>
                           </div>
+                          {unapprovedChecklistItems(checklist) > 0 && (
+                            <p className="text-xs text-amber-800 max-w-xs text-right">
+                              {waitingDocsMessage(unapprovedChecklistItems(checklist))}
+                            </p>
+                          )}
                         </div>
                       )}
                       {canWrite("kyc") && r.userId && r.kycStatus === "APPROVED" && (
@@ -1112,11 +1152,19 @@ export default function KycPage() {
                       {canWrite("kyc") && r.userId && r.kycStatus !== "APPROVED" && (
                         <div className="flex flex-col items-end gap-1">
                           <div className="flex gap-2">
-                            <BtnSuccess onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, true)}>
+                            <BtnSuccess
+                              onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, true)}
+                              disabled={unapprovedChecklistItems(checklist) > 0}
+                            >
                               {docsOk ? "Documents OK — Approuver le dossier" : "Approuver le dossier"}
                             </BtnSuccess>
                             <BtnDanger onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, false)}>Rejeter le dossier</BtnDanger>
                           </div>
+                          {unapprovedChecklistItems(checklist) > 0 && (
+                            <p className="text-xs text-amber-800 max-w-xs text-right">
+                              {waitingDocsMessage(unapprovedChecklistItems(checklist))}
+                            </p>
+                          )}
                         </div>
                       )}
                       {canWrite("kyc") && r.userId && r.kycStatus === "APPROVED" && (

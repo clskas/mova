@@ -1,3 +1,4 @@
+import { aiSwitchOn } from '../common/ai-switch';
 import { Injectable, Logger } from '@nestjs/common';
 import { KycOcrStatus, Prisma } from '@prisma/client';
 import {
@@ -121,7 +122,7 @@ export class OcrService {
       };
     }
 
-    const aiEnabled = process.env.AI_ENABLED === 'true';
+    const aiEnabled = aiSwitchOn();
     const apiKey = process.env.OPENAI_API_KEY?.trim();
     if (aiEnabled && (claudeAvailable() || apiKey)) {
       try {
@@ -179,7 +180,7 @@ export class OcrService {
         orderBy: { createdAt: 'desc' },
       });
 
-      const aiEnabled = process.env.AI_ENABLED === 'true';
+      const aiEnabled = aiSwitchOn();
       const apiKey = process.env.OPENAI_API_KEY?.trim();
       if (idDoc?.url && aiEnabled && apiKey) {
         const selfieUrl = await this.fetchImageAsDataUrl(doc.url);
@@ -244,14 +245,14 @@ export class OcrService {
           ? (profile[field] as Date | null | undefined) ?? null
           : null;
 
-      const aiEnabled = process.env.AI_ENABLED === 'true';
+      const aiEnabled = aiSwitchOn();
       const providers = configuredOcrProviders();
       if (!aiEnabled || providers.length === 0) {
         return this.saveOcrResult(documentId, {
           status: KycOcrStatus.SKIPPED,
           profileExpiry,
           notes:
-            'OCR désactivé — définir AI_ENABLED=true et au moins un moteur (ANTHROPIC_API_KEY, GOOGLE_DOCUMENT_AI_* ou OPENAI_API_KEY).',
+            'OCR désactivé — IA coupée (super admin) ou AI_ENABLED / moteur (ANTHROPIC_API_KEY, GOOGLE_DOCUMENT_AI_*, OPENAI_API_KEY) absent.',
         });
       }
 
@@ -436,7 +437,7 @@ export class OcrService {
    * verdict for the admin (OK / À VÉRIFIER / PROBLÈME). The admin still decides.
    */
   async checkVehiclePhotos(userId: string) {
-    if (!claudeAvailable()) return { available: false as const, message: 'Vérification IA désactivée (AI_ENABLED / ANTHROPIC_API_KEY).' };
+    if (!claudeAvailable()) return { available: false as const, message: 'Vérification IA désactivée (IA coupée par le super admin, ou AI_ENABLED / ANTHROPIC_API_KEY absent).' };
     const profile = await this.prisma.driverProfile.findUnique({ where: { userId }, include: { vehicles: true } });
     const vehicle = profile?.vehicles.find((v) => v.isActive) ?? profile?.vehicles[0];
     if (!vehicle) return { available: true as const, message: 'Aucun véhicule enregistré.' };
@@ -585,7 +586,7 @@ export class OcrService {
       message: 'Lecture automatique indisponible — remplissez les champs vous-même.',
     };
     if (!isScannableDocument(type)) return { ...unavailable, message: 'Ce document ne se lit pas automatiquement.' };
-    if (process.env.AI_ENABLED !== 'true' || !process.env.ANTHROPIC_API_KEY?.trim()) return unavailable;
+    if (!aiSwitchOn() || !process.env.ANTHROPIC_API_KEY?.trim()) return unavailable;
     const doc = await this.prisma.kycDocument.findFirst({ where: { userId, type }, orderBy: { createdAt: 'desc' } });
     if (!doc) return { ...unavailable, message: "Envoyez d'abord la photo du document." };
     const image = await this.fetchImageBuffer(doc.url);

@@ -9,7 +9,9 @@ import { IncidentsModule } from './incidents/incidents.module';
 import { InternalModule } from './internal/internal.module';
 import { AuthModule } from './auth/auth.module';
 import { SmileIdModule } from './smile-id/smile-id.module';
+import { AiSwitchService } from './common/ai-switch.service';
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, HealthModule, AuthModule, DriversModule, IncidentsModule, InternalModule, AssistantModule, SmileIdModule],
+  providers: [AiSwitchService],
 })
 export class AppModule {}

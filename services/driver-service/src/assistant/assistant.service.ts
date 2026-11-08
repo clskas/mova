@@ -1,3 +1,4 @@
+import { aiSwitchOn } from '../common/ai-switch';
 import Anthropic from '@anthropic-ai/sdk';
 import { Injectable, Logger } from '@nestjs/common';
 import { MARKET_RDC, currentRequestLanguage, type AppLanguage } from '@mova/shared';
@@ -66,7 +67,7 @@ export class AssistantService {
   private readonly usage = new Map<string, { day: string; count: number }>();
 
   available(): boolean {
-    return process.env.AI_ENABLED === 'true' && Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+    return aiSwitchOn() && Boolean(process.env.ANTHROPIC_API_KEY?.trim());
   }
 
   /** Counts one message for today; false when the daily limit is reached. */

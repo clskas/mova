@@ -1,3 +1,4 @@
+import { aiSwitchOn } from '../common/ai-switch';
 import Anthropic from '@anthropic-ai/sdk';
 import type { OcrImage } from './ocr-providers';
 import { DEFAULT_CLAUDE_OCR_MODEL } from './ocr-providers';
@@ -6,7 +7,7 @@ const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as co
 type ImageType = (typeof IMAGE_TYPES)[number];
 
 export function claudeAvailable(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.AI_ENABLED === 'true' && Boolean(env.ANTHROPIC_API_KEY?.trim());
+  return aiSwitchOn(env) && Boolean(env.ANTHROPIC_API_KEY?.trim());
 }
 
 /**

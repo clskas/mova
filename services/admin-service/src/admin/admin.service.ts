@@ -354,9 +354,10 @@ export class AdminService {
     };
   }
 
-  getReports(days = 30, city?: string | null, range?: { from?: string; to?: string }) {
+  getReports(days = 30, city?: string | null, range?: { from?: string; to?: string }, includeTests = false) {
     const reportDays = Math.min(366, Math.max(1, Math.floor(Number(days)) || 30));
     const params = new URLSearchParams({ days: String(reportDays) });
+    if (includeTests) params.set('includeTests', 'true');
     if (city?.trim()) params.set('city', city.trim());
     if (range?.from?.trim()) params.set('from', range.from.trim());
     if (range?.to?.trim()) params.set('to', range.to.trim());

@@ -138,8 +138,11 @@ export class InternalController {
     @Query('city') city?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('includeTests') includeTests?: string,
   ) {
-    return this.rides.getReportAnalytics(Number(days ?? 30), city, { from, to });
+    return this.rides.getReportAnalytics(Number(days ?? 30), city, { from, to }, {
+      includeTests: includeTests === 'true' || includeTests === '1',
+    });
   }
 
   @Get('rides/passengers-by-city')

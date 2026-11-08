@@ -1,3 +1,4 @@
+import { SEED_DEMO_PHONE_RE } from '@mova/shared';
 import { HttpStatus, Injectable, Optional } from '@nestjs/common';
 import { UserRole, UserStatus } from '@prisma/client';
 import {
@@ -459,6 +460,34 @@ export class UsersService {
     if (aliases[key]) return aliases[key];
     const upper = q.trim().toUpperCase();
     return (Object.values(UserRole) as string[]).includes(upper) ? (upper as UserRole) : undefined;
+  }
+
+  /**
+   * Accounts whose activity is not real customer activity, left out of the reports:
+   * store-review demo phones (+2439000000xx), Google Play test robots, and staff accounts.
+   */
+  async reportTestAccountIds() {
+    const staffRoles = [
+      UserRole.SUPER_ADMIN,
+      UserRole.ADMIN,
+      UserRole.SUPPORT,
+      UserRole.FINANCE,
+      UserRole.CONTENT,
+      UserRole.CITY_ADMIN,
+    ];
+    const [staff, demo, play] = await Promise.all([
+      this.prisma.user.findMany({ where: { role: { in: staffRoles } }, select: { id: true } }),
+      this.prisma.user.findMany({ where: { phone: { startsWith: '+2439000000' } }, select: { id: true, phone: true } }),
+      this.playPrelaunchUserIds(),
+    ]);
+    const ids = new Set<string>();
+    for (const u of staff) ids.add(u.id);
+    for (const u of demo) if (u.phone && SEED_DEMO_PHONE_RE.test(u.phone)) ids.add(u.id);
+    for (const id of play) ids.add(id);
+    return {
+      ids: [...ids],
+      counts: { staff: staff.length, storeReviewDemo: demo.length, playTestLab: play.length },
+    };
   }
 
   async listPlayPrelaunchUsers() {

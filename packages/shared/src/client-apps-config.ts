@@ -145,6 +145,11 @@ export type ClientAppsConfig = {
   languages: LanguagesConfig;
   /** Seat limits per vehicle range (admin and super admin). */
   seatLimits: SeatLimits;
+  /**
+   * AI master switch (super admin). Off = no AI call at all (document reading, forgery
+   * check, assistant, menu scan, translations…), even with AI credit left.
+   */
+  ai: { enabled: boolean };
 };
 
 export const DEFAULT_MAINTENANCE_MESSAGE_FR =
@@ -198,6 +203,7 @@ export const DEFAULT_CLIENT_APPS_CONFIG: ClientAppsConfig = {
   sosSms: { ...DEFAULT_SOS_SMS_CONFIG },
   languages: { ...DEFAULT_LANGUAGES_CONFIG },
   seatLimits: { ...DEFAULT_SEAT_LIMITS },
+  ai: { enabled: true },
 };
 
 export const CLIENT_APP_LABELS_FR: Record<ClientAppId, string> = {
@@ -337,6 +343,8 @@ export function mergeClientAppsConfig(raw: unknown): ClientAppsConfig {
   base.sosSms = normalizeSosSmsConfig((src as { sosSms?: unknown }).sosSms, base.sosSms);
   base.languages = normalizeLanguagesConfig((src as { languages?: unknown }).languages, base.languages);
   base.seatLimits = normalizeSeatLimits((src as { seatLimits?: unknown }).seatLimits, base.seatLimits);
+  const aiSrc = (src as { ai?: { enabled?: unknown } }).ai;
+  base.ai = { enabled: typeof aiSrc?.enabled === 'boolean' ? aiSrc.enabled : base.ai.enabled };
 
   return base;
 }

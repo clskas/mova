@@ -1593,6 +1593,9 @@ export class AdminController {
     if (body?.sosSms !== undefined && req.user.role !== 'SUPER_ADMIN') {
       throw new ForbiddenException('Seul le super administrateur peut modifier les SMS des alertes SOS et incidents.');
     }
+    if (body?.ai !== undefined && req.user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Seul le super administrateur peut activer ou couper l’IA.');
+    }
     if (body?.languages !== undefined && req.user.role !== 'SUPER_ADMIN') {
       throw new ForbiddenException('Seul le super administrateur peut afficher ou masquer les langues des applications.');
     }

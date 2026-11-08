@@ -101,6 +101,32 @@ export default function ServicesSengaPage() {
     setOk(null);
   }
 
+  /** AI master switch: saved at once (super admin only). */
+  async function toggleAi() {
+    if (!config || !canEditServices) return;
+    const next = config.ai?.enabled === false;
+    if (
+      !next &&
+      !window.confirm(
+        "Couper l'IA pour toute la plateforme ? Lecture des documents, contrôle anti-falsification, assistant, scan des menus et traductions s'arrêtent jusqu'à ce que vous la réactiviez.",
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setOk(null);
+    try {
+      const updated = await updateClientAppsConfig({ ai: { enabled: next } });
+      setConfig(updated);
+      setOk(next ? "IA activée." : "IA coupée pour toute la plateforme.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Enregistrement impossible");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function save() {
     if (!config || (!canEditServices && !canEditSengaPlus)) return;
     setSaving(true);
@@ -150,6 +176,29 @@ export default function ServicesSengaPage() {
       />
       {error && <ErrorBanner message={error} />}
       {ok && <p className="text-sm text-emerald-700">{ok}</p>}
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-slate-800">Intelligence artificielle</h2>
+        {!canEditServices && <p className="text-sm text-amber-700">Réservé au super administrateur.</p>}
+        <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3">
+          <span className="text-sm text-slate-800">
+            <span className="font-medium block">
+              {config.ai?.enabled === false ? "IA coupée" : "IA activée"}
+            </span>
+            <span className="text-xs text-slate-500">
+              Coupée, SENGA n&apos;utilise plus l&apos;IA, même s&apos;il reste du crédit : pas de pré-remplissage
+              des documents, pas de contrôle anti-falsification, pas d&apos;assistant, pas de scan de menu ni de
+              traduction automatique. Tout continue de fonctionner à la main. Prend effet en une minute.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={config.ai?.enabled !== false}
+            disabled={!canEditServices || saving}
+            onChange={() => void toggleAi()}
+          />
+        </label>
+      </section>
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-slate-800">SENGA Plus (abonnements)</h2>

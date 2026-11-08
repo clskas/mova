@@ -76,6 +76,7 @@ export class ClientAppsConfigService implements OnModuleInit {
       // Admin needs disabled rows too (CRUD).
       sosEmergencyContacts: this.config.sosEmergencyContacts,
       sosSms: this.config.sosSms,
+      ai: this.config.ai,
     };
   }
 
@@ -110,6 +111,7 @@ export class ClientAppsConfigService implements OnModuleInit {
       sosSms: patch.sosSms ? { ...this.config.sosSms, ...patch.sosSms } : this.config.sosSms,
       languages: patch.languages ? { ...this.config.languages, ...patch.languages } : this.config.languages,
       seatLimits: patch.seatLimits ? { ...this.config.seatLimits, ...patch.seatLimits } : this.config.seatLimits,
+      ai: patch.ai ? { ...this.config.ai, ...patch.ai } : this.config.ai,
     });
 
     this.validate(next);

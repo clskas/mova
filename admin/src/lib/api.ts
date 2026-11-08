@@ -2983,6 +2983,8 @@ export type ClientAppsConfig = {
   sosSms?: SosSmsConfig;
   /** Boutons de langue dans les apps (SuperAdmin). */
   languages?: LanguagesConfig;
+  /** Interrupteur général de l'IA (SuperAdmin). */
+  ai?: { enabled: boolean };
   /** Nombre de places par gamme (Admin / SuperAdmin). */
   seatLimits?: SeatLimits;
 };

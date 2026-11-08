@@ -1427,6 +1427,9 @@ export class AdminController {
     @Body('forceOverride') forceOverride?: boolean,
   ) {
     await this.adminService.assertRentalInquiryInScope(id, resolveManagedCityScope(req.user));
+    // « Payée » counts as paid everywhere (like « marquer payé » on a ride), and forcing a status
+    // the owner manages is exceptional: platform operators only.
+    if (String(status ?? '').toUpperCase() === 'PAID' || forceOverride === true) this.assertOpsAdmin(req.user);
     return this.adminService.updateRentalInquiryStatus(id, status, forceOverride === true);
   }
 

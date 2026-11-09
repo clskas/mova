@@ -560,7 +560,7 @@ describe('RidesService', () => {
     const result = await service.updateStatus('ride-ar-1', 'COMPLETED', 'd1');
 
     expect(prisma.ride.update).toHaveBeenCalledWith({
-      where: { id: 'ride-ar-1' },
+      where: { id: 'ride-ar-1', status: RideStatus.IN_PROGRESS, roundTripLeg: RoundTripLeg.OUTBOUND },
       data: { roundTripLeg: RoundTripLeg.RETURN },
     });
     expect(prisma.rideEvent.create).toHaveBeenCalledWith(
@@ -629,6 +629,41 @@ describe('RidesService', () => {
       MOVA_EVENTS.RIDE_COMPLETED,
       expect.objectContaining({ rideId: 'ride-ar-1' }),
     );
+  });
+
+  it('updateStatus: the passenger cannot advance the trip steps', async () => {
+    prisma.ride.findUnique.mockResolvedValue({
+      id: 'r-p',
+      passengerId: 'p1',
+      driverId: 'd1',
+      status: RideStatus.IN_PROGRESS,
+      roundTrip: false,
+    });
+    await expect(service.updateStatus('r-p', 'COMPLETED', 'p1')).rejects.toThrow(
+      'Seul le chauffeur fait avancer la course.',
+    );
+    expect(prisma.ride.update).not.toHaveBeenCalled();
+  });
+
+  it('updateStatus: CANCELLED goes through the normal cancel rules', async () => {
+    prisma.ride.findUnique.mockResolvedValue({
+      id: 'r-c',
+      passengerId: 'p1',
+      driverId: 'd1',
+      status: RideStatus.ACCEPTED,
+      roundTrip: false,
+    });
+    const cancelSpy = jest.spyOn(service, 'cancelRide').mockResolvedValue({
+      ride: { id: 'r-c', status: 'CANCELLED' },
+      cancellationFeeCdf: 0,
+      cancellationFeeFormatted: '0 FC',
+      message: 'Annulation gratuite.',
+      cancelledByRole: 'passenger',
+    } as never);
+    const result = await service.updateStatus('r-c', 'CANCELLED', 'p1');
+    expect(cancelSpy).toHaveBeenCalledWith('r-c', 'p1');
+    expect(result).toMatchObject({ status: 'CANCELLED', paymentReady: false });
+    expect(prisma.ride.update).not.toHaveBeenCalled();
   });
 
   it('findPassengerUnpaidRide: Pool payé via ServicePayment ne bloque plus', async () => {

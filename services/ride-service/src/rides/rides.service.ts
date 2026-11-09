@@ -562,6 +562,9 @@ export class RidesService {
         `Votre véhicule n'a pas assez de places pour ce groupe (${groupSize} passagers).`,
       );
     }
+    // Only one of the driver's own vehicles (someone else's id is ignored).
+    const ownVehicleId =
+      vehicleId && (driverProfile.vehicles ?? []).some((v) => v.id === vehicleId) ? vehicleId : undefined;
     const completionPin = this.tripShare.generateCompletionPin();
     // Conditional on SEARCHING: two drivers tapping « Accepter » together must not both win.
     const updated = await this.prisma.ride
@@ -569,7 +572,7 @@ export class RidesService {
         where: { id: rideId, status: RideStatus.SEARCHING },
         data: {
           driverId: driverUserId,
-          vehicleId,
+          vehicleId: ownVehicleId,
           status: RideStatus.ACCEPTED,
           acceptedAt: new Date(),
           completionPin,
@@ -723,6 +726,26 @@ export class RidesService {
     const allowed = ALLOWED_TRANSITIONS[ride.status] ?? [];
     if (!allowed.includes(status)) throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_TRANSITION);
 
+    // A cancel always follows the « Annuler » rules (fees, the driver told, pending cash
+    // cancelled). It used to be a bare status change here.
+    if (status === RideStatus.CANCELLED) {
+      const res = await this.cancelRide(rideId, userId);
+      return {
+        ...res.ride,
+        paymentReady: false,
+        cancellationFeeCdf: res.cancellationFeeCdf,
+        message: res.message,
+      };
+    }
+    // The trip steps (arrived, started, finished) belong to the assigned driver only.
+    if (ride.driverId !== userId) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_UNAUTHORIZED,
+        HttpStatus.FORBIDDEN,
+        'Seul le chauffeur fait avancer la course.',
+      );
+    }
+
     // Aller-retour : premier « COMPLETED » = fin de l'aller → jambe retour (même chauffeur).
     if (
       status === RideStatus.COMPLETED &&
@@ -730,10 +753,12 @@ export class RidesService {
       ride.roundTripLeg === RoundTripLeg.OUTBOUND &&
       ride.status === RideStatus.IN_PROGRESS
     ) {
-      const updated = await this.prisma.ride.update({
-        where: { id: rideId },
-        data: { roundTripLeg: RoundTripLeg.RETURN },
-      });
+      const updated = await this.prisma.ride
+        .update({
+          where: { id: rideId, status: ride.status, roundTripLeg: RoundTripLeg.OUTBOUND },
+          data: { roundTripLeg: RoundTripLeg.RETURN },
+        })
+        .catch((e: unknown) => this.rethrowStaleRide(e));
       await this.prisma.rideEvent.create({
         data: { rideId, event: 'ROUND_TRIP_RETURN', metadata: { from: 'OUTBOUND', to: 'RETURN' } },
       });
@@ -753,12 +778,11 @@ export class RidesService {
       updates.completedAt = new Date();
       updates.finalFareCdf = ride.finalFareCdf ?? ride.estimatedFareCdf;
     }
-    if (status === RideStatus.CANCELLED) {
-      updates.cancelledAt = new Date();
-      updates.cancelledBy = userId;
-    }
-
-    const updated = await this.prisma.ride.update({ where: { id: rideId }, data: updates });
+    // Conditional on the status read above: a double tap on « Terminer » must not finish
+    // (and announce) the ride twice.
+    const updated = await this.prisma.ride
+      .update({ where: { id: rideId, status: ride.status }, data: updates })
+      .catch((e: unknown) => this.rethrowStaleRide(e));
     await this.prisma.rideEvent.create({ data: { rideId, event: status } });
     this.emitStatusChange(rideId, status);
     await this.notifyRideStatusSms(rideId, ride.passengerId, status);
@@ -771,6 +795,17 @@ export class RidesService {
     }
     const detail = this.formatRideDetail(updated);
     return { ...detail, paymentReady: detail.paymentReady };
+  }
+
+  private rethrowStaleRide(e: unknown): never {
+    if ((e as { code?: string })?.code === 'P2025') {
+      throw new MovaHttpException(
+        MovaErrorCode.RIDE_INVALID_STATUS,
+        HttpStatus.CONFLICT,
+        'La course a déjà changé d’étape. Actualisez l’écran.',
+      );
+    }
+    throw e;
   }
 
   async cancelRide(rideId: string, userId: string, reason?: string) {

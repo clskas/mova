@@ -224,3 +224,24 @@ export function shouldReturnToSender(params: {
   const now = params.now ?? new Date();
   return now.getTime() - params.firstUnreachableAt.getTime() >= UNREACHABLE_DELAY_MS;
 }
+
+/**
+ * Wrong receipt codes allowed before the courier is locked out. The code has 4 digits:
+ * without a limit a courier could try them all and get paid without delivering.
+ */
+export const MAX_RECEIPT_PIN_ATTEMPTS = 5;
+
+export function receiptPinLocked(attempts: number | null | undefined): boolean {
+  return (attempts ?? 0) >= MAX_RECEIPT_PIN_ATTEMPTS;
+}
+
+export const RECEIPT_PIN_LOCKED_MESSAGE =
+  'Trop de codes incorrects. Demandez au client de confirmer la réception dans son application, ou contactez SENGA.';
+
+/** Same object without the customer's receipt code (for the courier, offers, partners). */
+export function withoutReceiptPin<T extends object>(value: T): T {
+  const copy = { ...(value as Record<string, unknown>) };
+  if ('deliveryPin' in copy) copy.deliveryPin = null;
+  if ('completionPin' in copy) copy.completionPin = null;
+  return copy as T;
+}

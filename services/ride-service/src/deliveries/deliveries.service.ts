@@ -13,6 +13,9 @@ import { fetchServicePaymentStatus, isHardUnpaidBlock } from '../common/payment-
 import {
   assertEscrowAllowsDispatch,
   assertPinMatches,
+  receiptPinLocked,
+  RECEIPT_PIN_LOCKED_MESSAGE,
+  withoutReceiptPin,
   cancelPhase,
   driverEligibleForFoodOffer,
   isDeliveryPrepaidRequired,
@@ -1300,10 +1303,13 @@ export class DeliveriesService {
       include: { restaurant: { select: { id: true, name: true, cuisine: true } }, events: { orderBy: { createdAt: 'asc' } } },
     });
     return {
-      data: rows.map((d) => ({
-        ...formatParcelDelivery(d),
-        restaurantName: d.restaurant?.name,
-      })),
+      data: rows.map((d) => {
+        const formatted = formatParcelDelivery(d);
+        return {
+          ...(role === 'driver' ? withoutReceiptPin(formatted) : formatted),
+          restaurantName: d.restaurant?.name,
+        };
+      }),
     };
   }
 
@@ -1560,7 +1566,7 @@ export class DeliveriesService {
           ? tripDistanceKm(profile.currentLat!, profile.currentLng!, pickupLat, pickupLng)
           : Number.POSITIVE_INFINITY;
         const pickupCity = resolveCityFromCoords(pickupLat, pickupLng).toLowerCase();
-        const formatted = formatParcelDelivery(d as Parameters<typeof formatParcelDelivery>[0]);
+        const formatted = withoutReceiptPin(formatParcelDelivery(d as Parameters<typeof formatParcelDelivery>[0]));
         const driverGross = deliveryDriverGross(d);
         const driverNetCdf = Math.round(
           this.commission.splitGross(driverGross, deliveryRule.platformPercent).driverNetCdf,
@@ -1791,6 +1797,9 @@ export class DeliveriesService {
       if (delivery.fundsFrozenAt) {
         throw new MovaHttpException(MovaErrorCode.DELIVERY_FUNDS_FROZEN);
       }
+      if (receiptPinLocked(delivery.pinAttemptCount)) {
+        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.FORBIDDEN, RECEIPT_PIN_LOCKED_MESSAGE);
+      }
       if (delivery.guaranteed && !assertPinMatches(delivery.deliveryPin, deliveryPin)) {
         await this.prisma.delivery.update({
           where: { id },
@@ -1803,6 +1812,10 @@ export class DeliveriesService {
         );
       }
       if (!delivery.guaranteed && !assertPinMatches(delivery.deliveryPin, deliveryPin)) {
+        await this.prisma.delivery.update({
+          where: { id },
+          data: { pinAttemptCount: { increment: 1 } },
+        });
         throw new MovaHttpException(
           MovaErrorCode.VALIDATION_ERROR,
           undefined,

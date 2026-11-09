@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { withoutReceiptPin } from '../deliveries/delivery-guarantee.util';
 import { DeliveryStatus, DeliveryType, PartnerKycStatus, Prisma } from '@prisma/client';
 import { parseDayBoundary,
   INTERNAL_API_KEY,
@@ -453,7 +454,7 @@ export class RestaurantPortalService {
       );
     }
     await this.publishStatus(updated, DeliveryStatus.CANCELLED);
-    return { order: this.formatOrder(updated), delivery: formatParcelDelivery(updated) };
+    return { order: this.formatOrder(updated), delivery: withoutReceiptPin(formatParcelDelivery(updated)) };
   }
 
   async getDashboard(ownerUserId: string) {
@@ -794,7 +795,7 @@ export class RestaurantPortalService {
         notifyAllDrivers: opts?.notifyAllDrivers,
       });
     }
-    return { order: this.formatOrder(updated), delivery: formatParcelDelivery(updated) };
+    return { order: this.formatOrder(updated), delivery: withoutReceiptPin(formatParcelDelivery(updated)) };
   }
 
   private assertInternalFleetAllowed(restaurant: { courierMode?: string | null }) {
@@ -1040,7 +1041,7 @@ export class RestaurantPortalService {
       if (!current) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
       return {
         order: this.formatOrder(current),
-        delivery: formatParcelDelivery(current),
+        delivery: withoutReceiptPin(formatParcelDelivery(current)),
         success: true,
         reassigned: false,
       };
@@ -1084,7 +1085,7 @@ export class RestaurantPortalService {
         phone: driver?.phone,
         email: driver?.email,
       }),
-      delivery: formatParcelDelivery(updated),
+      delivery: withoutReceiptPin(formatParcelDelivery(updated)),
       success: true,
       reassigned: true,
     };

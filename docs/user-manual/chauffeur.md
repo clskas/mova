@@ -35,6 +35,9 @@ La **ville SENGA** sur l'accueil est détectée via GPS à l'ouverture (modifiab
 - Les commissions sur courses **espèces** créent une **dette** plateforme (pas un débit forcé du wallet).
 - Si la dette dépasse le seuil, ou si un solde positif est exigé, les **offres sont bloquées** jusqu’à recharge ou règlement au guichet.
 - Après une **livraison COD**, le client paie en espèces à la remise ; vous confirmez **Cash reçu** dans l’app (sans code PIN).
+- **Code de réception (colis, repas, courses garanties)** : seul le client l’a (SMS et son application). Demandez-le à la remise et saisissez-le pour terminer. Après **5 codes faux**, la saisie est bloquée : le client confirme alors la réception dans son application, ou contactez SENGA.
+- **Courses & commissions** : le total des achats ne peut pas dépasser le **budget du client**. Si les articles coûtent plus, appelez le client avant d’acheter.
+- **Étapes d’une course** (arrivé, démarrée, terminée) : seul le chauffeur assigné les valide. Une annulation suit toujours les règles normales d’annulation.
 - **Cash reçu** : confirmez dès que vous avez encaissé. Sans action de votre part, un paiement espèces **sous 150 000 FC** peut être **clôturé automatiquement après 24 h** (considéré payé).
 - **Cash non reçu** : utilisez ce bouton si le client n’a pas remis l’argent. Cela ouvre un **litige**, bloque le passager pour de nouvelles courses, et **annule** l’auto-clôture.
 - Si le passager a déclaré **« J’ai payé en espèces »** (écran de suivi, reçu, ou fenêtre de litige), vérifiez et confirmez **J’ai reçu les espèces** ou maintenez le litige.

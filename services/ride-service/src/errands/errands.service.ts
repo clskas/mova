@@ -22,7 +22,16 @@ import {
 } from '../common/driver-job-alert.util';
 import { holdWalletFunds, releaseWalletHold } from '../common/wallet-hold.util';
 import { recordWalletEscrow, refundEscrow, releaseEscrowPayout, settleEscrowPartial, freezeEscrow } from '../common/escrow.util';
-import { assertEscrowAllowsDispatch, assertPinMatches, cancelPhase, isPinTimeoutDue, settleGuaranteedCancel } from '../deliveries/delivery-guarantee.util';
+import {
+  assertEscrowAllowsDispatch,
+  assertPinMatches,
+  cancelPhase,
+  isPinTimeoutDue,
+  receiptPinLocked,
+  RECEIPT_PIN_LOCKED_MESSAGE,
+  settleGuaranteedCancel,
+  withoutReceiptPin,
+} from '../deliveries/delivery-guarantee.util';
 import { deliveryPinSms, sendPlatformSms } from '../common/sms-notify.util';
 import { buildErrandTimeline, enrichErrandTrackingFields } from '../deliveries/parcel.util';
 import { MatchingService } from '../matching/matching.service';
@@ -398,6 +407,11 @@ export class ErrandsService {
     return enrichErrandTrackingFields(order, formatted, courier) as unknown as T;
   }
 
+  /** What the courier sees: never the customer's receipt code (it releases the payment). */
+  private formatErrandForDriver(order: ErrandOrder) {
+    return withoutReceiptPin(this.formatErrand(order));
+  }
+
   private formatErrand(order: ErrandOrder, extra?: Record<string, unknown>) {
     const structuredItems = this.itemsFromOrder(order);
     const timeline = buildErrandTimeline(order.status, order.completedAt);
@@ -625,7 +639,7 @@ export class ErrandsService {
         : 0;
       const driverNetCdf = errandDriverNetCdf(order.finalPriceCdf ?? order.estimatedPriceCdf, order.purchaseTotalCdf, errandRule.platformPercent);
       return {
-        ...this.formatErrand(order),
+        ...this.formatErrandForDriver(order),
         offerType: 'ERRAND',
         alreadyAssigned: true,
         tripDistanceKm: tripKm,
@@ -655,7 +669,7 @@ export class ErrandsService {
         );
         const driverNetCdf = errandDriverNetCdf(order.finalPriceCdf ?? order.estimatedPriceCdf, order.purchaseTotalCdf, errandRule.platformPercent);
         return {
-          ...this.formatErrand(order),
+          ...this.formatErrandForDriver(order),
           offerType: 'ERRAND',
           tripDistanceKm: tripKm,
           distanceToPickupKm,
@@ -681,7 +695,7 @@ export class ErrandsService {
     });
     return {
       data: rows.map((order) => ({
-        ...this.formatErrand(order),
+        ...this.formatErrandForDriver(order),
         type: 'ERRAND',
         label: 'Courses & commissions',
       })),
@@ -719,7 +733,7 @@ export class ErrandsService {
       });
     const requester = await fetchAuthUserBrief(updated.userId);
     await sendPlatformSms(requester?.phone, deliveryPinSms(pin, 'course'), 'delivery_pin');
-    const formatted = this.formatErrand(updated);
+    const formatted = this.formatErrandForDriver(updated);
     await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
       serviceType: 'ERRAND',
       referenceId: updated.id,
@@ -755,7 +769,7 @@ export class ErrandsService {
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
-    return rows.map((o) => this.formatErrand(o));
+    return rows.map((o) => this.formatErrandForDriver(o));
   }
 
   async updateStatusByDriver(
@@ -799,6 +813,23 @@ export class ErrandsService {
           'Photo preuve d\'achat obligatoire avant complétion.',
         );
       }
+      if (order.guaranteed && receiptPinLocked(order.pinAttemptCount)) {
+        throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.FORBIDDEN, RECEIPT_PIN_LOCKED_MESSAGE);
+      }
+      // The courier is paid fee + purchases: purchases above the budget the customer paid
+      // would be paid by SENGA.
+      if (
+        purchaseTotalCdf != null &&
+        order.budgetCdf != null &&
+        order.budgetCdf > 0 &&
+        Math.round(purchaseTotalCdf) > order.budgetCdf
+      ) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          `Le total des achats dépasse le budget du client (${order.budgetCdf} FC). Appelez le client avant d'acheter plus.`,
+        );
+      }
       if (order.guaranteed && !assertPinMatches(order.completionPin, completionPin)) {
         await this.prisma.errandOrder.update({
           where: { id },
@@ -830,7 +861,7 @@ export class ErrandsService {
       await releaseEscrowPayout('ERRAND', id).catch(() => undefined);
       await this.prisma.errandOrder.update({ where: { id }, data: { payoutReleasedAt: new Date() } });
     }
-    const formatted = this.formatErrand(updated);
+    const formatted = this.formatErrandForDriver(updated);
     await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
       serviceType: 'ERRAND',
       referenceId: updated.id,
@@ -856,7 +887,7 @@ export class ErrandsService {
       data: { proofPhotoUrl: proofPhotoUrl.trim() },
     });
     this.scheduleReceiptCheck(updated.id);
-    return this.formatErrand(updated);
+    return this.formatErrandForDriver(updated);
   }
 
   /** Claude reads the receipt photo; the verdict helps the client and the admin, it never blocks payment. */

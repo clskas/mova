@@ -3633,3 +3633,42 @@ export async function runMoneyControl() {
     body: JSON.stringify({}),
   });
 }
+
+/** Nettoyage des tests (SUPER_ADMIN) — aperçu puis annulation comptable. */
+export type TestCleanupItem = {
+  key: string;
+  type: string;
+  id: string;
+  createdAt: string;
+  durationMin: number;
+  priceCdf: number;
+  customerId: string | null;
+  driverId: string | null;
+  label: string;
+};
+export type TestCleanupMoneyItem = {
+  referenceType: string;
+  referenceId: string;
+  platformCommissionCdf?: number;
+  lines?: { txId: string; type: string; amountCdf: number }[];
+  openDebts?: { id: string; amountCdf: number }[];
+  failed?: { txId: string; amountCdf: number; reason: string }[];
+};
+export type TestCleanupPreview = {
+  count: number;
+  items: TestCleanupItem[];
+  money: { items: TestCleanupMoneyItem[]; platformCommissionCdf?: number };
+  unknownAccounts?: string[];
+};
+export type TestCleanupFilter = { before?: string; accounts?: string[]; maxMinutes?: number };
+
+export function previewTestCleanup(filter: TestCleanupFilter) {
+  return apiFetch<TestCleanupPreview>("/api/admin/test-cleanup/preview", { method: "POST", body: JSON.stringify(filter) });
+}
+
+export function applyTestCleanup(body: TestCleanupFilter & { confirmKeys: string[] }) {
+  return apiFetch<{ count: number; money: { items: TestCleanupMoneyItem[] } }>("/api/admin/test-cleanup/apply", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}

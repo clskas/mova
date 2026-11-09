@@ -758,6 +758,68 @@ export class AdminService {
   listPlayPrelaunchUsers() {
     return this.fetchJson('auth', '/internal/users/play-prelaunch');
   }
+  /** Phones / ids typed by the admin → user ids (test accounts). */
+  private async resolveTestAccounts(entries: string[]): Promise<{ ids: string[]; unknown: string[] }> {
+    const ids: string[] = [];
+    const unknown: string[] = [];
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    for (const raw of entries.map((e) => String(e).trim()).filter(Boolean).slice(0, 100)) {
+      if (uuid.test(raw)) {
+        ids.push(raw);
+        continue;
+      }
+      const digits = raw.replace(/\D/g, '');
+      const found = await this.fetchJson<{ data?: Array<{ id: string; phone?: string | null }> }>(
+        'auth',
+        `/internal/users?${new URLSearchParams({ search: raw, take: '10' })}`,
+      ).catch(() => ({ data: [] }));
+      const match = (found.data ?? []).filter((u) => {
+        const p = String(u.phone ?? '').replace(/\D/g, '');
+        return digits.length >= 6 && p.length >= 6 && (p.endsWith(digits.slice(-9)) || digits.endsWith(p.slice(-9)));
+      });
+      if (match.length) ids.push(...match.map((u) => u.id));
+      else unknown.push(raw);
+    }
+    return { ids: [...new Set(ids)], unknown };
+  }
+
+  private assertSuperAdmin(actorRole: string) {
+    if (actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Réservé au SUPER_ADMIN.');
+    }
+  }
+
+  /** Test rides / services to void in accounting — preview changes nothing. */
+  async testCleanupPreview(actorRole: string, body: { before?: string; accounts?: string[]; maxMinutes?: number }) {
+    this.assertSuperAdmin(actorRole);
+    const accounts = await this.resolveTestAccounts(body.accounts ?? []);
+    if ((body.accounts ?? []).length > 0 && accounts.ids.length === 0) {
+      return { count: 0, items: [], money: { items: [], platformCommissionCdf: 0 }, unknownAccounts: accounts.unknown };
+    }
+    const result = await this.proxy('ride', '/internal/test-cleanup/preview', {
+      method: 'POST',
+      body: JSON.stringify({ before: body.before, userIds: accounts.ids, maxMinutes: body.maxMinutes }),
+    });
+    return { ...(result as object), unknownAccounts: accounts.unknown, accountIds: accounts.ids };
+  }
+
+  async testCleanupApply(
+    actorRole: string,
+    body: { before?: string; accounts?: string[]; maxMinutes?: number; confirmKeys?: string[] },
+  ) {
+    this.assertSuperAdmin(actorRole);
+    const accounts = await this.resolveTestAccounts(body.accounts ?? []);
+    return this.proxy('ride', '/internal/test-cleanup/apply', {
+      method: 'POST',
+      body: JSON.stringify({
+        before: body.before,
+        userIds: accounts.ids,
+        maxMinutes: body.maxMinutes,
+        confirmKeys: body.confirmKeys ?? [],
+      }),
+    });
+  }
+
   async purgePlayPrelaunchUsers(actorRole: string, actorId: string) {
     if (actorRole !== UserRole.SUPER_ADMIN) {
       throw new MovaHttpException(

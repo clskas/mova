@@ -67,6 +67,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/blacklist": FraudIcon,
   "/alertes-staff": IncidentsIcon,
   "/audit": SettingsIcon,
+  "/nettoyage-tests": SettingsIcon,
   "/planifiees": CalendarIcon,
   "/parametres": SettingsIcon,
   "/lieux": SettingsIcon,

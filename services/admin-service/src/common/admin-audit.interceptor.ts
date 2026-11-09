@@ -44,7 +44,7 @@ export class AdminAuditInterceptor implements NestInterceptor {
     if (!['POST', 'PATCH', 'PUT', 'DELETE'].includes(method) || !req?.user?.id) return next.handle();
     const route = String(req.route?.path ?? req.originalUrl ?? '').replace(/^\/?(api\/)?admin\/?/, '');
     // Read-like POSTs (AI drafts, searches) are not changes.
-    if (/^(ai\/|search|fraud\/alerts|staff-alerts\/evaluate)/.test(route)) return next.handle();
+    if (/^(ai\/|search|fraud\/alerts|staff-alerts\/evaluate|test-cleanup\/preview)/.test(route)) return next.handle();
     const params = req.params ?? {};
     const resourceId = params.id ?? params.userId ?? params.debtId ?? params.documentId ?? params.vehicleType ?? params.category ?? params.type;
     const resourceType = route.split('/')[0] || 'admin';

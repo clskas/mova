@@ -58,7 +58,7 @@ on:
         type: boolean
         default: false
       asc_apps:
-        description: "iOS - apps a soumettre avec asc_submit_only : passenger,driver (defaut), passenger ou driver."
+        description: "iOS - apps a envoyer/soumettre (asc_submit_only ou build iOS) : passenger,driver (defaut), passenger ou driver."
         required: false
         type: string
         default: "passenger,driver"
@@ -810,7 +810,10 @@ jobs:
           bundler-cache: true
           working-directory: mobile/ios
 
+      # asc_apps=driver: only Senga Driver is uploaded/submitted (e.g. the passenger
+      # version is already released and Apple refuses a new build of it).
       - name: Download passenger IPA
+        if: contains(inputs.asc_apps || 'passenger,driver', 'passenger')
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
@@ -818,6 +821,7 @@ jobs:
           path: mobile/build/ios/ipa/passenger/
 
       - name: Download driver IPA
+        if: contains(inputs.asc_apps || 'passenger,driver', 'driver')
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
@@ -831,6 +835,7 @@ jobs:
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
           SUBMIT_APP_STORE: ${{ (github.event_name == 'workflow_dispatch' && inputs.submit_ios_app_store == true) || startsWith(github.ref, 'refs/tags/v') }}
+          ASC_APPS: ${{ inputs.asc_apps || 'passenger,driver' }}
         run: |
           set -euo pipefail
           if [ -z "${APP_STORE_CONNECT_API_KEY:-}" ]; then

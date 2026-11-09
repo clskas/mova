@@ -105,7 +105,7 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
 ## Course Pool (partagée)
 
 1. Une offre **Course Pool** arrive comme une course taxi ; le titre indique Pool.
-2. Utilisez **Navigation prochain arrêt** pour le prochain point de prise ou de dépose.
+2. Utilisez **Navigation prochain arrêt** pour le prochain point de prise ou de dépose. SENGA classe les arrêts dans l'**ordre le plus court** (l'arrêt le plus proche d'abord, chaque dépose après la prise du même passager) ; la liste des passagers suit cet ordre.
 3. Pour chaque passager : **Prendre ce passager** puis **Déposer ce passager** (ne pas « terminer » la course globalement tant qu’il reste des passagers).
 4. Chaque passager paie **sa place** ; les gains prepaid vont au **solde retirable**, les espèces restent **non retirables**.
 

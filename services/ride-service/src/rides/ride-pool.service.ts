@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { lastPoolPosition, onboardDetourKm, orderPoolStops, straightKm } from './pool-route.util';
 import {
   RideSharePassengerStatus,
   RideStatus,
@@ -402,8 +403,8 @@ export class RidePoolService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    let best: (typeof candidates)[0] | null = null;
-    let bestScore = Number.POSITIVE_INFINITY;
+    const scored: { ride: (typeof candidates)[0]; score: number; pickupNear: PoolCoords; dropoffNear: PoolCoords }[] = [];
+    const roadFactor = this.platformConfig.get().trip.roadDistanceFactor ?? 1.3;
 
     for (const ride of candidates) {
       const used = this.seatsUsed(ride.sharePassengers);
@@ -411,9 +412,28 @@ export class RidePoolService {
       if (used + seats > total) continue;
 
       const points = this.routePoints(ride);
-      const pickupDetour = Math.min(...points.map((p) => this.pricing.haversineKm(pickup.lat, pickup.lng, p.lat, p.lng)));
-      const dropoffDetour = Math.min(...points.map((p) => this.pricing.haversineKm(dropoff.lat, dropoff.lng, p.lat, p.lng)));
+      const nearest = (target: PoolCoords) =>
+        points.reduce(
+          (acc, p) => {
+            const km = straightKm(target, p);
+            return km < acc.km ? { km, p } : acc;
+          },
+          { km: Number.POSITIVE_INFINITY, p: points[0]! },
+        );
+      const pickupNear = nearest(pickup);
+      const dropoffNear = nearest(dropoff);
+      const pickupDetour = pickupNear.km;
+      const dropoffDetour = dropoffNear.km;
+      // Cheap filter first (a road is never shorter than the straight line).
       if (pickupDetour > maxDetour || dropoffDetour > maxDetour) continue;
+
+      // Passengers already on board: the new pickup must not send them far out of their way.
+      const onboard = ride.sharePassengers.filter((p) => p.status === RideSharePassengerStatus.PICKED_UP);
+      if (onboard.length > 0) {
+        const position = lastPoolPosition(ride, ride.sharePassengers);
+        const nextDropoff = orderPoolStops(position, ride.sharePassengers).find((s) => s.type === 'dropoff');
+        if (nextDropoff && onboardDetourKm(position, pickup, nextDropoff) * roadFactor > maxDetour) continue;
+      }
 
       // Même sens approximatif : dropoff du candidat plus loin dans la direction du trajet.
       const rideBearing = this.bearing(ride.pickupLat, ride.pickupLng, ride.dropoffLat, ride.dropoffLng);
@@ -422,12 +442,19 @@ export class RidePoolService {
       if (bearingDelta > 75) continue;
 
       const score = pickupDetour + dropoffDetour + bearingDelta / 100;
-      if (score < bestScore) {
-        bestScore = score;
-        best = ride;
-      }
+      scored.push({ ride, score, pickupNear: pickupNear.p, dropoffNear: dropoffNear.p });
     }
-    return best;
+
+    // Detour measured by road (not as the crow flies) for the 3 best candidates only.
+    scored.sort((a, b) => a.score - b.score);
+    for (const c of scored.slice(0, 3)) {
+      const [toPickup, toDropoff] = await Promise.all([
+        this.routing.roadDistanceKm(pickup.lat, pickup.lng, c.pickupNear.lat, c.pickupNear.lng),
+        this.routing.roadDistanceKm(dropoff.lat, dropoff.lng, c.dropoffNear.lat, c.dropoffNear.lng),
+      ]);
+      if (toPickup <= maxDetour && toDropoff <= maxDetour) return c.ride;
+    }
+    return null;
   }
 
   private seatsUsed(
@@ -493,7 +520,8 @@ export class RidePoolService {
     return ride;
   }
 
-  formatSharedRide(ride: {
+  formatSharedRide(
+    ride: {
     id: string;
     passengerId: string;
     driverId: string | null;
@@ -528,39 +556,27 @@ export class RidePoolService {
       pickedUpAt: Date | null;
       droppedOffAt: Date | null;
     }>;
-  }) {
+  },
+    /** Driver's live position when known (else the last stop done). */
+    driverPosition?: PoolCoords | null,
+  ) {
     const active = ride.sharePassengers.filter((p) => p.status !== RideSharePassengerStatus.CANCELLED);
     const seatsUsed = this.seatsUsed(ride.sharePassengers);
     const seatsTotal = ride.shareSeatsTotal ?? this.poolCfg().maxPassengers ?? 3;
-    const waypoints: Array<{
-      type: 'pickup' | 'dropoff';
-      bookingId: string;
-      userId: string;
-      lat: number;
-      lng: number;
-      address: string | null;
-    }> = [
-      ...active
-        .filter((p) => p.status === RideSharePassengerStatus.WAITING)
-        .map((p) => ({
-          type: 'pickup' as const,
-          bookingId: p.id,
-          userId: p.userId,
-          lat: p.pickupLat,
-          lng: p.pickupLng,
-          address: p.pickupAddress,
-        })),
-      ...active
-        .filter((p) => p.status === RideSharePassengerStatus.PICKED_UP)
-        .map((p) => ({
-          type: 'dropoff' as const,
-          bookingId: p.id,
-          userId: p.userId,
-          lat: p.dropoffLat,
-          lng: p.dropoffLng,
-          address: p.dropoffAddress,
-        })),
-    ];
+    // Remaining stops in driving order (nearest next stop, drop-off after pickup). The driver
+    // app navigates to waypoints[0]; passengers are listed in the same order.
+    const start =
+      driverPosition && Number.isFinite(driverPosition.lat) && Number.isFinite(driverPosition.lng)
+        ? driverPosition
+        : lastPoolPosition(ride, active);
+    const waypoints = orderPoolStops(start, active);
+    const stopRank = new Map<string, number>();
+    waypoints.forEach((w, i) => {
+      if (!stopRank.has(w.bookingId)) stopRank.set(w.bookingId, i);
+    });
+    const orderedPassengers = [...active].sort(
+      (x, y) => (stopRank.get(x.id) ?? Number.MAX_SAFE_INTEGER) - (stopRank.get(y.id) ?? Number.MAX_SAFE_INTEGER),
+    );
 
     return {
       id: ride.id,
@@ -584,8 +600,9 @@ export class RidePoolService {
       shareSeatsTotal: seatsTotal,
       seatsUsed,
       seatsAvailable: Math.max(0, seatsTotal - seatsUsed),
-      passengers: active.map((p) => ({
+      passengers: orderedPassengers.map((p) => ({
         id: p.id,
+        nextStopIndex: stopRank.get(p.id) ?? null,
         bookingId: p.id,
         userId: p.userId,
         seats: p.seats,
@@ -601,6 +618,7 @@ export class RidePoolService {
         paymentReady: p.status === RideSharePassengerStatus.DROPPED_OFF || ride.status === RideStatus.COMPLETED,
       })),
       waypoints,
+      nextStop: waypoints[0] ?? null,
       completionPin: ride.completionPin,
     };
   }

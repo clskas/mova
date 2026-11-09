@@ -48,9 +48,9 @@ Sur **Taxi** (voiture uniquement, pas moto), activez le bascule **Partagé (Pool
 
 1. Estimez le prix : le tarif Pool est **réduit** par rapport à une course exclusive (ordre de grandeur −35 %).
 2. Confirmez : SENGA cherche un véhicule qui peut accepter plusieurs passagers sur des trajets compatibles.
-3. Vous pouvez **rejoindre** une course déjà en cours si un siège est libre — le suivi s’ouvre directement si un chauffeur est déjà assigné.
+3. Vous pouvez **rejoindre** une course déjà en cours si un siège est libre — le suivi s’ouvre directement si un chauffeur est déjà assigné. Le détour est mesuré **par la route** (2,5 km au plus) et une course déjà commencée n'accepte un nouveau passager que s'il est sur le chemin : les passagers à bord ne font pas de grand détour.
 4. Après votre dépose, payez **votre place** (portefeuille, Mobile Money ou espèces) — pas le total de tous les passagers.
-5. Des détours sont possibles pour prendre / déposer d’autres passagers.
+5. De petits détours sont possibles pour prendre / déposer d’autres passagers ; le chauffeur suit l'ordre d'arrêts le plus court.
 
 > **Différence avec le Covoiturage** : le Pool est une course taxi **à la demande**. Le **Covoiturage** (menu dédié) reste un trajet **planifié** type BlaBlaCar (places sur un trajet publié à l’avance).
 

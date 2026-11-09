@@ -839,6 +839,11 @@ export class RentalService {
   }
 
   async createBooking(userId: string, dto: CreateRentalBookingDto) {
+    // A partner cannot book their own vehicle (promos, escrow, fake activity).
+    const own = await this.prisma.rentalVehicle.findUnique({ where: { id: dto.vehicleId }, select: { ownerUserId: true } });
+    if (own?.ownerUserId && own.ownerUserId === userId) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.FORBIDDEN, 'Vous ne pouvez pas réserver votre propre véhicule.');
+    }
     const quoteResult = await this.quote(dto, true);
     const startDate = new Date(dto.startDate);
     const endDate = new Date(dto.endDate);
@@ -1207,11 +1212,18 @@ export class RentalService {
       );
     }
     await this.assertRentalEscrowHeldForHandover(inquiry.id);
-    const updated = await this.prisma.rentalInquiry.update({
-      where: { id: inquiry.id },
-      data: { status: RentalInquiryStatus.IN_PROGRESS },
-      include: { vehicle: true },
-    });
+    const updated = await this.prisma.rentalInquiry
+      .update({
+        where: { id: inquiry.id, status: RentalInquiryStatus.CONFIRMED },
+        data: { status: RentalInquiryStatus.IN_PROGRESS },
+        include: { vehicle: true },
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string })?.code === 'P2025') {
+          throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.CONFLICT, 'La réservation vient de changer (annulée ?). Actualisez l’écran.');
+        }
+        throw e;
+      });
     await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
       serviceType: 'RENTAL',
       referenceId: updated.id,
@@ -1307,11 +1319,19 @@ export class RentalService {
         cancelEligibility.cancelBlockReason ?? 'Cette réservation ne peut plus être annulée.',
       );
     }
-    const updated = await this.prisma.rentalInquiry.update({
-      where: { id },
-      data: { status: RentalInquiryStatus.CLOSED },
-      include: { vehicle: true },
-    });
+    // Conditional: a cancel racing the owner's « Démarrer » must not refund a rental in progress.
+    const updated = await this.prisma.rentalInquiry
+      .update({
+        where: { id, status: inquiry.status },
+        data: { status: RentalInquiryStatus.CLOSED },
+        include: { vehicle: true },
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string })?.code === 'P2025') {
+          throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.CONFLICT, 'La réservation vient de changer. Actualisez l’écran.');
+        }
+        throw e;
+      });
     await this.refundRentalEscrowOnCancel(id);
     await this.publishRentalBooking(updated, updated.vehicle, 'CANCELLED');
     await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {

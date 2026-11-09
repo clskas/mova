@@ -683,10 +683,17 @@ export class CarpoolService {
     if (trip.departureAt <= new Date()) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Impossible d\'annuler après le départ.');
     }
-    return this.prisma.carpoolTrip.update({
-      where: { id: tripId },
-      data: { status: CarpoolStatus.CANCELLED, seatsAvailable: 0 },
-    });
+    return this.prisma.carpoolTrip
+      .update({
+        where: { id: tripId, status: trip.status },
+        data: { status: CarpoolStatus.CANCELLED, seatsAvailable: 0 },
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string })?.code === 'P2025') {
+          throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.CONFLICT, 'Le trajet vient de changer. Actualisez l’écran.');
+        }
+        throw e;
+      });
   }
 
   async leave(tripId: string, userId: string) {
@@ -696,14 +703,16 @@ export class CarpoolService {
     if (!trip || trip.status === CarpoolStatus.CANCELLED || trip.status === CarpoolStatus.COMPLETED) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
     }
-    if (trip.departureAt <= new Date()) {
+    // Started early by the driver counts as departed too.
+    if (trip.departureAt <= new Date() || trip.status === CarpoolStatus.IN_PROGRESS) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Impossible d\'annuler après le départ.');
     }
     await this.prisma.carpoolPassenger.delete({ where: { id: passenger.id } });
+    // Atomic: a booking at the same moment must not be lost (it used to write the old count + seats).
     const updated = await this.prisma.carpoolTrip.update({
       where: { id: tripId },
       data: {
-        seatsAvailable: trip.seatsAvailable + passenger.seats,
+        seatsAvailable: { increment: passenger.seats },
         status: CarpoolStatus.OPEN,
       },
       include: { passengers: true },

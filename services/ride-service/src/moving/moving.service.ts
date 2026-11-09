@@ -482,7 +482,15 @@ export class MovingService {
         updates.completionPin = this.tripShare.generateCompletionPin();
       }
     }
-    const updated = await this.prisma.movingRequest.update({ where: { id }, data: updates });
+    // Conditional: « Terminé » racing the customer's cancel (or a double tap) must not both apply.
+    const updated = await this.prisma.movingRequest
+      .update({ where: { id, status: request.status }, data: updates })
+      .catch((e: unknown) => {
+        if ((e as { code?: string })?.code === 'P2025') {
+          throw new MovaHttpException(MovaErrorCode.MOVING_INVALID_STATUS, HttpStatus.CONFLICT, 'Le déménagement vient de changer d’étape. Actualisez l’écran.');
+        }
+        throw e;
+      });
     await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
       serviceType: 'MOVING',
       referenceId: updated.id,
@@ -519,10 +527,17 @@ export class MovingService {
         cancelEligibility.cancelBlockReason,
       );
     }
-    const cancelled = await this.prisma.movingRequest.update({
-      where: { id },
-      data: { status: MovingRequestStatus.CANCELLED, cancelledAt: new Date() },
-    });
+    const cancelled = await this.prisma.movingRequest
+      .update({
+        where: { id, status: request.status },
+        data: { status: MovingRequestStatus.CANCELLED, cancelledAt: new Date() },
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string })?.code === 'P2025') {
+          throw new MovaHttpException(MovaErrorCode.MOVING_INVALID_STATUS, HttpStatus.CONFLICT, 'Le déménagement vient de changer d’étape. Actualisez l’écran.');
+        }
+        throw e;
+      });
     await this.stopMovingOffer(id, 'cancelled');
     return cancelled;
   }

@@ -1,4 +1,4 @@
-import { GeocodeProvider } from './geocode.provider';
+import { GeocodeProvider, isPreciseMatch } from './geocode.provider';
 import { MapboxService } from './mapbox.service';
 import { NominatimService } from './nominatim.service';
 import { PhotonService } from './photon.service';
@@ -55,10 +55,26 @@ describe('GeocodeProvider — cheapest first, Mapbox last', () => {
     expect(t.mapbox.search).toHaveBeenCalledTimes(1);
   });
 
-  it('the SENGA base already found something: no Mapbox', async () => {
+  it('the SENGA base already has a precise match: no Mapbox', async () => {
     const t = make({ mapbox: [place('X', -4.3, 15.3)] });
-    expect(await t.provider.search('gombe', { localHitCount: 2 })).toEqual([]);
+    expect(await t.provider.search('gombe', { localHitCount: 2, localPreciseHit: true })).toEqual([]);
     expect(t.mapbox.search).not.toHaveBeenCalled();
+  });
+
+  it('OpenStreetMap only approximate (the commune): Mapbox completes, its result first', async () => {
+    const t = make({
+      photon: [place('Gombe', -4.305, 15.312)],
+      mapbox: [place('Pharmacie du Fleuve', -4.301, 15.315)],
+    });
+    const r = await t.provider.search('pharmacie du fleuve');
+    expect(r.map((p) => p.provider)).toEqual(['mapbox', 'photon']);
+  });
+
+  it('isPreciseMatch: every meaningful word, accents ignored', () => {
+    expect(isPreciseMatch('pharmacie du fleuve', 'Pharmacie du Fleuve', 'Gombe')).toBe(true);
+    expect(isPreciseMatch('pharmacie du fleuve', 'Gombe', 'Kinshasa')).toBe(false);
+    expect(isPreciseMatch('universite kinshasa', 'Université de Kinshasa', null)).toBe(true);
+    expect(isPreciseMatch('Hôtel Memling', 'Hotel Memling', 'Gombe')).toBe(true);
   });
 
   it('Mapbox not configured: empty, no error', async () => {

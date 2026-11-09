@@ -17,9 +17,36 @@ type GeocodeSearchOpts = {
   bounded?: boolean;
   limit?: number;
   poiCategory?: PoiCategory;
-  /** Results the SENGA base already found: Mapbox (paid) is not called when > 0. */
+  /** Results the SENGA base already found (category browse: counted toward the minimum). */
   localHitCount?: number;
+  /** The SENGA base already has a precise match (all the words searched): no Mapbox. */
+  localPreciseHit?: boolean;
 };
+
+const STOP_WORDS = new Set([
+  'de', 'du', 'des', 'la', 'le', 'les', 'l', 'd', 'a', 'au', 'aux', 'et', 'en', 'sur', 'pres', 'avenue', 'av',
+  'rue', 'kinshasa', 'rdc', 'commune', 'quartier', 'q',
+]);
+
+function normalizeWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 2 && !STOP_WORDS.has(w));
+}
+
+/**
+ * A result is precise when its name / address contains every meaningful word searched
+ * (« pharmacie du fleuve » → « Pharmacie du Fleuve, Gombe », not just « Gombe »).
+ */
+export function isPreciseMatch(query: string, label: string, address?: string | null): boolean {
+  const wanted = normalizeWords(query);
+  if (wanted.length === 0) return true;
+  const have = new Set(normalizeWords(`${label} ${address ?? ''}`));
+  return wanted.every((w) => have.has(w) || [...have].some((h) => h.length >= 4 && (h.startsWith(w) || w.startsWith(h))));
+}
 
 /** Category browse: below this many free results, Mapbox completes the list. */
 const CATEGORY_MIN_RESULTS = 3;
@@ -58,14 +85,13 @@ export class GeocodeProvider {
       3500,
       [] as PhotonPlace[],
     );
-    const osm = this.mergePlaces(photonHits.map((p) => ({ ...p, provider: 'photon' as const })));
-    if (osm.length > 0) return osm;
+    let osm = this.mergePlaces(photonHits.map((p) => ({ ...p, provider: 'photon' as const })));
+    if (osm.length === 0) osm = await this.searchNominatim(query, searchOpts);
 
-    const nominatimHits = await this.searchNominatim(query, searchOpts);
-    if (nominatimHits.length > 0) return nominatimHits;
-
-    // Last resort (paid): nothing in the SENGA base nor in OpenStreetMap.
-    if ((opts?.localHitCount ?? 0) > 0 || !this.mapbox.isConfigured()) return [];
+    // Mapbox (paid) only when neither the SENGA base nor OpenStreetMap has a precise match:
+    // nothing found, or only approximate results (e.g. the commune instead of the pharmacy).
+    const osmPrecise = osm.some((p) => isPreciseMatch(query, p.label, p.address));
+    if (osmPrecise || opts?.localPreciseHit === true || !this.mapbox.isConfigured()) return osm;
     const mapboxHits = await this.withTimeout(
       this.mapbox.search(query, {
         centerLat: searchOpts.centerLat,
@@ -77,7 +103,7 @@ export class GeocodeProvider {
       4000,
       [] as MapboxPlace[],
     ).catch(() => [] as MapboxPlace[]);
-    return this.mergePlaces(mapboxHits.map((p) => ({ ...p, provider: 'mapbox' as const })));
+    return this.mergePlaces([...mapboxHits.map((p) => ({ ...p, provider: 'mapbox' as const })), ...osm]);
   }
 
   /** Browse POI by category (Taxi/Moto chips): OpenStreetMap first, Mapbox only to complete a thin list. */

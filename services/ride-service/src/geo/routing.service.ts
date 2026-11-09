@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PlatformConfigService } from '../platform/platform-config.service';
 
-export type RoadDistanceSource = 'stored' | 'osrm' | 'estimated';
+export type RoadDistanceSource = 'stored' | 'mapbox' | 'osrm' | 'estimated';
 
 export type RoadDistanceResult = {
   distanceKm: number;
@@ -9,14 +9,28 @@ export type RoadDistanceResult = {
   durationMin?: number;
 };
 
+/** "lng,lat;lng,lat" from real coordinates only (never raw request text in the URL). */
+export function routeCoords(lat1: number, lng1: number, lat2: number, lng2: number): string | null {
+  const pts = [Number(lat1), Number(lng1), Number(lat2), Number(lng2)];
+  if (!pts.every((n) => Number.isFinite(n))) return null;
+  const [a, b, c, d] = pts as [number, number, number, number];
+  if (Math.abs(a) > 90 || Math.abs(c) > 90 || Math.abs(b) > 180 || Math.abs(d) > 180) return null;
+  return `${b.toFixed(6)},${a.toFixed(6)};${d.toFixed(6)},${c.toFixed(6)}`;
+}
+
 @Injectable()
 export class RoutingService {
   private readonly logger = new Logger(RoutingService.name);
   private readonly baseUrl: string;
   private readonly enabled: boolean;
   private readonly timeoutMs: number;
+  private readonly mapboxToken: string;
+  private readonly mapboxEnabled: boolean;
 
   constructor(private platformConfig: PlatformConfigService) {
+    // Route distance sets the price: Mapbox Directions first (reliable), then OSRM, then the estimate.
+    this.mapboxToken = (process.env.MAPBOX_ACCESS_TOKEN ?? '').trim();
+    this.mapboxEnabled = this.mapboxToken.length > 0 && process.env.MAPBOX_DIRECTIONS_ENABLED !== 'false';
     this.baseUrl = (process.env.OSRM_BASE_URL ?? 'https://router.project-osrm.org').replace(/\/$/, '');
     this.enabled = process.env.OSRM_ENABLED !== 'false';
     this.timeoutMs = parseInt(process.env.OSRM_TIMEOUT_MS ?? '5000', 10);
@@ -32,7 +46,7 @@ export class RoutingService {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  /** Distance routière (km) — OSRM si disponible, sinon Haversine × facteur détour. */
+  /** Distance routière (km) — Mapbox, sinon OSRM, sinon Haversine × facteur détour. */
   async roadDistanceKm(
     lat1: number,
     lng1: number,
@@ -55,6 +69,11 @@ export class RoutingService {
       return { distanceKm: Math.round(storedKm * 100) / 100, source: 'stored' };
     }
 
+    if (this.mapboxEnabled) {
+      const mapbox = await this.fetchMapboxRoute(lat1, lng1, lat2, lng2);
+      if (mapbox) return mapbox;
+    }
+
     if (this.enabled) {
       const osrm = await this.fetchOsrmRoute(lat1, lng1, lat2, lng2);
       if (osrm) return osrm;
@@ -68,6 +87,47 @@ export class RoutingService {
     };
   }
 
+  private async fetchMapboxRoute(
+    lat1: number,
+    lng1: number,
+    lat2: number,
+    lng2: number,
+  ): Promise<RoadDistanceResult | null> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const coords = routeCoords(lat1, lng1, lat2, lng2);
+      if (!coords) return null;
+      const url =
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}` +
+        `?overview=false&alternatives=false&steps=false&access_token=${encodeURIComponent(this.mapboxToken)}`;
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) {
+        // Never log the URL: it carries the access token.
+        this.logger.warn(`Mapbox Directions HTTP ${res.status}`);
+        return null;
+      }
+      const data = (await res.json()) as { code?: string; routes?: { distance?: number; duration?: number }[] };
+      if (data.code !== 'Ok' || !data.routes?.length) {
+        this.logger.warn(`Mapbox Directions no route (${data.code ?? 'unknown'})`);
+        return null;
+      }
+      const route = data.routes[0];
+      const meters = route.distance;
+      if (meters == null || !Number.isFinite(meters) || meters <= 0) return null;
+      const durationMin =
+        route.duration != null && Number.isFinite(route.duration)
+          ? Math.max(1, Math.ceil(route.duration / 60))
+          : undefined;
+      return { distanceKm: Math.round((meters / 1000) * 100) / 100, source: 'mapbox', durationMin };
+    } catch (err) {
+      this.logger.warn(`Mapbox Directions unavailable: ${err instanceof Error ? err.name : 'error'}`);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   private async fetchOsrmRoute(
     lat1: number,
     lng1: number,
@@ -77,7 +137,8 @@ export class RoutingService {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const coords = `${lng1},${lat1};${lng2},${lat2}`;
+      const coords = routeCoords(lat1, lng1, lat2, lng2);
+      if (!coords) return null;
       const url = `${this.baseUrl}/route/v1/driving/${coords}?overview=false&alternatives=false&steps=false`;
       const res = await fetch(url, { signal: controller.signal });
       if (!res.ok) {

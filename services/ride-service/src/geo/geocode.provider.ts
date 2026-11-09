@@ -17,15 +17,45 @@ type GeocodeSearchOpts = {
   bounded?: boolean;
   limit?: number;
   poiCategory?: PoiCategory;
+  /** Results the SENGA base already found (category browse: counted toward the minimum). */
+  localHitCount?: number;
+  /** The SENGA base already has a precise match (all the words searched): no Mapbox. */
+  localPreciseHit?: boolean;
 };
 
+const STOP_WORDS = new Set([
+  'de', 'du', 'des', 'la', 'le', 'les', 'l', 'd', 'a', 'au', 'aux', 'et', 'en', 'sur', 'pres', 'avenue', 'av',
+  'rue', 'kinshasa', 'rdc', 'commune', 'quartier', 'q',
+]);
+
+function normalizeWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 2 && !STOP_WORDS.has(w));
+}
+
 /**
- * Fournisseur géocodage unifié :
- * 1. Mapbox Search Box (POI + adresses) en parallèle de Photon (OSM)
- * 2. Nominatim si les deux sont vides
- *
- * Ne plus court-circuiter sur le premier hit Mapbox : Geocoding v5 ne
- * renvoie plus de POI, et même Search Box est lacunaire à Kinshasa.
+ * A result is precise when its name / address contains every meaningful word searched
+ * (« pharmacie du fleuve » → « Pharmacie du Fleuve, Gombe », not just « Gombe »).
+ */
+export function isPreciseMatch(query: string, label: string, address?: string | null): boolean {
+  const wanted = normalizeWords(query);
+  if (wanted.length === 0) return true;
+  const have = new Set(normalizeWords(`${label} ${address ?? ''}`));
+  return wanted.every((w) => have.has(w) || [...have].some((h) => h.length >= 4 && (h.startsWith(w) || w.startsWith(h))));
+}
+
+/** Category browse: below this many free results, Mapbox completes the list. */
+const CATEGORY_MIN_RESULTS = 3;
+
+/**
+ * Address search, cheapest first (Mapbox is paid per request):
+ * 1. the SENGA base (communes, POI, places added by users) — in GeoService;
+ * 2. OpenStreetMap: Photon, then Nominatim if Photon is empty (free);
+ * 3. Mapbox, last resort, only when nothing else was found.
  */
 @Injectable()
 export class GeocodeProvider {
@@ -47,37 +77,36 @@ export class GeocodeProvider {
     const limit = Math.min(opts?.limit ?? 10, 10);
     const searchOpts = { ...opts, limit };
 
-    const mapboxPromise = this.mapbox.isConfigured()
-      ? this.mapbox.search(query, {
-          centerLat: searchOpts.centerLat,
-          centerLng: searchOpts.centerLng,
-          city: searchOpts.city,
-          limit,
-          poiCategory: searchOpts.poiCategory,
-        })
-      : Promise.resolve([] as MapboxPlace[]);
-
     const photonOsmTags = searchOpts.poiCategory
       ? poiCategorySpec(searchOpts.poiCategory).photonTags
       : undefined;
-    const photonPromise = this.withTimeout(
+    const photonHits = await this.withTimeout(
       this.photon.search(query, { ...searchOpts, osmTags: photonOsmTags }),
       3500,
-      [],
+      [] as PhotonPlace[],
     );
+    let osm = this.mergePlaces(photonHits.map((p) => ({ ...p, provider: 'photon' as const })));
+    if (osm.length === 0) osm = await this.searchNominatim(query, searchOpts);
 
-    const [mapboxHits, photonHits] = await Promise.all([mapboxPromise, photonPromise]);
-
-    const merged = this.mergePlaces([
-      ...mapboxHits.map((p) => ({ ...p, provider: 'mapbox' as const })),
-      ...photonHits.map((p) => ({ ...p, provider: 'photon' as const })),
-    ]);
-    if (merged.length > 0) return merged;
-
-    return this.searchNominatim(query, searchOpts);
+    // Mapbox (paid) only when neither the SENGA base nor OpenStreetMap has a precise match:
+    // nothing found, or only approximate results (e.g. the commune instead of the pharmacy).
+    const osmPrecise = osm.some((p) => isPreciseMatch(query, p.label, p.address));
+    if (osmPrecise || opts?.localPreciseHit === true || !this.mapbox.isConfigured()) return osm;
+    const mapboxHits = await this.withTimeout(
+      this.mapbox.search(query, {
+        centerLat: searchOpts.centerLat,
+        centerLng: searchOpts.centerLng,
+        city: searchOpts.city,
+        limit,
+        poiCategory: searchOpts.poiCategory,
+      }),
+      4000,
+      [] as MapboxPlace[],
+    ).catch(() => [] as MapboxPlace[]);
+    return this.mergePlaces([...mapboxHits.map((p) => ({ ...p, provider: 'mapbox' as const })), ...osm]);
   }
 
-  /** Browse POI par catégorie (puces Taxi/Moto) — Mapbox Search Box + Photon OSM. */
+  /** Browse POI by category (Taxi/Moto chips): OpenStreetMap first, Mapbox only to complete a thin list. */
   async searchCategory(
     category: PoiCategory,
     opts?: GeocodeSearchOpts,
@@ -85,34 +114,39 @@ export class GeocodeProvider {
     const limit = Math.min(opts?.limit ?? 15, 25);
     const searchOpts = { ...opts, limit };
 
-    const mapboxPromise = this.mapbox.isConfigured()
-      ? this.mapbox.searchCategory(category, {
-          centerLat: searchOpts.centerLat,
-          centerLng: searchOpts.centerLng,
-          city: searchOpts.city,
-          limit,
-        })
-      : Promise.resolve([] as MapboxPlace[]);
-
-    const photonPromise = this.withTimeout(
+    const photonHits = await this.withTimeout(
       this.photon.searchByCategory(category, searchOpts),
       5000,
-      [],
+      [] as PhotonPlace[],
     );
-
-    const [mapboxHits, photonHits] = await Promise.all([mapboxPromise, photonPromise]);
-    const merged = this.mergePlaces([
-      ...mapboxHits.map((p) => ({ ...p, provider: 'mapbox' as const, category: p.category ?? category })),
-      ...photonHits.map((p) => ({ ...p, provider: 'photon' as const, category: p.category ?? category })),
-    ]);
+    let merged = this.mergePlaces(
+      photonHits.map((p) => ({ ...p, provider: 'photon' as const, category: p.category ?? category })),
+    );
     if (merged.length >= 6) return merged;
 
     const fallbackQuery = poiCategorySpec(category).queries[0];
-    if (!fallbackQuery) return merged;
-    const nominatimHits = await this.searchNominatim(fallbackQuery, searchOpts);
+    if (fallbackQuery) {
+      const nominatimHits = await this.searchNominatim(fallbackQuery, searchOpts);
+      merged = this.mergePlaces([...merged, ...nominatimHits.map((p) => ({ ...p, category }))]);
+    }
+    if (merged.length + (opts?.localHitCount ?? 0) >= CATEGORY_MIN_RESULTS || !this.mapbox.isConfigured()) {
+      return merged;
+    }
+
+    // Last resort (paid): too few free results.
+    const mapboxHits = await this.withTimeout(
+      this.mapbox.searchCategory(category, {
+        centerLat: searchOpts.centerLat,
+        centerLng: searchOpts.centerLng,
+        city: searchOpts.city,
+        limit,
+      }),
+      4000,
+      [] as MapboxPlace[],
+    ).catch(() => [] as MapboxPlace[]);
     return this.mergePlaces([
       ...merged,
-      ...nominatimHits.map((p) => ({ ...p, category })),
+      ...mapboxHits.map((p) => ({ ...p, provider: 'mapbox' as const, category: p.category ?? category })),
     ]);
   }
 

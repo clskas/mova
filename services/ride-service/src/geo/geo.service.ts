@@ -15,7 +15,7 @@ import { addressToCoords } from '../common/address.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CityActivationService } from './city-activation.service';
 import { resolveDrcProximity } from './drc-proximity';
-import { GeocodeProvider } from './geocode.provider';
+import { GeocodeProvider, isPreciseMatch } from './geocode.provider';
 import { rankAutocompleteResults, type AutocompleteResult } from './geo-autocomplete.rank';
 import { parsePoiCategory, TAXI_POI_CHIP_CATEGORIES, type PoiCategory } from './poi-category.map';
 import { PoiImportService } from './poi-import.service';
@@ -441,8 +441,11 @@ export class GeoService implements OnModuleInit {
         bounded: true,
         limit: 10,
         poiCategory: category,
+        // Mapbox (paid) only when the SENGA base has no precise match.
+        localHitCount: results.length,
+        localPreciseHit: results.some((r) => isPreciseMatch(q, r.label, r.address)),
       },
-      6000,
+      9000,
     );
     for (const p of geocodeHits) {
       const resolvedCity =
@@ -478,6 +481,8 @@ export class GeoService implements OnModuleInit {
       bounded?: boolean;
       limit?: number;
       poiCategory?: PoiCategory;
+      localHitCount?: number;
+      localPreciseHit?: boolean;
     },
     timeoutMs: number,
   ) {
@@ -586,8 +591,10 @@ export class GeoService implements OnModuleInit {
       radiusKm: hasGps ? radiusKm : undefined,
       limit,
     });
-    if (live.length > 0) {
-      void this.poiImport.persistLivePlaces(live).catch((err: unknown) => {
+    // OpenStreetMap places only: Mapbox's terms limit storing its search results.
+    const storable = live.filter((p) => String(p.source).toUpperCase() !== 'MAPBOX');
+    if (storable.length > 0) {
+      void this.poiImport.persistLivePlaces(storable).catch((err: unknown) => {
         this.logger.warn(`POI live persist skipped: ${err instanceof Error ? err.message : String(err)}`);
       });
     }

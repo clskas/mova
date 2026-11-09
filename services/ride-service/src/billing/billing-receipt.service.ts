@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { rentalBookingDepositCdf } from '../rental/rental-escrow.util';
 import { DeliveryType, RentalInquiryStatus } from '@prisma/client';
 import { INTERNAL_API_KEY, MovaErrorCode, MovaHttpException, serviceUrl } from '@mova/shared';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
@@ -243,7 +244,7 @@ export class BillingReceiptService {
         { label: 'Total payé', amountCdf: totalCdf, kind: 'total' },
       ];
     }
-    const depositCdf = r.vehicle?.depositCdf ?? 0;
+    const depositCdf = rentalBookingDepositCdf(r as Parameters<typeof rentalBookingDepositCdf>[0]);
     const discountCdf = r.discountCdf ?? 0;
     const days = this.rentalDays(r.startDate, r.endDate);
     const hours = r.rentalPeriod === 'HOURLY' ? this.rentalHours(r.startDate, r.endDate) : 0;

@@ -22,6 +22,34 @@ export type PartnerPromoInput = {
 export class PartnerPromoService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Edits are not checked by the request validator (partial body): check them here.
+   * Uses >= 1, happy hours within the day, and a restaurant promo stays on food.
+   */
+  private assertUpdateValues(data: Partial<PartnerPromoInput>, food: boolean) {
+    const bad = (msg: string) => new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, msg);
+    if (data.maxUses != null && (!Number.isInteger(Number(data.maxUses)) || Number(data.maxUses) < 1)) {
+      throw bad('Le nombre d’utilisations doit être au moins 1.');
+    }
+    for (const [key, max] of [['happyHourStartMin', 1439], ['happyHourEndMin', 1440]] as const) {
+      const v = data[key];
+      if (v != null && (!Number.isInteger(Number(v)) || Number(v) < 0 || Number(v) > max)) {
+        throw bad('Heure de happy hour invalide.');
+      }
+    }
+    if (food && data.scope !== undefined && data.scope !== PromoScope.FOOD_MENU_ONLY && data.scope !== PromoScope.FOOD_ORDER) {
+      throw bad('Périmètre repas invalide.');
+    }
+  }
+
+  /** A code is unique across SENGA: say so instead of a technical error. */
+  private async assertCodeFree(code: string) {
+    const taken = await this.prisma.promoCode.findFirst({ where: { code }, select: { id: true } });
+    if (taken) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, `Le code ${code} est déjà utilisé. Choisissez-en un autre.`);
+    }
+  }
+
   private normalizeCode(code: string) {
     const normalized = code.trim().toUpperCase();
     if (!normalized) {
@@ -99,6 +127,7 @@ export class PartnerPromoService {
     this.assertRestaurantKycApproved(restaurant);
     this.validateDiscount(data);
     const code = this.normalizeCode(data.code);
+    await this.assertCodeFree(code);
     const scope = data.scope ?? PromoScope.FOOD_MENU_ONLY;
     if (scope !== PromoScope.FOOD_MENU_ONLY && scope !== PromoScope.FOOD_ORDER) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Périmètre repas invalide.');
@@ -135,6 +164,7 @@ export class PartnerPromoService {
     if (data.discountPercent != null || data.discountCdf != null) {
       this.validateDiscount({ code: existing.code, ...data });
     }
+    this.assertUpdateValues(data, true);
     const row = await this.prisma.promoCode.update({
       where: { id },
       data: {
@@ -164,6 +194,7 @@ export class PartnerPromoService {
   async createRentalPromo(ownerUserId: string, data: PartnerPromoInput) {
     this.validateDiscount(data);
     const code = this.normalizeCode(data.code);
+    await this.assertCodeFree(code);
     const row = await this.prisma.promoCode.create({
       data: {
         code,
@@ -189,6 +220,7 @@ export class PartnerPromoService {
     if (data.discountPercent != null || data.discountCdf != null) {
       this.validateDiscount({ code: existing.code, ...data });
     }
+    this.assertUpdateValues(data, false);
     const row = await this.prisma.promoCode.update({
       where: { id },
       data: {

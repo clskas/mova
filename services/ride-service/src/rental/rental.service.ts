@@ -16,7 +16,7 @@ import {
 import { applyPromoCode } from '../common/promo-apply.util';
 import { PromoService } from '../rides/surcharge.service';
 import { TripShareService } from '../share/trip-share.service';
-import { computeRentalEscrowFlags } from './rental-escrow.util';
+import { rentalBookingDepositCdf, computeRentalEscrowFlags } from './rental-escrow.util';
 
 type RentalAddOns = { childSeat?: boolean; gps?: boolean; extraDriver?: boolean };
 import { computeRentalPartnerDisplay } from '../billing/partner-display.util';
@@ -386,7 +386,7 @@ export class RentalService {
     const passenger = await fetchAuthUserBrief(inquiry.userId);
     const { flags } = await this.rentalPaymentFlags(inquiry.id, inquiry.status);
     const grossCdf = inquiry.totalCdf ?? inquiry.estimatedPriceCdf;
-    const depositCdf = (inquiry as { vehicle?: { depositCdf?: number } | null }).vehicle?.depositCdf ?? 0;
+    const depositCdf = rentalBookingDepositCdf(inquiry as Parameters<typeof rentalBookingDepositCdf>[0]);
     const partnerDiscountCdf = inquiry.discountCdf ?? 0;
     const amounts = computeRentalPartnerDisplay({
       totalCdf: grossCdf,
@@ -864,6 +864,7 @@ export class RentalService {
         notes: dto.notes,
         estimatedPriceCdf: quoteResult.totalCdf,
         totalCdf: quoteResult.totalCdf,
+        bookedDepositCdf: quoteResult.depositCdf,
         promoCode: quoteResult.promoCode,
         discountCdf: quoteResult.discountCdf || undefined,
         partnerDiscountCdf:
@@ -988,7 +989,7 @@ export class RentalService {
       startDate: inquiry.startDate,
     });
     const grossCdf = inquiry.totalCdf ?? inquiry.estimatedPriceCdf;
-    const depositCdf = inquiry.vehicle?.depositCdf ?? 0;
+    const depositCdf = rentalBookingDepositCdf(inquiry as Parameters<typeof rentalBookingDepositCdf>[0]);
     const partnerDiscountCdf = (inquiry as { discountCdf?: number | null }).discountCdf ?? 0;
     const rentalSubtotalCdf = Math.max(0, (grossCdf ?? 0) - depositCdf);
     const ownerDisplay = computeRentalPartnerDisplay({
@@ -1979,9 +1980,16 @@ export class RentalService {
     }
   }
 
+  /** Fields an owner may never set on their own vehicle (rating, SENGA badge, approval, owner). */
+  private ownerVehicleInput(data: Record<string, unknown>): Record<string, unknown> {
+    const { rating: _r, ownerBadge: _b, approvalStatus: _a, isActive: _i, ownerUserId: _o, id: _id, ...rest } = data ?? {};
+    void _r; void _b; void _a; void _i; void _o; void _id;
+    return rest;
+  }
+
   async createVehicleForOwner(ownerUserId: string, data: Record<string, unknown>) {
     await this.assertRentalPartnerApproved(ownerUserId);
-    const payload = this.normalizeVehicleAdminPayload(data);
+    const payload = this.normalizeVehicleAdminPayload(this.ownerVehicleInput(data));
     const created = await this.prisma.rentalVehicle.create({
       data: {
         ...payload,
@@ -1998,7 +2006,8 @@ export class RentalService {
   async updateVehicleForOwner(ownerUserId: string, id: string, data: Record<string, unknown>) {
     const existing = await this.prisma.rentalVehicle.findFirst({ where: { id, ownerUserId } });
     if (!existing) throw new MovaHttpException(MovaErrorCode.RENTAL_VEHICLE_NOT_FOUND, HttpStatus.NOT_FOUND);
-    const payload = this.normalizeVehicleAdminPayload(this.withPhotoPatch({ ...existing, ...data }, data));
+    const input = this.ownerVehicleInput(data);
+    const payload = this.normalizeVehicleAdminPayload(this.withPhotoPatch({ ...existing, ...input }, input));
     const isApproved = existing.approvalStatus === RentalVehicleApprovalStatus.APPROVED;
     const updated = await this.prisma.rentalVehicle.update({
       where: { id },
@@ -2193,6 +2202,16 @@ export class RentalService {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Tarif journalier invalide.');
     }
     const seats = Number(data.seats ?? 5);
+    // Amounts and discount must make sense (a negative deposit or a 150 % discount gives a negative price).
+    const bad = (msg: string) => new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, msg);
+    for (const key of ['depositCdf', 'hourlyRateCdf', 'limitedMileageFeeCdf']) {
+      const v = data[key];
+      if (v != null && v !== '' && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw bad(`Montant invalide (${key}).`);
+    }
+    if (data.weeklyDiscountPct != null && data.weeklyDiscountPct !== '') {
+      const pct = Number(data.weeklyDiscountPct);
+      if (!Number.isFinite(pct) || pct < 0 || pct > 90) throw bad('La remise semaine doit être comprise entre 0 et 90 %.');
+    }
     const features = Array.isArray(data.features)
       ? data.features.map((f) => String(f))
       : typeof data.features === 'string' && data.features.trim()

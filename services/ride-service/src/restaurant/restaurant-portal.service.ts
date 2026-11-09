@@ -429,9 +429,15 @@ export class RestaurantPortalService {
     if (delivery.status !== DeliveryStatus.PENDING && delivery.status !== DeliveryStatus.RESTAURANT_CONFIRMED) {
       throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
     }
-    const updated = await this.prisma.delivery.update({
-      where: { id: deliveryId },
+    // Only if still PENDING / CONFIRMED at this very moment (double click, courier just took it):
+    // never cancel — and refund — an order that moved on meanwhile.
+    const changed = await this.prisma.delivery.updateMany({
+      where: { id: deliveryId, status: { in: [DeliveryStatus.PENDING, DeliveryStatus.RESTAURANT_CONFIRMED] } },
       data: { status: DeliveryStatus.CANCELLED, cancelledAt: new Date() },
+    });
+    if (changed.count === 0) throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
+    const updated = await this.prisma.delivery.findUniqueOrThrow({
+      where: { id: deliveryId },
       include: { restaurant: true, events: { orderBy: { createdAt: 'asc' } } },
     });
     await this.prisma.deliveryEvent.create({

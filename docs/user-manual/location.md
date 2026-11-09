@@ -23,11 +23,15 @@ Portail web du partenaire location (loueur entreprise ou particulier).
 
 ## Caution
 
-Après le retour du véhicule, indiquez le sort de la caution avec le bouton **Caution** de la réservation :
+Après le retour du véhicule, indiquez le sort de la caution avec le bouton **Caution** de la réservation. Trois choix, avec un récapitulatif avant de valider :
 
-- **RELEASED** (rendue) : si le client a payé en ligne, la caution lui est remboursée sur son portefeuille SENGA ;
-- **PARTIAL** (retenue en partie) : indiquez le montant que vous gardez. Ce montant est versé sur votre portefeuille, le reste est rendu au client ;
-- **DISPUTED** (litige) : rien n'est versé tant que le litige n'est pas réglé.
+1. **La rendre entièrement** : si le client a payé en ligne, la caution lui est remboursée sur son portefeuille SENGA ;
+2. **En retenir une partie** (dégâts…) : indiquez le montant que vous gardez. Ce montant est versé sur votre portefeuille, le reste est rendu au client ;
+3. **Signaler un litige** : rien n'est versé tant que le litige n'est pas réglé.
+
+Le montant de la caution est celui payé par le client **au moment de la réservation**. Si vous changez la caution du véhicule ensuite, cela ne vaut que pour les nouvelles réservations.
+
+**État des lieux** : le check-in (départ) n'est possible que pour une réservation confirmée, et il démarre la location. Le check-out (retour) n'est possible que pour une location en cours : il enregistre le retour comme le bouton **Retour** (le client est prévenu et le paiement en ligne vous est versé).
 
 Une fois rendue ou retenue, la caution ne peut plus être modifiée depuis le portail : contactez le support. Si le client a payé en espèces, vous détenez déjà la caution et la rendez vous-même.
 

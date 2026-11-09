@@ -28,6 +28,7 @@ import { dayRangeFilter,
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { passengerRatingSummaries, passengerRatingSummary } from '../ratings/passenger-rating.util';
 import { parseOrderPlacedMetadata, computeFoodSettlementPools, applyOwnCourierRouting, computeFoodShares } from '../deliveries/food-delivery-settlement.util';
 import { deliveryDriverGross } from '../deliveries/delivery-driver-gross.util';
 import { computeRentalPartnerDisplay } from '../billing/partner-display.util';
@@ -653,6 +654,10 @@ export class RidesService {
     });
 
     const rideRule = await this.commission.get(CommissionServiceType.RIDE);
+    const passengerNotes = await passengerRatingSummaries(
+      this.prisma,
+      rides.map((r) => r.passengerId),
+    );
 
     const offers = rides
       .filter((ride) => {
@@ -688,6 +693,7 @@ export class RidesService {
           distanceToPickupKm,
           driverNetCdf: Math.round(driverNetCdf),
           searchRadiusKm: radiusKm,
+          ...(passengerNotes.get(ride.passengerId) ?? { passengerRating: null, passengerRatingCount: 0 }),
           _withinRadius: distanceToPickupKm <= radiusKm,
         };
       })
@@ -1089,6 +1095,8 @@ export class RidesService {
       tracking: timeline,
       gpsTrace,
       ratings: ride.ratings,
+      // Has the viewer already rated this ride (passenger → driver, driver → passenger)?
+      rated: Boolean(participantUserId && ride.ratings.some((r) => r.fromUserId === participantUserId)),
       driver,
       passenger: passenger
         ? {
@@ -1096,6 +1104,10 @@ export class RidesService {
             phone: passenger.phone ?? '',
           }
         : undefined,
+      // Drivers (offered or assigned) see the passenger's note before / during the ride.
+      ...(participantUserId && participantUserId !== ride.passengerId
+        ? await passengerRatingSummary(this.prisma, ride.passengerId)
+        : {}),
     };
   }
 

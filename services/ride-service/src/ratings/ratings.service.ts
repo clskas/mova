@@ -29,7 +29,13 @@ export class RatingsService {
     const rating = await this.prisma.rating.create({
       data: { rideId: dto.rideId, fromUserId, toUserId: dto.toUserId, score: dto.score, comment: dto.comment },
     });
-    const avg = await this.prisma.rating.aggregate({ where: { toUserId: dto.toUserId }, _avg: { score: true } });
+    // A passenger rated by the driver: their passenger note (shown on the next offers), not a
+    // driver rating. The driver note only counts ratings received as the ride's driver.
+    if (dto.toUserId !== ride.driverId) return rating;
+    const avg = await this.prisma.rating.aggregate({
+      where: { toUserId: dto.toUserId, ride: { driverId: dto.toUserId } },
+      _avg: { score: true },
+    });
     if (avg._avg.score) {
       await fetch(serviceUrl('driver', `/internal/drivers/${dto.toUserId}/rating`), {
         method: 'PATCH',

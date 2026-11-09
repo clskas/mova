@@ -9,6 +9,7 @@ jest.mock('../common/internal-lookup.util', () => ({
 
 describe('RidesService', () => {
   const prisma = {
+    rating: { findMany: jest.fn().mockResolvedValue([]) },
     ride: {
       findFirst: jest.fn(),
       create: jest.fn(),

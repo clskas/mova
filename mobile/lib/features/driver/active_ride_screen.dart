@@ -24,6 +24,8 @@ import '../../core/safety/sos_helper.dart';
 import '../../core/services/cancel_eligibility.dart';
 import 'driver_job_alert_service.dart';
 import 'widgets/driver_cash_received_dialog.dart';
+import 'widgets/passenger_rating_badge.dart';
+import '../rating/rating_screen.dart';
 import '../../core/location/location_permission.dart';
 import '../../core/i18n/i18n.dart';
 
@@ -62,6 +64,26 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   String get _rideId => _ride['id']?.toString() ?? '';
   String get _status => _ride['status']?.toString() ?? 'DRIVER_ASSIGNED';
   bool get _isPaid => _ride['isPaid'] == true;
+
+  bool _ratedPassenger = false;
+
+  bool get _canRatePassenger =>
+      _status == 'COMPLETED' && !_isSharedPool && _ride['rated'] != true && !_ratedPassenger;
+
+  Future<void> _ratePassenger() async {
+    final passenger = _ride['passenger'];
+    final done = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RatingScreen(
+          rideId: _rideId,
+          ratePassenger: true,
+          peerLabel: passenger is Map ? passenger['name']?.toString() : null,
+        ),
+      ),
+    );
+    if (done == true && mounted) setState(() => _ratedPassenger = true);
+  }
   bool get _canDriverCancel => CancelEligibility.rideDriver(_ride);
   bool get _isCancelledStatus {
     final s = _status.toUpperCase();
@@ -702,6 +724,14 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
                   ),
                   const SizedBox(height: 8),
                 ],
+                if (!_isSharedPool) ...[
+                  PassengerRatingBadge(
+                    name: _ride['passenger'] is Map ? (_ride['passenger'] as Map)['name']?.toString() : null,
+                    rating: PassengerRatingBadge.ratingFrom(_ride),
+                    count: PassengerRatingBadge.countFrom(_ride),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 if (_isRoundTrip) ...[
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -907,6 +937,15 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
               icon: Icons.cancel_outlined,
               isLoading: _loading,
               onPressed: _loading ? null : _cancelByDriver,
+            ),
+          ],
+          if (_canRatePassenger) ...[
+            const SizedBox(height: 12),
+            MovaButton(
+              key: const Key('ratePassengerButton'),
+              label: tr('Noter le passager'),
+              icon: Icons.star_outline,
+              onPressed: _ratePassenger,
             ),
           ],
           if (_status == 'COMPLETED') ...[

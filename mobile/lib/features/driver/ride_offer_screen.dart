@@ -14,6 +14,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'active_ride_screen.dart';
 import 'driver_job_alert_service.dart';
+import 'widgets/passenger_rating_badge.dart';
 import '../../core/location/location_permission.dart';
 import '../../core/i18n/i18n.dart';
 
@@ -41,6 +42,9 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
   double? _pickupDistanceKm;
   int? _pickupEtaMin;
   bool _closingForCancel = false;
+  // Passenger note (offers list, refreshed by the status poll for push offers).
+  late double? _passengerRating = PassengerRatingBadge.ratingFrom(widget.offer);
+  late int _passengerRatingCount = PassengerRatingBadge.countFrom(widget.offer);
 
   String get _rideId => widget.offer['id']?.toString() ?? '';
 
@@ -89,6 +93,14 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
     final result = await api.getRide(_rideId);
     if (!mounted || _closingForCancel) return;
     if (result case Success(:final data)) {
+      if (data.containsKey('passengerRatingCount') &&
+          (PassengerRatingBadge.countFrom(data) != _passengerRatingCount ||
+              PassengerRatingBadge.ratingFrom(data) != _passengerRating)) {
+        setState(() {
+          _passengerRating = PassengerRatingBadge.ratingFrom(data);
+          _passengerRatingCount = PassengerRatingBadge.countFrom(data);
+        });
+      }
       final status = (data['status']?.toString() ?? '').toUpperCase();
       if (status == 'CANCELLED' || status == 'CANCELED') {
         _closeAsCancelled();
@@ -334,6 +346,12 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                         type: widget.offer['type']?.toString() ?? 'RIDE',
                       ),
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
+                    ),
+                    const SizedBox(height: 10),
+                    PassengerRatingBadge(
+                      rating: _passengerRating,
+                      count: _passengerRatingCount,
+                      onDark: true,
                     ),
                     if (passengerCountLabel(widget.offer['passengerCount']) != null) ...[
                       const SizedBox(height: 10),

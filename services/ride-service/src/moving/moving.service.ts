@@ -1,4 +1,5 @@
 import { runAiVision } from '../common/ai-vision.util';
+import { assertNotOwnRequest } from '../common/driver-eligibility.util';
 import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { CommissionServiceType, MovingRequestStatus, MovingVehicleCategory, SurchargeType, VehicleType } from '@prisma/client';
 import {
@@ -297,6 +298,7 @@ export class MovingService {
     const request = await this.prisma.movingRequest.findUnique({ where: { id } });
     if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (request.status !== MovingRequestStatus.PENDING || request.driverId) throw taken();
+    assertNotOwnRequest(request.userId, driverId);
     await assertDriverEligibleForMoving(driverId, request.vehicleCategory, request.volumeM3);
     const updated = await this.prisma.movingRequest
       .update({

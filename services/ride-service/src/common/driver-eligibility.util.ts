@@ -306,3 +306,14 @@ export async function assertDriverEligibleForParcel(
   }
   return profile;
 }
+
+/** A driver cannot take their own request (self-dealing: promos, escrow payouts, fraud stats). */
+export function assertNotOwnRequest(requesterUserId: string | null | undefined, driverUserId: string): void {
+  if (requesterUserId && requesterUserId === driverUserId) {
+    throw new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      HttpStatus.FORBIDDEN,
+      'Vous ne pouvez pas accepter votre propre demande.',
+    );
+  }
+}

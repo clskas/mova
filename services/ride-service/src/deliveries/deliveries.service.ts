@@ -13,6 +13,8 @@ import { fetchServicePaymentStatus, isHardUnpaidBlock } from '../common/payment-
 import {
   assertEscrowAllowsDispatch,
   assertPinMatches,
+  UNREACHABLE_ATTEMPTS_BEFORE_RETURN,
+  UNREACHABLE_MAX_DISTANCE_KM,
   receiptPinLocked,
   RECEIPT_PIN_LOCKED_MESSAGE,
   withoutReceiptPin,
@@ -33,7 +35,7 @@ import {
   formatParcelDelivery,
   generateDeliveryPin,
 } from './parcel.util';
-import { activeVehicleTypes, assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverAcceptsDeliveries, driverApprovedVehicleTypes, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
+import { activeVehicleTypes, assertNotOwnRequest, assertDriverCanReceiveJobs, assertDriverEligibleForParcel, driverAcceptsDeliveries, driverApprovedVehicleTypes, driverCanReceiveJobs, fetchDriverProfileSnapshot } from '../common/driver-eligibility.util';
 import { fetchDriverDebtStatus } from '../common/driver-debt.util';
 import { isCommerceType, stubRestaurantCreateData } from '../restaurant/restaurant-profile.util';
 import { isRestaurantOpenNow } from '../common/restaurant-hours.util';
@@ -1624,6 +1626,7 @@ export class DeliveriesService {
   async acceptDelivery(deliveryId: string, driverUserId: string) {
     const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
     if (!delivery) throw new MovaHttpException(MovaErrorCode.DELIVERY_NOT_FOUND, HttpStatus.NOT_FOUND);
+    assertNotOwnRequest(delivery.userId, driverUserId);
     if (delivery.type !== DeliveryType.FOOD) {
       const eligible = await assertDriverEligibleForParcel(driverUserId, delivery.weightCategory);
       if (delivery.vehicleType && !driverFitsParcelVehicle(activeVehicleTypes(eligible), delivery.vehicleType)) {
@@ -1793,6 +1796,16 @@ export class DeliveriesService {
         'Seul l\'annulation ou la confirmation de réception est autorisée depuis l\'application passager.',
       );
     }
+    // The courier never cancels the customer's order: on a guaranteed delivery the cancel after
+    // acceptance paid him the delivery fee for nothing. He reports « injoignable » instead,
+    // or SENGA reassigns the delivery.
+    if (isDriver && !isPassenger && status === DeliveryStatus.CANCELLED) {
+      throw new MovaHttpException(
+        MovaErrorCode.DELIVERY_INVALID_STATUS,
+        HttpStatus.FORBIDDEN,
+        'Le livreur ne peut pas annuler la commande du client. Destinataire absent : « Injoignable ». Autre problème : contactez SENGA.',
+      );
+    }
     if (isDriver && status === DeliveryStatus.DELIVERED) {
       if (delivery.fundsFrozenAt) {
         throw new MovaHttpException(MovaErrorCode.DELIVERY_FUNDS_FROZEN);
@@ -1862,11 +1875,24 @@ export class DeliveriesService {
       }
     }
     if (status === DeliveryStatus.CANCELLED) updates.cancelledAt = new Date();
-    const updated = await this.prisma.delivery.update({
-      where: { id },
-      data: updates,
-      include: { events: { orderBy: { createdAt: 'asc' } }, restaurant: true },
-    });
+    // Conditional on the status read above: « Livré » and « Annuler » (or two « Livré ») at the
+    // same moment must not both settle the money.
+    const updated = await this.prisma.delivery
+      .update({
+        where: { id, status: delivery.status },
+        data: updates,
+        include: { events: { orderBy: { createdAt: 'asc' } }, restaurant: true },
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string })?.code === 'P2025') {
+          throw new MovaHttpException(
+            MovaErrorCode.DELIVERY_INVALID_STATUS,
+            HttpStatus.CONFLICT,
+            'La livraison vient de changer d’étape. Actualisez l’écran.',
+          );
+        }
+        throw e;
+      });
     await this.prisma.deliveryEvent.create({ data: { deliveryId: id, event: status, metadata: { updatedBy: userId } } });
     if (status === DeliveryStatus.PICKED_UP) {
       await this.creditRestaurantAtPickup(id, delivery.type, delivery.guaranteed);
@@ -2287,8 +2313,35 @@ export class DeliveriesService {
     if (delivery.driverId !== driverUserId) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
-    if (delivery.status !== DeliveryStatus.IN_TRANSIT && delivery.status !== DeliveryStatus.PICKED_UP) {
-      throw new MovaHttpException(MovaErrorCode.DELIVERY_INVALID_STATUS);
+    // Only once on the way, and at the drop-off: it used to be possible right after accepting,
+    // from anywhere — 3 taps over 30 min paid the delivery fee without moving.
+    if (delivery.status !== DeliveryStatus.IN_TRANSIT) {
+      throw new MovaHttpException(
+        MovaErrorCode.DELIVERY_INVALID_STATUS,
+        undefined,
+        'Démarrez la livraison (« En route ») et allez à l’adresse avant de signaler le destinataire injoignable.',
+      );
+    }
+    const dropLat = delivery.dropoffLat ?? delivery.deliveryLat;
+    const dropLng = delivery.dropoffLng ?? delivery.deliveryLng;
+    if (dropLat != null && dropLng != null) {
+      const profile = await fetchDriverProfileSnapshot(driverUserId);
+      const lat = profile?.currentLat;
+      const lng = profile?.currentLng;
+      if (lat == null || lng == null) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'Activez votre position : il faut être à l’adresse de livraison pour signaler le destinataire injoignable.',
+        );
+      }
+      if (tripDistanceKm(lat, lng, dropLat, dropLng) > UNREACHABLE_MAX_DISTANCE_KM) {
+        throw new MovaHttpException(
+          MovaErrorCode.VALIDATION_ERROR,
+          undefined,
+          'Vous êtes loin de l’adresse de livraison. Rendez-vous sur place avant de signaler le destinataire injoignable.',
+        );
+      }
     }
     const firstEvent = delivery.events.find((e) => e.event === 'UNREACHABLE');
     const updated = await this.prisma.delivery.update({
@@ -2298,6 +2351,15 @@ export class DeliveriesService {
     await this.prisma.deliveryEvent.create({
       data: { deliveryId: id, event: 'UNREACHABLE', metadata: { driverUserId } },
     });
+    // The customer is told at each attempt, so he can answer before the parcel goes back.
+    if (updated.unreachableAttempts < UNREACHABLE_ATTEMPTS_BEFORE_RETURN) {
+      const requester = await fetchAuthUserBrief(delivery.userId).catch(() => null);
+      await sendPlatformSms(
+        requester?.phone,
+        'SENGA : votre livreur est à l’adresse et n’arrive pas à vous joindre. Répondez-lui ou ouvrez l’application, sinon le colis repartira.',
+        'delivery_unreachable',
+      ).catch(() => undefined);
+    }
     const firstAt = firstEvent?.createdAt ?? new Date();
     if (
       shouldReturnToSender({

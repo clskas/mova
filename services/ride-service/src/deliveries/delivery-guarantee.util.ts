@@ -17,6 +17,9 @@ export const FOOD_PAYMENT_TIMEOUT_MS = 15 * 60 * 1000;
 export const UNREACHABLE_ATTEMPTS_BEFORE_RETURN = 3;
 export const UNREACHABLE_DELAY_MS = 30 * 60 * 1000;
 
+/** « Injoignable » only from the drop-off (GPS within this distance). */
+export const UNREACHABLE_MAX_DISTANCE_KM = 0.5;
+
 export type GuaranteePhase = 'BEFORE_PICKUP' | 'AFTER_PICKUP' | 'RETURN_TO_SENDER' | 'PIN_TIMEOUT';
 
 export type EscrowSettlement = {

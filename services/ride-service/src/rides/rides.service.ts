@@ -41,7 +41,7 @@ import { TrackingService } from '../tracking/tracking.service';
 import { assertServiceAreaPair, assertServiceAreaCoords } from '../common/address.util';
 import { tripDistanceKm } from '../common/geo.util';
 import { RoutingService } from '../geo/routing.service';
-import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, driverAcceptsRides, driverFitsRideGroup, driverApprovedVehicleTypes, driverCanReceiveJobs, fetchDriverProfileSnapshot, filterDriversAcceptingRides } from '../common/driver-eligibility.util';
+import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, assertNotOwnRequest, driverAcceptsRides, driverFitsRideGroup, driverApprovedVehicleTypes, driverCanReceiveJobs, fetchDriverProfileSnapshot, filterDriversAcceptingRides } from '../common/driver-eligibility.util';
 import { fetchDriverDebtStatus, filterDriversNotDebtBlocked } from '../common/driver-debt.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
@@ -555,6 +555,7 @@ export class RidesService {
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (!ride) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (ride.status !== RideStatus.SEARCHING) throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
+    assertNotOwnRequest(ride.passengerId, driverUserId);
     const driverProfile = await assertDriverEligibleForRide(driverUserId, ride.vehicleType);
     const groupSize = this.dispatchGroupSize(ride);
     if (!driverFitsRideGroup(driverProfile, ride.vehicleType, groupSize)) {

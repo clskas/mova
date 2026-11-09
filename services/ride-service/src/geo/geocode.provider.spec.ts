@@ -3,186 +3,78 @@ import { MapboxService } from './mapbox.service';
 import { NominatimService } from './nominatim.service';
 import { PhotonService } from './photon.service';
 
-describe('GeocodeProvider', () => {
-  afterEach(() => {
-    delete process.env.GEOCODE_PREFER_PHOTON;
+const place = (label: string, lat: number, lng: number) => ({
+  label,
+  address: `${label}, Kinshasa`,
+  lat,
+  lng,
+  commune: 'Gombe',
+  city: 'Kinshasa',
+});
+
+function make(opts: { mapbox?: unknown[]; photon?: unknown[]; nominatim?: unknown[]; configured?: boolean }) {
+  const mapbox = {
+    isConfigured: () => opts.configured !== false,
+    search: jest.fn().mockResolvedValue(opts.mapbox ?? []),
+    searchCategory: jest.fn().mockResolvedValue(opts.mapbox ?? []),
+  };
+  const photon = {
+    search: jest.fn().mockResolvedValue(opts.photon ?? []),
+    searchByCategory: jest.fn().mockResolvedValue(opts.photon ?? []),
+    reverse: jest.fn(),
+  };
+  const nominatim = { search: jest.fn().mockResolvedValue(opts.nominatim ?? []), reverse: jest.fn() };
+  const provider = new GeocodeProvider(
+    mapbox as unknown as MapboxService,
+    nominatim as unknown as NominatimService,
+    photon as unknown as PhotonService,
+  );
+  return { provider, mapbox, photon, nominatim };
+}
+
+describe('GeocodeProvider — cheapest first, Mapbox last', () => {
+  it('OpenStreetMap (Photon) answers: Mapbox is not called', async () => {
+    const t = make({ photon: [place('Marché de la Victoire', -4.338, 15.317)], mapbox: [place('X', -4.3, 15.3)] });
+    const r = await t.provider.search('victoire');
+    expect(r.map((p) => p.provider)).toEqual(['photon']);
+    expect(t.mapbox.search).not.toHaveBeenCalled();
+    expect(t.nominatim.search).not.toHaveBeenCalled();
   });
 
-  it('merges Mapbox and Photon instead of returning Mapbox exclusively', async () => {
-    const mapbox = {
-      isConfigured: () => true,
-      search: jest.fn().mockResolvedValue([
-        {
-          label: 'Gombe, Kinshasa',
-          address: 'Gombe, Kinshasa, RDC',
-          lat: -4.305,
-          lng: 15.312,
-          commune: 'Gombe',
-          city: 'Kinshasa',
-          featureType: 'neighborhood',
-        },
-      ]),
-    };
-    const photon = {
-      search: jest.fn().mockResolvedValue([
-        {
-          label: 'Marché de la Victoire, Kalamu',
-          address: 'Marché de la Victoire, Kalamu, Kinshasa',
-          lat: -4.338,
-          lng: 15.317,
-          commune: 'Kalamu',
-          city: 'Kinshasa',
-        },
-      ]),
-      reverse: jest.fn(),
-    };
-    const nominatim = { search: jest.fn(), reverse: jest.fn() };
-
-    const provider = new GeocodeProvider(
-      mapbox as unknown as MapboxService,
-      nominatim as unknown as NominatimService,
-      photon as unknown as PhotonService,
-    );
-
-    const results = await provider.search('victoire', {
-      centerLat: -4.32,
-      centerLng: 15.31,
-    });
-
-    expect(results).toHaveLength(2);
-    expect(results.map((r) => r.provider)).toEqual(['mapbox', 'photon']);
-    expect(nominatim.search).not.toHaveBeenCalled();
+  it('Photon empty: Nominatim, still no Mapbox', async () => {
+    const t = make({ nominatim: [place('Hôtel Memling', -4.31, 15.31)] });
+    const r = await t.provider.search('memling');
+    expect(r.map((p) => p.provider)).toEqual(['nominatim']);
+    expect(t.mapbox.search).not.toHaveBeenCalled();
   });
 
-  it('dedupes overlapping Mapbox and Photon coordinates', async () => {
-    const mapbox = {
-      isConfigured: () => true,
-      search: jest.fn().mockResolvedValue([
-        {
-          label: 'Hôtel Memling',
-          address: 'Hôtel Memling, Gombe',
-          lat: -4.30512,
-          lng: 15.31321,
-          commune: 'Gombe',
-          city: 'Kinshasa',
-          featureType: 'poi',
-        },
-      ]),
-    };
-    const photon = {
-      search: jest.fn().mockResolvedValue([
-        {
-          label: 'Hotel Memling',
-          address: 'Hotel Memling, Gombe',
-          lat: -4.30511,
-          lng: 15.31319,
-          commune: 'Gombe',
-          city: 'Kinshasa',
-        },
-      ]),
-      reverse: jest.fn(),
-    };
-
-    const provider = new GeocodeProvider(
-      mapbox as unknown as MapboxService,
-      { search: jest.fn(), reverse: jest.fn() } as unknown as NominatimService,
-      photon as unknown as PhotonService,
-    );
-
-    const results = await provider.search('memling');
-    expect(results).toHaveLength(1);
-    expect(results[0].provider).toBe('mapbox');
+  it('nothing in OpenStreetMap: Mapbox as last resort', async () => {
+    const t = make({ mapbox: [place('Pharmacie du Fleuve', -4.3, 15.31)] });
+    const r = await t.provider.search('pharmacie du fleuve');
+    expect(r.map((p) => p.provider)).toEqual(['mapbox']);
+    expect(t.mapbox.search).toHaveBeenCalledTimes(1);
   });
 
-  it('searchCategory merges Mapbox category hits with Photon OSM tags', async () => {
-    const mapbox = {
-      isConfigured: () => true,
-      search: jest.fn(),
-      searchCategory: jest.fn().mockResolvedValue([
-        {
-          label: 'Hôpital Provincial, Goma',
-          address: 'Goma',
-          lat: -1.674,
-          lng: 29.228,
-          commune: null,
-          city: 'Goma',
-          category: 'HOSPITAL',
-        },
-      ]),
-    };
-    const photon = {
-      search: jest.fn(),
-      searchByCategory: jest.fn().mockResolvedValue([
-        {
-          label: 'Clinique Kyeshero, Goma',
-          address: 'Goma',
-          lat: -1.681,
-          lng: 29.21,
-          commune: null,
-          city: 'Goma',
-          category: 'HOSPITAL',
-        },
-      ]),
-      reverse: jest.fn(),
-    };
-
-    const nominatim = { search: jest.fn().mockResolvedValue([]), reverse: jest.fn() };
-    const provider = new GeocodeProvider(
-      mapbox as unknown as MapboxService,
-      nominatim as unknown as NominatimService,
-      photon as unknown as PhotonService,
-    );
-
-    const results = await provider.searchCategory('HOSPITAL', {
-      centerLat: -1.6788,
-      centerLng: 29.2175,
-    });
-    expect(results).toHaveLength(2);
-    expect(mapbox.searchCategory).toHaveBeenCalledWith(
-      'HOSPITAL',
-      expect.objectContaining({ centerLat: -1.6788, centerLng: 29.2175 }),
-    );
-    expect(photon.searchByCategory).toHaveBeenCalled();
-    expect(nominatim.search).toHaveBeenCalled();
+  it('the SENGA base already found something: no Mapbox', async () => {
+    const t = make({ mapbox: [place('X', -4.3, 15.3)] });
+    expect(await t.provider.search('gombe', { localHitCount: 2 })).toEqual([]);
+    expect(t.mapbox.search).not.toHaveBeenCalled();
   });
 
-  it('searchCategory falls back to Nominatim when Mapbox and Photon are thin', async () => {
-    const mapbox = {
-      isConfigured: () => true,
-      search: jest.fn(),
-      searchCategory: jest.fn().mockResolvedValue([]),
-    };
-    const photon = {
-      search: jest.fn(),
-      searchByCategory: jest.fn().mockResolvedValue([]),
-      reverse: jest.fn(),
-    };
-    const nominatim = {
-      search: jest.fn().mockResolvedValue([
-        {
-          label: 'Hôpital Général de Kinshasa',
-          address: 'Gombe, Kinshasa',
-          lat: -4.3278,
-          lng: 15.3089,
-          commune: 'Gombe',
-          city: 'Kinshasa',
-        },
-      ]),
-      reverse: jest.fn(),
-    };
+  it('Mapbox not configured: empty, no error', async () => {
+    const t = make({ configured: false });
+    expect(await t.provider.search('rien')).toEqual([]);
+    expect(t.mapbox.search).not.toHaveBeenCalled();
+  });
 
-    const provider = new GeocodeProvider(
-      mapbox as unknown as MapboxService,
-      nominatim as unknown as NominatimService,
-      photon as unknown as PhotonService,
-    );
+  it('category browse: Mapbox only completes a thin list', async () => {
+    const many = Array.from({ length: 6 }, (_, i) => place(`Taxi ${i}`, -4.3 - i / 100, 15.3));
+    const rich = make({ photon: many, mapbox: [place('M', -4.2, 15.2)] });
+    expect((await rich.provider.searchCategory('PHARMACY')).length).toBe(6);
+    expect(rich.mapbox.searchCategory).not.toHaveBeenCalled();
 
-    const results = await provider.searchCategory('HOSPITAL', {
-      centerLat: -4.32,
-      centerLng: 15.31,
-    });
-    expect(results).toHaveLength(1);
-    expect(results[0].provider).toBe('nominatim');
-    expect(results[0].category).toBe('HOSPITAL');
+    const thin = make({ photon: [place('Taxi A', -4.3, 15.3)], mapbox: [place('Taxi M', -4.2, 15.2)] });
+    const r = await thin.provider.searchCategory('PHARMACY');
+    expect(r.map((p) => p.provider)).toContain('mapbox');
   });
 });

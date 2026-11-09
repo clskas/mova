@@ -8,6 +8,30 @@ describe('RoutingService', () => {
     global.fetch = originalFetch;
     delete process.env.OSRM_ENABLED;
     delete process.env.OSRM_BASE_URL;
+    delete process.env.MAPBOX_ACCESS_TOKEN;
+  });
+
+  it('asks Mapbox first when a key is set', async () => {
+    process.env.MAPBOX_ACCESS_TOKEN = 'test-token';
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ code: 'Ok', routes: [{ distance: 6100, duration: 900 }] }),
+    });
+    global.fetch = fetchMock as never;
+    const result = await new RoutingService(mockPlatformConfig()).resolveRoadDistance(-4.32, 15.31, -4.34, 15.33);
+    expect(result).toMatchObject({ source: 'mapbox', distanceKm: 6.1, durationMin: 15 });
+    expect(String(fetchMock.mock.calls[0][0])).toContain('api.mapbox.com/directions');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('Mapbox fails: OSRM next', async () => {
+    process.env.MAPBOX_ACCESS_TOKEN = 'test-token';
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 401 })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: 'Ok', routes: [{ distance: 5420, duration: 720 }] }) }) as never;
+    const result = await new RoutingService(mockPlatformConfig()).resolveRoadDistance(-4.32, 15.31, -4.34, 15.33);
+    expect(result.source).toBe('osrm');
   });
 
   it('returns stored distance when provided', async () => {

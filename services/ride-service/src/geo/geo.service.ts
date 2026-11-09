@@ -441,8 +441,10 @@ export class GeoService implements OnModuleInit {
         bounded: true,
         limit: 10,
         poiCategory: category,
+        // Mapbox (paid) only when the SENGA base found nothing.
+        localHitCount: results.length,
       },
-      6000,
+      9000,
     );
     for (const p of geocodeHits) {
       const resolvedCity =
@@ -478,6 +480,7 @@ export class GeoService implements OnModuleInit {
       bounded?: boolean;
       limit?: number;
       poiCategory?: PoiCategory;
+      localHitCount?: number;
     },
     timeoutMs: number,
   ) {

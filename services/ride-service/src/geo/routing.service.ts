@@ -9,6 +9,15 @@ export type RoadDistanceResult = {
   durationMin?: number;
 };
 
+/** "lng,lat;lng,lat" from real coordinates only (never raw request text in the URL). */
+export function routeCoords(lat1: number, lng1: number, lat2: number, lng2: number): string | null {
+  const pts = [Number(lat1), Number(lng1), Number(lat2), Number(lng2)];
+  if (!pts.every((n) => Number.isFinite(n))) return null;
+  const [a, b, c, d] = pts as [number, number, number, number];
+  if (Math.abs(a) > 90 || Math.abs(c) > 90 || Math.abs(b) > 180 || Math.abs(d) > 180) return null;
+  return `${b.toFixed(6)},${a.toFixed(6)};${d.toFixed(6)},${c.toFixed(6)}`;
+}
+
 @Injectable()
 export class RoutingService {
   private readonly logger = new Logger(RoutingService.name);
@@ -87,7 +96,8 @@ export class RoutingService {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const coords = `${lng1},${lat1};${lng2},${lat2}`;
+      const coords = routeCoords(lat1, lng1, lat2, lng2);
+      if (!coords) return null;
       const url =
         `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}` +
         `?overview=false&alternatives=false&steps=false&access_token=${encodeURIComponent(this.mapboxToken)}`;
@@ -127,7 +137,8 @@ export class RoutingService {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const coords = `${lng1},${lat1};${lng2},${lat2}`;
+      const coords = routeCoords(lat1, lng1, lat2, lng2);
+      if (!coords) return null;
       const url = `${this.baseUrl}/route/v1/driving/${coords}?overview=false&alternatives=false&steps=false`;
       const res = await fetch(url, { signal: controller.signal });
       if (!res.ok) {

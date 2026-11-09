@@ -1,4 +1,4 @@
-import { RoutingService } from './routing.service';
+import { RoutingService, routeCoords } from './routing.service';
 import { mockPlatformConfig } from '../platform/platform-config.mock';
 
 describe('RoutingService', () => {
@@ -32,6 +32,12 @@ describe('RoutingService', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: 'Ok', routes: [{ distance: 5420, duration: 720 }] }) }) as never;
     const result = await new RoutingService(mockPlatformConfig()).resolveRoadDistance(-4.32, 15.31, -4.34, 15.33);
     expect(result.source).toBe('osrm');
+  });
+
+  it('routeCoords keeps only real coordinates', () => {
+    expect(routeCoords(-4.32, 15.31, -4.34, 15.33)).toBe('15.310000,-4.320000;15.330000,-4.340000');
+    expect(routeCoords(Number('x'), 15, 1, 1)).toBeNull();
+    expect(routeCoords(95, 15, 1, 1)).toBeNull();
   });
 
   it('returns stored distance when provided', async () => {

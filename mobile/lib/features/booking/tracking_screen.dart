@@ -26,6 +26,7 @@ import '../geo/suggest_place_screen.dart';
 import '../billing/cash_paid_claim_button.dart';
 import '../rating/rating_screen.dart';
 import 'payment_screen.dart';
+import 'widgets/driver_identity_card.dart';
 import 'widgets/mova_ride_map.dart';
 import '../../core/safety/sos_helper.dart';
 
@@ -305,6 +306,13 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       'plateNumber': raw['plateNumber']?.toString() ?? vehicle?['plate']?.toString() ?? '—',
       'vehicleModel': raw['vehicleModel']?.toString() ??
           '${vehicle?['make'] ?? ''} ${vehicle?['model'] ?? ''}'.trim(),
+      'vehicleColor': raw['vehicleColor']?.toString() ?? vehicle?['color']?.toString(),
+      'photoUrl': raw['photoUrl']?.toString(),
+      'vehiclePhotoUrl': raw['vehiclePhotoUrl']?.toString() ??
+          ((vehicle?['photoUrls'] as List?)?.isNotEmpty == true
+              ? (vehicle!['photoUrls'] as List).first?.toString()
+              : null),
+      'totalRides': raw['totalRides'] as num?,
     };
   }
 
@@ -783,8 +791,6 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     }
 
     final driverName = _driver?['name']?.toString() ?? tr('Chauffeur');
-    final rating = (_driver?['rating'] as num?)?.toDouble();
-    final plate = _driver?['plateNumber']?.toString() ?? '—';
     final vehicle = _driver?['vehicleType']?.toString() ??
         _driver?['vehicleModel']?.toString() ??
         'Moto-taxi';
@@ -839,101 +845,53 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             MovaCard(
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  CircleAvatar(
-                                    radius: 28,
-                                    backgroundColor: MovaColors.violet.withValues(alpha: 0.15),
-                                    child: Text(
-                                      driverName.isNotEmpty ? driverName[0].toUpperCase() : '?',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: MovaColors.violet,
-                                        fontSize: 22,
-                                      ),
-                                    ),
+                                  DriverIdentityCard(
+                                    driver: _driver,
+                                    fallbackVehicleType: _ride?['vehicleType']?.toString(),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          driverName,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                        if (rating != null)
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.star, color: Colors.amber, size: 16),
-                                              const SizedBox(width: 4),
-                                              Text(rating.toStringAsFixed(1)),
-                                              const SizedBox(width: 8),
-                                              Flexible(
-                                                child: Text(
-                                                  '$vehicle · $plate',
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    color: MovaColors.textSecondary,
-                                                    fontSize: 13,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          )
-                                        else
-                                          Text(
-                                            '$vehicle · $plate',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              color: MovaColors.textSecondary,
-                                              fontSize: 13,
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                    IconButton(
+                                      icon: ChatBadgeIcon(
+                                        kind: 'ride',
+                                        threadId: widget.rideId,
+                                        color: MovaColors.violet,
+                                      ),
+                                      tooltip: tr('Chat'),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => RideChatScreen(
+                                              rideId: widget.rideId,
+                                              myRole: 'passenger',
+                                              peerLabel: driverName,
                                             ),
                                           ),
-                                      ],
+                                        );
+                                      },
                                     ),
-                                  ),
-                                  IconButton(
-                                    icon: ChatBadgeIcon(
-                                      kind: 'ride',
-                                      threadId: widget.rideId,
-                                      color: MovaColors.violet,
+                                    IconButton(
+                                      icon: const Icon(Icons.call_outlined, color: MovaColors.violet),
+                                      tooltip: tr('Appel SENGA'),
+                                      onPressed: _openVoiceCall,
                                     ),
-                                    tooltip: tr('Chat'),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => RideChatScreen(
-                                            rideId: widget.rideId,
-                                            myRole: 'passenger',
-                                            peerLabel: driverName,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.call_outlined, color: MovaColors.violet),
-                                    tooltip: tr('Appel SENGA'),
-                                    onPressed: _openVoiceCall,
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.phone, color: MovaColors.green),
-                                    tooltip: tr('Appeler / WhatsApp'),
-                                    onPressed: _callDriver,
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.chat, color: Color(0xFF25D366)),
-                                    tooltip: tr('WhatsApp'),
-                                    onPressed: () => launchWhatsApp(_driver?['phone']?.toString()),
+                                    IconButton(
+                                      icon: const Icon(Icons.phone, color: MovaColors.green),
+                                      tooltip: tr('Appeler / WhatsApp'),
+                                      onPressed: _callDriver,
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.chat, color: Color(0xFF25D366)),
+                                      tooltip: tr('WhatsApp'),
+                                      onPressed: () => launchWhatsApp(_driver?['phone']?.toString()),
+                                    ),
+                                    ],
                                   ),
                                 ],
                               ),

@@ -18,9 +18,10 @@ import { ShareModule } from '../share/share.module';
 import { RideChatService } from '../chat/ride-chat.service';
 import { FraudService } from '../fraud/fraud.service';
 import { GeoModule } from '../geo/geo.module';
+import { UploadsModule } from '../uploads/uploads.module';
 
 @Module({
-  imports: [MatchingModule, WebsocketModule, TrackingModule, ShareModule, GeoModule],
+  imports: [MatchingModule, WebsocketModule, TrackingModule, ShareModule, GeoModule, UploadsModule],
   controllers: [RidesController, RidePoolController],
   providers: [RidesService, RidePoolService, ScheduledRidesService, RideSearchScheduler, ScheduledRidesScheduler, PricingService, PricingTimeWindowService, PricingAdminService, CommissionService, SurchargeService, PromoService, RideChatService, FraudService],
   exports: [RidesService, RidePoolService, ScheduledRidesService, PricingService, PricingTimeWindowService, PricingAdminService, CommissionService, SurchargeService, PromoService, ShareModule, FraudService, RideChatService, GeoModule],

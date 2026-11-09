@@ -631,6 +631,29 @@ describe('RidesService', () => {
     );
   });
 
+  it('driver card: the vehicle of the ride, the photo through the ride', () => {
+    const s = service as unknown as {
+      pickRideVehicle: (v: unknown[], r?: unknown) => { id: string } | undefined;
+      driverPhotoUrl: (u: string | null, rideId?: string) => string | null;
+    };
+    const vehicles = [
+      { id: 'old', type: 'STANDARD', isActive: false, typeApprovalStatus: 'APPROVED' },
+      { id: 'moto', type: 'MOTO_TAXI', isActive: true, typeApprovalStatus: 'APPROVED' },
+      { id: 'car', type: 'STANDARD', isActive: true, typeApprovalStatus: 'APPROVED' },
+    ];
+    expect(s.pickRideVehicle(vehicles, { vehicleId: 'moto', vehicleType: 'STANDARD' })?.id).toBe('moto');
+    expect(s.pickRideVehicle(vehicles, { vehicleId: null, vehicleType: 'STANDARD' })?.id).toBe('car');
+    expect(s.pickRideVehicle(vehicles, { vehicleId: 'someone-else', vehicleType: 'VIP' })?.id).toBe('moto');
+    expect(s.driverPhotoUrl('/api/uploads/kyc/abc.jpg', 'r1')).toBe('/api/rides/r1/driver-photo');
+    expect(s.driverPhotoUrl('https://lh3.googleusercontent.com/x', 'r1')).toBe('https://lh3.googleusercontent.com/x');
+    expect(s.driverPhotoUrl(null, 'r1')).toBeNull();
+  });
+
+  it('driverPhotoSource: only the people on the ride', async () => {
+    prisma.ride.findUnique.mockResolvedValue({ id: 'r1', passengerId: 'p1', driverId: 'd1', sharePassengers: [] });
+    await expect(service.driverPhotoSource('r1', 'stranger')).rejects.toThrow();
+  });
+
   it('updateStatus: the passenger cannot advance the trip steps', async () => {
     prisma.ride.findUnique.mockResolvedValue({
       id: 'r-p',

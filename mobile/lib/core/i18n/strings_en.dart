@@ -75,6 +75,8 @@ const Map<String, String> kStringsEn = {
   "Envoyer SOS": "Send SOS",
   "Estimer le prix": "Estimate the price",
   "Fermer": "Close",
+  "Photo indisponible": "Photo unavailable",
+  "{count} courses": "{count} rides",
   "Gamme": "Category",
   "Guide SENGA Driver — simple et court": "SENGA Driver guide — short and simple",
   "Historique": "History",

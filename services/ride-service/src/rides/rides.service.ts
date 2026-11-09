@@ -24,6 +24,7 @@ import { dayRangeFilter,
   isTricycleEnabled,
   isPassengerCountEnabled,
   normalizeRidePassengerCount,
+  vehiclePhotoList,
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -994,7 +995,7 @@ export class RidesService {
     }
     if (ride.isShared) {
       const shared = this.ridePool.formatSharedRide(ride);
-      const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId) : null;
+      const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId, ride) : null;
       const activeBookings = ride.sharePassengers.filter((p) => p.status !== 'CANCELLED');
       const payEntries = await Promise.all(
         activeBookings.map(async (p) => {
@@ -1057,7 +1058,7 @@ export class RidesService {
         ratings: ride.ratings,
       };
     }
-    const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId) : null;
+    const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId, ride) : null;
     const passenger =
       participantUserId && ride.driverId === participantUserId
         ? await this.fetchUserBrief(ride.passengerId)
@@ -1241,15 +1242,22 @@ export class RidesService {
     return { etaMinutes, driverDistanceKm };
   }
 
-  private async fetchUserBrief(userId: string): Promise<{ name?: string; phone?: string } | null> {
+  private async fetchUserBrief(
+    userId: string,
+  ): Promise<{ name?: string; phone?: string; avatarUrl?: string | null } | null> {
     try {
       const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
         headers: { 'x-internal-api-key': INTERNAL_API_KEY },
       });
       if (!res.ok) return null;
-      const user = (await res.json()) as { firstName?: string; lastName?: string; phone?: string };
+      const user = (await res.json()) as {
+        firstName?: string;
+        lastName?: string;
+        phone?: string;
+        avatarUrl?: string | null;
+      };
       const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
-      return { name: name || undefined, phone: user.phone };
+      return { name: name || undefined, phone: user.phone, avatarUrl: user.avatarUrl ?? null };
     } catch {
       return null;
     }
@@ -1332,7 +1340,65 @@ export class RidesService {
     return { passengerIds: [...ids], city: area.name };
   }
 
-  private async fetchDriverInfo(userId: string) {
+  /**
+   * The vehicle the passenger must look for: the one the driver accepted the ride with,
+   * else an active approved vehicle of the ride's category, else the first active one.
+   * (It used to be the first vehicle on file — a driver with two vehicles showed the wrong plate.)
+   */
+  private pickRideVehicle<V extends { id: string; type?: string | null; isActive?: boolean | null; typeApprovalStatus?: string | null }>(
+    vehicles: V[],
+    ride?: { vehicleId?: string | null; vehicleType?: string | null } | null,
+  ): V | undefined {
+    if (ride?.vehicleId) {
+      const exact = vehicles.find((v) => v.id === ride.vehicleId);
+      if (exact) return exact;
+    }
+    const active = vehicles.filter((v) => v.isActive !== false);
+    const approved = active.filter((v) => String(v.typeApprovalStatus ?? '').toUpperCase() === 'APPROVED');
+    const wanted = ride?.vehicleType ? String(ride.vehicleType).toUpperCase() : null;
+    return (
+      (wanted ? approved.find((v) => String(v.type ?? '').toUpperCase() === wanted) : undefined) ??
+      approved[0] ??
+      active[0] ??
+      vehicles[0]
+    );
+  }
+
+  /** Driver photo for the passenger: a public URL as is, the KYC selfie through the ride. */
+  private driverPhotoUrl(avatarUrl: string | null | undefined, rideId?: string): string | null {
+    const url = String(avatarUrl ?? '').trim();
+    if (!url) return null;
+    if (/\/uploads\/kyc\//.test(url)) return rideId ? `/api/rides/${rideId}/driver-photo` : null;
+    return /^https?:\/\//.test(url) || url.startsWith('/') ? url : null;
+  }
+
+  /** File behind GET /rides/:id/driver-photo — only for the people on the ride. */
+  async driverPhotoSource(
+    rideId: string,
+    userId: string,
+  ): Promise<{ kind: 'kyc'; filename: string } | { kind: 'url'; url: string } | null> {
+    const ride = await this.prisma.ride.findUnique({
+      where: { id: rideId },
+      include: { sharePassengers: { select: { userId: true, status: true } } },
+    });
+    if (!ride?.driverId) return null;
+    const onRide =
+      ride.passengerId === userId ||
+      ride.driverId === userId ||
+      ride.sharePassengers.some((p) => p.userId === userId && p.status !== 'CANCELLED');
+    if (!onRide) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    const user = await this.fetchUserBrief(ride.driverId);
+    const url = String(user?.avatarUrl ?? '').trim();
+    if (!url) return null;
+    const kyc = url.match(/\/uploads\/kyc\/([^/?#]+)/);
+    if (kyc) return { kind: 'kyc', filename: kyc[1]! };
+    return /^https?:\/\//.test(url) ? { kind: 'url', url } : null;
+  }
+
+  private async fetchDriverInfo(
+    userId: string,
+    ride?: { id?: string; vehicleId?: string | null; vehicleType?: string | null } | null,
+  ) {
     try {
       const res = await fetch(serviceUrl('driver', `/internal/drivers/${userId}`), {
         headers: { 'x-internal-api-key': INTERNAL_API_KEY },
@@ -1340,19 +1406,42 @@ export class RidesService {
       if (!res.ok) return null;
       const profile = await res.json();
       const user = await this.fetchUserBrief(userId);
-      const vehicle = profile.vehicles?.[0];
-      const vehicleType = vehicle ? toMobileVehicleType(vehicle.type) : undefined;
+      const vehicle = this.pickRideVehicle(
+        (profile.vehicles ?? []) as {
+          id: string;
+          type?: string | null;
+          isActive?: boolean | null;
+          typeApprovalStatus?: string | null;
+          make?: string | null;
+          model?: string | null;
+          plateNumber?: string | null;
+          color?: string | null;
+          photoUrls?: unknown;
+          imageUrl?: string | null;
+        }[],
+        ride,
+      );
+      const vehicleType = vehicle?.type ? toMobileVehicleType(vehicle.type as VehicleType) : undefined;
+      // Photos are shown only once SENGA validated the vehicle.
+      const vehiclePhotos =
+        vehicle && String(vehicle.typeApprovalStatus ?? '').toUpperCase() === 'APPROVED'
+          ? vehiclePhotoList(vehicle).slice(0, 4)
+          : [];
+      const vehicleModel = vehicle ? `${vehicle.make ?? ''} ${vehicle.model ?? ''}`.trim() : undefined;
       return {
         userId: profile.userId,
         name: user?.name ?? `Chauffeur ${userId.slice(0, 6)}`,
         phone: user?.phone ?? '',
+        photoUrl: this.driverPhotoUrl(user?.avatarUrl, ride?.id),
         rating: profile.ratingAvg,
         totalRides: profile.totalRides,
         lat: profile.currentLat,
         lng: profile.currentLng,
         plateNumber: vehicle?.plateNumber,
         vehicleType,
-        vehicleModel: vehicle ? `${vehicle.make ?? ''} ${vehicle.model ?? ''}`.trim() : undefined,
+        vehicleModel: vehicleModel || undefined,
+        vehicleColor: vehicle?.color ?? null,
+        vehiclePhotoUrl: vehiclePhotos[0] ?? null,
         vehicle: vehicle
           ? {
               id: vehicle.id,
@@ -1361,6 +1450,7 @@ export class RidesService {
               model: vehicle.model,
               plate: vehicle.plateNumber,
               color: vehicle.color,
+              photoUrls: vehiclePhotos,
             }
           : null,
       };

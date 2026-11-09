@@ -75,6 +75,8 @@ export const UI_SOURCE_STRINGS: readonly string[] = [
  "Envoyer SOS",
  "Estimer le prix",
  "Fermer",
+ "Photo indisponible",
+ "{count} courses",
  "Gamme",
  "Guide SENGA Driver — simple et court",
  "Historique",

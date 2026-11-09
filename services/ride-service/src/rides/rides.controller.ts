@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Patch, Post, Query, Request, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
+import { UploadsService } from '../uploads/uploads.service';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ScheduledRideStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -27,7 +29,17 @@ export class RidesController {
     private scheduledRidesService: ScheduledRidesService,
     private rideChatService: RideChatService,
     private ridePoolService: RidePoolService,
+    private uploadsService: UploadsService,
   ) {}
+
+  @Get(':id/driver-photo')
+  @ApiOperation({ summary: 'Photo du chauffeur (passagers de la course uniquement)' })
+  async driverPhoto(@Request() req: { user: { id: string } }, @Param('id') id: string, @Res() res: Response) {
+    const source = await this.ridesService.driverPhotoSource(id, req.user.id);
+    if (!source) throw new NotFoundException('Photo indisponible');
+    if (source.kind === 'url') return res.redirect(source.url);
+    return this.uploadsService.serveUploadedFile('kyc', source.filename, res);
+  }
 
   @Post('estimate')
   @ApiOperation({ summary: 'Estimer tarif (CDF, Kinshasa)' })

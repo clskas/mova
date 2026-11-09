@@ -13,12 +13,17 @@ class RatingScreen extends ConsumerStatefulWidget {
     this.errandId,
     this.driverId,
     this.peerLabel,
+    this.ratePassenger = false,
   }) : assert(rideId != null || errandId != null);
 
   final String? rideId;
   final String? errandId;
   final String? driverId;
   final String? peerLabel;
+
+  /// Driver app: the driver rates the passenger (returns true to the caller instead of
+  /// closing the whole stack — the ride screen still handles the payment).
+  final bool ratePassenger;
 
   bool get isErrand => errandId != null;
 
@@ -53,6 +58,10 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
     if (!mounted || _closing) return;
     _closing = true;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    if (widget.ratePassenger) {
+      Navigator.of(context).pop(true);
+      return;
+    }
     Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
@@ -96,9 +105,16 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
       }
       setState(() {
         _loadingContext = false;
-        _driverId = data['driverId']?.toString() ?? _driverId;
-        final driver = data['driver'] as Map<String, dynamic>?;
-        _peerName = driver?['name']?.toString();
+        if (widget.ratePassenger) {
+          // The person rated is the passenger.
+          _driverId = data['passengerId']?.toString();
+          final passenger = data['passenger'] as Map<String, dynamic>?;
+          _peerName = passenger?['name']?.toString() ?? widget.peerLabel;
+        } else {
+          _driverId = data['driverId']?.toString() ?? _driverId;
+          final driver = data['driver'] as Map<String, dynamic>?;
+          _peerName = driver?['name']?.toString();
+        }
       });
       return;
     }
@@ -125,7 +141,9 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
       if (toUserId == null || toUserId.isEmpty) {
         setState(() {
           _loading = false;
-          _error = tr('Chauffeur introuvable pour cette course.');
+          _error = widget.ratePassenger
+              ? tr('Passager introuvable pour cette course.')
+              : tr('Chauffeur introuvable pour cette course.');
         });
         return;
       }
@@ -152,9 +170,17 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
     }
   }
 
-  String get _title => widget.isErrand ? tr('Noter le livreur') : tr('Noter la course');
+  String get _title => widget.ratePassenger
+      ? tr('Noter le passager')
+      : (widget.isErrand ? tr('Noter le livreur') : tr('Noter la course'));
 
   String get _prompt {
+    if (widget.ratePassenger) {
+      final peer = _peerName ?? widget.peerLabel;
+      return peer != null && peer.isNotEmpty
+          ? trf("Comment s'est passée la course avec {peer} ?", {'peer': peer})
+          : tr("Comment s'est passée la course avec ce passager ?");
+    }
     final label = widget.isErrand ? 'livraison' : 'course';
     final peer = _peerName ?? widget.peerLabel;
     if (peer != null) {

@@ -238,6 +238,8 @@ model Ride {
   ratings         Rating[]
   sharePassengers RideSharePassenger[]
 
+  /// Voided as a test (accounting reversed, never really happened).
+  testVoidedAt DateTime?
   @@index([status])
   @@index([passengerId])
   @@index([driverId])
@@ -409,6 +411,8 @@ model Delivery {
   events DeliveryEvent[]
   ratings DeliveryRating[]
 
+  /// Voided as a test (accounting reversed, never really happened).
+  testVoidedAt DateTime?
   @@index([userId])
   @@index([status])
   @@map("deliveries")
@@ -603,6 +607,8 @@ model CarpoolTrip {
   passengers CarpoolPassenger[]
   ratings    CarpoolRating[]
 
+  /// Voided as a test (accounting reversed, never really happened).
+  testVoidedAt DateTime?
   @@index([driverId])
   @@index([status])
   @@index([departureAt])
@@ -685,6 +691,8 @@ model ErrandOrder {
   updatedAt         DateTime          @updatedAt
   ratings           ErrandRating[]
 
+  /// Voided as a test (accounting reversed, never really happened).
+  testVoidedAt DateTime?
   @@index([userId])
   @@index([status])
   @@map("errand_orders")
@@ -889,6 +897,8 @@ model RentalInquiry {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
+  /// Voided as a test (accounting reversed, never really happened).
+  testVoidedAt DateTime?
   @@index([userId])
   @@index([status])
   @@index([driverId])
@@ -945,6 +955,8 @@ model MovingRequest {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
+  /// Voided as a test (accounting reversed, never really happened).
+  testVoidedAt DateTime?
   @@index([userId])
   @@index([status])
   @@map("moving_requests")

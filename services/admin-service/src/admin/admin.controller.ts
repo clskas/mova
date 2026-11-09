@@ -202,6 +202,26 @@ export class AdminController {
     return this.adminService.listPlayPrelaunchUsers();
   }
 
+  @Post('test-cleanup/preview')
+  @RequirePermissions(AdminPermission.USERS_DELETE)
+  @ApiOperation({ summary: 'Courses / services de test à annuler en comptabilité — aperçu (SUPER_ADMIN)' })
+  testCleanupPreview(
+    @Request() req: { user: { role: string } },
+    @Body() body: { before?: string; accounts?: string[]; maxMinutes?: number },
+  ) {
+    return this.adminService.testCleanupPreview(req.user.role, body ?? {});
+  }
+
+  @Post('test-cleanup/apply')
+  @RequirePermissions(AdminPermission.USERS_DELETE)
+  @ApiOperation({ summary: 'Annuler en comptabilité les éléments de test validés (SUPER_ADMIN)' })
+  testCleanupApply(
+    @Request() req: { user: { role: string } },
+    @Body() body: { before?: string; accounts?: string[]; maxMinutes?: number; confirmKeys?: string[] },
+  ) {
+    return this.adminService.testCleanupApply(req.user.role, body ?? {});
+  }
+
   @Post('users/purge-play-prelaunch')
   @RequirePermissions(AdminPermission.USERS_DELETE)
   @ApiOperation({ summary: 'Supprimer les comptes Play Test Lab (SUPER_ADMIN, après revue)' })

@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { TestCleanupService } from './test-cleanup.service';
 import { ApiTags } from '@nestjs/swagger';
 import {
   CarpoolStatus,
@@ -53,6 +54,7 @@ import { ClientAppsConfig } from '@mova/shared';
 export class InternalController {
   constructor(
     private rides: RidesService,
+    private testCleanup: TestCleanupService,
     private uploads: UploadsService,
     private deliveries: DeliveriesService,
     private errands: ErrandsService,
@@ -79,6 +81,17 @@ export class InternalController {
     private companyContacts: CompanyContactsService,
     private legalDocuments: LegalDocumentsService,
   ) {}
+
+  /** Test rides / services to void (preview changes nothing). */
+  @Post('test-cleanup/preview')
+  testCleanupPreview(@Body() body: { before?: string; userIds?: string[]; maxMinutes?: number }) {
+    return this.testCleanup.preview(body ?? {});
+  }
+
+  @Post('test-cleanup/apply')
+  testCleanupApply(@Body() body: { before?: string; userIds?: string[]; maxMinutes?: number; confirmKeys?: string[] }) {
+    return this.testCleanup.apply(body ?? {}, body?.confirmKeys ?? []);
+  }
 
   @Get('fraud/signals')
   fraudSignals(@Query('days') days?: string, @Query('minPair') minPair?: string) {

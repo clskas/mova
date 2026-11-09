@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { TestVoidService } from '../wallet/test-void.service';
 import { ApiTags } from '@nestjs/swagger';
 import { SubscriptionStatus, SubscriptionTarget } from '@prisma/client';
 import { IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
@@ -84,6 +85,7 @@ class ReconcileMobileMoneyDto {
 export class InternalController {
   constructor(
     private wallet: WalletService,
+    private testVoidService: TestVoidService,
     private subscriptions: SubscriptionsService,
     private driverPayouts: DriverPayoutService,
     private payments: PaymentsService,
@@ -229,6 +231,12 @@ export class InternalController {
     @Body() body: { amountCdf: number; referenceType: string; referenceId: string; description?: string },
   ) {
     return this.wallet.holdFunds(userId, body.amountCdf, body.referenceType, body.referenceId, body.description);
+  }
+
+  @Post('test-void')
+  testVoid(@Body() body: { items: { referenceType: string; referenceId: string; extraIds?: string[] }[]; apply?: boolean }) {
+    const items = Array.isArray(body?.items) ? body.items.slice(0, 2000) : [];
+    return body?.apply === true ? this.testVoidService.apply(items) : this.testVoidService.preview(items);
   }
 
   @Post('cancel-fees/collect')

@@ -240,6 +240,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/blacklist", label: "Liste noire", short: "Blacklist", section: "blacklist" },
   { href: "/alertes-staff", label: "Alertes staff", short: "Alertes", section: "alertes-staff" },
   { href: "/audit", label: "Journal d’audit", short: "Audit", section: "audit" },
+  { href: "/nettoyage-tests", label: "Nettoyage des tests", short: "Tests", section: "audit" },
   { href: "/planifiees", label: "Planifiées", short: "Planif.", section: "planifiees" },
   { href: "/parametres", label: "Zones géographiques", short: "Zones", section: "parametres" },
   { href: "/lieux", label: "Lieux & POI", short: "Lieux", section: "lieux" },

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { InternalController } from './internal.controller';
+import { TestCleanupService } from './test-cleanup.service';
 import { PaymentInfoService } from './payment-info.service';
 import { RidesModule } from '../rides/rides.module';
 import { DeliveriesModule } from '../deliveries/deliveries.module';
@@ -34,7 +35,7 @@ import { UploadsModule } from '../uploads/uploads.module';
     UploadsModule,
   ],
   controllers: [InternalController],
-  providers: [PaymentInfoService],
+  providers: [PaymentInfoService, TestCleanupService],
   exports: [PaymentInfoService],
 })
 export class InternalModule {}

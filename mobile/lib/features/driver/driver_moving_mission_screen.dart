@@ -65,6 +65,56 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
     });
   }
 
+  /// On site, before loading: the real volume. More than the customer declared → new price
+  /// (the customer gets an SMS and can still cancel before the start).
+  Future<void> _reportActualVolume() async {
+    final controller = TextEditingController(text: _moving?['volumeM3']?.toString() ?? '');
+    final value = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('Volume réel constaté')),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(labelText: tr('Volume en m³'), suffixText: 'm³'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Annuler'))),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, double.tryParse(controller.text.replaceAll(',', '.'))),
+            child: Text(tr('Valider')),
+          ),
+        ],
+      ),
+    );
+    if (value == null || !mounted) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final result = await ref.read(apiClientProvider).post(
+      '/moving/${widget.movingId}/actual-volume',
+      {'volumeM3': value},
+    );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    switch (result) {
+      case Success(:final data):
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              data['adjusted'] == true
+                  ? tr('Prix ajusté au volume réel — le client a été prévenu par SMS.')
+                  : tr('Volume conforme à la déclaration du client.'),
+            ),
+          ),
+        );
+        await _load();
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
+
   Future<void> _advanceStatus(String nextStatus, String successMessage) async {
     setState(() {
       _saving = true;
@@ -272,6 +322,16 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
                 label: _status == 'ASSIGNED' ? tr('Itinéraire départ') : tr('Itinéraire arrivée'),
                 icon: Icons.map,
                 onPressed: _saving ? null : () => _openMaps(toPickup: _status == 'ASSIGNED'),
+              ),
+              const SizedBox(height: 8),
+            ],
+            if (_status == 'ASSIGNED') ...[
+              MovaButton(
+                key: const Key('movingActualVolume'),
+                label: tr('Volume réel constaté'),
+                icon: Icons.straighten,
+                isSecondary: true,
+                onPressed: _saving ? null : _reportActualVolume,
               ),
               const SizedBox(height: 8),
             ],

@@ -202,6 +202,48 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
     }
   }
 
+  Future<void> _markPassenger(String bookingId, bool boarded) async {
+    setState(() => _actionLoading = true);
+    final api = ref.read(apiClientProvider);
+    final result = await api.post(
+      '/carpool/${widget.tripId}/passengers/$bookingId/${boarded ? 'boarded' : 'no-show'}',
+      {},
+    );
+    if (!mounted) return;
+    setState(() => _actionLoading = false);
+    switch (result) {
+      case Success():
+        _loadTrip();
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
+
+  Future<void> _declareNotTravelled() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr("Je n'ai pas voyagé")),
+        content: Text(tr("Confirmez que vous n'étiez pas dans ce trajet : vous n'aurez rien à payer.")),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Annuler'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Confirmer'))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _actionLoading = true);
+    final result = await ref.read(apiClientProvider).post('/carpool/${widget.tripId}/not-travelled', {});
+    if (!mounted) return;
+    setState(() => _actionLoading = false);
+    switch (result) {
+      case Success():
+        _loadTrip();
+      case Failure(:final error):
+        setState(() => _error = error.message);
+    }
+  }
+
   Future<void> _rateTrip() async {
     setState(() => _actionLoading = true);
     final api = ref.read(apiClientProvider);
@@ -443,12 +485,47 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                     Text(tr('Passagers'), style: Theme.of(context).textTheme.titleSmall),
                     const SizedBox(height: 8),
                     ...((trip['passengers'] as List).cast<Map<String, dynamic>>()).map(
-                      (p) => ListTile(
-                        dense: true,
-                        leading: const Icon(Icons.person_outline),
-                        title: Text(p['label']?.toString() ?? tr('Passager')),
-                        trailing: Text('${p['seats']} pl.'),
-                      ),
+                      (p) {
+                        final boarded = p['boarded'] == true;
+                        final noShow = p['noShow'] == true;
+                        final canMark = _isDriver && (_canStart || _canComplete);
+                        final state = boarded
+                            ? tr('Monté')
+                            : noShow
+                                ? tr('Absent')
+                                : p['notTravelled'] == true
+                                    ? tr('Pas voyagé')
+                                    : null;
+                        return ListTile(
+                          dense: true,
+                          leading: Icon(
+                            boarded ? Icons.check_circle : (noShow ? Icons.person_off : Icons.person_outline),
+                            color: boarded ? MovaColors.green : (noShow ? MovaColors.orange : null),
+                          ),
+                          title: Text(p['label']?.toString() ?? tr('Passager')),
+                          subtitle: Text(state == null ? '${p['seats']} pl.' : '${p['seats']} pl. · $state'),
+                          trailing: canMark
+                              ? Wrap(
+                                  spacing: 4,
+                                  children: [
+                                    TextButton(
+                                      key: Key('carpoolBoarded_${p['id']}'),
+                                      onPressed: _actionLoading || boarded
+                                          ? null
+                                          : () => _markPassenger(p['id'].toString(), true),
+                                      child: Text(tr('Monté')),
+                                    ),
+                                    TextButton(
+                                      onPressed: _actionLoading || noShow
+                                          ? null
+                                          : () => _markPassenger(p['id'].toString(), false),
+                                      child: Text(tr('Absent')),
+                                    ),
+                                  ],
+                                )
+                              : null,
+                        );
+                      },
                     ),
                   ],
                   if (_isDriver && (_canStart || _canComplete)) ...[
@@ -480,6 +557,12 @@ class _CarpoolDetailScreenState extends ConsumerState<CarpoolDetailScreen> {
                       isLoading: _actionLoading,
                       onPressed: _openPayment,
                     ),
+                    if (trip['canDeclareNotTravelled'] == true)
+                      TextButton(
+                        key: const Key('carpoolNotTravelled'),
+                        onPressed: _actionLoading ? null : _declareNotTravelled,
+                        child: Text(tr("Je n'ai pas voyagé")),
+                      ),
                   ],
                   if (_canRate) ...[
                     const SizedBox(height: 16),

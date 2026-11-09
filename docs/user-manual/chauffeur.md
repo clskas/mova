@@ -36,6 +36,8 @@ La **ville SENGA** sur l'accueil est détectée via GPS à l'ouverture (modifiab
 - Si la dette dépasse le seuil, ou si un solde positif est exigé, les **offres sont bloquées** jusqu’à recharge ou règlement au guichet.
 - Après une **livraison COD**, le client paie en espèces à la remise ; vous confirmez **Cash reçu** dans l’app (sans code PIN).
 - **Code de réception (colis, repas, courses garanties)** : seul le client l’a (SMS et son application). Demandez-le à la remise et saisissez-le pour terminer. Après **5 codes faux**, la saisie est bloquée : le client confirme alors la réception dans son application, ou contactez SENGA.
+- **Destinataire injoignable** : seulement une fois **en route** et **à l'adresse** (position GPS à moins de 500 m). Le client reçoit un SMS à chaque tentative ; après 3 tentatives sur 30 min, retour à l'expéditeur.
+- **Annulation** : le livreur ne peut pas annuler la commande d'un client. En cas de problème, contactez SENGA, qui réassigne la livraison. Vous ne pouvez pas non plus accepter votre propre commande.
 - **Courses & commissions** : le total des achats ne peut pas dépasser le **budget du client**. Si les articles coûtent plus, appelez le client avant d’acheter.
 - **Étapes d’une course** (arrivé, démarrée, terminée) : seul le chauffeur assigné les valide. Une annulation suit toujours les règles normales d’annulation.
 - **Cash reçu** : confirmez dès que vous avez encaissé. Sans action de votre part, un paiement espèces **sous 150 000 FC** peut être **clôturé automatiquement après 24 h** (considéré payé).
@@ -75,7 +77,7 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
    - et votre **volume utile** déclaré doit être au moins égal au volume du déménagement.
 2. Sur l'accueil, la carte **« Déménagements proposés »** montre le trajet, le volume, les objets et votre **gain net**.
 3. Appuyez sur **Accepter** : le **premier chauffeur** qui accepte obtient la mission. Si un autre a été plus rapide, l'app vous l'indique.
-4. Ouvrez la mission, appuyez sur **Démarrer** sur place (le client ne peut plus annuler), puis **Terminer** à l'arrivée.
+4. Ouvrez la mission. Sur place, **avant de charger**, appuyez sur **« Volume réel constaté »** si le volume dépasse la déclaration du client : au-delà de 10 %, le prix est ajusté et le client reçoit un SMS (il peut encore annuler). Puis **Démarrer** (le client ne peut plus annuler) et **Terminer** à l'arrivée.
 5. SENGA peut aussi vous **assigner** un déménagement directement depuis l'administration.
 
 ## Blocages fréquents
@@ -116,6 +118,7 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
 1. Depuis l'accueil, appuyez sur **Publier un covoiturage**.
 2. Renseignez date/heure, villes, places (1–6), prix par place, point de rendez-vous et notes.
 3. Publiez le trajet — les passagers le réservent depuis l'app Passager.
+4. Au départ, marquez chaque passager **Monté** ou **Absent** (à partir de l'heure de départ). Un passager absent ne paie rien ; un passager non confirmé « Monté » peut déclarer qu'il n'a pas voyagé.
 4. Gérez le trajet dans **Mes trajets** (démarrer, terminer, annuler).
 
 ## Mes missions (historique)

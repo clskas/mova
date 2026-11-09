@@ -12,6 +12,7 @@ jest.mock('../common/driver-eligibility.util', () => ({
   driverCanReceiveJobs: jest.fn().mockReturnValue(true),
   driverAcceptsDeliveries: jest.fn().mockReturnValue(true),
   fetchDriverProfileSnapshot: jest.fn().mockResolvedValue({ acceptsDeliveries: true }),
+  assertNotOwnRequest: jest.requireActual('../common/driver-eligibility.util').assertNotOwnRequest,
 }));
 jest.mock('../common/escrow.util', () => ({
   releaseEscrowPayout: jest.fn().mockResolvedValue({ success: true }),
@@ -573,6 +574,27 @@ describe('DeliveriesService', () => {
         data: expect.objectContaining({ courierSource: 'RESTAURANT', driverId: 'fleet-drv' }),
       }),
     );
+  });
+
+  it('audit : un livreur ne prend pas sa propre commande', async () => {
+    prisma.delivery.findUnique.mockResolvedValue({ id: 'd-own', userId: 'same', type: 'PARCEL', status: 'PENDING', driverId: null });
+    await expect(service.acceptDelivery('d-own', 'same')).rejects.toThrow('propre demande');
+  });
+
+  it('audit : le livreur ne peut pas annuler la commande du client', async () => {
+    prisma.delivery.findUnique.mockResolvedValue({
+      id: 'd-c', userId: 'client', driverId: 'drv', type: 'PARCEL', status: 'PICKED_UP', guaranteed: true,
+    });
+    prisma.delivery.update.mockClear();
+    await expect(service.updateStatus('d-c', 'CANCELLED' as never, 'drv')).rejects.toThrow('ne peut pas annuler');
+    expect(prisma.delivery.update).not.toHaveBeenCalled();
+  });
+
+  it('audit : « injoignable » seulement en route', async () => {
+    prisma.delivery.findUnique.mockResolvedValue({
+      id: 'd-u', userId: 'client', driverId: 'drv', type: 'PARCEL', status: 'PICKED_UP', events: [],
+    });
+    await expect(service.markUnreachable('d-u', 'drv')).rejects.toThrow('En route');
   });
 
   it('acceptDelivery : un second livreur concurrent reçoit 409, sans second crédit restaurant', async () => {

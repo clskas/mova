@@ -12,7 +12,7 @@ describe('CarpoolService', () => {
 
   const prisma = {
     carpoolTrip: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn(), aggregate: jest.fn() },
-    carpoolPassenger: { create: jest.fn(), findMany: jest.fn(), findFirst: jest.fn(), delete: jest.fn() },
+    carpoolPassenger: { create: jest.fn(), findMany: jest.fn().mockResolvedValue([]), update: jest.fn(), findFirst: jest.fn(), delete: jest.fn() },
     carpoolRating: { aggregate: jest.fn(), upsert: jest.fn() },
   };
 
@@ -30,6 +30,22 @@ describe('CarpoolService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     prisma.carpoolRating.aggregate.mockResolvedValue({ _avg: { score: null } });
+  });
+
+  it('audit: a passenger confirmed on board cannot say they did not travel', async () => {
+    prisma.carpoolTrip.findUnique.mockResolvedValueOnce({
+      id: 't1', driverId: 'd1', status: 'COMPLETED',
+      passengers: [{ id: 'b1', userId: 'p1', seats: 1, boardedAt: new Date() }],
+    });
+    await expect(service.declareNotTravelled('t1', 'p1')).rejects.toThrow('confirmé votre montée');
+  });
+
+  it('audit: no-show only from the departure time', async () => {
+    prisma.carpoolTrip.findUnique.mockResolvedValueOnce({
+      id: 't2', driverId: 'd1', status: 'OPEN', departureAt: new Date(Date.now() + 3600_000),
+      passengers: [{ id: 'b2', userId: 'p2', seats: 1 }],
+    });
+    await expect(service.markPassenger('t2', 'b2', 'd1', false)).rejects.toThrow('heure du départ');
   });
 
   it('refuse la publication covoiturage aux passagers', async () => {

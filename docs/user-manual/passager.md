@@ -42,6 +42,8 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 7. Sous la carte, utilisez les **filtres POI** (Marchés, Hôpitaux, Universités, Pharmacies) pour afficher les points d'intérêt à proximité.
 8. L'autocomplétion de destination inclut les **lieux SENGA** (marchés, hôpitaux, etc.) en plus des communes.
 
+**Frais d'annulation (taxi / moto-taxi)** : annuler après le délai gratuit suivant l'acceptation, ou être absent quand le chauffeur est arrivé, entraîne des frais (affichés au moment d'annuler). Ils sont **prélevés sur votre portefeuille** et versés au chauffeur. Si votre solde ne suffit pas, ils seront prélevés avant votre prochaine course : rechargez du montant indiqué.
+
 ## 2.1 Course Partagée (Pool)
 
 Sur **Taxi** (voiture uniquement, pas moto), activez le bascule **Partagé (Pool)** avant de confirmer.
@@ -104,6 +106,8 @@ Sur **Taxi** (voiture uniquement, pas moto), activez le bascule **Partagé (Pool
 3. **Réserver** : sélectionnez un trajet, choisissez le nombre de places et confirmez. Vous voyez le récapitulatif conducteur et pouvez contacter le conducteur (téléphone masqué).
 4. **Mes réservations** : consultez vos trajets réservés. Annulez avant le départ si besoin.
 5. **Détail trajet** : carte du parcours, timeline (Publié → Places réservées → En route → Terminé).
+6. **Paiement** : vous payez votre place après le trajet. Si le conducteur vous a marqué **Absent**, vous n'avez rien à payer. S'il ne vous a pas confirmé **Monté** et que vous n'étiez pas dans le trajet, appuyez sur **« Je n'ai pas voyagé »** : rien à payer.
+7. Une place impayée (hors espèces en attente) bloque les nouvelles réservations de covoiturage jusqu'au paiement.
 
 > La publication de trajets est réservée aux **chauffeurs SENGA** (app Chauffeur, KYC approuvé). Ce n’est **pas** le Pool taxi (section 2.1).
 
@@ -130,6 +134,7 @@ Sur **Taxi** (voiture uniquement, pas moto), activez le bascule **Partagé (Pool
 5. Vérifiez le prix (trajet + frais fixes + volume × engin) et confirmez.
 6. Les chauffeurs **utilitaire ou camion** assez grands sont prévenus ; le **premier qui accepte** prend votre déménagement. Vous êtes notifié dès qu'un chauffeur est assigné.
 7. Vous pouvez **annuler** tant que le déménagement n'a pas commencé. À la fin, payez depuis l'app ou en espèces.
+8. **Volume réel** : sur place, le chauffeur indique le volume constaté. S'il dépasse de plus de 10 % ce que vous avez déclaré, le prix est ajusté au volume réel et vous recevez un SMS avec le nouveau prix ; vous pouvez encore annuler sans frais avant le départ.
 
 ## 11. Wallet SENGA
 

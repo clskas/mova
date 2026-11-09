@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { assertNotOwnRequest } from '../common/driver-eligibility.util';
 import { CommissionServiceType, RideStatus, ScheduledRideStatus, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException, MOVA_EVENTS, estimateTripDurationMin, normalizeVehicleType, resolveCityFromCoords, canCancelScheduledRide, formatCdf } from '@mova/shared';
 import { RedisService } from '@mova/shared';
@@ -309,6 +310,7 @@ export class ScheduledRidesService {
     if (ride.status === ScheduledRideStatus.CANCELLED || ride.status === ScheduledRideStatus.COMPLETED) {
       throw new MovaHttpException(MovaErrorCode.SCHEDULED_RIDE_INVALID_STATUS);
     }
+    assertNotOwnRequest(ride.passengerId, driverId);
     await assertDriverEligibleForRide(driverId, ride.vehicleType);
     await this.prisma.scheduledDriverVolunteer.upsert({
       where: { scheduledRideId_driverId: { scheduledRideId: id, driverId } },

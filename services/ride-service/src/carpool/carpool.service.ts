@@ -11,7 +11,7 @@ import {
   serviceUrl,
 } from '@mova/shared';
 import { addressToCoords, DEFAULT_PICKUP } from '../common/address.util';
-import { fetchServicePaymentStatus } from '../common/payment-status.util';
+import { fetchServicePaymentStatus, isHardUnpaidBlock } from '../common/payment-status.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../rides/pricing.service';
 import { CommissionService } from '../rides/commission.service';
@@ -209,11 +209,15 @@ export class CarpoolService {
     const passengerRows = await Promise.all(
       passengers.map(async (p) => {
         const user = await this.fetchUserBrief(p.userId);
+        const row = p as typeof p & { boardedAt?: Date | null; noShowAt?: Date | null; notTravelledAt?: Date | null };
         return {
           id: p.id,
           userId: p.userId,
           seats: p.seats,
           label: user?.name ?? `Passager ${p.userId.slice(0, 6)}`,
+          boarded: Boolean(row.boardedAt),
+          noShow: Boolean(row.noShowAt),
+          notTravelled: Boolean(row.notTravelledAt),
         };
       }),
     );
@@ -283,10 +287,21 @@ export class CarpoolService {
       enriched.paymentReferenceId = myPassenger.id;
       enriched.myTotalCdf = (t.pricePerSeatCdf ?? 0) * myPassenger.seats;
       enriched.passengerTotalCdf = enriched.myTotalCdf;
-      if (t.status === CarpoolStatus.COMPLETED) {
+      const mine = myPassenger as typeof myPassenger & { boardedAt?: Date | null; noShowAt?: Date | null; notTravelledAt?: Date | null };
+      const nothingToPay = Boolean(mine.noShowAt || mine.notTravelledAt);
+      enriched.noShow = Boolean(mine.noShowAt);
+      enriched.notTravelled = Boolean(mine.notTravelledAt);
+      if (t.status === CarpoolStatus.COMPLETED && nothingToPay) {
+        enriched.isPaid = false;
+        enriched.paymentReady = false;
+        enriched.canDeclareNotTravelled = false;
+        enriched.hasRated = true;
+      } else if (t.status === CarpoolStatus.COMPLETED) {
         const payment = await fetchServicePaymentStatus('CARPOOL', myPassenger.id);
         enriched.isPaid = payment.isPaid;
         enriched.paymentReady = true;
+        // Not confirmed on board by the driver: the passenger can say they did not travel.
+        enriched.canDeclareNotTravelled = !payment.isPaid && !mine.boardedAt;
         const existingRating = await this.prisma.carpoolRating.findUnique({
           where: { tripId_fromUserId: { tripId: t.id, fromUserId: viewerUserId } },
         });
@@ -568,6 +583,7 @@ export class CarpoolService {
     }
     if (trip.driverId === userId) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
     if (trip.passengers.some((p) => p.userId === userId)) throw new MovaHttpException(MovaErrorCode.CARPOOL_ALREADY_JOINED);
+    await this.assertNoUnpaidCarpool(userId);
     if (trip.seatsAvailable < seats) throw new MovaHttpException(MovaErrorCode.CARPOOL_NO_SEATS);
     const passenger = await this.prisma.carpoolPassenger.create({ data: { tripId, userId, seats } });
     // Atomic decrement guarded on remaining seats: concurrent bookings must not overbook.
@@ -683,10 +699,17 @@ export class CarpoolService {
     if (trip.departureAt <= new Date()) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Impossible d\'annuler après le départ.');
     }
-    return this.prisma.carpoolTrip.update({
-      where: { id: tripId },
-      data: { status: CarpoolStatus.CANCELLED, seatsAvailable: 0 },
-    });
+    return this.prisma.carpoolTrip
+      .update({
+        where: { id: tripId, status: trip.status },
+        data: { status: CarpoolStatus.CANCELLED, seatsAvailable: 0 },
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string })?.code === 'P2025') {
+          throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.CONFLICT, 'Le trajet vient de changer. Actualisez l’écran.');
+        }
+        throw e;
+      });
   }
 
   async leave(tripId: string, userId: string) {
@@ -696,14 +719,16 @@ export class CarpoolService {
     if (!trip || trip.status === CarpoolStatus.CANCELLED || trip.status === CarpoolStatus.COMPLETED) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR);
     }
-    if (trip.departureAt <= new Date()) {
+    // Started early by the driver counts as departed too.
+    if (trip.departureAt <= new Date() || trip.status === CarpoolStatus.IN_PROGRESS) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Impossible d\'annuler après le départ.');
     }
     await this.prisma.carpoolPassenger.delete({ where: { id: passenger.id } });
+    // Atomic: a booking at the same moment must not be lost (it used to write the old count + seats).
     const updated = await this.prisma.carpoolTrip.update({
       where: { id: tripId },
       data: {
-        seatsAvailable: trip.seatsAvailable + passenger.seats,
+        seatsAvailable: { increment: passenger.seats },
         status: CarpoolStatus.OPEN,
       },
       include: { passengers: true },
@@ -724,6 +749,72 @@ export class CarpoolService {
       update: { score, comment },
     });
     return { rating, driverRating: await this.driverRatingAvg(trip.driverId) };
+  }
+
+  /** Driver: this passenger got in (they will pay) or did not show up (nothing to pay). */
+  async markPassenger(tripId: string, bookingId: string, driverUserId: string, boarded: boolean) {
+    const trip = await this.prisma.carpoolTrip.findUnique({ where: { id: tripId }, include: { passengers: true } });
+    if (!trip) throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (trip.driverId !== driverUserId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    if (trip.status === CarpoolStatus.CANCELLED || trip.status === CarpoolStatus.COMPLETED) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Le trajet est terminé ou annulé.');
+    }
+    const booking = trip.passengers.find((p) => p.id === bookingId);
+    if (!booking) throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (!boarded && trip.departureAt > new Date() && trip.status !== CarpoolStatus.IN_PROGRESS) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Un passager ne peut être déclaré absent qu’à l’heure du départ.');
+    }
+    await this.prisma.carpoolPassenger.update({
+      where: { id: bookingId },
+      data: boarded ? { boardedAt: new Date(), noShowAt: null } : { noShowAt: new Date(), boardedAt: null },
+    });
+    return this.get(tripId, driverUserId);
+  }
+
+  /**
+   * Passenger: « Je n'ai pas voyagé » — only if the driver did not confirm them on board, the
+   * trip is finished and not paid. Nothing to pay then (a driver who completes without them
+   * used to leave them owing the seat).
+   */
+  async declareNotTravelled(tripId: string, userId: string) {
+    const trip = await this.prisma.carpoolTrip.findUnique({ where: { id: tripId }, include: { passengers: true } });
+    if (!trip) throw new MovaHttpException(MovaErrorCode.CARPOOL_NOT_FOUND, HttpStatus.NOT_FOUND);
+    const booking = trip.passengers.find((p) => p.userId === userId);
+    if (!booking) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    if (trip.status !== CarpoolStatus.COMPLETED) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Possible une fois le trajet terminé.');
+    }
+    if (booking.boardedAt) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Le conducteur a confirmé votre montée. En cas d’erreur, signalez un litige depuis Aide.',
+      );
+    }
+    const payment = await fetchServicePaymentStatus('CARPOOL', booking.id);
+    if (payment.isPaid) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Cette place est déjà payée.');
+    await this.prisma.carpoolPassenger.update({ where: { id: booking.id }, data: { notTravelledAt: new Date() } });
+    return this.get(tripId, userId);
+  }
+
+  /** Unpaid seats (not cash pending) block new bookings, like rides. */
+  private async assertNoUnpaidCarpool(userId: string) {
+    const rows = await this.prisma.carpoolPassenger.findMany({
+      where: { userId, noShowAt: null, notTravelledAt: null, trip: { status: CarpoolStatus.COMPLETED } },
+      select: { id: true },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    });
+    for (const r of rows) {
+      const pay = await fetchServicePaymentStatus('CARPOOL', r.id);
+      if (isHardUnpaidBlock(pay)) {
+        throw new MovaHttpException(
+          MovaErrorCode.RIDE_UNPAID_PENDING,
+          HttpStatus.CONFLICT,
+          'Vous avez une place de covoiturage impayée. Payez-la (Mes trajets) avant de réserver à nouveau.',
+        );
+      }
+    }
   }
 
   async startTrip(tripId: string, userId: string) {

@@ -79,3 +79,6 @@ web/public/version.json
 admin/public/version.json
 restaurant/public/version.json
 rental-partner/public/version.json
+
+# Local uploaded media (served from DB / Supabase in production)
+services/ride-service/uploads/

@@ -1,4 +1,5 @@
 import { errandDriverNetCdf } from '../common/ride-driver-gross.util';
+import { assertNotOwnRequest } from '../common/driver-eligibility.util';
 import { receiptVerdict, runAiVision } from '../common/ai-vision.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, ErrandCategory, ErrandOrder, ErrandOrderStatus, Prisma, TrackingReferenceType, VehicleType } from '@prisma/client';
@@ -717,6 +718,7 @@ export class ErrandsService {
     if (order.status !== ErrandOrderStatus.PENDING || order.driverId) {
       throw new MovaHttpException(MovaErrorCode.ERRAND_INVALID_STATUS);
     }
+    assertNotOwnRequest(order.userId, driverUserId);
     assertEscrowAllowsDispatch(order);
     const pin = order.completionPin ?? this.tripShare.generateCompletionPin();
     // Conditional claim: concurrent accepts must not both assign.
@@ -1086,10 +1088,18 @@ export class ErrandsService {
         cancelEligibility.cancelBlockReason,
       );
     }
-    const updated = await this.prisma.errandOrder.update({
-      where: { id },
-      data: { status: ErrandOrderStatus.CANCELLED, cancelledAt: new Date() },
-    });
+    // Conditional: a cancel racing the courier's « Terminé » must not refund AND pay.
+    const updated = await this.prisma.errandOrder
+      .update({
+        where: { id, status: order.status },
+        data: { status: ErrandOrderStatus.CANCELLED, cancelledAt: new Date() },
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string })?.code === 'P2025') {
+          throw new MovaHttpException(MovaErrorCode.ERRAND_INVALID_STATUS, HttpStatus.CONFLICT, 'La course vient de changer d’étape. Actualisez l’écran.');
+        }
+        throw e;
+      });
     if (order.guaranteed) {
       const phase = cancelPhase(order.status);
       const settlement = settleGuaranteedCancel({

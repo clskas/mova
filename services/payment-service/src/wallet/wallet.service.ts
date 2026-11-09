@@ -599,6 +599,30 @@ export class WalletService {
     return { captured: true, amountCdf: capture };
   }
 
+  /**
+   * Ride cancellation fee: taken from the passenger's wallet and paid to the driver (or to
+   * SENGA when there is no driver). Idempotent per ride. Not enough balance → nothing taken,
+   * collected: false (the ride service asks the passenger to top up and retries).
+   */
+  async collectCancelFee(params: { passengerId: string; driverId?: string | null; amountCdf: number; rideId: string }) {
+    const amount = Math.round(params.amountCdf);
+    this.assertPositiveIntAmount(amount, 'Frais d’annulation');
+    const ref = `cancel_fee:${params.rideId}`;
+    if (await this.findExistingLedger(ref, 'DEBIT')) return { collected: true, already: true, amountCdf: amount };
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId: params.passengerId } });
+    const available = (wallet?.balanceCdf ?? 0) - (wallet?.heldBalanceCdf ?? 0);
+    if (available < amount) {
+      return { collected: false, amountCdf: amount, availableCdf: Math.max(0, available) };
+    }
+    await this.debit(params.passengerId, amount, 'Frais d’annulation de course', ref);
+    if (params.driverId) {
+      await this.credit(params.driverId, amount, 'Dédommagement : course annulée par le passager', ref);
+    } else {
+      await this.creditPlatformFee(amount, 'Frais d’annulation de course', ref);
+    }
+    return { collected: true, amountCdf: amount };
+  }
+
   async internalDebit(userId: string, amountCdf: number, description: string, reference?: string) {
     return this.debit(userId, amountCdf, description, reference);
   }

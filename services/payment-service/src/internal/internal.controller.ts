@@ -231,6 +231,13 @@ export class InternalController {
     return this.wallet.holdFunds(userId, body.amountCdf, body.referenceType, body.referenceId, body.description);
   }
 
+  @Post('cancel-fees/collect')
+  collectCancelFee(
+    @Body() body: { passengerId: string; driverId?: string | null; amountCdf: number; rideId: string },
+  ) {
+    return this.wallet.collectCancelFee(body);
+  }
+
   @Post('wallets/:userId/debit')
   debit(
     @Param('userId') userId: string,

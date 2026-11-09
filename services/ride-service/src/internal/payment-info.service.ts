@@ -243,7 +243,8 @@ export class PaymentInfoService {
         userId: booking.userId,
         amountCdf: trip.pricePerSeatCdf * booking.seats,
         status: trip.status,
-        paymentReady: trip.status === 'COMPLETED',
+        // Absent (driver) or « pas voyagé » (passenger): nothing to pay.
+        paymentReady: trip.status === 'COMPLETED' && !booking.noShowAt && !booking.notTravelledAt,
         driverId: trip.driverId,
         title: `${trip.pickupAddress ?? 'Départ'} → ${trip.dropoffAddress ?? 'Arrivée'}`,
       };

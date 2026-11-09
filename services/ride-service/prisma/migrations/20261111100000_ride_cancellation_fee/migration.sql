@@ -1,0 +1,3 @@
+ALTER TABLE "rides" ADD COLUMN IF NOT EXISTS "cancellationFeeCdf" INTEGER;
+ALTER TABLE "rides" ADD COLUMN IF NOT EXISTS "cancelFeeStatus" TEXT;
+ALTER TABLE "rides" ADD COLUMN IF NOT EXISTS "cancelFeeCollectedAt" TIMESTAMP(3);

@@ -1,4 +1,5 @@
 import { runAiVision } from '../common/ai-vision.util';
+import { sendPlatformSms } from '../common/sms-notify.util';
 import { assertNotOwnRequest } from '../common/driver-eligibility.util';
 import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { CommissionServiceType, MovingRequestStatus, MovingVehicleCategory, SurchargeType, VehicleType } from '@prisma/client';
@@ -502,6 +503,55 @@ export class MovingService {
       timeline: buildMovingTimeline(updated.status, updated.completedAt),
       paymentReady: status === MovingRequestStatus.COMPLETED,
     };
+  }
+
+  /**
+   * Driver on site, before loading: the real volume. More than 10 % above what the customer
+   * declared → the price goes up by the volume difference (the customer is told and can still
+   * cancel for free before the move starts). It used to stay at the declared volume.
+   */
+  async reportActualVolume(id: string, driverId: string, actualVolumeM3: number) {
+    const request = await this.prisma.movingRequest.findUnique({ where: { id } });
+    if (!request) throw new MovaHttpException(MovaErrorCode.MOVING_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (request.driverId !== driverId) throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    if (request.status !== MovingRequestStatus.ASSIGNED) {
+      throw new MovaHttpException(MovaErrorCode.MOVING_INVALID_STATUS, undefined, 'Le volume se constate sur place, avant de démarrer.');
+    }
+    const actual = Math.round(Number(actualVolumeM3) * 10) / 10;
+    if (!Number.isFinite(actual) || actual < 1 || actual > 100) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, undefined, 'Volume réel entre 1 et 100 m³.');
+    }
+    const declared = request.declaredVolumeM3 ?? request.volumeM3;
+    if (actual <= declared * 1.1) {
+      return { adjusted: false, moving: await this.formatMovingDetail(request, driverId) };
+    }
+    await assertDriverEligibleForMoving(driverId, request.vehicleCategory, actual);
+    const moving = await this.surcharges.get(SurchargeType.MOVING);
+    const perM3 = moving.perUnitCdf ?? 8000;
+    const multiplier = await this.vehicleCategoryMultiplier(request.vehicleCategory);
+    const extraCdf = Math.ceil((actual - request.volumeM3) * perM3 * multiplier);
+    const updated = await this.prisma.movingRequest.update({
+      where: { id, status: MovingRequestStatus.ASSIGNED },
+      data: {
+        declaredVolumeM3: declared,
+        volumeM3: actual,
+        estimatedPriceCdf: request.estimatedPriceCdf + Math.max(0, extraCdf),
+        volumeAdjustedAt: new Date(),
+      },
+    });
+    const customer = await fetchAuthUserBrief(request.userId).catch(() => null);
+    await sendPlatformSms(
+      customer?.phone,
+      `SENGA : volume constaté ${actual} m³ (déclaré ${declared} m³). Nouveau prix ${formatCdf(updated.estimatedPriceCdf)}. Vous pouvez annuler sans frais avant le départ.`,
+      'moving_volume',
+    ).catch(() => undefined);
+    await this.redis.publish(MOVA_EVENTS.SERVICE_STATUS_UPDATED, {
+      serviceType: 'MOVING',
+      referenceId: updated.id,
+      userId: updated.userId,
+      status: updated.status,
+    });
+    return { adjusted: true, previousPriceCdf: request.estimatedPriceCdf, moving: await this.formatMovingDetail(updated, driverId) };
   }
 
   async updateStatus(id: string, userId: string, status: MovingRequestStatus) {

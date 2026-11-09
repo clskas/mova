@@ -77,7 +77,7 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
    - et votre **volume utile** déclaré doit être au moins égal au volume du déménagement.
 2. Sur l'accueil, la carte **« Déménagements proposés »** montre le trajet, le volume, les objets et votre **gain net**.
 3. Appuyez sur **Accepter** : le **premier chauffeur** qui accepte obtient la mission. Si un autre a été plus rapide, l'app vous l'indique.
-4. Ouvrez la mission, appuyez sur **Démarrer** sur place (le client ne peut plus annuler), puis **Terminer** à l'arrivée.
+4. Ouvrez la mission. Sur place, **avant de charger**, appuyez sur **« Volume réel constaté »** si le volume dépasse la déclaration du client : au-delà de 10 %, le prix est ajusté et le client reçoit un SMS (il peut encore annuler). Puis **Démarrer** (le client ne peut plus annuler) et **Terminer** à l'arrivée.
 5. SENGA peut aussi vous **assigner** un déménagement directement depuis l'administration.
 
 ## Blocages fréquents
@@ -118,6 +118,7 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
 1. Depuis l'accueil, appuyez sur **Publier un covoiturage**.
 2. Renseignez date/heure, villes, places (1–6), prix par place, point de rendez-vous et notes.
 3. Publiez le trajet — les passagers le réservent depuis l'app Passager.
+4. Au départ, marquez chaque passager **Monté** ou **Absent** (à partir de l'heure de départ). Un passager absent ne paie rien ; un passager non confirmé « Monté » peut déclarer qu'il n'a pas voyagé.
 4. Gérez le trajet dans **Mes trajets** (démarrer, terminer, annuler).
 
 ## Mes missions (historique)

@@ -142,6 +142,24 @@ export class CarpoolController {
     return this.carpoolService.startTrip(id, req.user.id);
   }
 
+  @Post(':id/passengers/:bookingId/boarded')
+  @ApiOperation({ summary: 'Conducteur : passager monté' })
+  boarded(@Request() req: { user: { id: string } }, @Param('id') id: string, @Param('bookingId') bookingId: string) {
+    return this.carpoolService.markPassenger(id, bookingId, req.user.id, true);
+  }
+
+  @Post(':id/passengers/:bookingId/no-show')
+  @ApiOperation({ summary: 'Conducteur : passager absent (rien à payer)' })
+  noShow(@Request() req: { user: { id: string } }, @Param('id') id: string, @Param('bookingId') bookingId: string) {
+    return this.carpoolService.markPassenger(id, bookingId, req.user.id, false);
+  }
+
+  @Post(':id/not-travelled')
+  @ApiOperation({ summary: 'Passager : je n’ai pas voyagé (si non confirmé à bord)' })
+  notTravelled(@Request() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.carpoolService.declareNotTravelled(id, req.user.id);
+  }
+
   @Post(':id/complete')
   @ApiOperation({ summary: 'Terminer trajet covoiturage (conducteur, déclenche paiement)' })
   complete(@Request() req: { user: { id: string } }, @Param('id') id: string) {

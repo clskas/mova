@@ -28,6 +28,7 @@ import { dayRangeFilter,
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { collectCancelFee } from '../common/cancel-fee.util';
 import { passengerRatingSummaries, passengerRatingSummary } from '../ratings/passenger-rating.util';
 import { parseOrderPlacedMetadata, computeFoodSettlementPools, applyOwnCourierRouting, computeFoodShares } from '../deliveries/food-delivery-settlement.util';
 import { deliveryDriverGross } from '../deliveries/delivery-driver-gross.util';
@@ -276,6 +277,7 @@ export class RidesService {
     }
 
     await this.assertNoUnpaidCompletedRide(passengerId);
+    await this.settleOwedCancelFees(passengerId);
 
     assertServiceAreaPair(data.pickupLat, data.pickupLng, data.dropoffLat, data.dropoffLng);
 
@@ -805,6 +807,43 @@ export class RidesService {
     return { ...detail, paymentReady: detail.paymentReady };
   }
 
+  /**
+   * Cancellation fees still owed are taken from the wallet before a new ride; if the balance
+   * is still short, the ride is refused with the amount to top up.
+   */
+  async settleOwedCancelFees(passengerId: string) {
+    const owed = await this.prisma.ride.findMany({
+      where: { passengerId, cancelFeeStatus: 'OWED', cancellationFeeCdf: { gt: 0 } },
+      select: { id: true, driverId: true, cancellationFeeCdf: true },
+      orderBy: { cancelledAt: 'asc' },
+      take: 10,
+    });
+    let missing = 0;
+    for (const r of owed) {
+      const fee = await collectCancelFee({
+        passengerId,
+        driverId: r.driverId,
+        amountCdf: r.cancellationFeeCdf ?? 0,
+        rideId: r.id,
+      });
+      if (fee.collected) {
+        await this.prisma.ride.update({
+          where: { id: r.id },
+          data: { cancelFeeStatus: 'PAID', cancelFeeCollectedAt: new Date() },
+        });
+      } else {
+        missing += r.cancellationFeeCdf ?? 0;
+      }
+    }
+    if (missing > 0) {
+      throw new MovaHttpException(
+        MovaErrorCode.RIDE_UNPAID_PENDING,
+        HttpStatus.CONFLICT,
+        `Frais d’annulation impayés : ${formatCdf(missing)}. Rechargez votre portefeuille de ce montant, il sera prélevé automatiquement, puis recommandez.`,
+      );
+    }
+  }
+
   private rethrowStaleRide(e: unknown): never {
     if ((e as { code?: string })?.code === 'P2025') {
       throw new MovaHttpException(
@@ -884,6 +923,23 @@ export class RidesService {
 
     const notifiedDriverIds = unmatched ? await this.driverIdsNotifiedForRide(rideId) : [];
 
+    // The fee used to be shown and never charged: it is now taken from the passenger's
+    // wallet and paid to the driver; without enough balance it is owed (asked before the
+    // next ride).
+    let feeStatus: 'PAID' | 'OWED' | null = null;
+    if (feeCdf > 0) {
+      const fee = await collectCancelFee({
+        passengerId: ride.passengerId,
+        driverId: ride.driverId,
+        amountCdf: feeCdf,
+        rideId,
+      });
+      feeStatus = fee.collected ? 'PAID' : 'OWED';
+      feeMessage += fee.collected
+        ? ' Montant prélevé sur le portefeuille du passager.'
+        : ' Montant à régler : il sera prélevé sur le portefeuille avant la prochaine course.';
+    }
+
     const updated = await this.prisma.ride.update({
       where: { id: rideId },
       data: {
@@ -891,6 +947,13 @@ export class RidesService {
         cancelledAt: new Date(),
         cancelledBy: userId,
         cancelReason: reason,
+        ...(feeCdf > 0
+          ? {
+              cancellationFeeCdf: feeCdf,
+              cancelFeeStatus: feeStatus,
+              cancelFeeCollectedAt: feeStatus === 'PAID' ? new Date() : null,
+            }
+          : {}),
       },
     });
     await this.prisma.rideEvent.create({

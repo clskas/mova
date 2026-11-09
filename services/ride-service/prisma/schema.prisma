@@ -219,6 +219,10 @@ model Ride {
   cancelledAt      DateTime?
   cancelReason     String?
   cancelledBy      String?
+  /// Cancellation fee charged to the passenger (policy), and its state: PAID | OWED | WAIVED.
+  cancellationFeeCdf  Int?
+  cancelFeeStatus     String?
+  cancelFeeCollectedAt DateTime?
   completionPin    String?
   roundTrip        Boolean       @default(false)
   roundTripLeg     RoundTripLeg?
@@ -628,6 +632,11 @@ model CarpoolPassenger {
   userId    String
   seats     Int      @default(1)
   createdAt DateTime @default(now())
+  /// Driver confirmed the passenger got in / did not show up.
+  boardedAt     DateTime?
+  noShowAt      DateTime?
+  /// Passenger declared they did not travel (not marked boarded): nothing to pay.
+  notTravelledAt DateTime?
 
   @@unique([tripId, userId])
   @@index([userId])
@@ -912,6 +921,9 @@ model MovingRequest {
   userId            String
   status            MovingRequestStatus     @default(PENDING)
   volumeM3          Float
+  /// Volume declared by the customer when the driver found more on site (price adjusted).
+  declaredVolumeM3  Float?
+  volumeAdjustedAt  DateTime?
   vehicleCategory   MovingVehicleCategory   @default(CAMION_15M3)
   pickupLat         Float
   pickupLng         Float

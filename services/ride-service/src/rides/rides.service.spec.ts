@@ -3,6 +3,11 @@ import { MOVA_EVENTS } from '@mova/shared';
 import { RidesService } from './rides.service';
 import { mockPlatformConfig } from '../platform/platform-config.mock';
 
+jest.mock('../common/cancel-fee.util', () => ({
+  collectCancelFee: jest.fn().mockResolvedValue({ collected: true, amountCdf: 0 }),
+}));
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const cancelFeeUtil = require('../common/cancel-fee.util') as { collectCancelFee: jest.Mock };
 jest.mock('../common/internal-lookup.util', () => ({
   fetchAuthUserBrief: jest.fn().mockResolvedValue({ phone: '+243810000000' }),
 }));
@@ -653,6 +658,21 @@ describe('RidesService', () => {
   it('driverPhotoSource: only the people on the ride', async () => {
     prisma.ride.findUnique.mockResolvedValue({ id: 'r1', passengerId: 'p1', driverId: 'd1', sharePassengers: [] });
     await expect(service.driverPhotoSource('r1', 'stranger')).rejects.toThrow();
+  });
+
+  it('owed cancellation fees: taken from the wallet before a new ride', async () => {
+    prisma.ride.findMany.mockResolvedValueOnce([{ id: 'old', driverId: 'd1', cancellationFeeCdf: 2000 }]);
+    cancelFeeUtil.collectCancelFee.mockResolvedValueOnce({ collected: true, amountCdf: 2000 });
+    await service.settleOwedCancelFees('p1');
+    expect(prisma.ride.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'old' }, data: expect.objectContaining({ cancelFeeStatus: 'PAID' }) }),
+    );
+  });
+
+  it('owed cancellation fees: not enough balance refuses the new ride with the amount', async () => {
+    prisma.ride.findMany.mockResolvedValueOnce([{ id: 'old', driverId: 'd1', cancellationFeeCdf: 2000 }]);
+    cancelFeeUtil.collectCancelFee.mockResolvedValueOnce({ collected: false, amountCdf: 2000 });
+    await expect(service.settleOwedCancelFees('p1')).rejects.toThrow('Frais d’annulation impayés');
   });
 
   it('updateStatus: the passenger cannot advance the trip steps', async () => {

@@ -69,6 +69,12 @@ export class MovingController {
     return this.movingService.updateStatusByDriver(id, req.user.id, dto.status);
   }
 
+  @Post(':id/actual-volume')
+  @ApiOperation({ summary: 'Chauffeur : volume réel constaté sur place (ajuste le prix si plus grand)' })
+  actualVolume(@Request() req: { user: { id: string } }, @Param('id') id: string, @Body('volumeM3') volumeM3: number) {
+    return this.movingService.reportActualVolume(id, req.user.id, Number(volumeM3));
+  }
+
   @Post(':id/cancel')
   @ApiOperation({ summary: 'Annuler déménagement' })
   cancel(@Request() req: { user: { id: string } }, @Param('id') id: string) {

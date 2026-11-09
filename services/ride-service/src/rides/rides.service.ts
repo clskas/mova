@@ -1064,8 +1064,11 @@ export class RidesService {
       }
     }
     if (ride.isShared) {
-      const shared = this.ridePool.formatSharedRide(ride);
       const driver = ride.driverId ? await this.fetchDriverInfo(ride.driverId, ride) : null;
+      const shared = this.ridePool.formatSharedRide(
+        ride,
+        driver?.lat != null && driver?.lng != null ? { lat: driver.lat, lng: driver.lng } : null,
+      );
       const activeBookings = ride.sharePassengers.filter((p) => p.status !== 'CANCELLED');
       const payEntries = await Promise.all(
         activeBookings.map(async (p) => {

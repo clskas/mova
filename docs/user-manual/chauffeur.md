@@ -112,7 +112,9 @@ Appuyez sur le micro en haut de l'écran et dites :
 - sur une offre : **« accepter »** ou **« refuser »** ;
 - pendant la course : **« je suis arrivé »**, **« démarrer »**, **« terminer »** (une confirmation est demandée), **« itinéraire »**, **« appeler »** (le passager).
 
-Les mots sont reconnus par le téléphone, en français. Si la commande n'est pas comprise, l'app vous indique les mots possibles.
+Quand une course arrive, le micro **s'ouvre tout seul pendant 10 secondes** (la sonnerie se met en pause) : dites **« accepter »** ou **« refuser »** sans toucher l'écran. Rien compris ? La sonnerie reprend et vous pouvez toujours appuyer sur les boutons. Pour couper cette écoute automatique : **Notifications → Répondre aux offres à la voix**. Elle ne marche que si vous avez déjà autorisé le micro.
+
+Les mots sont reconnus par le téléphone, en français, et transformés en action : **votre voix n'est ni enregistrée ni envoyée au passager**. Le passager reçoit seulement la notification habituelle (par exemple « chauffeur arrivé »). Si la commande n'est pas comprise, l'app vous indique les mots possibles.
 
 ## Course Pool (partagée)
 

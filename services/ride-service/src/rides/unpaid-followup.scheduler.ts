@@ -3,25 +3,34 @@ import { RideStatus } from '@prisma/client';
 import { formatCdf, INTERNAL_API_KEY, MOVA_EVENTS, RedisService, serviceUrl, type PaymentReminderPayload } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { fetchRidePaymentStatuses } from '../common/payment-status.util';
+import { PlatformConfigService } from '../platform/platform-config.service';
+import { UNPAID_FOLLOWUP_DEFAULTS, type UnpaidFollowupConfig } from '../platform/platform-config.types';
 
 const TICK_MS = 5 * 60 * 1000;
 const FOLLOWUP_SINCE = new Date(process.env.UNPAID_FOLLOWUP_SINCE ?? '2026-11-13T12:00:00Z');
 const MIN = 60 * 1000;
 
-/** Follow-up steps after a ride ended unpaid (minutes after completion). */
-export const UNPAID_STEPS = [
-  { event: 'UNPAID_REMINDER_1', afterMin: 5 },
-  { event: 'UNPAID_DRIVER_CHECK', afterMin: 30 },
-  { event: 'UNPAID_REMINDER_2', afterMin: 120 },
-  { event: 'UNPAID_AUTO_DISPUTE', afterMin: 24 * 60 },
-] as const;
+export type UnpaidStep = 'UNPAID_REMINDER_1' | 'UNPAID_DRIVER_CHECK' | 'UNPAID_REMINDER_2' | 'UNPAID_AUTO_DISPUTE';
 
-export type UnpaidStep = (typeof UNPAID_STEPS)[number]['event'];
+/** Follow-up steps after a ride ended unpaid (minutes after completion), from the admin settings. */
+export function unpaidSteps(c: UnpaidFollowupConfig = UNPAID_FOLLOWUP_DEFAULTS): { event: UnpaidStep; afterMin: number }[] {
+  const steps: { event: UnpaidStep; afterMin: number }[] = [
+    { event: 'UNPAID_REMINDER_1', afterMin: c.reminder1Min },
+    { event: 'UNPAID_DRIVER_CHECK', afterMin: c.driverCheckMin },
+    { event: 'UNPAID_REMINDER_2', afterMin: c.reminder2Min },
+  ];
+  if (c.autoDisputeEnabled) steps.push({ event: 'UNPAID_AUTO_DISPUTE', afterMin: c.autoDisputeHours * 60 });
+  return steps.sort((a, b) => a.afterMin - b.afterMin);
+}
 
 /** The next step due for a ride, given its age and the steps already done. */
-export function nextUnpaidStep(ageMin: number, done: Set<string>): UnpaidStep | null {
+export function nextUnpaidStep(
+  ageMin: number,
+  done: Set<string>,
+  c: UnpaidFollowupConfig = UNPAID_FOLLOWUP_DEFAULTS,
+): UnpaidStep | null {
   let due: UnpaidStep | null = null;
-  for (const s of UNPAID_STEPS) {
+  for (const s of unpaidSteps(c)) {
     if (ageMin >= s.afterMin && !done.has(s.event)) due = s.event;
   }
   // Only the latest step due (a ride found late jumps straight to it, without a burst of messages).
@@ -39,7 +48,11 @@ export class UnpaidFollowupScheduler implements OnModuleInit, OnModuleDestroy {
   private timer?: ReturnType<typeof setInterval>;
   private running = false;
 
-  constructor(private prisma: PrismaService, private redis: RedisService) {}
+  constructor(
+    private prisma: PrismaService,
+    private redis: RedisService,
+    private platformConfig: PlatformConfigService,
+  ) {}
 
   onModuleInit() {
     if (process.env.UNPAID_FOLLOWUP_ENABLED === 'false') return;
@@ -54,6 +67,13 @@ export class UnpaidFollowupScheduler implements OnModuleInit, OnModuleDestroy {
     if (this.running) return;
     this.running = true;
     try {
+      // Settings may have been changed by the super-admin on another instance.
+      await this.platformConfig.refresh().catch(() => undefined);
+      const cfg = this.platformConfig.get().unpaidFollowup ?? UNPAID_FOLLOWUP_DEFAULTS;
+      if (!cfg.enabled) return;
+      const steps = unpaidSteps(cfg);
+      const firstMin = steps[0]?.afterMin ?? 5;
+      const lastMin = steps[steps.length - 1]?.afterMin ?? 24 * 60;
       const now = Date.now();
       const rides = await this.prisma.ride.findMany({
         where: {
@@ -62,8 +82,8 @@ export class UnpaidFollowupScheduler implements OnModuleInit, OnModuleDestroy {
           testVoidedAt: null,
           // Never before the feature went live (no burst of reminders for old rides at deploy).
           completedAt: {
-            gte: new Date(Math.max(now - 26 * 60 * MIN, FOLLOWUP_SINCE.getTime())),
-            lte: new Date(now - 5 * MIN),
+            gte: new Date(Math.max(now - (lastMin + 120) * MIN, FOLLOWUP_SINCE.getTime())),
+            lte: new Date(now - firstMin * MIN),
           },
         },
         select: {
@@ -85,7 +105,7 @@ export class UnpaidFollowupScheduler implements OnModuleInit, OnModuleDestroy {
         const pay = (pays as Record<string, { isPaid?: boolean; cashDisputed?: boolean; passengerClaimedPaid?: boolean }>)[r.id];
         if (!pay || pay.isPaid || pay.cashDisputed || pay.passengerClaimedPaid) continue;
         const ageMin = (now - (r.completedAt?.getTime() ?? now)) / MIN;
-        const step = nextUnpaidStep(ageMin, new Set(r.events.map((e) => e.event)));
+        const step = nextUnpaidStep(ageMin, new Set(r.events.map((e) => e.event)), cfg);
         if (!step) continue;
         await this.run(step, r).catch((e: unknown) =>
           this.logger.warn(`unpaid follow-up ${step} ride=${r.id}: ${e instanceof Error ? e.message : String(e)}`),

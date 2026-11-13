@@ -228,6 +228,32 @@ class DriverJobAlertService {
     }
   }
 
+  static bool _pausedForVoice = false;
+
+  /// Met la sonnerie en pause pendant l’écoute vocale d’une offre (le micro l’entendrait).
+  static Future<void> pauseRingForVoice() async {
+    if (!_ringing) return;
+    _pausedForVoice = true;
+    try {
+      await _player.pause();
+    } catch (_) {
+      /* ignore */
+    }
+    unawaited(NativeJobWake.stopRing());
+  }
+
+  /// Reprend la sonnerie après l’écoute si l’offre est toujours là.
+  static Future<void> resumeRingAfterVoice() async {
+    if (!_pausedForVoice) return;
+    _pausedForVoice = false;
+    if (!_ringing) return;
+    try {
+      await _player.resume();
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
   /// Arrête la sonnerie. Si [offerKey] est fourni, n’arrête que si plus aucune
   /// offre active (ou si c’est la dernière clé suivie).
   static Future<void> stopRinging({String? offerKey}) async {
@@ -252,6 +278,7 @@ class DriverJobAlertService {
     _ringSafetyTimer?.cancel();
     _ringSafetyTimer = null;
     _ringing = false;
+    _pausedForVoice = false;
     try {
       await _player.stop();
       await _player.setReleaseMode(ReleaseMode.stop);

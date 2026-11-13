@@ -1084,12 +1084,7 @@ export class PaymentsService {
         this.servicePaymentNotReadyMessage(type, info.status),
       );
     }
-    const existing = await this.prisma.servicePayment.findUnique({
-      where: { referenceType_referenceId: { referenceType: type, referenceId } },
-    });
-    if (!existing || existing.method !== PaymentMethod.CASH) {
-      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Aucun paiement espèces en attente.');
-    }
+    const existing = await this.ensureCashServicePayment(type, referenceId, info);
     if (existing.status === PaymentStatus.COMPLETED) {
       return { success: true, payment: existing, message: 'Paiement déjà confirmé' };
     }
@@ -1167,6 +1162,117 @@ export class PaymentsService {
     return { success: true, payment, message: 'Paiement espèces confirmé' };
   }
 
+  /**
+   * The ride's cash payment, created when the passenger never chose how to pay. A payment
+   * already made another way (wallet, Mobile Money done or in progress) is never turned into cash.
+   */
+  private async ensureCashRidePayment(rideId: string, ride: Record<string, unknown>) {
+    const existing = await this.prisma.payment.findUnique({ where: { rideId } });
+    if (existing?.method === PaymentMethod.CASH) return existing;
+    if (existing && existing.status !== PaymentStatus.FAILED) {
+      throw new MovaHttpException(
+        MovaErrorCode.PAYMENT_FAILED,
+        undefined,
+        existing.status === PaymentStatus.COMPLETED
+          ? 'Cette course est déjà payée (hors espèces).'
+          : 'Un paiement Mobile Money est en cours pour cette course.',
+      );
+    }
+    const amountCdf = Math.round(
+      Number(ride.finalFareCdf ?? ride.estimatedFareCdf ?? ride.priceCdf ?? ride.totalCdf ?? 0),
+    );
+    const userId = String(ride.passengerId ?? '');
+    if (!userId || amountCdf <= 0) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Montant de la course introuvable.');
+    }
+    return existing
+      ? this.prisma.payment.update({
+          where: { rideId },
+          data: { method: PaymentMethod.CASH, status: PaymentStatus.PENDING, failureReason: null },
+        })
+      : this.prisma.payment.create({
+          data: { rideId, userId, amountCdf, method: PaymentMethod.CASH, status: PaymentStatus.PENDING },
+        });
+  }
+
+  private async ensureCashServicePayment(
+    type: string,
+    referenceId: string,
+    info: { userId: string; amountCdf: number; cashAllowed?: boolean },
+  ) {
+    const key = { referenceType_referenceId: { referenceType: type, referenceId } };
+    const existing = await this.prisma.servicePayment.findUnique({ where: key });
+    if (existing?.method === PaymentMethod.CASH) return existing;
+    if (existing && existing.status !== PaymentStatus.FAILED) {
+      throw new MovaHttpException(
+        MovaErrorCode.PAYMENT_FAILED,
+        undefined,
+        existing.status === PaymentStatus.COMPLETED
+          ? 'Ce service est déjà payé (hors espèces).'
+          : 'Un paiement est en cours pour ce service.',
+      );
+    }
+    if (info.cashAllowed === false) {
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Ce service est prépayé : pas d’espèces.');
+    }
+    return existing
+      ? this.prisma.servicePayment.update({
+          where: key,
+          data: { method: PaymentMethod.CASH, status: PaymentStatus.PENDING },
+        })
+      : this.prisma.servicePayment.create({
+          data: {
+            referenceType: type,
+            referenceId,
+            userId: info.userId,
+            amountCdf: Math.round(info.amountCdf),
+            method: PaymentMethod.CASH,
+            status: PaymentStatus.PENDING,
+          },
+        });
+  }
+
+  /**
+   * 24 h after the end of a ride nobody settled: neither paid, nor declared paid by the passenger,
+   * nor confirmed by the driver → automatic cash dispute (passenger blocked, SENGA alerted).
+   */
+  async autoDisputeUnpaidRide(rideId: string) {
+    const ride = await this.fetchRide(rideId);
+    if (this.resolveRideStatus(ride) !== 'COMPLETED' || ride.isShared === true || !ride.driverId) {
+      return { disputed: false, reason: 'not_applicable' };
+    }
+    const current = await this.prisma.payment.findUnique({ where: { rideId } });
+    if (current?.status === PaymentStatus.COMPLETED) return { disputed: false, reason: 'paid' };
+    if (current?.cashDisputedAt) return { disputed: false, reason: 'already_disputed' };
+    if (current?.passengerClaimedPaidAt) return { disputed: false, reason: 'passenger_claimed' };
+    if (current && current.method !== PaymentMethod.CASH && current.status === PaymentStatus.PENDING) {
+      return { disputed: false, reason: 'payment_in_progress' };
+    }
+    const existing = await this.ensureCashRidePayment(rideId, ride);
+    await this.prisma.payment.update({
+      where: { rideId },
+      data: { cashDisputedAt: new Date(), cashDisputeReason: 'UNPAID_24H', autoConfirmedAt: null },
+    });
+    await this.publishCashDisputed({
+      userId: existing.userId,
+      amountCdf: existing.amountCdf,
+      reason: 'UNPAID_24H',
+      rideId,
+      referenceType: 'RIDE',
+      referenceId: rideId,
+    });
+    await this.openCashNotReceivedIncident({
+      userId: existing.userId,
+      amountCdf: existing.amountCdf,
+      rideId,
+      referenceType: 'RIDE',
+      referenceId: rideId,
+      counterpartyUserId: String(ride.driverId),
+    });
+    this.logger.warn(`Auto cash dispute ride=${rideId} (unpaid 24 h)`);
+    return { disputed: true };
+  }
+
   async confirmCashRide(rideId: string, driverUserId: string) {
     const ride = await this.fetchRide(rideId);
     if (ride.isShared === true || ride.shared === true || ride.type === 'RIDE_SHARE') {
@@ -1180,10 +1286,9 @@ export class PaymentsService {
     if (this.resolveRideStatus(ride) !== 'COMPLETED') {
       throw new MovaHttpException(MovaErrorCode.RIDE_INVALID_STATUS);
     }
-    const existing = await this.prisma.payment.findUnique({ where: { rideId } });
-    if (!existing || existing.method !== PaymentMethod.CASH) {
-      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Aucun paiement espèces en attente.');
-    }
+    // The passenger paid cash and left without choosing « Espèces » in the app: the driver can
+    // still confirm (it used to answer « Aucun paiement espèces en attente »).
+    const existing = await this.ensureCashRidePayment(rideId, ride);
     if (existing.status === PaymentStatus.COMPLETED) {
       return { success: true, payment: existing, message: 'Paiement déjà confirmé' };
     }
@@ -1215,10 +1320,8 @@ export class PaymentsService {
     if (ride.driverId !== driverUserId) {
       throw new MovaHttpException(MovaErrorCode.AUTH_UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
-    const existing = await this.prisma.payment.findUnique({ where: { rideId } });
-    if (!existing || existing.method !== PaymentMethod.CASH) {
-      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Aucun paiement espèces en attente.');
-    }
+    // « Cash non reçu » also when the passenger left without choosing a payment.
+    const existing = await this.ensureCashRidePayment(rideId, ride);
     if (existing.status === PaymentStatus.COMPLETED) {
       throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, undefined, 'Ce paiement est déjà confirmé.');
     }

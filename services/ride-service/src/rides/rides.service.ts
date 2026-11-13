@@ -1581,13 +1581,35 @@ export class RidesService {
       where: { passengerId, status: RideStatus.COMPLETED },
       orderBy: { completedAt: 'desc' },
       take: 5,
-      select: { id: true, isShared: true },
+      select: {
+        id: true,
+        isShared: true,
+        completedAt: true,
+        pickupAddress: true,
+        dropoffAddress: true,
+        finalFareCdf: true,
+        estimatedFareCdf: true,
+      },
     });
     for (const ride of completed) {
       const pay = await this.resolvePassengerCompletedPayment(ride, passengerId);
       // Soft cash: PENDING espèces sans litige → passager libre ; litige ou autre méthode → bloque.
       if (isHardUnpaidBlock(pay)) {
-        throw new MovaHttpException(MovaErrorCode.RIDE_UNPAID_PENDING, HttpStatus.CONFLICT);
+        // Say which ride and what to do (the generic text spoke of a dispute even when the
+        // passenger had simply never paid).
+        const when = ride.completedAt
+          ? ride.completedAt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'Africa/Kinshasa' })
+          : '';
+        const trip = `${ride.pickupAddress ?? 'Départ'} → ${ride.dropoffAddress ?? 'Arrivée'}`;
+        const amount = formatCdf(ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0);
+        const disputed = (pay as { cashDisputed?: boolean }).cashDisputed === true;
+        throw new MovaHttpException(
+          MovaErrorCode.RIDE_UNPAID_PENDING,
+          HttpStatus.CONFLICT,
+          disputed
+            ? `Le chauffeur signale ne pas avoir reçu le paiement de la course du ${when} (${trip}, ${amount}). Payez-la, déclarez « J'ai payé en espèces », ou contactez le support.`
+            : `La course du ${when} (${trip}, ${amount}) n'est pas réglée. Ouvrez-la dans votre historique pour la payer, ou indiquez « J'ai payé en espèces » si vous avez déjà payé le chauffeur.`,
+        );
       }
     }
     // Joiners Pool (pas host) : bookings DROPPED_OFF / course terminée

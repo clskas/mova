@@ -291,6 +291,11 @@ export class InternalController {
     return this.payments.getServicePaymentDetail(referenceType, referenceId);
   }
 
+  @Post('rides/:rideId/auto-dispute-unpaid')
+  autoDisputeUnpaidRide(@Param('rideId') rideId: string) {
+    return this.payments.autoDisputeUnpaidRide(rideId);
+  }
+
   @Post('rides/payment-status')
   getRidePaymentStatuses(@Body() body: { rideIds?: string[] }) {
     return this.payments.getRidePaymentStatuses(body.rideIds ?? []);

@@ -12,6 +12,7 @@ import '../../core/widgets/mova_widgets.dart';
 import 'tracking_screen.dart';
 import '../passenger/passenger_alert_service.dart';
 import '../../core/i18n/i18n.dart';
+import '../../core/voice/voice_command_button.dart';
 
 class MatchingScreen extends ConsumerStatefulWidget {
   const MatchingScreen({
@@ -187,6 +188,15 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
     );
   }
 
+  Future<void> _onSearchVoice(String text) async {
+    if (parsePassengerVoiceIntent(text) == PassengerVoiceIntent.cancel) {
+      if (await confirmVoiceAction(context, tr('Annuler la recherche ?'), tr('Oui, annuler'))) await _cancel();
+      return;
+    }
+    if (!mounted) return;
+    voiceNotUnderstood(context, text, tr('annuler'));
+  }
+
   Future<void> _cancel() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -229,6 +239,9 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
       child: MovaScreen(
       title: tr('Recherche'),
       scrollable: false,
+      actions: [
+        VoiceCommandButton(onText: _onSearchVoice, hint: tr('Dites « annuler » pour arrêter la recherche')),
+      ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

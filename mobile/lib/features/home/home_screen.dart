@@ -2,6 +2,7 @@ import '../../core/i18n/i18n_remote.dart';
 import '../../core/safety/sos_follow_up.dart';
 import 'dart:async';
 import '../../core/i18n/i18n.dart';
+import '../../core/voice/voice_command_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -292,6 +293,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     return tr('Bonsoir');
   }
 
+  /// Voice on the home screen: opens a service, or the ride / delivery in progress.
+  Future<void> _onHomeVoice(String text) async {
+    final intent = parsePassengerVoiceIntent(text);
+    switch (intent) {
+      case PassengerVoiceIntent.taxi:
+        _open(context, const BookingScreen());
+      case PassengerVoiceIntent.delivery || PassengerVoiceIntent.food || PassengerVoiceIntent.parcel:
+        _open(context, const DeliveryHubScreen());
+      case PassengerVoiceIntent.scheduled:
+        _open(context, const ScheduledRideScreen());
+      case PassengerVoiceIntent.carpool:
+        _open(context, const CarpoolScreen());
+      case PassengerVoiceIntent.rental:
+        _open(context, const RentalScreen());
+      case PassengerVoiceIntent.moving:
+        _open(context, const MovingScreen());
+      case PassengerVoiceIntent.wallet:
+        _open(context, const WalletScreen());
+      case PassengerVoiceIntent.history:
+        _open(context, const HistoryScreen());
+      case PassengerVoiceIntent.myRide when _activeRide != null:
+        _resumeActiveRide();
+      case PassengerVoiceIntent.myRide when _activeDelivery != null:
+        _resumeActiveDelivery();
+      default:
+        voiceNotUnderstood(
+          context,
+          text,
+          tr('taxi, livraison, planifier, covoiturage, location, déménagement, wallet, historique, ma course'),
+        );
+    }
+  }
+
   void _open(BuildContext context, Widget screen) {
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
@@ -326,6 +360,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     return MovaScreen(
       title: 'Senga',
       actions: [
+        VoiceCommandButton(
+          onText: _onHomeVoice,
+          hint: tr('Dites : taxi, livraison, covoiturage, wallet, ma course…'),
+        ),
         const NotificationsBellButton(),
         IconButton(
           icon: const Icon(Icons.person_outline),

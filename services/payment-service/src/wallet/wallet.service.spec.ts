@@ -263,6 +263,40 @@ describe('WalletService', () => {
     expect(redis.client.del).not.toHaveBeenCalled();
   });
 
+  describe('writeOffDeletedUser', () => {
+    it('refuses a wallet that is not a deleted account', async () => {
+      prisma.walletTransaction.findFirst.mockResolvedValue(null);
+      prisma.walletHold.findUnique.mockResolvedValue(null);
+      await expect(service.writeOffDeletedUser('u1', 'test')).rejects.toMatchObject({
+        response: { message: expect.stringMatching(/compte supprimé/i) },
+      });
+    });
+
+    it('releases the freeze then debits the whole balance once', async () => {
+      prisma.walletTransaction.findFirst.mockResolvedValue(null);
+      prisma.walletHold.findUnique.mockResolvedValue({ id: 'h1', walletId: 'w1', amountCdf: 409, status: 'ACTIVE' });
+      const release = jest.spyOn(service, 'releaseHold').mockResolvedValue({ released: true, amountCdf: 409 });
+      prisma.wallet.findUnique.mockResolvedValue({ userId: 'u1', balanceCdf: 409, heldBalanceCdf: 0 });
+      const debit = jest.spyOn(service, 'debit').mockResolvedValue({ balanceCdf: 0 } as never);
+      const res = await service.writeOffDeletedUser('u1', 'Compte de test');
+      expect(release).toHaveBeenCalledWith('DELETED_USER', 'u1');
+      expect(debit).toHaveBeenCalledWith('u1', 409, expect.stringContaining('Compte de test'), 'DELETED_USER_WRITEOFF:u1');
+      expect(res.amountCdf).toBe(409);
+      release.mockRestore();
+      debit.mockRestore();
+    });
+
+    it('does nothing the second time', async () => {
+      prisma.walletTransaction.findFirst.mockResolvedValue({ id: 't1', type: 'DEBIT' });
+      prisma.wallet.findUnique.mockResolvedValue({ userId: 'u1', balanceCdf: 0 });
+      const debit = jest.spyOn(service, 'debit');
+      const res = await service.writeOffDeletedUser('u1', 'x');
+      expect(res.alreadyApplied).toBe(true);
+      expect(debit).not.toHaveBeenCalled();
+      debit.mockRestore();
+    });
+  });
+
   it('ne recapture pas un séquestre déjà pris (CAS status=ACTIVE)', async () => {
     prisma.walletHold.findUnique.mockResolvedValue({
       id: 'h1',

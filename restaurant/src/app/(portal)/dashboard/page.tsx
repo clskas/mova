@@ -211,6 +211,16 @@ export default function DashboardPage() {
               />
               <KpiCard label="Revenus ce mois" value={formatCdf(kpis.revenueMonthCdf)} href="/earnings" />
               <KpiCard label="Ventes créditées" value={String(kpis.totalSalesCount)} href="/earnings" />
+              <KpiCard
+                label={`Payé en espèces aujourd'hui (${kpis.cashTodayCount ?? 0})`}
+                value={formatCdf(kpis.cashTodayCdf ?? 0)}
+                href={`/earnings?from=${today}&to=${today}`}
+              />
+              <KpiCard
+                label={`Payé en espèces ce mois (${kpis.cashMonthCount ?? 0})`}
+                value={formatCdf(kpis.cashMonthCdf ?? 0)}
+                href="/earnings"
+              />
             </div>
           </section>
 

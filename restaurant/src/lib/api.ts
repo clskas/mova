@@ -304,6 +304,11 @@ export type RestaurantDashboard = {
     revenueTodayCdf: number;
     revenueMonthCdf: number;
     totalSalesCount: number;
+    cashTodayCdf?: number;
+    cashTodayCount?: number;
+    cashMonthCdf?: number;
+    cashMonthCount?: number;
+    cashEarningsCdf?: number;
   };
   recentOrders: RestaurantOrder[];
 };

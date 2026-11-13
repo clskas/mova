@@ -27,6 +27,8 @@ import 'widgets/driver_cash_received_dialog.dart';
 import '../../core/location/location_permission.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/voice/voice_command_button.dart';
+import 'driver_alert_prefs.dart';
+import '../../core/geo/geo_utils.dart';
 
 class ActiveDeliveryScreen extends ConsumerStatefulWidget {
   const ActiveDeliveryScreen({
@@ -245,6 +247,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       return;
     }
     final pos = await Geolocator.getCurrentPosition();
+    _checkVoiceMoments(pos.latitude, pos.longitude);
     final api = ref.read(apiClientProvider);
     await api.updateDriverLocation(pos.latitude, pos.longitude);
 
@@ -427,12 +430,37 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     }
   }
 
+  /// Key moments: the micro opens on its own once (near the pickup, after arriving, near the
+  /// destination), when the admin and the driver allow it.
+  final VoiceAutoTrigger _voiceMoment = VoiceAutoTrigger();
+  final Set<String> _voiceMomentsDone = {};
+
+  void _voiceMomentOnce(String key) {
+    if (!kDriverVoiceAutoListen || !DriverAlertPrefs.voiceAutoListen) return;
+    if (!_voiceMomentsDone.add(key)) return;
+    _voiceMoment.fire();
+  }
+
+  double? _kmTo(Object? lat, Object? lng, double? fromLat, double? fromLng) {
+    if (lat is! num || lng is! num || fromLat == null || fromLng == null) return null;
+    return GeoUtils.haversineKm(fromLat, fromLng, lat.toDouble(), lng.toDouble());
+  }
+
+  void _checkVoiceMoments(double lat, double lng) {
+    if (_isErrand || !mounted) return;
+    if (_status == 'PICKED_UP' || _status == 'IN_TRANSIT') {
+      final km = _kmTo(_delivery['dropoffLat'] ?? _delivery['deliveryLat'], _delivery['dropoffLng'] ?? _delivery['deliveryLng'], lat, lng);
+      if (km != null && km <= 0.15) _voiceMomentOnce('delivered');
+    }
+  }
+
   /// Voice commands on a delivery / errand. Delivered asks the recipient PIN, as with the button.
   Future<void> _onDeliveryVoice(String text) async {
     final intent = parseDriverVoiceIntent(text);
     final next = _nextAction;
     switch (intent) {
-      case DriverVoiceIntent.start || DriverVoiceIntent.arrived when next == 'IN_TRANSIT' || next == 'IN_PROGRESS':
+      case DriverVoiceIntent.start || DriverVoiceIntent.arrived || DriverVoiceIntent.passengerPicked
+          when next == 'IN_TRANSIT' || next == 'IN_PROGRESS':
         await _handleNextAction();
       case DriverVoiceIntent.finish when next == 'DELIVERED' || next == 'COMPLETED':
         if (next == 'COMPLETED' &&
@@ -663,6 +691,8 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       actions: [
         VoiceCommandButton(
           onText: _onDeliveryVoice,
+          trigger: _voiceMoment,
+          autoListenFor: Duration(seconds: kDriverVoiceAutoListenSeconds),
           hint: tr('Dites : en route, livré, injoignable, itinéraire, appeler'),
         ),
         sosAppBarButton(

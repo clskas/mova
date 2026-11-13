@@ -6,6 +6,8 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/config/client_apps_config.dart';
 import '../../core/api/api_client.dart';
 import '../../core/voice/voice_command_button.dart';
+import 'driver_alert_prefs.dart';
+import '../../core/geo/geo_utils.dart';
 import '../../core/api/ride_socket.dart';
 import '../../core/config/market_config.dart';
 import '../../core/contact/contact_actions.dart';
@@ -332,6 +334,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     if (!mounted) return;
     _currentLat = pos.latitude;
     _currentLng = pos.longitude;
+    _checkVoiceMoments();
     final api = ref.read(apiClientProvider);
     final socket = ref.read(rideSocketProvider);
     await api.updateDriverLocation(pos.latitude, pos.longitude);
@@ -543,6 +546,42 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         };
 
   /// Driver voice: arrived / start / finish / navigation / call. Finishing asks a confirmation.
+  /// Key moments: the micro opens on its own once (near the pickup, after arriving, near the
+  /// destination), when the admin and the driver allow it.
+  final VoiceAutoTrigger _voiceMoment = VoiceAutoTrigger();
+  final Set<String> _voiceMomentsDone = {};
+
+  void _voiceMomentOnce(String key) {
+    if (!kDriverVoiceAutoListen || !DriverAlertPrefs.voiceAutoListen) return;
+    if (!_voiceMomentsDone.add(key)) return;
+    _voiceMoment.fire();
+  }
+
+  double? _kmTo(Object? lat, Object? lng, double? fromLat, double? fromLng) {
+    if (lat is! num || lng is! num || fromLat == null || fromLng == null) return null;
+    return GeoUtils.haversineKm(fromLat, fromLng, lat.toDouble(), lng.toDouble());
+  }
+
+  void _checkVoiceMoments() {
+    if (_isSharedPool || !mounted) return;
+    switch (_status) {
+      case 'DRIVER_ASSIGNED':
+        final km = _kmTo(_ride['pickupLat'], _ride['pickupLng'], _currentLat, _currentLng);
+        if (km != null && km <= 0.1) _voiceMomentOnce('arrived');
+      case 'ARRIVING' || 'DRIVER_ARRIVED':
+        // Give the passenger time to get in, then ask « démarrer ».
+        if (!_voiceMomentsDone.contains('start-armed')) {
+          Timer(const Duration(seconds: 45), () {
+            if (mounted && (_status == 'ARRIVING' || _status == 'DRIVER_ARRIVED')) _voiceMomentOnce('start');
+          });
+          _voiceMomentsDone.add('start-armed');
+        }
+      case 'IN_PROGRESS':
+        final km = _kmTo(_ride['dropoffLat'], _ride['dropoffLng'], _currentLat, _currentLng);
+        if (km != null && km <= 0.15) _voiceMomentOnce('finish');
+    }
+  }
+
   Future<void> _onDriverVoice(String text) async {
     final intent = parseDriverVoiceIntent(text);
     final next = _nextStatus();
@@ -696,6 +735,8 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         if (_status != 'COMPLETED')
           VoiceCommandButton(
             onText: _onDriverVoice,
+            trigger: _voiceMoment,
+            autoListenFor: Duration(seconds: kDriverVoiceAutoListenSeconds),
             color: Colors.white,
             hint: _isSharedPool
                 ? tr('Dites : passager pris, passager déposé, itinéraire, appeler')

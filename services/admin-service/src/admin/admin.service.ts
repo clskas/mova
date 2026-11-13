@@ -2481,6 +2481,14 @@ export class AdminService {
         'La configuration nationale de la plateforme est réservée au staff central. Utilisez « Documents » pour le KYC ville.',
       );
     }
+    // Payment timeouts (cash auto-close, unpaid reminders and automatic dispute): super-admin only.
+    if ((body?.unpaidFollowup !== undefined || body?.cashPayment !== undefined) && actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Seul le super administrateur peut modifier les délais de paiement (espèces et impayés).',
+      );
+    }
     return this.proxy('ride', '/internal/platform-config', { method: 'PATCH', body: JSON.stringify(body) });
   }
 

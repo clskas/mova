@@ -8,6 +8,7 @@ import {
   mergeCashPayment,
   mergeDriverOps,
   mergeIdentityVerification,
+  mergeUnpaidFollowup,
 } from './platform-config.types';
 
 function mergeConfig(overrides: PlatformConfigOverrides): MergedPlatformConfig {
@@ -30,6 +31,7 @@ function mergeConfig(overrides: PlatformConfigOverrides): MergedPlatformConfig {
     carpool: { ...d.carpool, ...o.carpool },
     driverOps: mergeDriverOps(d.driverOps, o.driverOps),
     cashPayment: mergeCashPayment(d.cashPayment, o.cashPayment),
+    unpaidFollowup: mergeUnpaidFollowup(d.unpaidFollowup, o.unpaidFollowup),
     identityVerification: mergeIdentityVerification(d.identityVerification, o.identityVerification),
   };
 }
@@ -156,6 +158,12 @@ export class PlatformConfigService implements OnModuleInit {
             patch.cashPayment,
           )
         : this.overrides.cashPayment,
+      unpaidFollowup: patch.unpaidFollowup
+        ? mergeUnpaidFollowup(
+            mergeUnpaidFollowup(PLATFORM_CONFIG_DEFAULTS.unpaidFollowup, this.overrides.unpaidFollowup),
+            patch.unpaidFollowup,
+          )
+        : this.overrides.unpaidFollowup,
       identityVerification: patch.identityVerification
         ? mergeIdentityVerification(
             { smileIdInApp: this.overrides.identityVerification?.smileIdInApp === true },
@@ -222,6 +230,21 @@ export class PlatformConfigService implements OnModuleInit {
         MovaErrorCode.VALIDATION_ERROR,
         HttpStatus.BAD_REQUEST,
         'Délai auto-clôture espèces : entre 1 et 168 heures.',
+      );
+    }
+    const u = m.unpaidFollowup;
+    if (!(u.reminder1Min < u.driverCheckMin && u.driverCheckMin < u.reminder2Min)) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Relances impayés : le 1er rappel doit venir avant la question au chauffeur, elle-même avant le 2e rappel.',
+      );
+    }
+    if (u.autoDisputeHours * 60 <= u.reminder2Min) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Relances impayés : le litige automatique doit venir après le 2e rappel.',
       );
     }
     if (m.cashPayment.autoConfirmMaxCdf < 0) {

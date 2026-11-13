@@ -711,6 +711,15 @@ export type PlatformConfigData = {
     autoConfirmHours: number;
     autoConfirmMaxCdf: number;
   };
+  /** Unpaid ride follow-up delays (super-admin). */
+  unpaidFollowup?: {
+    enabled: boolean;
+    reminder1Min: number;
+    driverCheckMin: number;
+    reminder2Min: number;
+    autoDisputeEnabled: boolean;
+    autoDisputeHours: number;
+  };
   /** Smile ID verification card in the driver app (shown / hidden). */
   identityVerification?: { smileIdInApp: boolean };
 };

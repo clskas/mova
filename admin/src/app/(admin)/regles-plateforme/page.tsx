@@ -119,6 +119,8 @@ export default function ReglesPlateformePage() {
   const readOnly = !canWrite("regles");
   /** Admin ville : uniquement la règle documents (jobs), pas les paramètres nationaux. */
   const cityAdminDocsOnly = role === "CITY_ADMIN";
+  /** Délais de paiement (espèces, impayés) : super-admin uniquement. */
+  const timeoutsReadOnly = readOnly || role !== "SUPER_ADMIN";
   const [config, setConfig] = useState<PlatformConfigData | null>(null);
   const [cancellationPolicies, setCancellationPolicies] = useState<CancellationPolicy[]>([]);
   const [weightBands, setWeightBands] = useState<ParcelWeightBand[]>([]);
@@ -167,6 +169,12 @@ export default function ReglesPlateformePage() {
   const [cashAutoEnabled, setCashAutoEnabled] = useState(true);
   const [cashAutoHours, setCashAutoHours] = useState("24");
   const [cashAutoMaxCdf, setCashAutoMaxCdf] = useState("150000");
+  const [unpaidEnabled, setUnpaidEnabled] = useState(true);
+  const [unpaidReminder1, setUnpaidReminder1] = useState("5");
+  const [unpaidDriverCheck, setUnpaidDriverCheck] = useState("30");
+  const [unpaidReminder2, setUnpaidReminder2] = useState("120");
+  const [unpaidDisputeEnabled, setUnpaidDisputeEnabled] = useState(true);
+  const [unpaidDisputeHours, setUnpaidDisputeHours] = useState("24");
 
   function applyConfig(c: PlatformConfigData) {
     setConfig(c);
@@ -211,6 +219,12 @@ export default function ReglesPlateformePage() {
     setCashAutoEnabled(c.cashPayment?.autoConfirmEnabled !== false);
     setCashAutoHours(String(c.cashPayment?.autoConfirmHours ?? 24));
     setCashAutoMaxCdf(String(c.cashPayment?.autoConfirmMaxCdf ?? 150000));
+    setUnpaidEnabled(c.unpaidFollowup?.enabled !== false);
+    setUnpaidReminder1(String(c.unpaidFollowup?.reminder1Min ?? 5));
+    setUnpaidDriverCheck(String(c.unpaidFollowup?.driverCheckMin ?? 30));
+    setUnpaidReminder2(String(c.unpaidFollowup?.reminder2Min ?? 120));
+    setUnpaidDisputeEnabled(c.unpaidFollowup?.autoDisputeEnabled !== false);
+    setUnpaidDisputeHours(String(c.unpaidFollowup?.autoDisputeHours ?? 24));
   }
 
   const load = useCallback(async () => {
@@ -498,7 +512,7 @@ export default function ReglesPlateformePage() {
                 <input
                   type="checkbox"
                   checked={cashAutoEnabled}
-                  disabled={readOnly}
+                  disabled={timeoutsReadOnly}
                   onChange={(e) => setCashAutoEnabled(e.target.checked)}
                 />
                 <span>Activer l’auto-clôture après délai</span>
@@ -508,16 +522,16 @@ export default function ReglesPlateformePage() {
                   label="Délai (heures, 1–168)"
                   value={cashAutoHours}
                   onChange={setCashAutoHours}
-                  disabled={readOnly || !cashAutoEnabled}
+                  disabled={timeoutsReadOnly || !cashAutoEnabled}
                 />
                 <NumField
                   label="Plafond montant (FC)"
                   value={cashAutoMaxCdf}
                   onChange={setCashAutoMaxCdf}
-                  disabled={readOnly || !cashAutoEnabled}
+                  disabled={timeoutsReadOnly || !cashAutoEnabled}
                 />
               </div>
-              {!readOnly && (
+              {!timeoutsReadOnly && (
                 <BtnPrimary
                   disabled={savingSection === "cashPayment"}
                   onClick={() =>
@@ -531,6 +545,84 @@ export default function ReglesPlateformePage() {
                   }
                 >
                   {savingSection === "cashPayment" ? "…" : "Enregistrer timeout espèces"}
+                </BtnPrimary>
+              )}
+            </Card>
+          </section>
+
+          <section>
+            <h2 className="font-semibold text-[#1A1A2E] mb-3">Courses non réglées (relances)</h2>
+            <Card className="p-4 space-y-4 max-w-xl">
+              <p className="text-sm text-gray-600">
+                Course terminée mais ni payée, ni déclarée payée par le passager, ni confirmée par le chauffeur :
+                SENGA relance le passager, demande au chauffeur s’il a été payé, relance encore (avec SMS), puis
+                ouvre un litige « non payé » qui bloque le passager jusqu’au règlement. Délais comptés depuis la fin
+                de la course.
+                {role !== "SUPER_ADMIN" && " Réglage réservé au super administrateur."}
+              </p>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={unpaidEnabled}
+                  disabled={timeoutsReadOnly}
+                  onChange={(e) => setUnpaidEnabled(e.target.checked)}
+                />
+                <span>Activer les relances</span>
+              </label>
+              <div className="grid sm:grid-cols-3 gap-4">
+                <NumField
+                  label="1er rappel passager (min)"
+                  value={unpaidReminder1}
+                  onChange={setUnpaidReminder1}
+                  disabled={timeoutsReadOnly || !unpaidEnabled}
+                />
+                <NumField
+                  label="Question au chauffeur (min)"
+                  value={unpaidDriverCheck}
+                  onChange={setUnpaidDriverCheck}
+                  disabled={timeoutsReadOnly || !unpaidEnabled}
+                />
+                <NumField
+                  label="2e rappel + SMS (min)"
+                  value={unpaidReminder2}
+                  onChange={setUnpaidReminder2}
+                  disabled={timeoutsReadOnly || !unpaidEnabled}
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={unpaidDisputeEnabled}
+                  disabled={timeoutsReadOnly || !unpaidEnabled}
+                  onChange={(e) => setUnpaidDisputeEnabled(e.target.checked)}
+                />
+                <span>Litige automatique « non payé »</span>
+              </label>
+              <div className="grid sm:grid-cols-3 gap-4">
+                <NumField
+                  label="Litige après (heures, 1–168)"
+                  value={unpaidDisputeHours}
+                  onChange={setUnpaidDisputeHours}
+                  disabled={timeoutsReadOnly || !unpaidEnabled || !unpaidDisputeEnabled}
+                />
+              </div>
+              {!timeoutsReadOnly && (
+                <BtnPrimary
+                  disabled={savingSection === "unpaidFollowup"}
+                  onClick={() =>
+                    savePlatform("unpaidFollowup", {
+                      unpaidFollowup: {
+                        enabled: unpaidEnabled,
+                        reminder1Min: Number(unpaidReminder1) || 5,
+                        driverCheckMin: Number(unpaidDriverCheck) || 30,
+                        reminder2Min: Number(unpaidReminder2) || 120,
+                        autoDisputeEnabled: unpaidDisputeEnabled,
+                        autoDisputeHours: Number(unpaidDisputeHours) || 24,
+                      },
+                    })
+                  }
+                >
+                  {savingSection === "unpaidFollowup" ? "…" : "Enregistrer les relances"}
                 </BtnPrimary>
               )}
             </Card>

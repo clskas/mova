@@ -21,6 +21,7 @@ class _DriverNotificationSettingsScreenState
   bool _muted = false;
   DriverAlertSoundStyle _style = DriverAlertSoundStyle.senga;
   bool _testing = false;
+  bool _voiceAuto = true;
 
   @override
   void initState() {
@@ -34,6 +35,7 @@ class _DriverNotificationSettingsScreenState
     setState(() {
       _muted = DriverAlertPrefs.muted;
       _style = DriverAlertPrefs.style;
+      _voiceAuto = DriverAlertPrefs.voiceAutoListen;
       _loading = false;
     });
   }
@@ -42,6 +44,12 @@ class _DriverNotificationSettingsScreenState
     await DriverAlertPrefs.setMuted(value);
     if (!mounted) return;
     setState(() => _muted = value);
+  }
+
+  Future<void> _setVoiceAuto(bool value) async {
+    await DriverAlertPrefs.setVoiceAutoListen(value);
+    if (!mounted) return;
+    setState(() => _voiceAuto = value);
   }
 
   Future<void> _setStyle(DriverAlertSoundStyle value) async {
@@ -96,6 +104,14 @@ class _DriverNotificationSettingsScreenState
                   subtitle: Text(_muted ? tr('Coupé (vibration seule)') : tr('Activé')),
                   value: !_muted,
                   onChanged: (on) => _setMuted(!on),
+                ),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.mic_none, color: MovaColors.violet),
+                  title: Text(tr('Répondre aux offres à la voix'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(tr('Le micro s’ouvre 10 s quand une course arrive : dites « accepter » ou « refuser ».')),
+                  value: _voiceAuto,
+                  onChanged: _setVoiceAuto,
                 ),
                 const Divider(height: 28),
                 Text(

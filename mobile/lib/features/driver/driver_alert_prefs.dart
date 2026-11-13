@@ -14,12 +14,17 @@ class DriverAlertPrefs {
 
   static const _mutedKey = 'senga_driver_alert_muted_v1';
   static const _styleKey = 'senga_driver_alert_sound_style_v1';
+  static const _voiceKey = 'senga_driver_offer_voice_auto_v1';
 
   static bool _muted = false;
   static DriverAlertSoundStyle _style = DriverAlertSoundStyle.senga;
   static bool _loaded = false;
+  static bool _voiceAutoListen = true;
 
   static bool get muted => _muted;
+
+  /// Micro ouvert automatiquement 10 s quand une offre arrive.
+  static bool get voiceAutoListen => _voiceAutoListen;
   static DriverAlertSoundStyle get style => _style;
 
   static Future<void> ensureLoaded() async {
@@ -27,6 +32,7 @@ class DriverAlertPrefs {
     try {
       final prefs = await SharedPreferences.getInstance();
       _muted = prefs.getBool(_mutedKey) ?? false;
+      _voiceAutoListen = prefs.getBool(_voiceKey) ?? true;
       final raw = prefs.getString(_styleKey) ?? DriverAlertSoundStyle.senga.name;
       _style = DriverAlertSoundStyle.values.firstWhere(
         (e) => e.name == raw,
@@ -44,6 +50,17 @@ class DriverAlertPrefs {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_mutedKey, value);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  static Future<void> setVoiceAutoListen(bool value) async {
+    _voiceAutoListen = value;
+    _loaded = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_voiceKey, value);
     } catch (_) {
       /* ignore */
     }

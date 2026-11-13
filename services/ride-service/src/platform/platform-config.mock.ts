@@ -40,6 +40,14 @@ export function mockPlatformConfig(
       autoConfirmHours: 24,
       autoConfirmMaxCdf: 150_000,
     },
+    unpaidFollowup: {
+      enabled: true,
+      reminder1Min: 5,
+      driverCheckMin: 30,
+      reminder2Min: 120,
+      autoDisputeEnabled: true,
+      autoDisputeHours: 24,
+    },
     identityVerification: { smileIdInApp: false },
   };
   return {

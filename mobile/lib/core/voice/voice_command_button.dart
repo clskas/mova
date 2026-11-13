@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -15,6 +17,10 @@ class VoiceCommandButton extends StatefulWidget {
     this.hint,
     this.color,
     this.localeId = 'fr_FR',
+    this.autoListen = false,
+    this.autoListenDelay = const Duration(seconds: 2),
+    this.autoListenFor = const Duration(seconds: 10),
+    this.onAutoListenChanged,
   });
 
   final Future<void> Function(String text) onText;
@@ -25,6 +31,15 @@ class VoiceCommandButton extends StatefulWidget {
   final Color? color;
   final String localeId;
 
+  /// Opens the micro on its own (no sheet) once, [autoListenDelay] after the button appears,
+  /// for [autoListenFor] — only if the micro permission was already granted (never a prompt).
+  final bool autoListen;
+  final Duration autoListenDelay;
+  final Duration autoListenFor;
+
+  /// true when the automatic listening starts, false when it ends (after [onText] has run).
+  final ValueChanged<bool>? onAutoListenChanged;
+
   @override
   State<VoiceCommandButton> createState() => _VoiceCommandButtonState();
 }
@@ -32,8 +47,76 @@ class VoiceCommandButton extends StatefulWidget {
 class _VoiceCommandButtonState extends State<VoiceCommandButton> {
   final SpeechToText _speech = SpeechToText();
   bool _busy = false;
+  bool _autoListening = false;
+  Timer? _autoStartTimer;
+  Timer? _autoStopTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoListen) {
+      _autoStartTimer = Timer(widget.autoListenDelay, () => unawaited(_startAutoListen()));
+    }
+  }
+
+  @override
+  void dispose() {
+    _autoStartTimer?.cancel();
+    _autoStopTimer?.cancel();
+    if (_autoListening) unawaited(_speech.stop());
+    super.dispose();
+  }
+
+  Future<void> _startAutoListen() async {
+    if (!mounted || _busy || _autoListening) return;
+    try {
+      // Never ask for the micro here: an offer screen is not the place for a permission prompt.
+      if (!await _speech.hasPermission) return;
+      final ok = await _speech.initialize(
+        onError: (_) => _endAutoListen(),
+        onStatus: (s) {
+          if (s == SpeechToText.doneStatus || s == SpeechToText.notListeningStatus) _endAutoListen();
+        },
+      );
+      if (!ok || !mounted) return;
+      setState(() => _autoListening = true);
+      widget.onAutoListenChanged?.call(true);
+      _autoStopTimer = Timer(widget.autoListenFor + const Duration(seconds: 1), _endAutoListen);
+      await _speech.listen(
+        localeId: widget.localeId,
+        listenFor: widget.autoListenFor,
+        pauseFor: const Duration(seconds: 3),
+        onResult: (r) {
+          if (!mounted || !_autoListening || !r.finalResult) return;
+          final text = r.recognizedWords.trim();
+          _endAutoListen(text: text);
+        },
+      );
+    } catch (_) {
+      _endAutoListen();
+    }
+  }
+
+  /// Ends the automatic listening once; runs [VoiceCommandButton.onText] with what was heard first.
+  Future<void> _endAutoListen({String text = ''}) async {
+    if (!_autoListening) return;
+    _autoListening = false;
+    _autoStopTimer?.cancel();
+    unawaited(_speech.stop());
+    if (mounted) setState(() {});
+    try {
+      if (text.isNotEmpty && mounted) await widget.onText(text);
+    } finally {
+      widget.onAutoListenChanged?.call(false);
+    }
+  }
 
   Future<void> _listen() async {
+    if (_autoListening) {
+      // Tap while it listens on its own: stop.
+      await _endAutoListen();
+      return;
+    }
     if (_busy) return;
     setState(() => _busy = true);
     try {
@@ -61,10 +144,12 @@ class _VoiceCommandButtonState extends State<VoiceCommandButton> {
   Widget build(BuildContext context) {
     return IconButton(
       key: const Key('voiceCommandButton'),
-      tooltip: widget.tooltip ?? tr('Commande vocale'),
-      icon: _busy
-          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-          : Icon(Icons.mic, color: widget.color ?? MovaColors.violet),
+      tooltip: _autoListening ? tr('Arrêter l’écoute') : (widget.tooltip ?? tr('Commande vocale')),
+      icon: _autoListening
+          ? const Icon(Icons.mic, color: Colors.redAccent)
+          : _busy
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : Icon(Icons.mic, color: widget.color ?? MovaColors.violet),
       onPressed: _busy ? null : _listen,
     );
   }

@@ -14,6 +14,7 @@ import '../../core/billing/driver_earnings_display.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'active_ride_screen.dart';
+import 'driver_alert_prefs.dart';
 import 'driver_job_alert_service.dart';
 import 'widgets/passenger_rating_badge.dart';
 import '../../core/location/location_permission.dart';
@@ -43,6 +44,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
   double? _pickupDistanceKm;
   int? _pickupEtaMin;
   bool _closingForCancel = false;
+  bool _voiceListening = false;
   // Passenger note (offers list, refreshed by the status poll for push offers).
   late double? _passengerRating = PassengerRatingBadge.ratingFrom(widget.offer);
   late int _passengerRatingCount = PassengerRatingBadge.countFrom(widget.offer);
@@ -222,6 +224,16 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
         }
         setState(() => _error = msg);
     }
+  }
+
+  void _onAutoListenChanged(bool listening) {
+    if (listening) {
+      unawaited(DriverJobAlertService.pauseRingForVoice());
+    } else if (mounted && !_loading && !_closingForCancel) {
+      // Nothing understood: the offer keeps ringing.
+      unawaited(DriverJobAlertService.resumeRingAfterVoice());
+    }
+    if (mounted) setState(() => _voiceListening = listening);
   }
 
   Future<void> _onOfferVoice(String text) async {
@@ -528,10 +540,18 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                         onText: _onOfferVoice,
                         color: Colors.white,
                         hint: tr('Dites « accepter » ou « refuser »'),
+                        autoListen: DriverAlertPrefs.voiceAutoListen,
+                        onAutoListenChanged: _onAutoListenChanged,
                       ),
-                      Text(
-                        tr('Répondre à la voix'),
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                      Flexible(
+                        child: Text(
+                          _voiceListening ? tr('Je vous écoute : « accepter » ou « refuser »') : tr('Répondre à la voix'),
+                          style: TextStyle(
+                            color: _voiceListening ? Colors.white : Colors.white.withValues(alpha: 0.7),
+                            fontSize: 13,
+                            fontWeight: _voiceListening ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
                       ),
                     ],
                   ),

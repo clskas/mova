@@ -29,6 +29,20 @@ export type CashPaymentConfig = {
   autoConfirmMaxCdf: number;
 };
 
+/** Relances d'une course terminée et non réglée (réglables par le super-admin). */
+export type UnpaidFollowupConfig = {
+  enabled: boolean;
+  /** 1er rappel au passager (minutes après la fin). */
+  reminder1Min: number;
+  /** Question au chauffeur « le client a-t-il payé ? » (minutes). */
+  driverCheckMin: number;
+  /** 2e rappel au passager, avec SMS (minutes). */
+  reminder2Min: number;
+  /** Litige automatique « non payé » (heures). */
+  autoDisputeEnabled: boolean;
+  autoDisputeHours: number;
+};
+
 export type PlatformConfigOverrides = {
   interCity?: Partial<typeof MARKET_RDC.interCity>;
   delivery?: Partial<typeof MARKET_RDC.delivery> & { maxFoodInterCityDistanceKm?: number };
@@ -51,6 +65,7 @@ export type PlatformConfigOverrides = {
   };
   driverOps?: Partial<DriverOpsConfig>;
   cashPayment?: Partial<CashPaymentConfig>;
+  unpaidFollowup?: Partial<UnpaidFollowupConfig>;
   identityVerification?: Partial<IdentityVerificationConfig>;
 };
 
@@ -100,7 +115,17 @@ export type MergedPlatformConfig = {
   };
   driverOps: DriverOpsConfig;
   cashPayment: CashPaymentConfig;
+  unpaidFollowup: UnpaidFollowupConfig;
   identityVerification: IdentityVerificationConfig;
+};
+
+export const UNPAID_FOLLOWUP_DEFAULTS: UnpaidFollowupConfig = {
+  enabled: true,
+  reminder1Min: 5,
+  driverCheckMin: 30,
+  reminder2Min: 120,
+  autoDisputeEnabled: true,
+  autoDisputeHours: 24,
 };
 
 export const PLATFORM_CONFIG_DEFAULTS: MergedPlatformConfig = {
@@ -137,6 +162,7 @@ export const PLATFORM_CONFIG_DEFAULTS: MergedPlatformConfig = {
     autoConfirmHours: 24,
     autoConfirmMaxCdf: 150_000,
   },
+  unpaidFollowup: { ...UNPAID_FOLLOWUP_DEFAULTS },
   identityVerification: { smileIdInApp: false },
 };
 
@@ -147,6 +173,29 @@ export function mergeIdentityVerification(
   if (!patch) return base;
   return {
     smileIdInApp: patch.smileIdInApp !== undefined ? patch.smileIdInApp === true : base.smileIdInApp,
+  };
+}
+
+function intIn(v: unknown, fallback: number, min: number, max: number): number {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fallback;
+}
+
+export function mergeUnpaidFollowup(
+  base: UnpaidFollowupConfig,
+  patch?: Partial<UnpaidFollowupConfig>,
+): UnpaidFollowupConfig {
+  if (!patch) return base;
+  return {
+    enabled: patch.enabled !== undefined ? patch.enabled === true : base.enabled,
+    reminder1Min: patch.reminder1Min !== undefined ? intIn(patch.reminder1Min, base.reminder1Min, 1, 1440) : base.reminder1Min,
+    driverCheckMin:
+      patch.driverCheckMin !== undefined ? intIn(patch.driverCheckMin, base.driverCheckMin, 1, 1440) : base.driverCheckMin,
+    reminder2Min: patch.reminder2Min !== undefined ? intIn(patch.reminder2Min, base.reminder2Min, 1, 1440) : base.reminder2Min,
+    autoDisputeEnabled:
+      patch.autoDisputeEnabled !== undefined ? patch.autoDisputeEnabled === true : base.autoDisputeEnabled,
+    autoDisputeHours:
+      patch.autoDisputeHours !== undefined ? intIn(patch.autoDisputeHours, base.autoDisputeHours, 1, 168) : base.autoDisputeHours,
   };
 }
 

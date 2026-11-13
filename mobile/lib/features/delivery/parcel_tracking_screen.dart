@@ -21,6 +21,7 @@ import 'delivery_live_tracking.dart';
 import 'delivery_payment_state.dart';
 import 'widgets/delivery_tracking_map.dart';
 import '../../core/i18n/i18n.dart';
+import '../../core/voice/voice_command_button.dart';
 
 class ParcelTrackingScreen extends ConsumerStatefulWidget {
   const ParcelTrackingScreen({super.key, required this.parcelId});
@@ -255,6 +256,26 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
     _openPayment();
   }
 
+  Future<void> _onDeliveryVoice(String text) async {
+    final intent = parsePassengerVoiceIntent(text);
+    switch (intent) {
+      case PassengerVoiceIntent.cancel when _canCancel && !_cancelling:
+        await _cancelDelivery();
+      case PassengerVoiceIntent.pay when _paymentDue:
+        await _openPayment();
+      case PassengerVoiceIntent.cashPaid when _cashPaymentPending:
+        if (await confirmVoiceAction(context, tr('Vous avez payé le livreur en espèces ?'), tr('Oui, j’ai payé'))) {
+          await _claimCashPaid();
+        }
+      case PassengerVoiceIntent.received when _canConfirmReceipt:
+        if (await confirmVoiceAction(context, tr('Confirmer la réception ?'), tr('Oui, reçu'))) {
+          await _confirmReceipt();
+        }
+      default:
+        voiceNotUnderstood(context, text, tr('annuler, payer, j’ai payé, colis reçu'));
+    }
+  }
+
   Future<void> _cancelDelivery() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -309,6 +330,10 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
       scrollable: false,
       padding: EdgeInsets.zero,
       actions: [
+        VoiceCommandButton(
+          onText: _onDeliveryVoice,
+          hint: tr('Dites : annuler, payer, j’ai payé, colis reçu'),
+        ),
         IconButton(icon: const Icon(Icons.refresh), onPressed: () => _load()),
       ],
       child: _loading && _delivery == null

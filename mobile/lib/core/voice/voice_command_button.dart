@@ -250,6 +250,56 @@ enum DriverVoiceIntent {
   unknown,
 }
 
+/// Passenger voice commands, recognised on the phone (no AI). Ordering a ride by voice
+/// (« je vais à Limete en moto ») stays on the booking screen, which uses the AI.
+enum PassengerVoiceIntent {
+  taxi,
+  delivery,
+  food,
+  parcel,
+  scheduled,
+  carpool,
+  rental,
+  moving,
+  wallet,
+  history,
+  myRide,
+  cancel,
+  callDriver,
+  share,
+  sos,
+  pay,
+  cashPaid,
+  received,
+  unknown,
+}
+
+PassengerVoiceIntent parsePassengerVoiceIntent(String text) {
+  final t = _norm(text);
+  bool has(List<String> words) => words.any(t.contains);
+  if (has(['sos', 'au secours', 'urgence', 'aidez moi', 'danger'])) return PassengerVoiceIntent.sos;
+  if (has(['j ai paye', 'deja paye', 'paye en especes', 'paye le chauffeur', 'paye le livreur', 'j ai donne l argent'])) {
+    return PassengerVoiceIntent.cashPaid;
+  }
+  if (has(['annule', 'annuler', 'annulation'])) return PassengerVoiceIntent.cancel;
+  if (has(['recu le colis', 'colis recu', 'j ai recu', 'bien recu', 'commande recue', 'repas recu'])) return PassengerVoiceIntent.received;
+  if (has(['payer', 'paiement', 'regler'])) return PassengerVoiceIntent.pay;
+  if (has(['appelle', 'appeler', 'appel', 'telephone'])) return PassengerVoiceIntent.callDriver;
+  if (has(['partage', 'partager', 'envoie mon trajet'])) return PassengerVoiceIntent.share;
+  if (has(['ma course', 'ma commande', 'ma livraison', 'suivre', 'suivi', 'ou est'])) return PassengerVoiceIntent.myRide;
+  if (has(['planifi', 'programmer', 'reserver pour', 'demain'])) return PassengerVoiceIntent.scheduled;
+  if (has(['covoiturage', 'partager un trajet'])) return PassengerVoiceIntent.carpool;
+  if (has(['demenag'])) return PassengerVoiceIntent.moving;
+  if (has(['location', 'louer'])) return PassengerVoiceIntent.rental;
+  if (has(['wallet', 'portefeuille', 'solde', 'recharger', 'recharge'])) return PassengerVoiceIntent.wallet;
+  if (has(['historique', 'mes courses', 'anciennes courses'])) return PassengerVoiceIntent.history;
+  if (has(['repas', 'manger', 'restaurant', 'nourriture', 'faim'])) return PassengerVoiceIntent.food;
+  if (has(['colis', 'paquet', 'envoyer un'])) return PassengerVoiceIntent.parcel;
+  if (has(['livraison', 'livrer', 'express', 'commission'])) return PassengerVoiceIntent.delivery;
+  if (has(['taxi', 'moto', 'course', 'voiture', 'chauffeur', 'je vais', 'aller a'])) return PassengerVoiceIntent.taxi;
+  return PassengerVoiceIntent.unknown;
+}
+
 /// Admin settings (super admin, /public/client-config `driverVoice`): micro opened by itself on
 /// offers, and how long it listens. The driver's own switch (Notifications) comes on top.
 bool kDriverVoiceAutoListen = true;

@@ -46,6 +46,14 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 
 **Commander à la voix** : sur l'écran Taxi, appuyez sur le micro (« Commander à la voix ») et dites par exemple « une moto pour Limete, 7e rue » ou « une voiture de Gombe au marché central ». SENGA remplit le départ (votre position si vous ne le dites pas), la destination et la gamme ; si plusieurs lieux correspondent, choisissez le bon. Vérifiez le trajet et le prix, puis confirmez : rien n'est commandé sans votre confirmation. Fonctionne en français ; autorisez le micro la première fois.
 
+**Autres commandes vocales** (micro en haut de l'écran) :
+- sur l'accueil : **« taxi »**, **« livraison »**, **« colis »**, **« repas »**, **« planifier »**, **« covoiturage »**, **« location »**, **« déménagement »**, **« wallet »**, **« historique »**, **« ma course »** (ouvre la course ou la livraison en cours) ;
+- pendant la recherche d'un chauffeur : **« annuler »** ;
+- pendant la course : **« appeler »** (le chauffeur), **« partager »**, **« SOS »**, **« annuler »**, **« payer »**, **« j'ai payé »** (espèces) ;
+- pendant une livraison ou une commande repas : **« annuler »**, **« payer »**, **« j'ai payé »**, **« colis reçu »**.
+
+Annuler, déclarer un paiement en espèces ou confirmer une réception demande **toujours une confirmation à l'écran**. Les mots sont reconnus par votre téléphone : votre voix n'est ni enregistrée ni envoyée au chauffeur.
+
 **Course non réglée** : si vous partez sans payer dans l'app, SENGA vous le rappelle (5 min, puis 2 h avec un SMS). Payez la course, ou indiquez **« J'ai payé en espèces »** si vous avez payé le chauffeur. Le chauffeur peut aussi confirmer avoir reçu les espèces. Sans réponse après 24 h, un litige est ouvert et les nouvelles commandes sont bloquées jusqu'au règlement.
 
 ## 2.1 Course Partagée (Pool)

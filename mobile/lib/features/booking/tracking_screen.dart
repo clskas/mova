@@ -1,4 +1,5 @@
 import '../../core/i18n/i18n.dart';
+import '../../core/voice/voice_command_button.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -714,6 +715,30 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     );
   }
 
+  Future<void> _onTrackingVoice(String text) async {
+    final intent = parsePassengerVoiceIntent(text);
+    switch (intent) {
+      case PassengerVoiceIntent.callDriver:
+        await _callDriver();
+      case PassengerVoiceIntent.share:
+        await _shareTrip();
+      case PassengerVoiceIntent.sos:
+        // The SOS screen asks before sending.
+        await _triggerSos();
+      case PassengerVoiceIntent.cancel when _canCancel && !_cancelling:
+        // The usual dialog asks first (fees).
+        await _cancelRide();
+      case PassengerVoiceIntent.pay when _needsPayment:
+        await _goToPayment();
+      case PassengerVoiceIntent.cashPaid when _status.toUpperCase() == 'COMPLETED' && _ride?['isPaid'] != true:
+        if (await confirmVoiceAction(context, tr('Vous avez payé le chauffeur en espèces ?'), tr('Oui, j’ai payé'))) {
+          await _claimCashPaid();
+        }
+      default:
+        voiceNotUnderstood(context, text, tr('appeler, partager, SOS, annuler, payer, j’ai payé'));
+    }
+  }
+
   Future<void> _cancelRide() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -805,6 +830,10 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       scrollable: false,
       padding: EdgeInsets.zero,
       actions: [
+        VoiceCommandButton(
+          onText: _onTrackingVoice,
+          hint: tr('Dites : appeler, partager, SOS, annuler, payer, j’ai payé'),
+        ),
         sosAppBarButton(onPressed: ([bool skip = false]) => _triggerSos(skipConfirm: skip)),
         IconButton(
           icon: const Icon(Icons.share_outlined),

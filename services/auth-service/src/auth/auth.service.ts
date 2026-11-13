@@ -547,30 +547,34 @@ export class AuthService {
           missingInviteOnlyAccountMessage(normalized, requestedRole),
         );
       }
-      if (shouldRefusePassengerAutoRegister(normalized, requestedRole)) {
-        throw new MovaHttpException(
-          MovaErrorCode.AUTH_FORBIDDEN,
-          HttpStatus.FORBIDDEN,
-          missingInviteOnlyAccountMessage(normalized, requestedRole),
-        );
-      }
-      const createdRole = isAllowedPartnerSelfRegisterRole(requestedRole)
-        ? requestedRole!
-        : UserRole.PASSENGER;
-      user = await this.prisma.user.create({
-        data: {
-          phone: normalized,
-          role: createdRole,
-          status: UserStatus.ACTIVE,
-        },
-      });
-      isNew = true;
-      await this.provisionUser(user.id, user.role);
-      try {
-        const payload: UserCreatedPayload = { userId: user.id, phone: user.phone ?? undefined, role: user.role };
-        await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
-      } catch (e) {
-        this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
+      // A new driver was just created above: do not create the account a second time
+      // (it failed on the unique phone and showed an error at the first sign-up — Sentry SENGA-BACKEND-1C).
+      if (!user) {
+        if (shouldRefusePassengerAutoRegister(normalized, requestedRole)) {
+          throw new MovaHttpException(
+            MovaErrorCode.AUTH_FORBIDDEN,
+            HttpStatus.FORBIDDEN,
+            missingInviteOnlyAccountMessage(normalized, requestedRole),
+          );
+        }
+        const createdRole = isAllowedPartnerSelfRegisterRole(requestedRole)
+          ? requestedRole!
+          : UserRole.PASSENGER;
+        user = await this.prisma.user.create({
+          data: {
+            phone: normalized,
+            role: createdRole,
+            status: UserStatus.ACTIVE,
+          },
+        });
+        isNew = true;
+        await this.provisionUser(user.id, user.role);
+        try {
+          const payload: UserCreatedPayload = { userId: user.id, phone: user.phone ?? undefined, role: user.role };
+          await this.redis.publish(MOVA_EVENTS.USER_CREATED, payload);
+        } catch (e) {
+          this.logger.warn(`USER_CREATED publish failed: ${(e as Error).message}`);
+        }
       }
     }
     this.assertRoleAccess(user, requestedRole);

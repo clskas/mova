@@ -129,7 +129,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
         offerKey: DriverJobAlertService.offerKey('delivery', _deliveryId),
       ),
     );
-    Navigator.pop(context, result);
+    _popOffer(result);
   }
 
   Future<void> _resolvePickupProximity() async {
@@ -173,6 +173,19 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
     }
   }
 
+  /// Closes this offer with [result]. When something was opened on top of it (e.g. the cash
+  /// dialog of a previous ride), a plain pop closed that dialog instead and crashed
+  /// (Sentry SENGA-MOBILE-8): remove only the offer's own route then.
+  void _popOffer([Object? result]) {
+    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    if (route == null || route.isCurrent) {
+      Navigator.pop(context, result);
+    } else {
+      Navigator.of(context).removeRoute(route, result);
+    }
+  }
+
   @override
   void dispose() {
     _jobStopSub?.cancel();
@@ -184,7 +197,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
   /// Pas de réponse : ne pas rejeter côté serveur — la livraison sera reproposée plus tard.
   Future<void> _expireOffer() async {
     _timer?.cancel();
-    if (mounted) Navigator.pop(context, 'timeout');
+    _popOffer('timeout');
   }
 
   Future<void> _reject() async {
@@ -192,7 +205,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
     if (_deliveryId.isNotEmpty) {
       await ref.read(apiClientProvider).rejectDelivery(_deliveryId);
     }
-    if (mounted) Navigator.pop(context, 'rejected');
+    _popOffer('rejected');
   }
 
   Future<void> _accept() async {
@@ -211,7 +224,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(tr('Livraison acceptée'))),
           );
-          Navigator.pop(context, result.data);
+          _popOffer(result.data);
         }
       case Failure(:final error):
         setState(() => _error = error.message);

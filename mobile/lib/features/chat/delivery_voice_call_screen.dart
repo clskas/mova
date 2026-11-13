@@ -76,10 +76,16 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
 
   String get _scope => widget.kind == VoiceCallKind.ride ? 'ride' : 'delivery';
 
+  /// Read in initState: `ref` can no longer be used in dispose().
+  late final RideSocket _rideSocket;
+  late final RideChatSocket _rideChatSocket;
+
   @override
   void initState() {
     super.initState();
     _api = ref.read(apiClientProvider);
+    _rideSocket = ref.read(rideSocketProvider);
+    _rideChatSocket = ref.read(rideChatSocketProvider);
     CallRingService.markInCall(widget.threadId);
     CallRingService.peerEndedThreadId.addListener(_onPeerEndedSignal);
     _socketCallListener = _onSocketCallEvent;
@@ -121,8 +127,8 @@ class _DeliveryVoiceCallScreenState extends ConsumerState<DeliveryVoiceCallScree
   void dispose() {
     _ringTimeout?.cancel();
     CallRingService.peerEndedThreadId.removeListener(_onPeerEndedSignal);
-    ref.read(rideSocketProvider).removeCallListener(_socketCallListener);
-    ref.read(rideChatSocketProvider).removeCallListener(_socketCallListener);
+    _rideSocket.removeCallListener(_socketCallListener);
+    _rideChatSocket.removeCallListener(_socketCallListener);
     unawaited(_signalEndAndStopRing());
     unawaited(_tearDownRoom());
     super.dispose();

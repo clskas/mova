@@ -168,6 +168,8 @@ describe('AuthService', () => {
     const result = await service.verifyOtp('+243811111111', '847291', UserRole.DRIVER);
     expect(result.user.role).toBe(UserRole.DRIVER);
     expect(result.user.status).toBe(UserStatus.PENDING_KYC);
+    // Created once (a second create failed on the unique phone at the first sign-up).
+    expect(prisma.user.create).toHaveBeenCalledTimes(1);
     expect(prisma.user.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

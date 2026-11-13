@@ -101,10 +101,14 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     return parts.isEmpty ? null : parts.join(' · ');
   }
 
+  /// Read in initState: `ref` can no longer be used in dispose().
+  late final RideSocket _rideSocket;
+
   @override
   void initState() {
     super.initState();
     _delivery = Map<String, dynamic>.from(widget.delivery);
+    _rideSocket = ref.read(rideSocketProvider);
     _bootstrapTracking();
   }
 
@@ -112,7 +116,7 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
   void dispose() {
     _locationTimer?.cancel();
     _paymentPollTimer?.cancel();
-    ref.read(rideSocketProvider).clearHandlers();
+    _rideSocket.clearHandlers();
     super.dispose();
   }
 

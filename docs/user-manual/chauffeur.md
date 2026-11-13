@@ -119,6 +119,10 @@ Pour tout ce qui ne peut pas être annulé (terminer, annuler, livré, passager 
 
 Quand une course ou une livraison arrive, le micro **s'ouvre tout seul quelques secondes** (10 s par défaut, réglé par SENGA) (la sonnerie se met en pause) : dites **« accepter »** ou **« refuser »** sans toucher l'écran. Rien compris ? La sonnerie reprend et vous pouvez toujours appuyer sur les boutons. Pour couper cette écoute automatique : **Notifications → Répondre aux offres à la voix**. Elle ne marche que si vous avez déjà autorisé le micro.
 
+Le micro s'ouvre aussi tout seul **aux moments clés** (une seule fois chacun) : à environ 100 m du point de prise en charge (dites « je suis arrivé »), 45 secondes après votre arrivée (« démarrer »), à environ 150 m de la destination (« terminer », ou « livré » pour une livraison). Le reste du temps, appuyez sur le micro : il ne reste jamais ouvert en permanence.
+
+**Langues** : parlez dans la langue de l'application — français, anglais (« accept », « I've arrived », « finish »…) ou swahili (« nakubali », « nimefika », « nimemaliza »…). Les téléphones ne reconnaissent pas le lingala : en lingala, parlez français.
+
 Les mots sont reconnus par le téléphone, en français, et transformés en action : **votre voix n'est ni enregistrée ni envoyée au passager**. Le passager reçoit seulement la notification habituelle (par exemple « chauffeur arrivé »). Si la commande n'est pas comprise, l'app vous indique les mots possibles.
 
 ## Course Pool (partagée)

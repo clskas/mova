@@ -52,7 +52,7 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 - pendant la course : **« appeler »** (le chauffeur), **« partager »**, **« SOS »**, **« annuler »**, **« payer »**, **« j'ai payé »** (espèces) ;
 - pendant une livraison ou une commande repas : **« annuler »**, **« payer »**, **« j'ai payé »**, **« colis reçu »**.
 
-Annuler, déclarer un paiement en espèces ou confirmer une réception demande **toujours une confirmation à l'écran**. Les mots sont reconnus par votre téléphone : votre voix n'est ni enregistrée ni envoyée au chauffeur.
+Annuler, déclarer un paiement en espèces ou confirmer une réception demande **toujours une confirmation à l'écran**. Les mots sont reconnus par votre téléphone : votre voix n'est ni enregistrée ni envoyée au chauffeur. Parlez dans la langue de l'application : français, anglais ou swahili (en lingala, parlez français : les téléphones ne reconnaissent pas le lingala). Le micro ne s'ouvre que quand vous appuyez dessus.
 
 **Course non réglée** : si vous partez sans payer dans l'app, SENGA vous le rappelle (5 min, puis 2 h avec un SMS). Payez la course, ou indiquez **« J'ai payé en espèces »** si vous avez payé le chauffeur. Le chauffeur peut aussi confirmer avoir reçu les espèces. Sans réponse après 24 h, un litige est ouvert et les nouvelles commandes sont bloquées jusqu'au règlement.
 

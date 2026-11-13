@@ -453,7 +453,7 @@ export class RestaurantPortalService {
         () => undefined,
       );
     }
-    await this.publishStatus(updated, DeliveryStatus.CANCELLED);
+    await this.publishStatus(updated, DeliveryStatus.CANCELLED, reason?.trim() || 'Refus du partenaire');
     return { order: this.formatOrder(updated), delivery: withoutReceiptPin(formatParcelDelivery(updated)) };
   }
 
@@ -490,10 +490,33 @@ export class RestaurantPortalService {
           restaurantId: restaurant.id,
           createdAt: { gte: todayStart },
         },
-        select: { finalPriceCdf: true, estimatedPriceCdf: true },
+        select: { id: true, finalPriceCdf: true, estimatedPriceCdf: true },
       }),
       fetchPartnerWallet(ownerUserId),
     ]);
+    // Cash orders: the money is handed over in cash (never credited to the wallet), so the
+    // wallet-based revenue missed them — shown apart.
+    const [cashVirtual, monthDelivered] = await Promise.all([
+      fetchPartnerCashVirtual(ownerUserId).catch(() => null),
+      this.prisma.delivery.findMany({
+        where: {
+          type: DeliveryType.FOOD,
+          status: DeliveryStatus.DELIVERED,
+          restaurantId: restaurant.id,
+          createdAt: { gte: monthStart },
+        },
+        select: { id: true, createdAt: true, finalPriceCdf: true, estimatedPriceCdf: true },
+        take: 2000,
+      }),
+    ]);
+    const pays = await fetchServicePaymentStatuses('DELIVERY', monthDelivered.map((d) => d.id)).catch(
+      () => ({}) as Record<string, { paymentMethod?: string | null; isPaid?: boolean }>,
+    );
+    const isCash = (id: string) => String(pays[id]?.paymentMethod ?? '').toUpperCase() === 'CASH';
+    const grossOf = (d: { finalPriceCdf: number | null; estimatedPriceCdf: number | null }) =>
+      d.finalPriceCdf ?? d.estimatedPriceCdf ?? 0;
+    const cashMonth = monthDelivered.filter((d) => isCash(d.id));
+    const cashToday = cashMonth.filter((d) => d.createdAt >= todayStart);
     const foodCredits = filterPartnerTransactions(wallet.transactions, 'Vente repas');
     const revenueTodayCdf = sumTransactionAmounts(
       filterPartnerTransactions(wallet.transactions, 'Vente repas', { from: todayStart }),
@@ -525,6 +548,11 @@ export class RestaurantPortalService {
         revenueTodayCdf,
         revenueMonthCdf,
         totalSalesCount: foodCredits.length,
+        cashTodayCdf: cashToday.reduce((s, d) => s + grossOf(d), 0),
+        cashTodayCount: cashToday.length,
+        cashMonthCdf: cashMonth.reduce((s, d) => s + grossOf(d), 0),
+        cashMonthCount: cashMonth.length,
+        cashEarningsCdf: cashVirtual?.cashEarningsCdf ?? 0,
       },
       recentOrders: recent.orders,
     };
@@ -1094,12 +1122,14 @@ export class RestaurantPortalService {
   private async publishStatus(
     delivery: { id: string; userId: string; type: DeliveryType; restaurant?: { name: string; ownerUserId?: string | null } | null },
     status: DeliveryStatus,
+    reason?: string,
   ) {
     await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
       deliveryId: delivery.id,
       userId: delivery.userId,
       type: delivery.type,
       status,
+      reason,
       restaurantName: delivery.restaurant?.name,
       restaurantOwnerUserId: delivery.restaurant?.ownerUserId ?? undefined,
     });

@@ -833,7 +833,9 @@ export class NotificationsService implements OnModuleInit {
         PICKED_UP: 'Le livreur a récupéré votre commande.',
         IN_TRANSIT: 'Le livreur est en route vers vous.',
         DELIVERED: 'Commande livrée. Bon appétit !',
-        CANCELLED: 'Votre commande a été annulée.',
+        CANCELLED: payload.reason?.trim()
+          ? `Votre commande a été refusée${payload.restaurantName ? ` par ${payload.restaurantName}` : ''}. Motif : ${payload.reason.trim().slice(0, 200)}`
+          : 'Votre commande a été annulée.',
       }[payload.status] ?? null
     );
   }

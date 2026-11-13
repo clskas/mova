@@ -55,7 +55,7 @@ export type AdminReports = {
   periodTo?: string;
   generatedAt: string;
   city?: string | null;
-  daily: { date: string; rides: number; completed: number; revenueCdf: number; cancelled: number; deliveries: number }[];
+  daily: { date: string; rides: number; completed: number; revenueCdf: number; cancelled: number; deliveries: number; deliveryRevenueCdf?: number }[];
   vehicleBreakdown: Record<string, number>;
   serviceBreakdown: {
     rides: number;
@@ -432,6 +432,7 @@ export type DeliveryOverview = {
   timeline?: { label: string; done: boolean; at?: string }[];
   isPaid?: boolean;
   paymentStatus?: string | null;
+  paymentMethod?: string | null;
 };
 
 export type ScheduledOverview = {
@@ -467,6 +468,34 @@ export type RideOverview = {
   gpsTrace?: GpsPoint[];
   isPaid?: boolean;
   paymentStatus?: string | null;
+  paymentMethod?: string | null;
+  distanceKm?: number | null;
+  durationMin?: number | null;
+  acceptedAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+  cancelReason?: string | null;
+  passengerCount?: number | null;
+  passenger?: AdminPersonBrief | null;
+  driverPerson?: (AdminPersonBrief & {
+    rating?: number | null;
+    totalRides?: number | null;
+    vehicleType?: string | null;
+    vehicleModel?: string | null;
+    vehicleColor?: string | null;
+    plateNumber?: string | null;
+  }) | null;
+};
+
+export type AdminPersonBrief = {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  email?: string | null;
+  publicId?: string | null;
+  role?: string | null;
+  status?: string | null;
 };
 
 export type GpsPoint = { lat: number; lng: number; recordedAt?: string };

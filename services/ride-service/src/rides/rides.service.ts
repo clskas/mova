@@ -2618,13 +2618,13 @@ export class RidesService {
 
     const dailyMap = new Map<
       string,
-      { date: string; rides: number; completed: number; revenueCdf: number; cancelled: number; deliveries: number }
+      { date: string; rides: number; completed: number; revenueCdf: number; cancelled: number; deliveries: number; deliveryRevenueCdf: number }
     >();
     for (let i = 0; i < periodDays; i++) {
       const d = new Date(since);
       d.setDate(d.getDate() + i);
       const key = dayKeyInTz(d);
-      dailyMap.set(key, { date: key, rides: 0, completed: 0, revenueCdf: 0, cancelled: 0, deliveries: 0 });
+      dailyMap.set(key, { date: key, rides: 0, completed: 0, revenueCdf: 0, cancelled: 0, deliveries: 0, deliveryRevenueCdf: 0 });
     }
 
     const vehicleBreakdown: Record<string, number> = {};
@@ -2694,6 +2694,7 @@ export class RidesService {
       const completed = delivery.status === DeliveryStatus.DELIVERED;
       if (completed) {
         const price = delivery.finalPriceCdf ?? delivery.estimatedPriceCdf ?? 0;
+        if (dailyMap.has(key)) dailyMap.get(key)!.deliveryRevenueCdf += price;
         const city = cityOf(delivery.pickupLat, delivery.pickupLng);
         if (delivery.type === DeliveryType.FOOD) {
           bumpCommission(city, 'food', platformFee(price, foodRule.platformPercent));
@@ -2705,6 +2706,9 @@ export class RidesService {
     for (const errand of filteredErrands) {
       const key = dayKeyInTz(errand.createdAt);
       if (dailyMap.has(key)) dailyMap.get(key)!.deliveries += 1;
+      if (errand.status === ErrandOrderStatus.COMPLETED && dailyMap.has(key)) {
+        dailyMap.get(key)!.deliveryRevenueCdf += errand.finalPriceCdf ?? 0;
+      }
     }
 
     // Revenue = completed only. Cancelled food/parcel still carry estimatedPriceCdf —

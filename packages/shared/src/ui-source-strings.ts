@@ -91,6 +91,7 @@ export const UI_SOURCE_STRINGS: readonly string[] = [
  "Monté",
  "Absent",
  "Pas voyagé",
+ "Annulée — motif : {reason}",
  "Fermer",
  "Photo indisponible",
  "{count} courses",

@@ -132,6 +132,8 @@ export interface DeliveryStatusUpdatedPayload {
   status: string;
   restaurantName?: string;
   restaurantOwnerUserId?: string;
+  /** Why the order was cancelled (partner's refusal reason), shown to the customer. */
+  reason?: string;
 }
 
 export interface ServiceAssignedPayload {

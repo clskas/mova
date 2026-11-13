@@ -1,5 +1,7 @@
 import '../config/client_apps_config.dart';
 import 'package:flutter/material.dart';
+
+import '../voice/voice_command_button.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
@@ -38,6 +40,8 @@ class _MaintenanceGateState extends ConsumerState<MaintenanceGate> {
         // Seat limits set in the admin (tricycle, Familiale…).
         final seats = root['seatLimits'];
         if (seats is Map) applySeatLimits(Map<String, dynamic>.from(seats));
+        // SENGA Driver: voice answers on offers (super admin).
+        applyDriverVoiceConfig(root['driverVoice']);
         final maintenance = root['maintenance'];
         if (maintenance is Map) {
           final apps = maintenance['apps'];

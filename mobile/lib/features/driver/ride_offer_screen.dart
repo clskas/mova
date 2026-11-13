@@ -553,7 +553,8 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
                         onText: _onOfferVoice,
                         color: Colors.white,
                         hint: tr('Dites « accepter » ou « refuser »'),
-                        autoListen: DriverAlertPrefs.voiceAutoListen,
+                        autoListen: kDriverVoiceAutoListen && DriverAlertPrefs.voiceAutoListen,
+                        autoListenFor: Duration(seconds: kDriverVoiceAutoListenSeconds),
                         onAutoListenChanged: _onAutoListenChanged,
                       ),
                       Flexible(

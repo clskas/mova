@@ -109,10 +109,15 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
 
 Appuyez sur le micro en haut de l'écran et dites :
 - sur l'accueil : **« en ligne »** ou **« hors ligne »** ;
-- sur une offre : **« accepter »** ou **« refuser »** ;
-- pendant la course : **« je suis arrivé »**, **« démarrer »**, **« terminer »** (une confirmation est demandée), **« itinéraire »**, **« appeler »** (le passager).
+- sur une offre de course ou de livraison : **« accepter »** ou **« refuser »** ;
+- pendant une course : **« je suis arrivé »**, **« démarrer »**, **« terminer »**, **« itinéraire »**, **« appeler »** (le passager), **« annuler »** ou **« passager absent »**, et après la course **« cash reçu »** / **« cash non reçu »** ;
+- en Pool : **« passager pris »** et **« passager déposé »** (le prochain passager dans l'ordre du trajet) ;
+- pendant une livraison : **« en route »**, **« livré »** (le code PIN du destinataire est demandé), **« injoignable »**, **« itinéraire »**, **« appeler »**, **« cash reçu »** ;
+- déménagement et course planifiée : **« démarrer »**, **« terminer »**, **« itinéraire »**, **« cash reçu »**.
 
-Quand une course arrive, le micro **s'ouvre tout seul pendant 10 secondes** (la sonnerie se met en pause) : dites **« accepter »** ou **« refuser »** sans toucher l'écran. Rien compris ? La sonnerie reprend et vous pouvez toujours appuyer sur les boutons. Pour couper cette écoute automatique : **Notifications → Répondre aux offres à la voix**. Elle ne marche que si vous avez déjà autorisé le micro.
+Pour tout ce qui ne peut pas être annulé (terminer, annuler, livré, passager pris ou déposé, cash), l'app **demande toujours une confirmation à l'écran** : la voix ne valide jamais seule une action d'argent.
+
+Quand une course ou une livraison arrive, le micro **s'ouvre tout seul quelques secondes** (10 s par défaut, réglé par SENGA) (la sonnerie se met en pause) : dites **« accepter »** ou **« refuser »** sans toucher l'écran. Rien compris ? La sonnerie reprend et vous pouvez toujours appuyer sur les boutons. Pour couper cette écoute automatique : **Notifications → Répondre aux offres à la voix**. Elle ne marche que si vous avez déjà autorisé le micro.
 
 Les mots sont reconnus par le téléphone, en français, et transformés en action : **votre voix n'est ni enregistrée ni envoyée au passager**. Le passager reçoit seulement la notification habituelle (par exemple « chauffeur arrivé »). Si la commande n'est pas comprise, l'app vous indique les mots possibles.
 

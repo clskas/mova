@@ -1692,6 +1692,9 @@ export class AdminController {
     if (body?.sosSms !== undefined && req.user.role !== 'SUPER_ADMIN') {
       throw new ForbiddenException('Seul le super administrateur peut modifier les SMS des alertes SOS et incidents.');
     }
+    if (body?.driverVoice !== undefined && req.user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Seul le super administrateur peut régler l’écoute vocale de SENGA Driver.');
+    }
     if (body?.ai !== undefined && req.user.role !== 'SUPER_ADMIN') {
       throw new ForbiddenException('Seul le super administrateur peut activer ou couper l’IA.');
     }

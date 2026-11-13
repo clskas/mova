@@ -109,7 +109,7 @@ class _DriverNotificationSettingsScreenState
                   contentPadding: EdgeInsets.zero,
                   secondary: const Icon(Icons.mic_none, color: MovaColors.violet),
                   title: Text(tr('Répondre aux offres à la voix'), style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(tr('Le micro s’ouvre 10 s quand une course arrive : dites « accepter » ou « refuser ».')),
+                  subtitle: Text(tr('Le micro s’ouvre quelques secondes quand une offre arrive : dites « accepter » ou « refuser ».')),
                   value: _voiceAuto,
                   onChanged: _setVoiceAuto,
                 ),

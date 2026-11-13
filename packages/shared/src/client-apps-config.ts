@@ -150,7 +150,31 @@ export type ClientAppsConfig = {
    * check, assistant, menu scan, translations…), even with AI credit left.
    */
   ai: { enabled: boolean };
+  /** SENGA Driver voice answers (super admin): micro opened by itself on offers. */
+  driverVoice: DriverVoiceConfig;
 };
+
+export type DriverVoiceConfig = {
+  /** Micro opens by itself when an offer arrives (ride, delivery). */
+  autoListenEnabled: boolean;
+  /** How long it listens, in seconds (5–30). */
+  autoListenSeconds: number;
+};
+
+export const DEFAULT_DRIVER_VOICE_CONFIG: DriverVoiceConfig = { autoListenEnabled: true, autoListenSeconds: 10 };
+
+export function normalizeDriverVoiceConfig(
+  raw: unknown,
+  fallback: DriverVoiceConfig = DEFAULT_DRIVER_VOICE_CONFIG,
+): DriverVoiceConfig {
+  const out = { ...fallback };
+  if (!raw || typeof raw !== 'object') return out;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.autoListenEnabled === 'boolean') out.autoListenEnabled = o.autoListenEnabled;
+  const n = Math.round(Number(o.autoListenSeconds));
+  if (Number.isFinite(n) && n >= 5 && n <= 30) out.autoListenSeconds = n;
+  return out;
+}
 
 export const DEFAULT_MAINTENANCE_MESSAGE_FR =
   'SENGA est actuellement en maintenance afin d’améliorer nos services et vous offrir une expérience encore meilleure. Merci pour votre patience et votre confiance — nous serons de retour très bientôt !';
@@ -204,6 +228,7 @@ export const DEFAULT_CLIENT_APPS_CONFIG: ClientAppsConfig = {
   languages: { ...DEFAULT_LANGUAGES_CONFIG },
   seatLimits: { ...DEFAULT_SEAT_LIMITS },
   ai: { enabled: true },
+  driverVoice: { ...DEFAULT_DRIVER_VOICE_CONFIG },
 };
 
 export const CLIENT_APP_LABELS_FR: Record<ClientAppId, string> = {
@@ -345,6 +370,7 @@ export function mergeClientAppsConfig(raw: unknown): ClientAppsConfig {
   base.seatLimits = normalizeSeatLimits((src as { seatLimits?: unknown }).seatLimits, base.seatLimits);
   const aiSrc = (src as { ai?: { enabled?: unknown } }).ai;
   base.ai = { enabled: typeof aiSrc?.enabled === 'boolean' ? aiSrc.enabled : base.ai.enabled };
+  base.driverVoice = normalizeDriverVoiceConfig((src as { driverVoice?: unknown }).driverVoice, base.driverVoice);
 
   return base;
 }

@@ -15,4 +15,27 @@ void main() {
     expect(parseDriverVoiceIntent('je refuse'), DriverVoiceIntent.reject);
     expect(parseDriverVoiceIntent('bonjour'), DriverVoiceIntent.unknown);
   });
+
+  test('new driver actions: cancel, cash, Pool, delivery', () {
+    expect(parseDriverVoiceIntent('annuler la course'), DriverVoiceIntent.cancel);
+    expect(parseDriverVoiceIntent('le passager est absent'), DriverVoiceIntent.cancel);
+    expect(parseDriverVoiceIntent('cash reçu'), DriverVoiceIntent.cashReceived);
+    expect(parseDriverVoiceIntent("j'ai reçu l'argent"), DriverVoiceIntent.cashReceived);
+    expect(parseDriverVoiceIntent('cash non reçu'), DriverVoiceIntent.cashNotReceived);
+    expect(parseDriverVoiceIntent("il n'a pas payé"), DriverVoiceIntent.cashNotReceived);
+    expect(parseDriverVoiceIntent('passager pris'), DriverVoiceIntent.passengerPicked);
+    expect(parseDriverVoiceIntent('passager déposé'), DriverVoiceIntent.passengerDropped);
+    expect(parseDriverVoiceIntent('colis livré'), DriverVoiceIntent.finish);
+    expect(parseDriverVoiceIntent('en route vers le client'), DriverVoiceIntent.start);
+    expect(parseDriverVoiceIntent('le destinataire est injoignable'), DriverVoiceIntent.unreachable);
+  });
+
+  test('admin voice settings: only valid values are applied', () {
+    applyDriverVoiceConfig({'autoListenEnabled': false, 'autoListenSeconds': 15});
+    expect(kDriverVoiceAutoListen, isFalse);
+    expect(kDriverVoiceAutoListenSeconds, 15);
+    applyDriverVoiceConfig({'autoListenSeconds': 99});
+    expect(kDriverVoiceAutoListenSeconds, 15);
+    applyDriverVoiceConfig({'autoListenEnabled': true, 'autoListenSeconds': 10});
+  });
 }

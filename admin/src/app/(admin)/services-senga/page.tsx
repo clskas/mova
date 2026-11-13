@@ -127,6 +127,28 @@ export default function ServicesSengaPage() {
     }
   }
 
+  /** SENGA Driver voice answers: saved at once (super admin only). */
+  async function saveDriverVoice(next: { autoListenEnabled: boolean; autoListenSeconds: number }) {
+    if (!config || !canEditServices) return;
+    const secs = Math.round(next.autoListenSeconds);
+    if (!Number.isFinite(secs) || secs < 5 || secs > 30) {
+      setError("Durée d'écoute : entre 5 et 30 secondes.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setOk(null);
+    try {
+      const updated = await updateClientAppsConfig({ driverVoice: { ...next, autoListenSeconds: secs } });
+      setConfig(updated);
+      setOk("Écoute vocale SENGA Driver enregistrée.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Enregistrement impossible");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function save() {
     if (!config || (!canEditServices && !canEditSengaPlus)) return;
     setSaving(true);
@@ -196,6 +218,53 @@ export default function ServicesSengaPage() {
             checked={config.ai?.enabled !== false}
             disabled={!canEditServices || saving}
             onChange={() => void toggleAi()}
+          />
+        </label>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-slate-800">SENGA Driver — réponse vocale aux offres</h2>
+        {!canEditServices && <p className="text-sm text-amber-700">Réservé au super administrateur.</p>}
+        <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3">
+          <span className="text-sm text-slate-800">
+            <span className="font-medium block">Micro ouvert automatiquement</span>
+            <span className="text-xs text-slate-500">
+              Quand une course ou une livraison arrive, le micro s&apos;ouvre seul : le chauffeur dit « accepter » ou
+              « refuser » sans toucher l&apos;écran. Le chauffeur peut aussi le couper sur son téléphone. Prend effet à
+              la prochaine ouverture de l&apos;app.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={config.driverVoice?.autoListenEnabled !== false}
+            disabled={!canEditServices || saving}
+            onChange={(e) =>
+              void saveDriverVoice({
+                autoListenEnabled: e.target.checked,
+                autoListenSeconds: config.driverVoice?.autoListenSeconds ?? 10,
+              })
+            }
+          />
+        </label>
+        <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3">
+          <span className="text-sm font-medium text-slate-800">Durée d&apos;écoute (secondes, 5 à 30)</span>
+          <input
+            type="number"
+            min={5}
+            max={30}
+            className="w-20 rounded border border-slate-300 px-2 py-1 text-sm"
+            defaultValue={config.driverVoice?.autoListenSeconds ?? 10}
+            key={config.driverVoice?.autoListenSeconds ?? 10}
+            disabled={!canEditServices || saving || config.driverVoice?.autoListenEnabled === false}
+            onBlur={(e) => {
+              const v = Number(e.target.value);
+              if (v !== (config.driverVoice?.autoListenSeconds ?? 10)) {
+                void saveDriverVoice({
+                  autoListenEnabled: config.driverVoice?.autoListenEnabled !== false,
+                  autoListenSeconds: v,
+                });
+              }
+            }}
           />
         </label>
       </section>

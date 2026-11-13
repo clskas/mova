@@ -231,7 +231,60 @@ class _ListeningSheetState extends State<_ListeningSheet> {
 
 /// Driver voice commands, recognised on the phone (no AI, works offline once the phone
 /// recognises French). Short words a driver says with hands on the wheel.
-enum DriverVoiceIntent { arrived, start, finish, navigate, callPassenger, online, offline, accept, reject, unknown }
+enum DriverVoiceIntent {
+  arrived,
+  start,
+  finish,
+  navigate,
+  callPassenger,
+  online,
+  offline,
+  accept,
+  reject,
+  cancel,
+  cashReceived,
+  cashNotReceived,
+  passengerPicked,
+  passengerDropped,
+  unreachable,
+  unknown,
+}
+
+/// Admin settings (super admin, /public/client-config `driverVoice`): micro opened by itself on
+/// offers, and how long it listens. The driver's own switch (Notifications) comes on top.
+bool kDriverVoiceAutoListen = true;
+int kDriverVoiceAutoListenSeconds = 10;
+
+void applyDriverVoiceConfig(Object? raw) {
+  if (raw is! Map) return;
+  final on = raw['autoListenEnabled'];
+  if (on is bool) kDriverVoiceAutoListen = on;
+  final s = raw['autoListenSeconds'];
+  final n = s is num ? s.round() : int.tryParse(s?.toString() ?? '');
+  if (n != null && n >= 5 && n <= 30) kDriverVoiceAutoListenSeconds = n;
+}
+
+/// Asks before a voice command that cannot be undone (finish, cancel, delivered…).
+Future<bool> confirmVoiceAction(BuildContext context, String title, String yesLabel) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(title),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(yesLabel)),
+      ],
+    ),
+  );
+  return ok == true && context.mounted;
+}
+
+/// « Commande non reconnue » with the words that work on this screen.
+void voiceNotUnderstood(BuildContext context, String text, String words) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(trf('Commande non reconnue : « {text} ». Dites : {words}.', {'text': text, 'words': words}))),
+  );
+}
 
 String _norm(String s) => s
     .toLowerCase()
@@ -240,11 +293,30 @@ String _norm(String s) => s
     .replaceAll(RegExp('[îï]'), 'i')
     .replaceAll(RegExp('[ôö]'), 'o')
     .replaceAll(RegExp('[ùûü]'), 'u')
-    .replaceAll('ç', 'c');
+    .replaceAll('ç', 'c')
+    .replaceAll(RegExp("['’-]"), ' ');
 
 DriverVoiceIntent parseDriverVoiceIntent(String text) {
   final t = _norm(text);
   bool has(List<String> words) => words.any(t.contains);
+  // Longest / most specific phrases first (« cash non reçu » before « cash reçu »,
+  // « passager déposé » before « déposé »…).
+  if (has(['non recu', 'pas recu', 'pas paye', 'n a pas paye', 'cash non', 'pas de cash', 'pas d argent'])) {
+    return DriverVoiceIntent.cashNotReceived;
+  }
+  if (has(['cash recu', 'argent recu', 'especes recu', 'il a paye', 'elle a paye', 'paye en especes', 'j ai recu'])) {
+    return DriverVoiceIntent.cashReceived;
+  }
+  if (has(['injoignable', 'ne repond pas', 'personne ne repond', 'destinataire absent'])) return DriverVoiceIntent.unreachable;
+  if (has(['annule', 'annuler', 'annulation', 'passager absent', 'no show', 'client absent', 'absent'])) return DriverVoiceIntent.cancel;
+  if (has(['passager depose', 'deposer le passager', 'depose le passager', 'il est descendu', 'elle est descendue', 'passager descendu'])) {
+    return DriverVoiceIntent.passengerDropped;
+  }
+  if (has(['passager pris', 'prendre le passager', 'passager monte', 'il est monte', 'elle est montee', 'passager a bord', 'prends le passager'])) {
+    return DriverVoiceIntent.passengerPicked;
+  }
+  if (has(['livre', 'livraison faite', 'colis remis', 'remis au client'])) return DriverVoiceIntent.finish;
+  if (has(['en route', 'colis recupere', 'j ai le colis', 'colis pris', 'je pars'])) return DriverVoiceIntent.start;
   if (has(['hors ligne', 'hors-ligne', 'deconnect', 'pause', 'arrete de travailler'])) return DriverVoiceIntent.offline;
   if (has(['en ligne', 'connecte', 'je travaille', 'disponible'])) return DriverVoiceIntent.online;
   if (has(['refuse', 'refuser', 'non merci', 'decline'])) return DriverVoiceIntent.reject;

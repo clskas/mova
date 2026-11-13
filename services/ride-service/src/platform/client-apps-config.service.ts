@@ -64,6 +64,8 @@ export class ClientAppsConfigService implements OnModuleInit {
       languages: this.config.languages,
       // Seat limits per range (admin): the apps size the passenger selector with them.
       seatLimits: this.config.seatLimits,
+      // SENGA Driver: micro opened by itself on offers, and for how long (super admin).
+      driverVoice: this.config.driverVoice,
     };
   }
 
@@ -112,6 +114,7 @@ export class ClientAppsConfigService implements OnModuleInit {
       languages: patch.languages ? { ...this.config.languages, ...patch.languages } : this.config.languages,
       seatLimits: patch.seatLimits ? { ...this.config.seatLimits, ...patch.seatLimits } : this.config.seatLimits,
       ai: patch.ai ? { ...this.config.ai, ...patch.ai } : this.config.ai,
+      driverVoice: patch.driverVoice ? { ...this.config.driverVoice, ...patch.driverVoice } : this.config.driverVoice,
     });
 
     this.validate(next);

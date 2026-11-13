@@ -26,6 +26,7 @@ import 'widgets/driver_cash_pin_dialog.dart';
 import 'widgets/driver_cash_received_dialog.dart';
 import '../../core/location/location_permission.dart';
 import '../../core/i18n/i18n.dart';
+import '../../core/voice/voice_command_button.dart';
 
 class ActiveDeliveryScreen extends ConsumerStatefulWidget {
   const ActiveDeliveryScreen({
@@ -426,6 +427,34 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
     }
   }
 
+  /// Voice commands on a delivery / errand. Delivered asks the recipient PIN, as with the button.
+  Future<void> _onDeliveryVoice(String text) async {
+    final intent = parseDriverVoiceIntent(text);
+    final next = _nextAction;
+    switch (intent) {
+      case DriverVoiceIntent.start || DriverVoiceIntent.arrived when next == 'IN_TRANSIT' || next == 'IN_PROGRESS':
+        await _handleNextAction();
+      case DriverVoiceIntent.finish when next == 'DELIVERED' || next == 'COMPLETED':
+        if (next == 'COMPLETED' &&
+            !await confirmVoiceAction(context, tr('Marquer les courses comme terminées ?'), tr('Oui, terminé'))) {
+          return;
+        }
+        await _handleNextAction();
+      case DriverVoiceIntent.unreachable when !_isErrand && (_status == 'IN_TRANSIT' || _status == 'PICKED_UP'):
+        if (await confirmVoiceAction(context, tr('Destinataire injoignable ?'), tr('Oui, injoignable'))) {
+          await _markUnreachable();
+        }
+      case DriverVoiceIntent.cashReceived || DriverVoiceIntent.cashNotReceived when _awaitingCashConfirm || _cashDisputed:
+        await _confirmCash();
+      case DriverVoiceIntent.navigate:
+        await _openMaps();
+      case DriverVoiceIntent.callPassenger when !_isErrand && _deliveryId.isNotEmpty:
+        await _openVoiceCall();
+      default:
+        voiceNotUnderstood(context, text, tr('en route, livré, injoignable, itinéraire, appeler, cash reçu'));
+    }
+  }
+
   Future<void> _markUnreachable() async {
     final api = ref.read(apiClientProvider);
     final result = await api.markDeliveryUnreachable(_deliveryId);
@@ -632,6 +661,10 @@ class _ActiveDeliveryScreenState extends ConsumerState<ActiveDeliveryScreen> {
       title: tr('Livraison active'),
       scrollable: false,
       actions: [
+        VoiceCommandButton(
+          onText: _onDeliveryVoice,
+          hint: tr('Dites : en route, livré, injoignable, itinéraire, appeler'),
+        ),
         sosAppBarButton(
           onPressed: _deliveryId.isEmpty
               ? ([bool skip = false]) {

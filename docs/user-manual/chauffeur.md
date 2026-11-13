@@ -121,7 +121,7 @@ Quand une course ou une livraison arrive, le micro **s'ouvre tout seul quelques 
 
 Le micro s'ouvre aussi tout seul **aux moments clés** (une seule fois chacun) : à environ 100 m du point de prise en charge (dites « je suis arrivé »), 45 secondes après votre arrivée (« démarrer »), à environ 150 m de la destination (« terminer », ou « livré » pour une livraison). Le reste du temps, appuyez sur le micro : il ne reste jamais ouvert en permanence.
 
-**Langues** : parlez dans la langue de l'application — français, anglais (« accept », « I've arrived », « finish »…) ou swahili (« nakubali », « nimefika », « nimemaliza »…). Les téléphones ne reconnaissent pas le lingala : en lingala, parlez français.
+**Langues** : parlez dans la langue de l'application — français, anglais (« accept », « I've arrived », « finish »…) ou swahili (« nakubali », « nimefika », « nimemaliza »…). Le lingala n'est pas reconnu par les téléphones : l'app écoute alors en français et comprend aussi quelques mots lingala courants (« nandimi », « naboyi », « nakomi », « tokende », « nasilisi »…), sans garantie. En cas d'échec, parlez français.
 
 Les mots sont reconnus par le téléphone, en français, et transformés en action : **votre voix n'est ni enregistrée ni envoyée au passager**. Le passager reçoit seulement la notification habituelle (par exemple « chauffeur arrivé »). Si la commande n'est pas comprise, l'app vous indique les mots possibles.
 

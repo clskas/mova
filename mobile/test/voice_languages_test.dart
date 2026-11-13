@@ -46,4 +46,16 @@ void main() {
     appLanguage.value = 'fr';
     expect(voiceLocaleId(), 'fr_FR');
   });
+
+  test('common Lingala words (best effort)', () {
+    expect(parseDriverVoiceIntent('nandimi'), DriverVoiceIntent.accept);
+    expect(parseDriverVoiceIntent('naboyi'), DriverVoiceIntent.reject);
+    expect(parseDriverVoiceIntent('nakomi'), DriverVoiceIntent.arrived);
+    expect(parseDriverVoiceIntent('tokende'), DriverVoiceIntent.start);
+    expect(parseDriverVoiceIntent('nasilisi'), DriverVoiceIntent.finish);
+    expect(parseDriverVoiceIntent('afuti te'), DriverVoiceIntent.cashNotReceived);
+    expect(parsePassengerVoiceIntent('nafuti'), PassengerVoiceIntent.cashPaid);
+    expect(parsePassengerVoiceIntent('nalingi kokende na motuka'), PassengerVoiceIntent.taxi);
+    expect(parsePassengerVoiceIntent('longola'), PassengerVoiceIntent.cancel);
+  });
 }

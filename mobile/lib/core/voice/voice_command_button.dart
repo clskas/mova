@@ -289,26 +289,26 @@ enum PassengerVoiceIntent {
 PassengerVoiceIntent parsePassengerVoiceIntent(String text) {
   final t = _norm(text);
   bool has(List<String> words) => words.any(t.contains);
-  if (has(['sos', 'au secours', 'urgence', 'aidez moi', 'danger', 'help me', 'emergency', 'msaada', 'nisaidie', 'dharura'])) return PassengerVoiceIntent.sos;
-  if (has(['j ai paye', 'deja paye', 'paye en especes', 'paye le chauffeur', 'paye le livreur', 'j ai donne l argent', 'i paid', 'already paid', 'paid cash', 'nimelipa', 'nimeshalipa'])) {
+  if (has(['sos', 'au secours', 'urgence', 'aidez moi', 'danger', 'help me', 'emergency', 'msaada', 'nisaidie', 'dharura', 'lisalisi', 'bosalisa ngai'])) return PassengerVoiceIntent.sos;
+  if (has(['j ai paye', 'deja paye', 'paye en especes', 'paye le chauffeur', 'paye le livreur', 'j ai donne l argent', 'i paid', 'already paid', 'paid cash', 'nimelipa', 'nimeshalipa', 'nafuti'])) {
     return PassengerVoiceIntent.cashPaid;
   }
-  if (has(['annule', 'annuler', 'annulation', 'cancel', 'ghairi', 'sitisha'])) return PassengerVoiceIntent.cancel;
-  if (has(['recu le colis', 'colis recu', 'j ai recu', 'bien recu', 'commande recue', 'repas recu', 'received', 'got my', 'nimepokea'])) return PassengerVoiceIntent.received;
+  if (has(['annule', 'annuler', 'annulation', 'cancel', 'ghairi', 'sitisha', 'longola', 'tika yango'])) return PassengerVoiceIntent.cancel;
+  if (has(['recu le colis', 'colis recu', 'j ai recu', 'bien recu', 'commande recue', 'repas recu', 'received', 'got my', 'nimepokea', 'nazwi'])) return PassengerVoiceIntent.received;
   if (has(['payer', 'paiement', 'regler', 'pay ', 'pay the', 'payment', 'lipa', 'malipo'])) return PassengerVoiceIntent.pay;
-  if (has(['appelle', 'appeler', 'appel', 'telephone', 'call', 'phone', 'piga simu', 'mpigie'])) return PassengerVoiceIntent.callDriver;
+  if (has(['appelle', 'appeler', 'appel', 'telephone', 'call', 'phone', 'piga simu', 'mpigie', 'benga'])) return PassengerVoiceIntent.callDriver;
   if (has(['partage', 'partager', 'envoie mon trajet', 'share', 'shiriki', 'tuma safari'])) return PassengerVoiceIntent.share;
-  if (has(['ma course', 'ma commande', 'ma livraison', 'suivre', 'suivi', 'ou est', 'my ride', 'my order', 'my delivery', 'where is', 'track', 'safari yangu', 'oda yangu', 'iko wapi'])) return PassengerVoiceIntent.myRide;
+  if (has(['ma course', 'ma commande', 'ma livraison', 'suivre', 'suivi', 'ou est', 'my ride', 'my order', 'my delivery', 'where is', 'track', 'safari yangu', 'oda yangu', 'iko wapi', 'ezali wapi'])) return PassengerVoiceIntent.myRide;
   if (has(['planifi', 'programmer', 'reserver pour', 'demain', 'schedule', 'tomorrow', 'book for', 'ratiba', 'kesho', 'panga'])) return PassengerVoiceIntent.scheduled;
   if (has(['covoiturage', 'partager un trajet', 'carpool', 'ride share', 'kushiriki gari'])) return PassengerVoiceIntent.carpool;
   if (has(['demenag', 'moving', 'move house', 'kuhama', 'hamisha'])) return PassengerVoiceIntent.moving;
   if (has(['location', 'louer', 'rent a', 'rental', 'hire a car', 'kukodi', 'kodi gari'])) return PassengerVoiceIntent.rental;
   if (has(['wallet', 'portefeuille', 'solde', 'recharger', 'recharge', 'wallet', 'balance', 'top up', 'pochi', 'salio', 'weka pesa'])) return PassengerVoiceIntent.wallet;
   if (has(['historique', 'mes courses', 'anciennes courses', 'history', 'my trips', 'historia', 'safari zangu'])) return PassengerVoiceIntent.history;
-  if (has(['repas', 'manger', 'restaurant', 'nourriture', 'faim', 'food', 'to eat', 'hungry', 'chakula', 'kula', 'njaa'])) return PassengerVoiceIntent.food;
-  if (has(['colis', 'paquet', 'envoyer un', 'parcel', 'package', 'send a', 'kifurushi', 'mzigo', 'tuma'])) return PassengerVoiceIntent.parcel;
+  if (has(['repas', 'manger', 'restaurant', 'nourriture', 'faim', 'food', 'to eat', 'hungry', 'chakula', 'kula', 'njaa', 'bilei', 'kolia', 'nzala'])) return PassengerVoiceIntent.food;
+  if (has(['colis', 'paquet', 'envoyer un', 'parcel', 'package', 'send a', 'kifurushi', 'mzigo', 'tuma', 'biloko', 'kotinda'])) return PassengerVoiceIntent.parcel;
   if (has(['livraison', 'livrer', 'express', 'commission', 'delivery', 'deliver', 'errand', 'usafirishaji', 'peleka'])) return PassengerVoiceIntent.delivery;
-  if (has(['taxi', 'moto', 'course', 'voiture', 'chauffeur', 'je vais', 'aller a', 'taxi', 'car', 'ride', 'i m going', 'take me', 'pikipiki', 'gari', 'nataka kwenda', 'nipeleke'])) return PassengerVoiceIntent.taxi;
+  if (has(['taxi', 'moto', 'course', 'voiture', 'chauffeur', 'je vais', 'aller a', 'taxi', 'car', 'ride', 'i m going', 'take me', 'pikipiki', 'gari', 'nataka kwenda', 'nipeleke', 'motuka', 'nalingi kokende'])) return PassengerVoiceIntent.taxi;
   return PassengerVoiceIntent.unknown;
 }
 
@@ -317,7 +317,8 @@ class VoiceAutoTrigger extends ChangeNotifier {
   void fire() => notifyListeners();
 }
 
-/// Speech locale for the app language. Phones do not recognise Lingala: French then.
+/// Speech locale for the app language. Phones do not recognise Lingala: French then, and the
+/// common Lingala words are in the lists (best effort: the French recogniser may not spell them).
 String voiceLocaleId() => switch (appLanguage.value) {
       'en' => 'en_US',
       'sw' => 'sw_KE',
@@ -375,30 +376,30 @@ DriverVoiceIntent parseDriverVoiceIntent(String text) {
   bool has(List<String> words) => words.any(t.contains);
   // Longest / most specific phrases first (« cash non reçu » before « cash reçu »,
   // « passager déposé » before « déposé »…).
-  if (has(['non recu', 'pas recu', 'pas paye', 'n a pas paye', 'cash non', 'pas de cash', 'pas d argent', 'not received', 'didn t pay', 'did not pay', 'no cash', 'sijapokea', 'hajalipa'])) {
+  if (has(['non recu', 'pas recu', 'pas paye', 'n a pas paye', 'cash non', 'pas de cash', 'pas d argent', 'not received', 'didn t pay', 'did not pay', 'no cash', 'sijapokea', 'hajalipa', 'mbongo te', 'afuti te', 'apesi te'])) {
     return DriverVoiceIntent.cashNotReceived;
   }
-  if (has(['cash recu', 'argent recu', 'especes recu', 'il a paye', 'elle a paye', 'paye en especes', 'j ai recu', 'cash received', 'got the cash', 'he paid', 'she paid', 'nimepokea pesa', 'amelipa'])) {
+  if (has(['cash recu', 'argent recu', 'especes recu', 'il a paye', 'elle a paye', 'paye en especes', 'j ai recu', 'cash received', 'got the cash', 'he paid', 'she paid', 'nimepokea pesa', 'amelipa', 'nazwi mbongo', 'afuti', 'apesi mbongo'])) {
     return DriverVoiceIntent.cashReceived;
   }
   if (has(['injoignable', 'ne repond pas', 'personne ne repond', 'destinataire absent', 'unreachable', 'not answering', 'no answer', 'hapatikani', 'hapokei'])) return DriverVoiceIntent.unreachable;
-  if (has(['annule', 'annuler', 'annulation', 'passager absent', 'no show', 'client absent', 'absent', 'cancel', 'no show', 'ghairi', 'sitisha'])) return DriverVoiceIntent.cancel;
-  if (has(['passager depose', 'deposer le passager', 'depose le passager', 'il est descendu', 'elle est descendue', 'passager descendu', 'dropped off', 'drop off', 'passenger out', 'ameshuka', 'abiria ameshuka'])) {
+  if (has(['annule', 'annuler', 'annulation', 'passager absent', 'no show', 'client absent', 'absent', 'cancel', 'no show', 'ghairi', 'sitisha', 'longola', 'tika yango'])) return DriverVoiceIntent.cancel;
+  if (has(['passager depose', 'deposer le passager', 'depose le passager', 'il est descendu', 'elle est descendue', 'passager descendu', 'dropped off', 'drop off', 'passenger out', 'ameshuka', 'abiria ameshuka', 'akiti'])) {
     return DriverVoiceIntent.passengerDropped;
   }
-  if (has(['passager pris', 'prendre le passager', 'passager monte', 'il est monte', 'elle est montee', 'passager a bord', 'prends le passager', 'picked up', 'pick up', 'passenger in', 'on board', 'amepanda', 'abiria amepanda'])) {
+  if (has(['passager pris', 'prendre le passager', 'passager monte', 'il est monte', 'elle est montee', 'passager a bord', 'prends le passager', 'picked up', 'pick up', 'passenger in', 'on board', 'amepanda', 'abiria amepanda', 'amati', 'akoti'])) {
     return DriverVoiceIntent.passengerPicked;
   }
-  if (has(['livre', 'livraison faite', 'colis remis', 'remis au client', 'finish', 'done', 'delivered', 'trip over', 'maliza', 'nimemaliza', 'imefikishwa', 'nimefikisha'])) return DriverVoiceIntent.finish;
-  if (has(['en route', 'colis recupere', 'j ai le colis', 'colis pris', 'je pars', 'start', 'let s go', 'on my way', 'anza', 'tuanze', 'niko njiani'])) return DriverVoiceIntent.start;
-  if (has(['hors ligne', 'hors-ligne', 'deconnect', 'pause', 'arrete de travailler', 'offline', 'go offline', 'nje ya mtandao', 'zima kazi'])) return DriverVoiceIntent.offline;
-  if (has(['en ligne', 'connecte', 'je travaille', 'disponible', 'online', 'go online', 'mtandaoni', 'niko kazini'])) return DriverVoiceIntent.online;
-  if (has(['refuse', 'refuser', 'non merci', 'decline', 'reject', 'no thanks', 'kataa', 'sitaki'])) return DriverVoiceIntent.reject;
-  if (has(['accepte', 'accepter', 'je prends', 'ok je prends', 'accept', 'i take it', 'kubali', 'nakubali'])) return DriverVoiceIntent.accept;
-  if (has(['itineraire', 'navigation', 'naviguer', 'gps', 'guide-moi', 'guide moi', 'carte', 'navigate', 'directions', 'route', 'map', 'njia', 'ramani'])) return DriverVoiceIntent.navigate;
-  if (has(['appelle', 'appeler', 'appel', 'telephone', 'call', 'phone', 'piga simu', 'mpigie'])) return DriverVoiceIntent.callPassenger;
+  if (has(['livre', 'livraison faite', 'colis remis', 'remis au client', 'finish', 'done', 'delivered', 'trip over', 'maliza', 'nimemaliza', 'imefikishwa', 'nimefikisha', 'nasilisi', 'esili', 'nakabi'])) return DriverVoiceIntent.finish;
+  if (has(['en route', 'colis recupere', 'j ai le colis', 'colis pris', 'je pars', 'start', 'let s go', 'on my way', 'anza', 'tuanze', 'niko njiani', 'tokende', 'tobanda'])) return DriverVoiceIntent.start;
+  if (has(['hors ligne', 'hors-ligne', 'deconnect', 'pause', 'arrete de travailler', 'offline', 'go offline', 'nje ya mtandao', 'zima kazi', 'pema', 'nakopema'])) return DriverVoiceIntent.offline;
+  if (has(['en ligne', 'connecte', 'je travaille', 'disponible', 'online', 'go online', 'mtandaoni', 'niko kazini', 'na mosala'])) return DriverVoiceIntent.online;
+  if (has(['refuse', 'refuser', 'non merci', 'decline', 'reject', 'no thanks', 'kataa', 'sitaki', 'naboyi', 'boya'])) return DriverVoiceIntent.reject;
+  if (has(['accepte', 'accepter', 'je prends', 'ok je prends', 'accept', 'i take it', 'kubali', 'nakubali', 'nandimi', 'ndima'])) return DriverVoiceIntent.accept;
+  if (has(['itineraire', 'navigation', 'naviguer', 'gps', 'guide-moi', 'guide moi', 'carte', 'navigate', 'directions', 'route', 'map', 'njia', 'ramani', 'nzela'])) return DriverVoiceIntent.navigate;
+  if (has(['appelle', 'appeler', 'appel', 'telephone', 'call', 'phone', 'piga simu', 'mpigie', 'benga'])) return DriverVoiceIntent.callPassenger;
   if (has(['termine', 'terminer', 'fini', 'fin de course', 'arrive a destination', 'arrivee'])) return DriverVoiceIntent.finish;
   if (has(['demarre', 'demarrer', 'commence', 'commencer', 'on y va', 'passager a bord', 'est monte'])) return DriverVoiceIntent.start;
-  if (has(['arrive', 'je suis la', 'sur place', 'arrived', 'i m here', 'i am here', 'nimefika', 'niko hapa'])) return DriverVoiceIntent.arrived;
+  if (has(['arrive', 'je suis la', 'sur place', 'arrived', 'i m here', 'i am here', 'nimefika', 'niko hapa', 'nakomi', 'nayei', 'nazali awa'])) return DriverVoiceIntent.arrived;
   return DriverVoiceIntent.unknown;
 }

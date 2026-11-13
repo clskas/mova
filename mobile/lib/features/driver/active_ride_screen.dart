@@ -545,24 +545,25 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   /// Driver voice: arrived / start / finish / navigation / call. Finishing asks a confirmation.
   Future<void> _onDriverVoice(String text) async {
     final intent = parseDriverVoiceIntent(text);
-    void say(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
     final next = _nextStatus();
     switch (intent) {
       case DriverVoiceIntent.arrived when next == 'ARRIVING':
-      case DriverVoiceIntent.start when next == 'IN_PROGRESS':
+      case DriverVoiceIntent.start || DriverVoiceIntent.passengerPicked when next == 'IN_PROGRESS':
         await _advanceStatus(next!);
-      case DriverVoiceIntent.finish when next == 'COMPLETED':
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(tr('Terminer la course ?')),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
-              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Oui, terminer'))),
-            ],
-          ),
-        );
-        if (ok == true && mounted) await _advanceStatus('COMPLETED');
+      case DriverVoiceIntent.finish || DriverVoiceIntent.passengerDropped when next == 'COMPLETED':
+        if (await confirmVoiceAction(context, tr('Terminer la course ?'), tr('Oui, terminer'))) {
+          await _advanceStatus('COMPLETED');
+        }
+      case DriverVoiceIntent.cancel when _canDriverCancel:
+        // The usual dialog asks first (fees, no-show).
+        await _cancelByDriver();
+      case DriverVoiceIntent.cashReceived || DriverVoiceIntent.cashNotReceived when _status == 'COMPLETED' && !_isPaid:
+        // Opens « Cash reçu ? »: the driver confirms or disputes there.
+        await _confirmCash();
+      case DriverVoiceIntent.passengerPicked || DriverVoiceIntent.start when _isSharedPool:
+        await _poolVoice(pickup: true);
+      case DriverVoiceIntent.passengerDropped || DriverVoiceIntent.finish when _isSharedPool:
+        await _poolVoice(pickup: false);
       case DriverVoiceIntent.navigate:
         await _openNavigation(toPickup: _status == 'DRIVER_ASSIGNED' || _status == 'ARRIVING');
       case DriverVoiceIntent.callPassenger:
@@ -570,8 +571,33 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
         final phone = passenger is Map ? passenger['phone']?.toString() : _ride['passengerPhone']?.toString();
         showCallWhatsAppSheet(context, phone: phone, peerLabel: tr('le passager'));
       default:
-        say(trf('Commande non reconnue : « {text} ». Dites : arrivé, démarrer, terminer, itinéraire ou appeler.', {'text': text}));
+        voiceNotUnderstood(
+          context,
+          text,
+          _isSharedPool
+              ? tr('passager pris, passager déposé, itinéraire, appeler, annuler')
+              : tr('arrivé, démarrer, terminer, itinéraire, appeler, annuler, cash reçu'),
+        );
     }
+  }
+
+  /// Pool by voice: next passenger to pick up (or to drop), in route order, after a confirmation.
+  Future<void> _poolVoice({required bool pickup}) async {
+    final wanted = pickup ? 'WAITING' : 'PICKED_UP';
+    final p = _sharePassengers.where((p) => p['status']?.toString() == wanted).firstOrNull;
+    final bookingId = (p?['bookingId'] ?? p?['id'])?.toString() ?? '';
+    if (p == null || bookingId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(pickup ? tr('Aucun passager à prendre.') : tr('Aucun passager à déposer.'))),
+      );
+      return;
+    }
+    final where = pickup ? p['pickupAddress'] : p['dropoffAddress'];
+    final title = pickup
+        ? trf('Prendre le passager ({where}) ?', {'where': where ?? tr('Prise')})
+        : trf('Déposer le passager ({where}) ?', {'where': where ?? tr('Dépose')});
+    if (!await confirmVoiceAction(context, title, pickup ? tr('Oui, pris') : tr('Oui, déposé'))) return;
+    await (pickup ? _pickupShare(bookingId) : _dropoffShare(bookingId));
   }
 
   String? _nextStatus() => _isSharedPool
@@ -671,7 +697,9 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
           VoiceCommandButton(
             onText: _onDriverVoice,
             color: Colors.white,
-            hint: tr('Dites : arrivé, démarrer, terminer, itinéraire, appeler'),
+            hint: _isSharedPool
+                ? tr('Dites : passager pris, passager déposé, itinéraire, appeler')
+                : tr('Dites : arrivé, démarrer, terminer, itinéraire, appeler, annuler'),
           ),
         sosAppBarButton(
           onPressed: ([bool skip = false]) => triggerSosAlert(

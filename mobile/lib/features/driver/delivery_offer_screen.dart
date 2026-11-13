@@ -13,7 +13,9 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../booking/widgets/mova_ride_map.dart';
+import 'driver_alert_prefs.dart';
 import 'driver_job_alert_service.dart';
+import '../../core/voice/voice_command_button.dart';
 import '../../core/location/location_permission.dart';
 import '../../core/i18n/i18n.dart';
 
@@ -37,6 +39,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
   int? _pickupEtaMin;
   LatLng? _driverPosition;
   bool _closing = false;
+  bool _voiceListening = false;
 
   String get _deliveryId => widget.offer['id']?.toString() ?? '';
 
@@ -195,6 +198,23 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
   }
 
   /// Pas de réponse : ne pas rejeter côté serveur — la livraison sera reproposée plus tard.
+  void _onAutoListenChanged(bool listening) {
+    if (listening) {
+      unawaited(DriverJobAlertService.pauseRingForVoice());
+    } else if (mounted && !_loading && !_closing) {
+      unawaited(DriverJobAlertService.resumeRingAfterVoice());
+    }
+    if (mounted) setState(() => _voiceListening = listening);
+  }
+
+  Future<void> _onOfferVoice(String text) async {
+    final intent = parseDriverVoiceIntent(text);
+    if (intent == DriverVoiceIntent.accept) return _accept();
+    if (intent == DriverVoiceIntent.reject) return _reject();
+    if (!mounted) return;
+    voiceNotUnderstood(context, text, tr('« accepter » ou « refuser »'));
+  }
+
   Future<void> _expireOffer() async {
     _timer?.cancel();
     _popOffer('timeout');
@@ -414,7 +434,30 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
             const SizedBox(height: 16),
             MovaErrorBanner(message: _error!),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              VoiceCommandButton(
+                onText: _onOfferVoice,
+                hint: tr('Dites « accepter » ou « refuser »'),
+                autoListen: kDriverVoiceAutoListen && DriverAlertPrefs.voiceAutoListen,
+                autoListenFor: Duration(seconds: kDriverVoiceAutoListenSeconds),
+                onAutoListenChanged: _onAutoListenChanged,
+              ),
+              Flexible(
+                child: Text(
+                  _voiceListening ? tr('Je vous écoute : « accepter » ou « refuser »') : tr('Répondre à la voix'),
+                  style: TextStyle(
+                    color: _voiceListening ? MovaColors.violet : MovaColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: _voiceListening ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           MovaButton(
             label: tr('Accepter la livraison'),
             isLoading: _loading,

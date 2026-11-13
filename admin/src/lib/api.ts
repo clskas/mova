@@ -3090,6 +3090,8 @@ export type ClientAppsConfig = {
   languages?: LanguagesConfig;
   /** Interrupteur général de l'IA (SuperAdmin). */
   ai?: { enabled: boolean };
+  /** SENGA Driver : micro ouvert seul sur les offres, et sa durée (SuperAdmin). */
+  driverVoice?: { autoListenEnabled: boolean; autoListenSeconds: number };
   /** Nombre de places par gamme (Admin / SuperAdmin). */
   seatLimits?: SeatLimits;
 };

@@ -11,6 +11,7 @@ import '../history/history_detail_dialog.dart';
 import '../../core/safety/sos_helper.dart';
 import 'widgets/driver_cash_received_dialog.dart';
 import '../../core/i18n/i18n.dart';
+import '../../core/voice/voice_command_button.dart';
 
 class DriverMovingMissionScreen extends ConsumerStatefulWidget {
   const DriverMovingMissionScreen({
@@ -192,6 +193,26 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
     Navigator.pop(context, true);
   }
 
+  Future<void> _onMissionVoice(String text) async {
+    final intent = parseDriverVoiceIntent(text);
+    switch (intent) {
+      case DriverVoiceIntent.start when _status == 'ASSIGNED':
+        if (await confirmVoiceAction(context, tr('Démarrer le déménagement ?'), tr('Oui, démarrer'))) {
+          await _advanceStatus('IN_PROGRESS', 'Déménagement démarré');
+        }
+      case DriverVoiceIntent.finish when _status == 'IN_PROGRESS':
+        if (await confirmVoiceAction(context, tr('Terminer le déménagement ?'), tr('Oui, terminer'))) {
+          await _advanceStatus('COMPLETED', 'Déménagement terminé');
+        }
+      case DriverVoiceIntent.cashReceived || DriverVoiceIntent.cashNotReceived when _status == 'COMPLETED':
+        await _confirmCash();
+      case DriverVoiceIntent.navigate:
+        await _openMaps(toPickup: _status == 'ASSIGNED');
+      default:
+        voiceNotUnderstood(context, text, tr('démarrer, terminer, itinéraire, cash reçu'));
+    }
+  }
+
   Future<void> _openMaps({required bool toPickup}) async {
     final lat = _moving?[toPickup ? 'pickupLat' : 'dropoffLat'] as num?;
     final lng = _moving?[toPickup ? 'pickupLng' : 'dropoffLng'] as num?;
@@ -240,6 +261,10 @@ class _DriverMovingMissionScreenState extends ConsumerState<DriverMovingMissionS
       title: tr('Mission déménagement'),
       scrollable: false,
       actions: [
+        VoiceCommandButton(
+          onText: _onMissionVoice,
+          hint: tr('Dites : démarrer, terminer, itinéraire, cash reçu'),
+        ),
         sosAppBarButton(
           onPressed: ([bool skip = false]) => triggerSosAlert(
             skipConfirm: skip,

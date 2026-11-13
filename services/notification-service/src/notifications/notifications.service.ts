@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { incidentNotifiesReporter,
   MOVA_EVENTS,
   CashDisputedPayload,
+  PaymentReminderPayload,
   ChatMessagePayload,
   DeliveryCreatedPayload,
   DeliveryStatusUpdatedPayload,
@@ -48,6 +49,7 @@ export class NotificationsService implements OnModuleInit {
       MOVA_EVENTS.RIDE_CREATED,
       MOVA_EVENTS.PAYMENT_COMPLETED,
       MOVA_EVENTS.CASH_DISPUTED,
+      MOVA_EVENTS.PAYMENT_REMINDER,
       MOVA_EVENTS.DELIVERY_CREATED,
       MOVA_EVENTS.DELIVERY_STATUS_UPDATED,
       MOVA_EVENTS.SERVICE_ASSIGNED,
@@ -77,6 +79,7 @@ export class NotificationsService implements OnModuleInit {
         if (channel === MOVA_EVENTS.RIDE_CREATED) await this.onRideCreated(data as RideCreatedPayload);
         if (channel === MOVA_EVENTS.PAYMENT_COMPLETED) await this.onPaymentCompleted(data as PaymentCompletedPayload);
         if (channel === MOVA_EVENTS.CASH_DISPUTED) await this.onCashDisputed(data as CashDisputedPayload);
+        if (channel === MOVA_EVENTS.PAYMENT_REMINDER) await this.onPaymentReminder(data as PaymentReminderPayload);
         if (channel === MOVA_EVENTS.DELIVERY_CREATED) await this.onDeliveryCreated(data as DeliveryCreatedPayload);
         if (channel === MOVA_EVENTS.DELIVERY_STATUS_UPDATED) await this.onDeliveryStatusUpdated(data as DeliveryStatusUpdatedPayload);
         if (channel === MOVA_EVENTS.SERVICE_ASSIGNED) await this.onServiceAssigned(data as ServiceAssignedPayload);
@@ -177,6 +180,22 @@ export class NotificationsService implements OnModuleInit {
       referenceId: payload.referenceId ?? '',
     });
     this.logger.log(`payment.completed notification for ${payload.rideId ?? payload.referenceId} (${method || 'n/a'})`);
+  }
+
+  /** Unpaid ride follow-up (in-app + push, and SMS for the second reminder). */
+  async onPaymentReminder(payload: PaymentReminderPayload) {
+    if (!payload?.userId) return;
+    await this.create(payload.userId, payload.title, payload.body, payload.kind, payload);
+    await this.pushToUsersAnyFlavor([payload.userId], payload.title, payload.body, {
+      type: payload.kind,
+      rideId: payload.rideId ?? '',
+      referenceType: payload.referenceType ?? 'RIDE',
+      referenceId: payload.referenceId ?? payload.rideId ?? '',
+    });
+    if (payload.sms) {
+      const user = await fetchAuthUserBrief(payload.userId).catch(() => null);
+      if (user?.phone) await this.sms.sendMessage(user.phone, `SENGA — ${payload.body}`.slice(0, 160), user.language).catch(() => undefined);
+    }
   }
 
   async onCashDisputed(payload: CashDisputedPayload) {

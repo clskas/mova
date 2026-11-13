@@ -8,6 +8,8 @@ export const MOVA_EVENTS = {
   SERVICE_CASH_PENDING: 'service.cash.pending',
   /** Chauffeur a signalé espèces non reçues — notifier le passager. */
   CASH_DISPUTED: 'payment.cash.disputed',
+  /** Unpaid ride follow-up: reminder to the passenger or question to the driver. */
+  PAYMENT_REMINDER: 'payment.reminder',
   DRIVER_RATING_UPDATED: 'driver.rating.updated',
   DELIVERY_CREATED: 'delivery.created',
   DELIVERY_STATUS_UPDATED: 'delivery.status.updated',
@@ -238,4 +240,17 @@ export interface RentalPartnerVehiclePayload {
   action: 'created' | 'updated' | 'deleted' | 'reviewed';
   approvalStatus?: string;
   isActive?: boolean;
+}
+
+export interface PaymentReminderPayload {
+  userId: string;
+  title: string;
+  body: string;
+  /** PASSENGER_REMINDER | DRIVER_CHECK */
+  kind: string;
+  rideId?: string;
+  referenceType?: string;
+  referenceId?: string;
+  /** Also by SMS (second reminder). */
+  sms?: boolean;
 }

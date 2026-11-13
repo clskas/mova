@@ -40,6 +40,7 @@ La **ville SENGA** sur l'accueil est détectée via GPS à l'ouverture (modifiab
 - **Annulation** : le livreur ne peut pas annuler la commande d'un client. En cas de problème, contactez SENGA, qui réassigne la livraison. Vous ne pouvez pas non plus accepter votre propre commande.
 - **Courses & commissions** : le total des achats ne peut pas dépasser le **budget du client**. Si les articles coûtent plus, appelez le client avant d’acheter.
 - **Étapes d’une course** (arrivé, démarrée, terminée) : seul le chauffeur assigné les valide. Une annulation suit toujours les règles normales d’annulation.
+- **Le client a payé en espèces sans rien indiquer dans son app** : appuyez quand même sur **Cash reçu**, la course est enregistrée en espèces. S'il est parti sans payer : **Cash non reçu**. 30 min après une course non réglée, SENGA vous pose la question.
 - **Cash reçu** : confirmez dès que vous avez encaissé. Sans action de votre part, un paiement espèces **sous 150 000 FC** peut être **clôturé automatiquement après 24 h** (considéré payé).
 - **Cash non reçu** : utilisez ce bouton si le client n’a pas remis l’argent. Cela ouvre un **litige**, bloque le passager pour de nouvelles courses, et **annule** l’auto-clôture.
 - Si le passager a déclaré **« J’ai payé en espèces »** (écran de suivi, reçu, ou fenêtre de litige), vérifiez et confirmez **J’ai reçu les espèces** ou maintenez le litige.

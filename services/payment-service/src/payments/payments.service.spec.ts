@@ -16,6 +16,7 @@ import {
 describe('PaymentsService', () => {
   const prisma = {
     payment: {
+      create: jest.fn().mockResolvedValue({ id: 'pay-new', rideId: 'ride-1', userId: 'user-1', amountCdf: 8500, method: 'CASH', status: 'PENDING' }),
       upsert: jest.fn().mockResolvedValue({ id: 'pay-1', rideId: 'ride-1', status: 'COMPLETED' }),
       findUnique: jest.fn().mockResolvedValue(null),
       findFirst: jest.fn().mockResolvedValue(null),
@@ -230,6 +231,31 @@ describe('PaymentsService', () => {
         data: expect.objectContaining({ status: 'COMPLETED' }),
       }),
     );
+  });
+
+  it('audit: « Cash reçu » works when the passenger never chose a payment', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ passengerId: 'user-1', driverId: 'driver-1', status: 'COMPLETED', internalStatus: 'COMPLETED', finalFareCdf: 8500 }),
+    });
+    prisma.payment.findUnique.mockResolvedValueOnce(null);
+    prisma.payment.update.mockResolvedValueOnce({ id: 'pay-new', rideId: 'ride-1', status: 'COMPLETED', method: PaymentMethod.CASH });
+    const result = await service.confirmCashRide('ride-1', 'driver-1');
+    expect(result.success).toBe(true);
+    expect(prisma.payment.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ rideId: 'ride-1', method: 'CASH', amountCdf: 8500, userId: 'user-1' }) }),
+    );
+  });
+
+  it('audit: a ride already paid by wallet is never turned into cash', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ passengerId: 'user-1', driverId: 'driver-1', status: 'COMPLETED', internalStatus: 'COMPLETED', finalFareCdf: 8500 }),
+    });
+    prisma.payment.findUnique.mockResolvedValueOnce({ id: 'p', rideId: 'ride-1', userId: 'user-1', amountCdf: 8500, method: 'WALLET', status: 'COMPLETED' });
+    await expect(service.confirmCashRide('ride-1', 'driver-1')).rejects.toThrow('déjà payée');
   });
 
   it('Pool : confirmCashRide confirme le booking RIDE_SHARE (compat app)', async () => {

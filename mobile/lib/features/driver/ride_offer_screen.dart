@@ -73,12 +73,25 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
       if (ev.reason == 'taken') {
         _timer?.cancel();
         _statusPollTimer?.cancel();
-        Navigator.pop(context, 'taken');
+        _closeOffer('taken');
       } else {
         _closeAsCancelled();
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _pollRideStillOpen());
+  }
+
+  /// Closes this offer with [result]. When something was opened on top of it (e.g. the cash
+  /// dialog of a previous ride), a plain pop closed that dialog instead and crashed
+  /// (Sentry SENGA-MOBILE-8): remove only the offer's own route then.
+  void _closeOffer([Object? result]) {
+    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    if (route == null || route.isCurrent) {
+      Navigator.pop(context, result);
+    } else {
+      Navigator.of(context).removeRoute(route, result);
+    }
   }
 
   @override
@@ -114,7 +127,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
         // Déjà prise / autre état — fermer sans message d'erreur générique.
         _timer?.cancel();
         _statusPollTimer?.cancel();
-        if (mounted) Navigator.pop(context, 'taken');
+        _closeOffer('taken');
       }
     }
   }
@@ -130,7 +143,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
         offerKey: DriverJobAlertService.offerKey('ride', _rideId),
       ),
     );
-    Navigator.pop(context, 'cancelled');
+    _closeOffer('cancelled');
   }
 
   /// Le compte à rebours a expiré sans réponse du chauffeur.
@@ -138,7 +151,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
   /// qu'elle puisse être re-proposée plus tard. On renvoie 'timeout' pour
   /// que le tableau de bord ne fasse qu'une mise en veille temporaire.
   Future<void> _expireOffer() async {
-    if (mounted) Navigator.pop(context, 'timeout');
+    _closeOffer('timeout');
   }
 
   /// Distance/ETA chauffeur → client (point de prise en charge).
@@ -201,7 +214,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
         if (!mounted) return;
         // Remonter l’accueil avec la course acceptée pour renseigner _activeRide,
         // puis ouvrir ActiveRideScreen (évite un écran fantôme si annulation).
-        Navigator.pop(context, data);
+        _closeOffer(data);
       case Failure(:final error):
         final msg = error.message;
         final looksInvalidStatus = msg.contains('Statut de course invalide') ||
@@ -259,7 +272,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
       case Success():
         _timer?.cancel();
         _statusPollTimer?.cancel();
-        Navigator.pop(context, 'rejected');
+        _closeOffer('rejected');
       case Failure(:final error):
         final msg = error.message;
         // Offre déjà annulée / prise / refusée : toujours fermer (fenêtre fantôme).

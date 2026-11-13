@@ -112,10 +112,14 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       !_cashDisputed &&
       _ride['paymentStatus']?.toString().toUpperCase() == 'PENDING';
 
+  /// Read in initState: `ref` can no longer be used in dispose().
+  late final RideSocket _rideSocket;
+
   @override
   void initState() {
     super.initState();
     _ride = Map<String, dynamic>.from(widget.ride);
+    _rideSocket = ref.read(rideSocketProvider);
     _jobStopSub = DriverJobAlertService.onJobStop.listen(_onJobStopEvent);
     _bootstrap();
   }
@@ -126,7 +130,7 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
     _locationTimer?.cancel();
     _paymentPollTimer?.cancel();
     _statusPollTimer?.cancel();
-    ref.read(rideSocketProvider).clearHandlers();
+    _rideSocket.clearHandlers();
     super.dispose();
   }
 

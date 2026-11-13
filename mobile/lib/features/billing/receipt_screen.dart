@@ -56,10 +56,14 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   String? _error;
   final _emailController = TextEditingController();
 
+  /// Read in initState: `ref` can no longer be used in dispose().
+  late final RideSocket _rideSocket;
+
   @override
   void initState() {
     super.initState();
     _cashStillPending = widget.pendingCash;
+    _rideSocket = ref.read(rideSocketProvider);
     _load();
     if (widget.pendingCash) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _listenCashConfirmation());
@@ -69,7 +73,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   @override
   void dispose() {
     if (widget.pendingCash) {
-      ref.read(rideSocketProvider).clearHandlers();
+      _rideSocket.clearHandlers();
     }
     _emailController.dispose();
     super.dispose();

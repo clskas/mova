@@ -320,8 +320,43 @@ export default function CoursesPage() {
         {selected && (
           <div className="space-y-3 text-sm">
             <p><span className="text-gray-500">ID:</span> {selected.id}</p>
-            <p><span className="text-gray-500">Passager:</span> {selected.passengerId}</p>
-            <p><span className="text-gray-500">Chauffeur:</span> {selected.driverId ?? "Non assigné"}</p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <PersonCard
+                title="Passager"
+                person={rideDetail?.passenger ?? null}
+                fallbackId={selected.passengerId}
+                extra={rideDetail?.passengerCount && rideDetail.passengerCount > 1 ? `${rideDetail.passengerCount} passagers` : undefined}
+              />
+              <PersonCard
+                title="Chauffeur"
+                person={rideDetail?.driverPerson ?? null}
+                fallbackId={selected.driverId ?? undefined}
+                empty="Non assigné"
+                extra={[
+                  rideDetail?.driverPerson?.rating != null ? `★ ${Number(rideDetail.driverPerson.rating).toFixed(1)}` : null,
+                  rideDetail?.driverPerson?.totalRides ? `${rideDetail.driverPerson.totalRides} courses` : null,
+                  [rideDetail?.driverPerson?.vehicleModel, rideDetail?.driverPerson?.vehicleColor].filter(Boolean).join(" · ") || null,
+                  rideDetail?.driverPerson?.plateNumber ? `Plaque ${rideDetail.driverPerson.plateNumber}` : null,
+                ].filter(Boolean).join(" · ") || undefined}
+              />
+            </div>
+            <p className="text-gray-600">
+              {[
+                rideDetail?.vehicleType ? `Gamme : ${rideDetail.vehicleType}` : null,
+                rideDetail?.distanceKm != null ? `${Number(rideDetail.distanceKm).toFixed(1)} km` : null,
+                rideDetail?.durationMin != null ? `${rideDetail.durationMin} min estimées` : null,
+                rideDetail?.paymentMethod ? `Paiement : ${rideDetail.paymentMethod}` : null,
+              ].filter(Boolean).join(" · ")}
+            </p>
+            <p className="text-gray-600">
+              {[
+                rideDetail?.createdAt ? `Demandée ${new Date(rideDetail.createdAt).toLocaleString("fr-CD")}` : null,
+                rideDetail?.acceptedAt ? `acceptée ${new Date(rideDetail.acceptedAt).toLocaleTimeString("fr-CD")}` : null,
+                rideDetail?.startedAt ? `démarrée ${new Date(rideDetail.startedAt).toLocaleTimeString("fr-CD")}` : null,
+                rideDetail?.completedAt ? `terminée ${new Date(rideDetail.completedAt).toLocaleTimeString("fr-CD")}` : null,
+                rideDetail?.cancelledAt ? `annulée ${new Date(rideDetail.cancelledAt).toLocaleTimeString("fr-CD")}${rideDetail.cancelReason ? ` (${rideDetail.cancelReason})` : ""}` : null,
+              ].filter(Boolean).join(" · ")}
+            </p>
             <p>
               <span className="text-gray-500">Statut:</span>{" "}
               <StatusBadge status={selected.status} />
@@ -417,6 +452,46 @@ export default function CoursesPage() {
         danger
         loading={saving}
       />
+    </div>
+  );
+}
+
+function PersonCard({
+  title,
+  person,
+  fallbackId,
+  empty = "—",
+  extra,
+}: {
+  title: string;
+  person: { id: string; name: string | null; phone: string | null; publicId?: string | null; status?: string | null } | null;
+  fallbackId?: string;
+  empty?: string;
+  extra?: string;
+}) {
+  if (!person && !fallbackId) {
+    return (
+      <div className="rounded border p-3">
+        <p className="text-gray-500">{title}</p>
+        <p>{empty}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded border p-3 space-y-1">
+      <p className="text-gray-500">{title}</p>
+      <p className="font-medium">{person?.name ?? "Nom inconnu"}</p>
+      {person?.phone ? (
+        <p>
+          <a className="text-indigo-600 underline" href={`tel:${person.phone}`}>{person.phone}</a>
+          {" · "}
+          <a className="text-green-700 underline" href={`https://wa.me/${person.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">WhatsApp</a>
+        </p>
+      ) : (
+        <p className="text-gray-400">Téléphone inconnu</p>
+      )}
+      {extra && <p className="text-gray-600">{extra}</p>}
+      <p className="text-xs text-gray-400">{person?.publicId ?? person?.id ?? fallbackId}{person?.status ? ` · ${person.status}` : ""}</p>
     </div>
   );
 }

@@ -22,7 +22,7 @@ import { Card, ErrorBanner, LoadingState, PageHeader, SelectInput, StatusBadge }
 
 type PeriodPreset = 1 | 7 | 30 | 90;
 type PeriodMode = "preset" | "custom";
-type ChartMode = "rides" | "revenue" | "deliveries";
+type ChartMode = "rides" | "revenue" | "deliveries" | "deliveryRevenue";
 
 function todayYmdKinshasa(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -206,7 +206,9 @@ export default function DashboardPage() {
           ? d.rides
           : chartMode === "revenue"
             ? d.revenueCdf
-            : d.deliveries,
+            : chartMode === "deliveryRevenue"
+              ? (d.deliveryRevenueCdf ?? 0)
+              : d.deliveries,
     }));
   }, [reports, chartMode]);
 
@@ -508,8 +510,9 @@ export default function DashboardPage() {
                   {(
                     [
                       ["rides", "Courses"],
-                      ["revenue", "Revenus"],
+                      ["revenue", "Revenus courses"],
                       ["deliveries", "Livraisons"],
+                      ["deliveryRevenue", "Revenus livraisons"],
                     ] as const
                   ).map(([mode, label]) => (
                     <button
@@ -528,7 +531,7 @@ export default function DashboardPage() {
               <BarChart
                 data={chartData}
                 color={chartMode === "revenue" ? "#10b981" : chartMode === "deliveries" ? "#f97316" : "#6366f1"}
-                valueFormatter={chartMode === "revenue" ? (n) => formatCdf(n) : undefined}
+                valueFormatter={chartMode === "revenue" || chartMode === "deliveryRevenue" ? (n) => formatCdf(n) : undefined}
               />
             </Card>
 
@@ -574,8 +577,20 @@ export default function DashboardPage() {
                   <dd className="font-bold text-lg tabular-nums text-orange-600">{m.cancelledRides}</dd>
                 </div>
                 <div className="p-3 rounded-xl bg-gray-50">
-                  <dt className="text-gray-500 text-xs">Revenus ({periodLabel})</dt>
+                  <dt className="text-gray-500 text-xs">Revenus courses ({periodLabel})</dt>
                   <dd className="font-bold text-sm tabular-nums">{formatCdf(m.totalRevenueCdf)}</dd>
+                </div>
+                <div className="p-3 rounded-xl bg-gray-50">
+                  <dt className="text-gray-500 text-xs">Revenus livraisons ({periodLabel})</dt>
+                  <dd className="font-bold text-sm tabular-nums text-orange-600">
+                    {formatCdf(reports?.kpis.deliveryRevenueCdf ?? 0)}
+                  </dd>
+                </div>
+                <div className="p-3 rounded-xl bg-gray-50">
+                  <dt className="text-gray-500 text-xs">Revenus totaux ({periodLabel})</dt>
+                  <dd className="font-bold text-sm tabular-nums text-emerald-700">
+                    {formatCdf((m.totalRevenueCdf ?? 0) + (reports?.kpis.deliveryRevenueCdf ?? 0))}
+                  </dd>
                 </div>
                 <div className="p-3 rounded-xl bg-gray-50 col-span-2">
                   <dt className="text-gray-500 text-xs mb-1">Transactions wallet aujourd&apos;hui</dt>

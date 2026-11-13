@@ -91,6 +91,7 @@ const Map<String, String> kStringsEn = {
   "Monté": "On board",
   "Absent": "No-show",
   "Pas voyagé": "Did not travel",
+  "Annulée — motif : {reason}": "Cancelled — reason: {reason}",
   "Fermer": "Close",
   "Photo indisponible": "Photo unavailable",
   "{count} courses": "{count} rides",

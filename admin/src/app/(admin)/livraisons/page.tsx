@@ -344,6 +344,7 @@ export default function LivraisonsPage() {
                 <th className="p-3">Type</th>
                 <th className="p-3">Trajet / Restaurant</th>
                 <th className="p-3">Statut</th>
+                <th className="p-3">Paiement</th>
                 <th className="p-3">Coursier</th>
                 <th className="p-3">Assigner</th>
                 <th className="p-3">Prix</th>
@@ -363,6 +364,9 @@ export default function LivraisonsPage() {
                         : `${d.pickupAddress ?? "—"} → ${d.dropoffAddress ?? "—"}`}
                   </td>
                   <td className="p-3"><StatusBadge status={d.status} /></td>
+                  <td className="p-3 whitespace-nowrap">
+                    <PaymentCell isPaid={d.isPaid} status={d.paymentStatus} method={d.paymentMethod} />
+                  </td>
                   <td className="p-3">{d.driverName ?? (d.driverId ? "Assigné" : "—")}</td>
                   <td className="p-3">
                     {canAssignRecord(d) ? (
@@ -404,6 +408,10 @@ export default function LivraisonsPage() {
               <p><span className="text-gray-500">Articles:</span> {selected.description}</p>
             )}
             <p><span className="text-gray-500">Statut actuel:</span> <StatusBadge status={selected.status} /></p>
+            <p>
+              <span className="text-gray-500">Paiement:</span>{" "}
+              <PaymentCell isPaid={selected.isPaid} status={selected.paymentStatus} method={selected.paymentMethod} />
+            </p>
             {selected.type === "ERRAND" && <ErrandReceiptBlock detail={deliveryDetail ?? selected} />}
             {selected.passengerName && (
               <ContactBlock title="Passager" name={selected.passengerName} phone={selected.passengerPhone} />
@@ -550,4 +558,31 @@ function ErrandReceiptBlock({ detail }: { detail: DeliveryOverview }) {
       )}
     </div>
   );
+}
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: "Espèces",
+  WALLET: "Portefeuille",
+  ORANGE_MONEY: "Orange Money",
+  MPESA: "M-Pesa",
+  AIRTEL_MONEY: "Airtel Money",
+  AFRIMONEY: "Afrimoney",
+};
+
+/** « Payé » / « En attente » / « Non payé », with the payment method. */
+function PaymentCell({ isPaid, status, method }: { isPaid?: boolean; status?: string | null; method?: string | null }) {
+  const m = method ? (PAYMENT_METHOD_LABELS[method.toUpperCase()] ?? method) : null;
+  if (isPaid) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <StatusBadge status="PAID" />
+        {m && <span className="text-xs text-gray-500">{m}</span>}
+      </span>
+    );
+  }
+  if (status === "PENDING") {
+    return <span className="text-xs text-orange-600">En attente{m ? ` · ${m}` : ""}</span>;
+  }
+  if (status === "REFUNDED") return <span className="text-xs text-gray-500">Remboursé</span>;
+  return <span className="text-xs text-gray-400">Non payé</span>;
 }

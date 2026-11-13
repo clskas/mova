@@ -1437,10 +1437,40 @@ export class AdminService {
     return scoped.slice(skip, skip + Math.min(200, take));
   }
 
+  /** Name / phone / public id of a person, for the admin detail screens. */
+  async personBrief(id?: string | null) {
+    if (!id) return null;
+    try {
+      const u = await this.fetchJson<{
+        firstName?: string | null;
+        lastName?: string | null;
+        phone?: string | null;
+        email?: string | null;
+        publicId?: string | null;
+        role?: string | null;
+        status?: string | null;
+      }>('auth', `/internal/users/${id}`);
+      return {
+        id,
+        name: [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || null,
+        phone: u.phone ?? null,
+        email: u.email ?? null,
+        publicId: u.publicId ?? null,
+        role: u.role ?? null,
+        status: u.status ?? null,
+      };
+    } catch {
+      return { id, name: null, phone: null, email: null, publicId: null, role: null, status: null };
+    }
+  }
+
   async getRide(id: string, managedCity?: string | null) {
     const ride = await this.fetchJson<{
       pickupLat?: number | null;
       pickupLng?: number | null;
+      passengerId?: string | null;
+      driverId?: string | null;
+      driver?: Record<string, unknown> | null;
       [key: string]: unknown;
     }>('ride', `/internal/rides/${id}`);
     assertCoordsInManagedCity(
@@ -1449,7 +1479,27 @@ export class AdminService {
       ride?.pickupLng,
       'Course hors de votre ville gérée.',
     );
-    return ride;
+    // Detail screen: who the passenger and the driver are (name, phone), not only their ids.
+    const [passenger, driverPerson] = await Promise.all([
+      this.personBrief(ride.passengerId),
+      this.personBrief(ride.driverId),
+    ]);
+    const d = (ride.driver ?? {}) as Record<string, unknown>;
+    return {
+      ...ride,
+      passenger,
+      driverPerson: driverPerson
+        ? {
+            ...driverPerson,
+            rating: (d.rating as number | undefined) ?? null,
+            totalRides: (d.totalRides as number | undefined) ?? null,
+            vehicleType: (d.vehicleType as string | undefined) ?? null,
+            vehicleModel: (d.vehicleModel as string | undefined) ?? null,
+            vehicleColor: (d.vehicleColor as string | undefined) ?? null,
+            plateNumber: (d.plateNumber as string | undefined) ?? null,
+          }
+        : null,
+    };
   }
 
   async getGpsTrace(type: string, id: string, managedCity?: string | null) {
@@ -1558,8 +1608,35 @@ export class AdminService {
       lat: r.pickupLat ?? r.deliveryLat,
       lng: r.pickupLng ?? r.deliveryLng,
     }));
-    if (!managedCity) return scoped;
-    return scoped.slice(skip, skip + take);
+    const page = managedCity ? scoped.slice(skip, skip + take) : scoped;
+    return this.withServicePaymentStatus(page);
+  }
+
+  /** Adds isPaid / paymentStatus / paymentMethod to delivery and errand rows (admin list). */
+  private async withServicePaymentStatus<T extends Record<string, unknown>>(rows: T[]): Promise<T[]> {
+    type Pay = { isPaid?: boolean; paymentStatus?: string | null; paymentMethod?: string | null };
+    const idsOf = (errand: boolean) =>
+      rows
+        .filter((r) => (String(r.type ?? '').toUpperCase() === 'ERRAND') === errand)
+        .map((r) => String(r.id ?? ''))
+        .filter(Boolean);
+    const fetchPay = (referenceType: string, referenceIds: string[]) =>
+      referenceIds.length
+        ? (this.proxy('payment', '/internal/services/payment-status', {
+            method: 'POST',
+            body: JSON.stringify({ referenceType, referenceIds }),
+          }).catch(() => ({})) as Promise<Record<string, Pay>>)
+        : Promise.resolve({} as Record<string, Pay>);
+    const [deliveries, errands] = await Promise.all([fetchPay('DELIVERY', idsOf(false)), fetchPay('ERRAND', idsOf(true))]);
+    return rows.map((r) => {
+      const pay = (String(r.type ?? '').toUpperCase() === 'ERRAND' ? errands : deliveries)[String(r.id ?? '')];
+      return {
+        ...r,
+        isPaid: pay?.isPaid === true,
+        paymentStatus: pay?.paymentStatus ?? null,
+        paymentMethod: pay?.paymentMethod ?? null,
+      };
+    });
   }
   async getDelivery(id: string, managedCity?: string | null) {
     const delivery = await this.fetchJson<{

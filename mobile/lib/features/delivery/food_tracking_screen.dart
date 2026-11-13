@@ -176,7 +176,9 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
             'PICKED_UP' => tr('Livreur assigné'),
             'IN_TRANSIT' => tr('En livraison'),
             'DELIVERED' => tr('Livré'),
-            'CANCELLED' => tr('Annulée'),
+            'CANCELLED' => (_delivery?['cancelReason']?.toString().trim().isNotEmpty ?? false)
+                ? trf('Annulée — motif : {reason}', {'reason': _delivery!['cancelReason'].toString().trim()})
+                : tr('Annulée'),
             _ => tr('En cours'),
           };
     if (deliveryIsPaid(_delivery)) return trf('{base} · Payée', {'base': base});
@@ -316,6 +318,8 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
     return rated == true;
   }
 
+  bool _ratedOrAsked = false;
+
   bool get _paymentDue => deliveryPaymentDue(_delivery);
 
   bool get _escrowPaymentDue => deliveryEscrowPaymentDue(_delivery);
@@ -360,8 +364,11 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
     final status = _delivery?['status']?.toString();
     final delivered = status == 'DELIVERED';
 
-    if (delivered && _delivery?['rated'] != true && !_ratingInProgress) {
+    // The refresh (polling) replaces _delivery without the « rated » flag: remember it here,
+    // and ask only once per screen, so the rating window does not come back after rating.
+    if (delivered && _delivery?['rated'] != true && !_ratedOrAsked && !_ratingInProgress) {
       _ratingInProgress = true;
+      _ratedOrAsked = true;
       final rated = await _showFoodRatingPrompt();
       _ratingInProgress = false;
       if (rated && mounted) {

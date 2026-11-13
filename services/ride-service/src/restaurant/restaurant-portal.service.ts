@@ -453,7 +453,7 @@ export class RestaurantPortalService {
         () => undefined,
       );
     }
-    await this.publishStatus(updated, DeliveryStatus.CANCELLED);
+    await this.publishStatus(updated, DeliveryStatus.CANCELLED, reason?.trim() || 'Refus du partenaire');
     return { order: this.formatOrder(updated), delivery: withoutReceiptPin(formatParcelDelivery(updated)) };
   }
 
@@ -1094,12 +1094,14 @@ export class RestaurantPortalService {
   private async publishStatus(
     delivery: { id: string; userId: string; type: DeliveryType; restaurant?: { name: string; ownerUserId?: string | null } | null },
     status: DeliveryStatus,
+    reason?: string,
   ) {
     await this.redis.publish(MOVA_EVENTS.DELIVERY_STATUS_UPDATED, {
       deliveryId: delivery.id,
       userId: delivery.userId,
       type: delivery.type,
       status,
+      reason,
       restaurantName: delivery.restaurant?.name,
       restaurantOwnerUserId: delivery.restaurant?.ownerUserId ?? undefined,
     });

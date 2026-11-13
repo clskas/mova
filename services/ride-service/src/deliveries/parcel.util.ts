@@ -392,6 +392,12 @@ export function formatParcelDelivery(
     paymentReady,
     restaurant: delivery.restaurant ? { id: delivery.restaurant.id, name: delivery.restaurant.name, cuisine: delivery.restaurant.cuisine } : undefined,
     createdAt: delivery.createdAt.toISOString(),
+    // Why it was cancelled (the partner's refusal reason), for the customer's screen.
+    cancelReason:
+      delivery.status === 'CANCELLED'
+        ? ((([...(delivery.events ?? [])].reverse().find((e) => e.event === 'CANCELLED')?.metadata as { reason?: string } | null)
+            ?.reason ?? null) as string | null)
+        : null,
     deliveryPin: delivery.deliveryPin ?? null,
     guaranteed,
     escrowReady,

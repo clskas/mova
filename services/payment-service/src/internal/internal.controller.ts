@@ -161,6 +161,11 @@ export class InternalController {
     return this.wallet.listTransactionsAdmin(Number(skip ?? 0), Number(take ?? 50), userId, kind);
   }
 
+  @Post('wallets/:userId/write-off-deleted')
+  writeOffDeleted(@Param('userId') userId: string, @Body() body: { reason?: string }) {
+    return this.wallet.writeOffDeletedUser(userId, String(body?.reason ?? ''));
+  }
+
   @Post('wallets/:userId/adjust')
   adjust(@Param('userId') userId: string, @Body() dto: AdminAdjustDto) {
     return this.wallet.adminAdjust(userId, dto.amountCdf, dto.type, dto.description);

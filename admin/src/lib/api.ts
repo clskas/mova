@@ -2193,6 +2193,13 @@ export async function fetchWalletTransactions(
   return apiFetch<WalletTransactionsPage>(`/api/admin/wallet/transactions?${params}`);
 }
 
+export async function writeOffDeletedWallet(userId: string, reason: string) {
+  return apiFetch<{ message?: string; amountCdf?: number; balanceCdf?: number }>(
+    `/api/admin/wallet/${userId}/write-off-deleted`,
+    { method: "POST", body: JSON.stringify({ reason }) },
+  );
+}
+
 export async function adjustWallet(
   userId: string,
   data: { amountCdf: number; type: "CREDIT" | "DEBIT"; description: string },
@@ -3337,6 +3344,9 @@ export type UserWalletDetail = {
   userId: string;
   userName?: string;
   balanceCdf?: number;
+  /** Frozen part (e.g. deleted account). */
+  heldBalanceCdf?: number;
+  transactions?: Array<{ type?: string; reference?: string | null }>;
   currency?: string;
   transactionCount?: number;
 };

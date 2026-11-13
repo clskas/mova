@@ -2328,6 +2328,13 @@ export class AdminService {
       },
     );
   }
+  writeOffDeletedWallet(userId: string, reason: string) {
+    return this.proxy('payment', `/internal/wallets/${userId}/write-off-deleted`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
   adjustWallet(userId: string, body: { amountCdf: number; type: 'CREDIT' | 'DEBIT'; description: string }) {
     return this.proxy('payment', `/internal/wallets/${userId}/adjust`, { method: 'POST', body: JSON.stringify(body) });
   }

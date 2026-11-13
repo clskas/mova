@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   adjustWallet,
+  writeOffDeletedWallet,
   apiFetch,
   fetchCashDebts,
   fetchDebtPolicy,
@@ -68,7 +69,7 @@ function debtCategoryLabel(category: string) {
 }
 
 export default function PortefeuillePage() {
-  const { canWrite } = useAdmin();
+  const { canWrite, role } = useAdmin();
   const readOnly = !canWrite("portefeuille");
   const [metrics, setMetrics] = useState<AdminMetrics>({});
   const [wallet, setWallet] = useState<WalletOverview>({});
@@ -457,6 +458,32 @@ Cette opération est enregistrée à votre nom dans le journal d'audit.`,
       await load();
     } catch (e) {
       setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec ajustement"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** Frozen balance of a deleted account (hold DELETED_USER). */
+  const deletedFrozen =
+    (userWalletDetail?.transactions ?? []).some((t) => (t.reference ?? "").startsWith("DELETED_USER:")) &&
+    (userWalletDetail?.balanceCdf ?? 0) > 0;
+
+  async function submitWriteOff() {
+    if (!activeUserId || !deletedFrozen) return;
+    const amount = userWalletDetail?.balanceCdf ?? 0;
+    const reason = window.prompt(
+      `Solder ${formatCdf(amount)} gelés sur ce compte supprimé ? Le montant sort du passif utilisateurs (rien n'est effacé, l'opération reste dans l'historique).\n\nMotif :`,
+      "Compte de test",
+    );
+    if (reason === null) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await writeOffDeletedWallet(activeUserId, reason.trim() || "Compte de test");
+      await loadUserWalletDetail(activeUserId);
+      await load();
+    } catch (e) {
+      setError(sanitizeAdminError(e instanceof Error ? e.message : "Échec"));
     } finally {
       setSaving(false);
     }
@@ -870,6 +897,22 @@ L'argent part réellement. Opération enregistrée à votre nom.`,
                   {withdrawing ? "Retrait en cours…" : "Initier le retrait"}
                 </BtnPrimary>
               </Card>
+
+              {deletedFrozen && (
+                <Card className="p-5 space-y-3">
+                  <h2 className="font-semibold">Compte supprimé — solde gelé</h2>
+                  <p className="text-sm text-gray-600">
+                    Ce compte a été supprimé : {formatCdf(userWalletDetail?.balanceCdf ?? 0)} restent gelés et comptent
+                    dans le passif utilisateurs. Si personne ne les réclamera (compte de test…), soldez-les.
+                    {role !== "SUPER_ADMIN" && " Réservé au super administrateur."}
+                  </p>
+                  {role === "SUPER_ADMIN" && (
+                    <BtnPrimary onClick={submitWriteOff} disabled={saving}>
+                      {saving ? "En cours…" : "Solder le compte supprimé"}
+                    </BtnPrimary>
+                  )}
+                </Card>
+              )}
 
               <Card className="p-5 space-y-4">
                 <h2 className="font-semibold">Ajustement manuel</h2>

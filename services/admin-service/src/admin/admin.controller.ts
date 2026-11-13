@@ -1608,6 +1608,20 @@ export class AdminController {
     return this.adminService.getWallet(userId);
   }
 
+  @Post('wallet/:userId/write-off-deleted')
+  @RequirePermissions(AdminPermission.WALLETS_WRITE)
+  @ApiOperation({ summary: 'Solder le portefeuille gelé d’un compte supprimé — SuperAdmin' })
+  writeOffDeletedWallet(
+    @Request() req: { user: AdminJwtUser },
+    @Param('userId') userId: string,
+    @Body() body: { reason?: string },
+  ) {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Seul le super administrateur peut solder un compte supprimé.');
+    }
+    return this.adminService.writeOffDeletedWallet(userId, String(body?.reason ?? ''));
+  }
+
   @Post('wallet/:userId/adjust')
   @RequirePermissions(AdminPermission.WALLETS_WRITE)
   @ApiOperation({ summary: 'Ajustement manuel portefeuille (ops / urgence)' })

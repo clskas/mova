@@ -1466,6 +1466,45 @@ export class WalletService {
     };
   }
 
+  /**
+   * Deleted account: its balance was frozen (hold DELETED_USER) and could not be debited.
+   * Super admin writes it off: the hold is released, then the whole balance is debited
+   * (test accounts, or a balance nobody will claim). Idempotent.
+   */
+  async writeOffDeletedUser(userId: string, reason: string) {
+    const ref = `DELETED_USER_WRITEOFF:${userId}`;
+    const already = await this.findExistingLedger(ref, 'DEBIT');
+    if (already) {
+      const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+      return { alreadyApplied: true, amountCdf: 0, balanceCdf: wallet?.balanceCdf ?? 0, message: 'Compte déjà soldé.' };
+    }
+    const hold = await this.prisma.walletHold.findUnique({
+      where: { referenceType_referenceId: { referenceType: 'DELETED_USER', referenceId: userId } },
+    });
+    if (!hold) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Ce portefeuille n’appartient pas à un compte supprimé : utilisez l’ajustement manuel.',
+      );
+    }
+    await this.releaseHold('DELETED_USER', userId);
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+    const balance = Math.max(0, (wallet?.balanceCdf ?? 0) - (wallet?.heldBalanceCdf ?? 0));
+    if (balance <= 0) {
+      return { alreadyApplied: false, amountCdf: 0, balanceCdf: wallet?.balanceCdf ?? 0, message: 'Aucun solde à solder.' };
+    }
+    const label = `Compte supprimé soldé — ${reason.trim() || 'décision super admin'}`;
+    const after = await this.debit(userId, balance, label.slice(0, 180), ref);
+    this.logger.warn(`Deleted account written off user=${userId} amount=${balance}`);
+    return {
+      alreadyApplied: false,
+      amountCdf: balance,
+      balanceCdf: after.balanceCdf,
+      message: `Compte supprimé soldé : ${formatCdf(balance)} retirés du passif.`,
+    };
+  }
+
   async adminAdjust(userId: string, amountCdf: number, type: 'CREDIT' | 'DEBIT', description: string) {
     this.assertPositiveIntAmount(amountCdf, 'Ajustement');
     const auditRef = `admin_adjust_${type}_${Date.now()}`;

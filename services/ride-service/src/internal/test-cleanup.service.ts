@@ -13,7 +13,7 @@ export type TestCleanupFilter = {
 
 export type TestCleanupItem = {
   key: string;
-  type: 'RIDE' | 'DELIVERY' | 'ERRAND' | 'MOVING' | 'RENTAL' | 'CARPOOL';
+  type: 'RIDE' | 'DELIVERY' | 'ERRAND' | 'MOVING' | 'RENTAL' | 'CARPOOL' | 'SCHEDULED';
   id: string;
   createdAt: string;
   durationMin: number;
@@ -162,6 +162,37 @@ export class TestCleanupService {
       });
     }
 
+    // Scheduled rides: the real trip is the linked ride (started → completed), the booking itself
+    // is made days before. Without a linked ride the real duration is unknown: left out.
+    const scheduled = await this.prisma.scheduledRide.findMany({
+      where: {
+        status: 'COMPLETED', rideId: { not: null }, ...created, ...notVoided, ...who(['passengerId', 'driverId']),
+      },
+      select: {
+        id: true, createdAt: true, rideId: true, passengerId: true, driverId: true, estimatedPriceCdf: true,
+        pickupAddress: true, dropoffAddress: true,
+      },
+      take,
+    });
+    const linked = scheduled.length
+      ? await this.prisma.ride.findMany({
+          where: { id: { in: scheduled.map((s) => s.rideId!) } },
+          select: { id: true, startedAt: true, completedAt: true, updatedAt: true, finalFareCdf: true },
+        })
+      : [];
+    const linkedById = new Map(linked.map((r) => [r.id, r]));
+    for (const x of scheduled) {
+      const r = linkedById.get(x.rideId!);
+      if (!r) continue;
+      const d = minutes(r.startedAt, r.completedAt ?? r.updatedAt);
+      if (d >= maxMinutes) continue;
+      items.push({
+        key: `SCHEDULED:${x.id}`, type: 'SCHEDULED', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: Math.round(d * 10) / 10,
+        priceCdf: r.finalFareCdf ?? x.estimatedPriceCdf, customerId: x.passengerId, driverId: x.driverId,
+        label: `Planifiée ${x.pickupAddress ?? ''} → ${x.dropoffAddress ?? ''}`, extraIds: [x.rideId!],
+      });
+    }
+
     return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
@@ -203,6 +234,14 @@ export class TestCleanupService {
       else if (i.type === 'MOVING') await this.prisma.movingRequest.update({ ...ids, data: { status: 'CANCELLED', cancelledAt: now, testVoidedAt: now } });
       else if (i.type === 'RENTAL') await this.prisma.rentalInquiry.update({ ...ids, data: { status: 'CLOSED', testVoidedAt: now } });
       else if (i.type === 'CARPOOL') await this.prisma.carpoolTrip.update({ ...ids, data: { status: 'CANCELLED', testVoidedAt: now } });
+      else if (i.type === 'SCHEDULED') {
+        await this.prisma.scheduledRide.update({ ...ids, data: { status: 'CANCELLED', cancelledAt: now, cancelReason: reason, testVoidedAt: now } });
+        // The linked ride carried the trip: out of revenue and stats too.
+        await this.prisma.ride.updateMany({
+          where: { id: { in: i.extraIds }, testVoidedAt: null },
+          data: { status: 'CANCELLED', cancelledAt: now, cancelReason: reason, testVoidedAt: now },
+        });
+      }
     }
     return { count: items.length, money };
   }

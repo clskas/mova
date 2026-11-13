@@ -11,6 +11,7 @@ const TYPE_LABELS: Record<string, string> = {
   MOVING: "Déménagement",
   RENTAL: "Location",
   CARPOOL: "Covoiturage",
+  SCHEDULED: "Course planifiée",
 };
 
 const cdf = (n: number) => `${Math.round(n).toLocaleString("fr-CD")} FC`;
@@ -86,7 +87,7 @@ export default function TestCleanupPage() {
     <div className="max-w-6xl mx-auto space-y-4">
       <PageHeader
         title="Nettoyage des tests"
-        subtitle="Courses et services de test terminés trop vite : annulation comptable (rien n'est effacé). Super admin."
+        subtitle="Courses (taxi, moto, Pool, planifiées), livraisons (colis, repas, express), courses & commissions, déménagements, location et covoiturage de test terminés trop vite : annulation comptable (rien n'est effacé). Super admin."
       />
       {error && <ErrorBanner message={error} />}
       {done && <Card className="border-green-300 bg-green-50 text-green-900">{done}</Card>}

@@ -15,6 +15,7 @@ describe('TestCleanupService', () => {
     movingRequest: { findMany: jest.fn().mockResolvedValue([]) },
     rentalInquiry: { findMany: jest.fn().mockResolvedValue([]) },
     carpoolTrip: { findMany: jest.fn().mockResolvedValue([]) },
+    scheduledRide: { findMany: jest.fn().mockResolvedValue([]) },
   };
   const service = new TestCleanupService(prisma as never);
 
@@ -35,5 +36,17 @@ describe('TestCleanupService', () => {
     expect(res.count).toBe(0);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(prisma.ride.update).not.toHaveBeenCalled();
+  });
+
+  it('also finds scheduled rides, timed on their linked ride', async () => {
+    prisma.scheduledRide.findMany.mockResolvedValueOnce([
+      { id: 's-short', createdAt: at('2026-10-30T08:00:00Z'), rideId: 'r-short', passengerId: 'p', driverId: 'd', estimatedPriceCdf: 7000, pickupAddress: 'A', dropoffAddress: 'B' },
+      { id: 's-real', createdAt: at('2026-10-30T09:00:00Z'), rideId: 'r-real', passengerId: 'p', driverId: 'd', estimatedPriceCdf: 9000, pickupAddress: 'A', dropoffAddress: 'C' },
+    ]);
+    const items = await service.select({ before: '2026-11-05' });
+    const scheduled = items.filter((i) => i.type === 'SCHEDULED');
+    expect(scheduled.map((i) => i.id)).toEqual(['s-short']);
+    expect(scheduled[0]!.extraIds).toEqual(['r-short']);
+    expect(scheduled[0]!.durationMin).toBe(2);
   });
 });

@@ -472,6 +472,8 @@ model ScheduledRide {
   reminderDayBeforeSentAt  DateTime?
   reminderHourBeforeSentAt DateTime?
   autoAssignAttemptedAt    DateTime?
+  /// Voided as a test (accounting reversed, never really happened).
+  testVoidedAt             DateTime?
   createdAt                DateTime            @default(now())
   updatedAt                DateTime            @updatedAt
   volunteers               ScheduledDriverVolunteer[]

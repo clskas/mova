@@ -1,6 +1,7 @@
 import { Body, Controller, Get, NotFoundException, Param, Patch, Post, Query, Request, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { UploadsService } from '../uploads/uploads.service';
+import { VoiceOrderService } from '../geo/voice-order.service';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ScheduledRideStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -30,6 +31,7 @@ export class RidesController {
     private rideChatService: RideChatService,
     private ridePoolService: RidePoolService,
     private uploadsService: UploadsService,
+    private voiceOrder: VoiceOrderService,
   ) {}
 
   @Get(':id/driver-photo')
@@ -39,6 +41,12 @@ export class RidesController {
     if (!source) throw new NotFoundException('Photo indisponible');
     if (source.kind === 'url') return res.redirect(source.url);
     return this.uploadsService.serveUploadedFile('kyc', source.filename, res);
+  }
+
+  @Post('voice-parse')
+  @ApiOperation({ summary: 'Commande vocale : phrase → départ, destination, gamme (le passager confirme ensuite)' })
+  voiceParse(@Body() body: { text?: string; city?: string; lat?: number; lng?: number }) {
+    return this.voiceOrder.parse(body ?? {});
   }
 
   @Post('estimate')

@@ -44,6 +44,8 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 
 **Frais d'annulation (taxi / moto-taxi)** : annuler après le délai gratuit suivant l'acceptation, ou être absent quand le chauffeur est arrivé, entraîne des frais (affichés au moment d'annuler). Ils sont **prélevés sur votre portefeuille** et versés au chauffeur. Si votre solde ne suffit pas, ils seront prélevés avant votre prochaine course : rechargez du montant indiqué.
 
+**Commander à la voix** : sur l'écran Taxi, appuyez sur le micro (« Commander à la voix ») et dites par exemple « une moto pour Limete, 7e rue » ou « une voiture de Gombe au marché central ». SENGA remplit le départ (votre position si vous ne le dites pas), la destination et la gamme ; si plusieurs lieux correspondent, choisissez le bon. Vérifiez le trajet et le prix, puis confirmez : rien n'est commandé sans votre confirmation. Fonctionne en français ; autorisez le micro la première fois.
+
 ## 2.1 Course Partagée (Pool)
 
 Sur **Taxi** (voiture uniquement, pas moto), activez le bascule **Partagé (Pool)** avant de confirmer.

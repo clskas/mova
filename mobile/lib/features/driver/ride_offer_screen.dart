@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/config/client_apps_config.dart';
 import '../../core/api/api_client.dart';
+import '../../core/voice/voice_command_button.dart';
 import '../../core/config/market_config.dart';
 import '../../core/error/result.dart';
 import '../../core/geo/geo_utils.dart';
@@ -221,6 +222,16 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
         }
         setState(() => _error = msg);
     }
+  }
+
+  Future<void> _onOfferVoice(String text) async {
+    final intent = parseDriverVoiceIntent(text);
+    if (intent == DriverVoiceIntent.accept) return _accept();
+    if (intent == DriverVoiceIntent.reject) return _reject();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(trf('Commande non reconnue : « {text} ». Dites « accepter » ou « refuser ».', {'text': text}))),
+    );
   }
 
   Future<void> _reject() async {
@@ -510,6 +521,20 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               child: Column(
                 children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      VoiceCommandButton(
+                        onText: _onOfferVoice,
+                        color: Colors.white,
+                        hint: tr('Dites « accepter » ou « refuser »'),
+                      ),
+                      Text(
+                        tr('Répondre à la voix'),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                      ),
+                    ],
+                  ),
                   SizedBox(
                     width: double.infinity,
                     child: MovaButton(

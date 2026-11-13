@@ -48,6 +48,8 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>SENGA reconnaît votre voix pour commander une course ou piloter la course sans les mains.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>SENGA utilise le micro pour les appels vocaux entre client, livreur et partenaire.</string>
 	<key>NSCameraUsageDescription</key>

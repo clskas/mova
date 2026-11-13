@@ -14,6 +14,7 @@ import '../../core/billing/driver_earnings_display.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/cache/profile_cache.dart';
 import '../../core/api/api_client.dart';
+import '../../core/voice/voice_command_button.dart';
 import '../../core/api/ride_socket.dart';
 import '../../core/auth/session.dart';
 import '../../core/offline/connectivity_service.dart';
@@ -1395,6 +1396,22 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
     }
   }
 
+  Future<void> _onDriverHomeVoice(String text) async {
+    final intent = parseDriverVoiceIntent(text);
+    if (intent == DriverVoiceIntent.online && !_available) return _toggleAvailability(true);
+    if (intent == DriverVoiceIntent.offline && _available) return _toggleAvailability(false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          intent == DriverVoiceIntent.online || intent == DriverVoiceIntent.offline
+              ? (_available ? tr('Vous êtes déjà en ligne.') : tr('Vous êtes déjà hors ligne.'))
+              : trf('Commande non reconnue : « {text} ». Dites « en ligne » ou « hors ligne ».', {'text': text}),
+        ),
+      ),
+    );
+  }
+
   Future<void> _toggleAvailability(bool value) async {
     setState(() => _availabilityError = null);
     String? locationWarning;
@@ -1529,6 +1546,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       title: 'SENGA Driver',
       scrollable: false,
       actions: [
+        VoiceCommandButton(
+          onText: _onDriverHomeVoice,
+          color: Colors.white,
+          hint: tr('Dites « en ligne » ou « hors ligne »'),
+        ),
         const NotificationsBellButton(),
         sosAppBarButton(
           icon: Icons.sos,

@@ -78,6 +78,24 @@ export class PricingService {
     return 1.0;
   }
 
+  /**
+   * Waiting at the pickup: after the free minutes, each minute is charged at the range's price
+   * per minute (city rule), up to the ceiling. 0 when switched off.
+   */
+  async waitFee(vehicleType: VehicleType, city: string, arrivedAt: Date, startedAt: Date) {
+    const p = this.platformConfig.get().pricing;
+    const waitedMin = Math.max(0, Math.floor((startedAt.getTime() - arrivedAt.getTime()) / 60000));
+    const chargedMin = p.waitFeeEnabled
+      ? Math.min(Math.max(0, waitedMin - p.waitFreeMinutes), p.waitMaxChargedMinutes)
+      : 0;
+    if (chargedMin <= 0) return { waitedMin, chargedMin: 0, feeCdf: 0 };
+    const rule =
+      (await this.prisma.pricingRule.findUnique({ where: { vehicleType_city: { vehicleType, city } } })) ??
+      (await this.prisma.pricingRule.findFirst({ where: { vehicleType }, orderBy: { city: 'asc' } }));
+    const perMin = rule?.perMinuteCdf ?? 0;
+    return { waitedMin, chargedMin, feeCdf: chargedMin * perMin };
+  }
+
   haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;

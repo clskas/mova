@@ -34,6 +34,7 @@ import { parseOrderPlacedMetadata, computeFoodSettlementPools, applyOwnCourierRo
 import { deliveryDriverGross } from '../deliveries/delivery-driver-gross.util';
 import { computeRentalPartnerDisplay } from '../billing/partner-display.util';
 import { PricingService } from './pricing.service';
+import { DemandSurgeService } from './demand-surge.service';
 import { CommissionService } from './commission.service';
 import { MatchingService } from '../matching/matching.service';
 import { computeDriverEta } from '../matching/eta.util';
@@ -97,6 +98,7 @@ export class RidesService {
     private platformConfig: PlatformConfigService,
     private ridePool: RidePoolService,
     private clientApps?: ClientAppsConfigService,
+    private demandSurge?: DemandSurgeService,
   ) {}
 
   /** « Nombre de passagers » is live only while the admin switch is on. */
@@ -144,6 +146,26 @@ export class RidesService {
       route.durationMin ?? estimateTripDurationMin(distanceKm, this.platformConfig.get().trip.averageSpeedKmh.ride);
     const fare = await this.pricing.estimateFare(vehicleType, distanceKm, etaMinutes, pickupArea.name);
     let base = this.pricing.withInterCitySurcharge(fare, isInterCity, distanceKm);
+    // Demand surge (many waiting passengers, few free drivers), capped with peak / night.
+    const surge = (await this.demandSurge?.multiplier(pickupLat, pickupLng, vehicleType)) ?? { level: 0, multiplier: 1 };
+    const timeMultiplier = Math.max(1, Number(base.surchargeMultiplier) || 1);
+    const demandMultiplier =
+      surge.multiplier > 1
+        ? Math.max(1, Math.min(surge.multiplier, this.platformConfig.get().pricing.maxTotalMultiplier / timeMultiplier))
+        : 1;
+    if (demandMultiplier > 1) {
+      const surged = Math.ceil(base.totalCdf * demandMultiplier);
+      base = {
+        ...base,
+        surchargeCdf: base.surchargeCdf + (surged - base.totalCdf),
+        totalCdf: surged,
+        estimatedFareCdf: surged,
+        estimatedPriceCdf: surged,
+        totalFormatted: formatCdf(surged),
+        formatted: formatCdf(surged),
+      };
+    }
+    const surchargeLabel = this.surchargeLabel(timeMultiplier, demandMultiplier);
     // Aller-retour immédiat : tarif ≈ 2× A→B (même distance/temps × 2), avant promo.
     if (roundTrip) {
       distanceKm = Math.round(distanceKm * 2 * 100) / 100;
@@ -175,7 +197,20 @@ export class RidesService {
       distanceSource: route.source,
       roundTrip,
       oneWayFareCdf: roundTrip ? Math.round(promoApplied.estimatedPriceCdf / 2) : promoApplied.estimatedPriceCdf,
+      demandMultiplier,
+      demandLevel: demandMultiplier > 1 ? surge.level : 0,
+      // Read by the apps (older ones show `peakHourLabel` when there is no peak hour).
+      surchargeLabel,
+      ...(surchargeLabel ? { peakHourLabel: surchargeLabel } : {}),
     };
+  }
+
+  private surchargeLabel(timeMultiplier: number, demandMultiplier: number): string | null {
+    const pct = (m: number) => Math.round((m - 1) * 100);
+    const parts: string[] = [];
+    if (timeMultiplier > 1) parts.push(`Heure de pointe / nuit (+${pct(timeMultiplier)} %)`);
+    if (demandMultiplier > 1) parts.push(`Forte demande (+${pct(demandMultiplier)} %)`);
+    return parts.length ? parts.join(' · ') : null;
   }
 
   /**
@@ -519,8 +554,12 @@ export class RidesService {
       [RideStatus.IN_PROGRESS]: 'SENGA : votre course est en cours.',
       [RideStatus.COMPLETED]: 'SENGA : course terminée. Merci d\'avoir voyagé avec SENGA.',
     };
-    const message = messages[status];
+    let message = messages[status];
     if (!message) return;
+    const p = this.platformConfig.get().pricing;
+    if (status === RideStatus.DRIVER_ARRIVED && p.waitFeeEnabled && p.waitMaxChargedMinutes > 0) {
+      message += ` Attente gratuite ${p.waitFreeMinutes} min, puis facturée à la minute.`;
+    }
     try {
       await this.redis.publish(MOVA_EVENTS.RIDE_STATUS_SMS, {
         rideId,
@@ -783,7 +822,30 @@ export class RidesService {
     }
 
     const updates: Record<string, unknown> = { status };
-    if (status === RideStatus.IN_PROGRESS) updates.startedAt = new Date();
+    let waitFee: { waitedMin: number; chargedMin: number; feeCdf: number } | null = null;
+    if (status === RideStatus.IN_PROGRESS) {
+      const startedAt = new Date();
+      updates.startedAt = startedAt;
+      // Waiting at the pickup beyond the free minutes is added to the fare (not for Pool).
+      if (ride.status === RideStatus.DRIVER_ARRIVED && !ride.isShared) {
+        const arrived = await this.prisma.rideEvent.findFirst({
+          where: { rideId, event: RideStatus.DRIVER_ARRIVED },
+          orderBy: { createdAt: 'asc' },
+          select: { createdAt: true },
+        });
+        if (arrived) {
+          waitFee = await this.pricing.waitFee(
+            ride.vehicleType,
+            this.pricing.resolveCity(ride.pickupLat, ride.pickupLng),
+            arrived.createdAt,
+            startedAt,
+          );
+          if (waitFee.feeCdf > 0) {
+            updates.finalFareCdf = (ride.finalFareCdf ?? ride.estimatedFareCdf ?? 0) + waitFee.feeCdf;
+          }
+        }
+      }
+    }
     if (status === RideStatus.COMPLETED) {
       updates.completedAt = new Date();
       updates.finalFareCdf = ride.finalFareCdf ?? ride.estimatedFareCdf;
@@ -794,6 +856,11 @@ export class RidesService {
       .update({ where: { id: rideId, status: ride.status }, data: updates })
       .catch((e: unknown) => this.rethrowStaleRide(e));
     await this.prisma.rideEvent.create({ data: { rideId, event: status } });
+    if (waitFee && waitFee.feeCdf > 0) {
+      await this.prisma.rideEvent.create({
+        data: { rideId, event: 'WAIT_FEE', metadata: waitFee },
+      });
+    }
     this.emitStatusChange(rideId, status);
     await this.notifyRideStatusSms(rideId, ride.passengerId, status);
     if (status === RideStatus.COMPLETED) {

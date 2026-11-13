@@ -689,6 +689,14 @@ export type PlatformConfigData = {
     defaultPeakMultiplier: number;
     defaultNightMultiplier: number;
     combinedPeakNightMultiplier: number;
+    waitFeeEnabled?: boolean;
+    waitFreeMinutes?: number;
+    waitMaxChargedMinutes?: number;
+    demandSurgeEnabled?: boolean;
+    demandSurgeMinRequests?: number;
+    demandSurgeMediumMultiplier?: number;
+    demandSurgeHighMultiplier?: number;
+    maxTotalMultiplier?: number;
   };
   carpool: {
     matchRadiusKm: number;

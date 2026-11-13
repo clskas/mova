@@ -45,6 +45,11 @@ La **ville SENGA** sur l'accueil est détectée via GPS à l'ouverture (modifiab
 - **Cash non reçu** : utilisez ce bouton si le client n’a pas remis l’argent. Cela ouvre un **litige**, bloque le passager pour de nouvelles courses, et **annule** l’auto-clôture.
 - Si le passager a déclaré **« J’ai payé en espèces »** (écran de suivi, reçu, ou fenêtre de litige), vérifiez et confirmez **J’ai reçu les espèces** ou maintenez le litige.
 
+## Attente et forte demande (courses taxi / moto)
+
+- **Attente payée** : appuyez sur « Je suis arrivé » dès que vous êtes au point de départ. Après les minutes gratuites (5 par défaut), chaque minute d'attente jusqu'au démarrage est ajoutée au prix de la course (plafond fixé par SENGA) ; vous touchez votre part comme sur le reste de la course.
+- **Forte demande** : quand beaucoup de passagers attendent près d'un endroit et que peu de chauffeurs sont libres, le prix augmente (+20 % ou +40 % par défaut). Restez en ligne dans ces zones : vos gains par course y sont plus élevés.
+
 ## Position GPS pendant les missions
 
 Pendant une course ou une livraison active, l'application envoie automatiquement votre position :

@@ -186,6 +186,28 @@ export class PlatformConfigService implements OnModuleInit {
     if (m.interCity.baseSurchargeCdf < 0 || m.interCity.perKmSurchargeCdf < 0) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Majoration inter-ville invalide.');
     }
+    const p = m.pricing;
+    if (p.waitFreeMinutes < 0 || p.waitFreeMinutes > 30 || p.waitMaxChargedMinutes < 0 || p.waitMaxChargedMinutes > 60) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Attente : minutes gratuites entre 0 et 30, minutes facturées au plus 60.',
+      );
+    }
+    if (
+      p.demandSurgeMediumMultiplier < 1 ||
+      p.demandSurgeHighMultiplier < p.demandSurgeMediumMultiplier ||
+      p.demandSurgeHighMultiplier > 3 ||
+      p.maxTotalMultiplier < 1 ||
+      p.maxTotalMultiplier > 3 ||
+      p.demandSurgeMinRequests < 1
+    ) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.BAD_REQUEST,
+        'Majoration demande : forte ≥ moyenne ≥ 1, au plus ×3 ; plafond total entre 1 et 3 ; au moins 1 demande.',
+      );
+    }
     if (m.matching.initialRadiusKm <= 0 || m.matching.maxRadiusKm < m.matching.initialRadiusKm) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Rayons de dispatch invalides.');
     }

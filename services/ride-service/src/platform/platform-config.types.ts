@@ -54,7 +54,19 @@ export type PlatformConfigOverrides = {
     roadDistanceFactor?: number;
     averageSpeedKmh?: Partial<typeof MARKET_RDC.trip.averageSpeedKmh>;
   };
-  pricing?: Partial<typeof MARKET_RDC.pricing>;
+  pricing?: Partial<{
+    defaultPeakMultiplier: number;
+    defaultNightMultiplier: number;
+    combinedPeakNightMultiplier: number;
+    waitFeeEnabled: boolean;
+    waitFreeMinutes: number;
+    waitMaxChargedMinutes: number;
+    demandSurgeEnabled: boolean;
+    demandSurgeMinRequests: number;
+    demandSurgeMediumMultiplier: number;
+    demandSurgeHighMultiplier: number;
+    maxTotalMultiplier: number;
+  }>;
   carpool?: {
     matchRadiusKm?: number;
     relaxedRadiusMultiplier?: number;
@@ -105,6 +117,14 @@ export type MergedPlatformConfig = {
     defaultPeakMultiplier: number;
     defaultNightMultiplier: number;
     combinedPeakNightMultiplier: number;
+    waitFeeEnabled: boolean;
+    waitFreeMinutes: number;
+    waitMaxChargedMinutes: number;
+    demandSurgeEnabled: boolean;
+    demandSurgeMinRequests: number;
+    demandSurgeMediumMultiplier: number;
+    demandSurgeHighMultiplier: number;
+    maxTotalMultiplier: number;
   };
   carpool: {
     matchRadiusKm: number;

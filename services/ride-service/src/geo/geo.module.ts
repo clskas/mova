@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { GeoController } from './geo.controller';
 import { GeoService } from './geo.service';
+import { VoiceOrderService } from './voice-order.service';
 import { CityActivationService } from './city-activation.service';
 import { GeocodeProvider } from './geocode.provider';
 import { MapboxService } from './mapbox.service';
@@ -15,6 +16,7 @@ import { RoutingService } from './routing.service';
   controllers: [GeoController, PoiSuggestionsController],
   providers: [
     GeoService,
+    VoiceOrderService,
     CityActivationService,
     PoiImportService,
     RoutingService,
@@ -26,6 +28,7 @@ import { RoutingService } from './routing.service';
   ],
   exports: [
     GeoService,
+    VoiceOrderService,
     CityActivationService,
     PoiImportService,
     RoutingService,

@@ -94,6 +94,10 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- Voice commands: the phone's speech recognition service -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
+        </intent>
         <!-- Android 11+ package visibility — Google Sign-In / Play Services -->
         <package android:name="com.google.android.gms"/>
         <intent>

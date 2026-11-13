@@ -104,6 +104,15 @@ Gardez le **GPS activé** et l'application au premier plan pendant la mission.
 3. Vous recevrez des rappels la veille et une heure avant le départ.
 4. Au **démarrage**, une course GPS est ouverte pour le suivi en direct (comme une course taxi classique).
 
+## Commandes vocales (mains sur le volant)
+
+Appuyez sur le micro en haut de l'écran et dites :
+- sur l'accueil : **« en ligne »** ou **« hors ligne »** ;
+- sur une offre : **« accepter »** ou **« refuser »** ;
+- pendant la course : **« je suis arrivé »**, **« démarrer »**, **« terminer »** (une confirmation est demandée), **« itinéraire »**, **« appeler »** (le passager).
+
+Les mots sont reconnus par le téléphone, en français. Si la commande n'est pas comprise, l'app vous indique les mots possibles.
+
 ## Course Pool (partagée)
 
 1. Une offre **Course Pool** arrive comme une course taxi ; le titre indique Pool.

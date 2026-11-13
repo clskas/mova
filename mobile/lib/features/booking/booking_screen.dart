@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../billing/cash_paid_claim_button.dart';
 import '../../core/api/api_client.dart';
+import '../../core/voice/voice_command_button.dart';
 import '../../core/config/test_runtime_config.dart';
 import '../../core/location/destination_coords.dart';
 import '../../core/location/location_service.dart';
@@ -193,6 +194,75 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       'min': kFamilialeMinSeats,
       'max': kFamilialeMaxSeats,
     });
+  }
+
+  /// Voice order: the sentence is understood on the server (places + vehicle), the screen is
+  /// filled in, and the passenger still checks the price and confirms.
+  Future<void> _onVoiceOrder(String text) async {
+    final api = ref.read(apiClientProvider);
+    final result = await api.post('/rides/voice-parse', {
+      'text': text,
+      'city': _autocompleteCity,
+      'lat': _pickup.latitude,
+      'lng': _pickup.longitude,
+    });
+    if (!mounted) return;
+    void say(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+    switch (result) {
+      case Failure(:final error):
+        say(error.message);
+        return;
+      case Success(:final data):
+        if (data['available'] != true) {
+          say(data['message']?.toString() ?? tr('Commande vocale indisponible. Tapez votre destination.'));
+          return;
+        }
+        final vt = data['vehicleType']?.toString() ?? '';
+        if (vt.isNotEmpty) setState(() => _vehicleType = MarketConfig.normalizeVehicleType(vt));
+        final pc = (data['passengerCount'] as num?)?.toInt();
+        if (pc != null && pc > 1 && _passengerCountEnabled) _onPassengerCountChanged(pc.clamp(1, _passengerMax));
+        List<Map<String, dynamic>> list(Object? raw) =>
+            raw is List ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : const [];
+        final pickups = list(data['pickupCandidates']);
+        if (pickups.isNotEmpty) {
+          final p = await _chooseVoicePlace(tr('Départ'), pickups);
+          if (p != null && mounted) _onPickupSuggestionSelected(p);
+        }
+        final dropoffs = list(data['dropoffCandidates']);
+        if (dropoffs.isNotEmpty) {
+          final d = await _chooseVoicePlace(tr('Destination'), dropoffs);
+          if (d != null && mounted) _onDestinationSuggestionSelected(d);
+        }
+        final clarification = data['clarification']?.toString() ?? '';
+        if (clarification.isNotEmpty) {
+          say(clarification);
+        } else if (dropoffs.isNotEmpty) {
+          say(tr('Vérifiez le trajet et le prix, puis confirmez.'));
+        }
+    }
+  }
+
+  Future<Map<String, dynamic>?> _chooseVoicePlace(String title, List<Map<String, dynamic>> places) async {
+    if (places.length == 1) return places.first;
+    return showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(title: Text(trf('{title} : lequel ?', {'title': title}), style: const TextStyle(fontWeight: FontWeight.bold))),
+            ...places.map(
+              (p) => ListTile(
+                leading: const Icon(Icons.place_outlined),
+                title: Text(p['label']?.toString() ?? ''),
+                subtitle: Text(p['address']?.toString() ?? ''),
+                onTap: () => Navigator.pop(ctx, p),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// 5+ passengers move a Standard / Confort / VIP booking to Familiale.
@@ -920,7 +990,26 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 onPressed: _loadingGps ? null : _useMyLocation,
               ),
             ),
-            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Flexible(
+                    child: Text(
+                      tr('Commander à la voix'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: MovaColors.textSecondary, fontSize: 13),
+                    ),
+                  ),
+                  VoiceCommandButton(
+                    onText: _onVoiceOrder,
+                    hint: tr('Dites par exemple : « une moto pour Limete, 7e rue »'),
+                  ),
+                ],
+              ),
+            ),
             GeoAutocompleteField(
               controller: _destinationController,
               api: api,

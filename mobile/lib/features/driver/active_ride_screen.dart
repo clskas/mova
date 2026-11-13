@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/config/client_apps_config.dart';
 import '../../core/api/api_client.dart';
+import '../../core/voice/voice_command_button.dart';
 import '../../core/api/ride_socket.dart';
 import '../../core/config/market_config.dart';
 import '../../core/contact/contact_actions.dart';
@@ -537,6 +538,38 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
           _ => null,
         };
 
+  /// Driver voice: arrived / start / finish / navigation / call. Finishing asks a confirmation.
+  Future<void> _onDriverVoice(String text) async {
+    final intent = parseDriverVoiceIntent(text);
+    void say(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+    final next = _nextStatus();
+    switch (intent) {
+      case DriverVoiceIntent.arrived when next == 'ARRIVING':
+      case DriverVoiceIntent.start when next == 'IN_PROGRESS':
+        await _advanceStatus(next!);
+      case DriverVoiceIntent.finish when next == 'COMPLETED':
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(tr('Terminer la course ?')),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Oui, terminer'))),
+            ],
+          ),
+        );
+        if (ok == true && mounted) await _advanceStatus('COMPLETED');
+      case DriverVoiceIntent.navigate:
+        await _openNavigation(toPickup: _status == 'DRIVER_ASSIGNED' || _status == 'ARRIVING');
+      case DriverVoiceIntent.callPassenger:
+        final passenger = _ride['passenger'];
+        final phone = passenger is Map ? passenger['phone']?.toString() : _ride['passengerPhone']?.toString();
+        showCallWhatsAppSheet(context, phone: phone, peerLabel: tr('le passager'));
+      default:
+        say(trf('Commande non reconnue : « {text} ». Dites : arrivé, démarrer, terminer, itinéraire ou appeler.', {'text': text}));
+    }
+  }
+
   String? _nextStatus() => _isSharedPool
       ? null
       : switch (_status) {
@@ -630,6 +663,12 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
           : (_isSharedPool ? tr('Course Pool') : tr('Course en cours')),
       scrollable: false,
       actions: [
+        if (_status != 'COMPLETED')
+          VoiceCommandButton(
+            onText: _onDriverVoice,
+            color: Colors.white,
+            hint: tr('Dites : arrivé, démarrer, terminer, itinéraire, appeler'),
+          ),
         sosAppBarButton(
           onPressed: ([bool skip = false]) => triggerSosAlert(
             skipConfirm: skip,

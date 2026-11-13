@@ -147,7 +147,7 @@ export function isAiVisionTask(task: unknown): task is AiVisionTask {
 }
 
 /** Text-only tasks (no photos): admin analytics, daily summary, reply drafts. */
-export type AiTextTask = 'ANALYTICS_ANSWER' | 'DAILY_SUMMARY' | 'REPLY_DRAFT' | 'TRANSLATE_CONTENT';
+export type AiTextTask = 'ANALYTICS_ANSWER' | 'DAILY_SUMMARY' | 'REPLY_DRAFT' | 'TRANSLATE_CONTENT' | 'RIDE_VOICE_ORDER';
 
 const DATA_RULES =
   'Réponds uniquement à partir des données fournies ; si elles ne permettent pas de répondre, dis-le et indique quelle donnée manque. ' +
@@ -257,6 +257,35 @@ export const AI_TEXT_TASKS: Record<
         `Textes (JSON clé → texte) : ${JSON.stringify(ctx.texts ?? {}).slice(0, 12000)}`,
       ].join('\n');
     },
+  },
+  RIDE_VOICE_ORDER: {
+    maxTokens: 1500,
+    schema: {
+      type: 'object',
+      properties: {
+        understood: { type: 'boolean', description: 'true si la phrase demande une course taxi / moto' },
+        pickup: { type: 'string', description: 'Lieu de départ dit par le passager, tel quel ; vide si non dit (position actuelle)' },
+        dropoff: { type: 'string', description: 'Destination dite par le passager, telle quelle ; vide si non dite' },
+        vehicleType: {
+          type: 'string',
+          enum: ['MOTO_TAXI', 'TRICYCLE', 'STANDARD', 'COMFORT', 'VIP', 'FAMILIALE', ''],
+          description: 'Gamme demandée ; vide si non dite',
+        },
+        passengerCount: { type: 'integer', description: 'Nombre de passagers dit ; 0 si non dit' },
+        clarification: { type: 'string', description: 'Question courte à poser si la demande est incomplète ou ambiguë ; vide sinon' },
+      },
+      required: ['understood', 'pickup', 'dropoff', 'vehicleType', 'passengerCount', 'clarification'],
+      additionalProperties: false,
+    },
+    prompt: (ctx) =>
+      [
+        'Tu aides SENGA (VTC en RDC) à comprendre une commande vocale de course, transcrite par le téléphone (fautes possibles).',
+        'Extrais le départ, la destination, la gamme et le nombre de passagers. Recopie les lieux tels qu’ils sont dits (quartier, commune, avenue, repère comme « marché central », « rond-point Victoire », « chez Mama X ») sans les inventer ni les compléter.',
+        'Gammes : moto / moto-taxi / wewa → MOTO_TAXI ; tricycle / kéké / bajaj → TRICYCLE ; voiture / taxi → STANDARD ; confort → COMFORT ; VIP → VIP ; grande voiture / familiale / 7 places → FAMILIALE.',
+        'Si le départ n’est pas dit, laisse-le vide (le passager part de sa position). Si la destination manque ou si ce n’est pas une demande de course, mets understood à false et une question courte dans clarification.',
+        `Ville du passager : ${String(ctx.city ?? 'Kinshasa')}.`,
+        `Phrase du passager : ${String(ctx.text ?? '').slice(0, 400)}`,
+      ].join('\n'),
   },
 };
 

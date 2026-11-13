@@ -876,6 +876,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   String? get _peakLabel {
+    // Server label: peak / night and « Forte demande » together.
+    final label = _selectedEstimate?['surchargeLabel']?.toString();
+    if (label != null && label.isNotEmpty) return tr(label);
     final multiplier = (_selectedEstimate?['surchargeMultiplier'] as num?)?.toDouble();
     if (multiplier != null && multiplier > 1.0) {
       final pct = ((multiplier - 1) * 100).round();

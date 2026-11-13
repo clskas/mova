@@ -95,6 +95,17 @@ export const MARKET_RDC = {
     defaultPeakMultiplier: 1.3,
     defaultNightMultiplier: 1.2,
     combinedPeakNightMultiplier: 1.5,
+    /** Waiting at the pickup: free minutes, then the range's price per minute (immediate rides). */
+    waitFeeEnabled: true,
+    waitFreeMinutes: 5,
+    waitMaxChargedMinutes: 20,
+    /** Demand surge: many open requests and few free drivers near the pickup (immediate rides). */
+    demandSurgeEnabled: true,
+    demandSurgeMinRequests: 3,
+    demandSurgeMediumMultiplier: 1.2,
+    demandSurgeHighMultiplier: 1.4,
+    /** Ceiling of time (peak / night) × demand multipliers together. */
+    maxTotalMultiplier: 2,
   },
 
   /** Majoration livraison / course inter-villes (départ et arrivée dans des zones SENGA différentes). */

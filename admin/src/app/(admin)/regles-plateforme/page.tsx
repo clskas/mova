@@ -153,6 +153,14 @@ export default function ReglesPlateformePage() {
   const [peakDefault, setPeakDefault] = useState("");
   const [nightDefault, setNightDefault] = useState("");
   const [combinedPeakNight, setCombinedPeakNight] = useState("");
+  const [waitEnabled, setWaitEnabled] = useState(true);
+  const [waitFree, setWaitFree] = useState("5");
+  const [waitMax, setWaitMax] = useState("20");
+  const [surgeEnabled, setSurgeEnabled] = useState(true);
+  const [surgeMinRequests, setSurgeMinRequests] = useState("3");
+  const [surgeMedium, setSurgeMedium] = useState("1.2");
+  const [surgeHigh, setSurgeHigh] = useState("1.4");
+  const [maxTotalMultiplier, setMaxTotalMultiplier] = useState("2");
   const [carpoolRadius, setCarpoolRadius] = useState("");
   const [poolFareMultiplier, setPoolFareMultiplier] = useState("");
   const [poolMaxPassengers, setPoolMaxPassengers] = useState("");
@@ -203,6 +211,14 @@ export default function ReglesPlateformePage() {
     setPeakDefault(String(c.pricing.defaultPeakMultiplier));
     setNightDefault(String(c.pricing.defaultNightMultiplier));
     setCombinedPeakNight(String(c.pricing.combinedPeakNightMultiplier));
+    setWaitEnabled(c.pricing.waitFeeEnabled !== false);
+    setWaitFree(String(c.pricing.waitFreeMinutes ?? 5));
+    setWaitMax(String(c.pricing.waitMaxChargedMinutes ?? 20));
+    setSurgeEnabled(c.pricing.demandSurgeEnabled !== false);
+    setSurgeMinRequests(String(c.pricing.demandSurgeMinRequests ?? 3));
+    setSurgeMedium(String(c.pricing.demandSurgeMediumMultiplier ?? 1.2));
+    setSurgeHigh(String(c.pricing.demandSurgeHighMultiplier ?? 1.4));
+    setMaxTotalMultiplier(String(c.pricing.maxTotalMultiplier ?? 2));
     setCarpoolRadius(String(c.carpool.matchRadiusKm));
     setPoolFareMultiplier(String(c.carpool.fareMultiplier ?? 0.65));
     setPoolMaxPassengers(String(c.carpool.maxPassengers ?? 3));
@@ -653,6 +669,62 @@ export default function ReglesPlateformePage() {
                     {savingSection === "scheduled" ? "…" : "Enregistrer planifiées"}
                   </BtnPrimary>
                 </div>
+              )}
+            </Card>
+          </section>
+
+          <section>
+            <h2 className="font-semibold text-[#1A1A2E] mb-3">Attente au départ et forte demande (courses immédiates)</h2>
+            <Card className="p-4 space-y-4">
+              <p className="text-sm text-gray-600">
+                <strong>Attente</strong> : quand le chauffeur est arrivé, les premières minutes sont gratuites, puis
+                chaque minute est facturée au prix par minute de la gamme (Tarifs), jusqu&apos;au plafond. Ajouté au
+                prix au démarrage de la course ; le passager est prévenu par SMS à l&apos;arrivée du chauffeur.
+              </p>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={waitEnabled} disabled={readOnly} onChange={(e) => setWaitEnabled(e.target.checked)} />
+                <span>Facturer l&apos;attente</span>
+              </label>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <NumField label="Minutes gratuites (0–30)" value={waitFree} onChange={setWaitFree} disabled={readOnly || !waitEnabled} />
+                <NumField label="Minutes facturées au plus (0–60)" value={waitMax} onChange={setWaitMax} disabled={readOnly || !waitEnabled} />
+              </div>
+              <p className="text-sm text-gray-600">
+                <strong>Forte demande</strong> : quand beaucoup de passagers attendent un chauffeur près du départ
+                (10 dernières minutes, ~3 km) et que peu de chauffeurs sont libres, le prix augmente : « moyenne » si
+                il y a autant de demandes que de chauffeurs libres, « forte » s&apos;il y en a deux fois plus. Le
+                passager voit « Forte demande » avant de commander. Le plafond limite pointe/nuit × demande ensemble.
+              </p>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={surgeEnabled} disabled={readOnly} onChange={(e) => setSurgeEnabled(e.target.checked)} />
+                <span>Majoration selon la demande</span>
+              </label>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <NumField label="Demandes minimum" value={surgeMinRequests} onChange={setSurgeMinRequests} disabled={readOnly || !surgeEnabled} />
+                <NumField label="Demande moyenne (×)" value={surgeMedium} onChange={setSurgeMedium} step="0.05" disabled={readOnly || !surgeEnabled} />
+                <NumField label="Forte demande (×)" value={surgeHigh} onChange={setSurgeHigh} step="0.05" disabled={readOnly || !surgeEnabled} />
+                <NumField label="Plafond total (×)" value={maxTotalMultiplier} onChange={setMaxTotalMultiplier} step="0.1" disabled={readOnly} />
+              </div>
+              {!readOnly && (
+                <BtnPrimary
+                  disabled={savingSection === "waitSurge"}
+                  onClick={() =>
+                    savePlatform("waitSurge", {
+                      pricing: {
+                        waitFeeEnabled: waitEnabled,
+                        waitFreeMinutes: Number(waitFree),
+                        waitMaxChargedMinutes: Number(waitMax),
+                        demandSurgeEnabled: surgeEnabled,
+                        demandSurgeMinRequests: Number(surgeMinRequests),
+                        demandSurgeMediumMultiplier: Number(surgeMedium),
+                        demandSurgeHighMultiplier: Number(surgeHigh),
+                        maxTotalMultiplier: Number(maxTotalMultiplier),
+                      },
+                    })
+                  }
+                >
+                  {savingSection === "waitSurge" ? "…" : "Enregistrer attente et demande"}
+                </BtnPrimary>
               )}
             </Card>
           </section>

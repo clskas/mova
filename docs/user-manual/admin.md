@@ -50,7 +50,7 @@ Source technique : `admin/src/lib/rbac.ts`.
 | **Déménagements** | Demandes passagers — proposées automatiquement aux chauffeurs utilitaire/camion éligibles ; assignation manuelle, statut et annulation |
 | **Covoiturage** | Trajets publiés — statut et annulation |
 | **Litiges** | Gestion des incidents ; **Brouillon de réponse (IA)** à relire puis copier (rien n'est envoyé automatiquement) |
-| **Tarifs** | Grilles, majorations, commissions plateforme, codes promo |
+| **Tarifs** | Grilles, majorations, commissions plateforme, codes promo. **Règles plateforme → Attente au départ et forte demande** : minutes gratuites et plafond de l'attente facturée ; majoration selon la demande (moyenne / forte, nombre minimum de demandes, plafond total avec pointe et nuit) |
 | **Abonnements** | Offres abonnement passagers |
 | **Portefeuille** | Soldes et opérations wallet |
 | **Communes** | Zones de service par ville |

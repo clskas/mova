@@ -42,6 +42,10 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 7. Sous la carte, utilisez les **filtres POI** (Marchés, Hôpitaux, Universités, Pharmacies) pour afficher les points d'intérêt à proximité.
 8. L'autocomplétion de destination inclut les **lieux SENGA** (marchés, hôpitaux, etc.) en plus des communes.
 
+**Attente du chauffeur** : quand votre chauffeur est arrivé, les **5 premières minutes d'attente sont gratuites** (vous recevez un SMS). Au-delà, chaque minute est ajoutée au prix de la course, au tarif par minute de la gamme, avec un plafond (20 minutes facturées au plus). Soyez prêt quand le chauffeur arrive !
+
+**Forte demande** : quand beaucoup de passagers cherchent un chauffeur au même endroit et que peu de chauffeurs sont libres, le prix peut augmenter (par exemple +20 % ou +40 %). L'app affiche **« Forte demande »** avec le pourcentage **avant** que vous commandiez : vous pouvez attendre quelques minutes ou choisir une autre gamme.
+
 **Frais d'annulation (taxi / moto-taxi)** : annuler après le délai gratuit suivant l'acceptation, ou être absent quand le chauffeur est arrivé, entraîne des frais (affichés au moment d'annuler). Ils sont **prélevés sur votre portefeuille** et versés au chauffeur. Si votre solde ne suffit pas, ils seront prélevés avant votre prochaine course : rechargez du montant indiqué.
 
 **Commander à la voix** : sur l'écran Taxi, appuyez sur le micro (« Commander à la voix ») et dites par exemple « une moto pour Limete, 7e rue » ou « une voiture de Gombe au marché central ». SENGA remplit le départ (votre position si vous ne le dites pas), la destination et la gamme ; si plusieurs lieux correspondent, choisissez le bon. Vérifiez le trajet et le prix, puis confirmez : rien n'est commandé sans votre confirmation. Fonctionne en français ; autorisez le micro la première fois.

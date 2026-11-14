@@ -214,7 +214,10 @@ export class AutoPayoutController {
   }
 
   @Post()
-  async set(@Request() req: { user: { id: string } }, @Body() body: { enabled?: boolean; provider?: string }) {
+  async set(@Request() req: { user: { id: string; role?: string } }, @Body() body: { enabled?: boolean; provider?: string }) {
+    if (String(req.user.role ?? '').toUpperCase() !== 'DRIVER') {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Réservé aux chauffeurs et livreurs.');
+    }
     const cfg = (await fetchAutomations()).autoPayouts;
     if (!cfg.enabled) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Le paiement automatique n’est pas activé.');
     const provider = String(body?.provider ?? '').toUpperCase();

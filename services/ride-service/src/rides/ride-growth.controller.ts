@@ -77,7 +77,10 @@ export class RideGrowthController {
 
   @Post('driver-destination')
   @ApiOperation({ summary: 'Chauffeur : n’accepter que des courses vers ma destination (3 h)' })
-  async setDestination(@Request() req: { user: { id: string } }, @Body() body: { lat: number; lng: number; label?: string }) {
+  async setDestination(@Request() req: { user: { id: string; role?: string } }, @Body() body: { lat: number; lng: number; label?: string }) {
+    if (String(req.user.role ?? '').toUpperCase() !== 'DRIVER') {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Réservé aux chauffeurs.');
+    }
     const cfg = this.platformConfig.get().automations.driverDestination;
     if (!cfg.enabled) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'La destination chauffeur n’est pas activée.');
     const lat = Number(body?.lat);

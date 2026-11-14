@@ -2089,4 +2089,5 @@ const Map<String, String> kStringsEn = {
   "{v1} a des difficultés en ce moment : utilisez un autre opérateur ou les espèces.": "{v1} is having trouble right now: use another operator or cash.",
   "Paiement automatique chaque semaine": "Automatic weekly payout",
   "Votre solde (dès {v1}) est envoyé sur votre propre numéro Mobile Money.": "Your balance (from {v1}) is sent to your own Mobile Money number.",
+  "Vérifié par l’équipe SENGA sur votre pièce d’identité.": "Checked by the SENGA team on your ID.",
 };

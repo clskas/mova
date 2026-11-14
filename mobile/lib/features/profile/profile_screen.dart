@@ -191,12 +191,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           children: [
                             Text(tr('Genre (facultatif)'), style: const TextStyle(fontWeight: FontWeight.w600)),
                             Text(
-                              tr('Sert seulement à l’option « chauffeure femme ».'),
+                              _profile['role']?.toString().toUpperCase() == 'DRIVER'
+                                  ? tr('Vérifié par l’équipe SENGA sur votre pièce d’identité.')
+                                  : tr('Sert seulement à l’option « chauffeure femme ».'),
                               style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
                             ),
                           ],
                         ),
                       ),
+                      if (_profile['role']?.toString().toUpperCase() == 'DRIVER')
+                        Text(
+                          switch (_profile['gender']?.toString()) {
+                            'F' => tr('Femme'),
+                            'M' => tr('Homme'),
+                            _ => tr('Non précisé'),
+                          },
+                        )
+                      else
                       DropdownButton<String>(
                         value: (_profile['gender'] ?? '').toString(),
                         items: [

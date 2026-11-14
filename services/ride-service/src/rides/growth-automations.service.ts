@@ -216,6 +216,9 @@ export class GrowthAutomationsService {
     for (const r of rides) {
       if (!r.driverId || r.cancelledBy !== r.driverId || !r.acceptedAt || !r.cancelledAt) continue;
       if (r.cancelledAt.getTime() - r.acceptedAt.getTime() < c.waitedMinutes * MIN) continue;
+      // Driver had arrived: the passenger did not show up, no apology credit.
+      const arrived = await this.prisma.rideEvent.count({ where: { rideId: r.id, event: RideStatus.DRIVER_ARRIVED } });
+      if (arrived > 0) continue;
       if (!(await this.once(`auto:comp:${r.id}`, 7 * 24 * 3600))) continue;
       await this.bonus(r.passengerId, c.creditCdf, `Excuses SENGA : course annulée par le chauffeur ${r.id.slice(0, 8)}`, `COMP:${r.id}`);
       await this.tell(r.passengerId, 'Toutes nos excuses', `Votre chauffeur a annulé après votre attente. ${formatCdf(c.creditCdf)} ont été ajoutés à votre portefeuille.`);

@@ -720,10 +720,19 @@ export class RidesService {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.CONFLICT, 'Un chauffeur a déjà accepté : le prix ne peut plus changer.');
     }
     const price = clampProposedFare(ride.listFareCdf, proposedFareCdf, cfg);
-    const updated = await this.prisma.ride.update({
-      where: { id: rideId },
+    // Raise only: drivers may already be looking at the current price.
+    if (price <= (ride.proposedFareCdf ?? ride.estimatedFareCdf ?? 0)) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Le prix ne peut qu’augmenter (ou il a atteint le maximum).');
+    }
+    // Atomic with the accept: only while the ride is still looking for a driver.
+    const changed = await this.prisma.ride.updateMany({
+      where: { id: rideId, status: { in: [RideStatus.REQUESTED, RideStatus.SEARCHING] } },
       data: { proposedFareCdf: price, estimatedFareCdf: price },
     });
+    if (changed.count !== 1) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.CONFLICT, 'Un chauffeur a déjà accepté : le prix ne peut plus changer.');
+    }
+    const updated = await this.prisma.ride.findUniqueOrThrow({ where: { id: rideId } });
     await this.prisma.rideEvent.create({ data: { rideId, event: 'PRICE_PROPOSED', metadata: { proposedFareCdf: price } } });
     return { ...this.formatRideDetail(updated), proposedFareCdf: price };
   }

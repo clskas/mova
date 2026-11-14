@@ -156,6 +156,24 @@ describe('RidesService', () => {
     expect(result.vehicles[0]).not.toHaveProperty('userId');
   });
 
+  it('proposed price: raise only, and only while no driver accepted', async () => {
+    const cfg = (service as unknown as { platformConfig: { get: () => { automations: { priceOffer: unknown } } } }).platformConfig.get();
+    const saved = cfg.automations.priceOffer;
+    cfg.automations.priceOffer = { enabled: true, minPct: 80, maxPct: 150 };
+    try {
+      prisma.ride.findUnique.mockResolvedValue({ id: 'r1', passengerId: 'p1', status: RideStatus.SEARCHING, listFareCdf: 10000, proposedFareCdf: 9000, estimatedFareCdf: 9000 });
+      await expect(service.updateProposedFare('r1', 'p1', 8500)).rejects.toThrow(/augmenter/);
+      const updateMany = jest.fn().mockResolvedValue({ count: 0 });
+      (prisma.ride as unknown as { updateMany: jest.Mock }).updateMany = updateMany;
+      await expect(service.updateProposedFare('r1', 'p1', 9500)).rejects.toThrow(/déjà accepté/);
+      expect(updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'r1', status: { in: [RideStatus.REQUESTED, RideStatus.SEARCHING] } } }),
+      );
+    } finally {
+      cfg.automations.priceOffer = saved;
+    }
+  });
+
   it('transitions to MATCHING on search', async () => {
     prisma.ride.findUnique.mockResolvedValue({
       id: 'ride-1',

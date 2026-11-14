@@ -28,6 +28,8 @@ class UpdateUserAdminDto {
   @IsOptional() managedCity?: string | null;
   @IsOptional() @IsString() homeCity?: string | null;
   @IsOptional() @IsString() avatarUrl?: string | null;
+  /** 'F' | 'M' | '' — drivers: checked by the team on the ID. */
+  @IsOptional() @IsString() gender?: string | null;
   @IsOptional() @IsArray() @IsString({ each: true }) adminPermissions?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) accessLevelIds?: string[];
 }

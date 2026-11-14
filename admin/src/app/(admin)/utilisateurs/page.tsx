@@ -115,6 +115,7 @@ export default function UtilisateursPage() {
   const [editStatus, setEditStatus] = useState("ACTIVE");
   const [editFirst, setEditFirst] = useState("");
   const [editLast, setEditLast] = useState("");
+  const [editGender, setEditGender] = useState("");
   const [editAccessLevels, setEditAccessLevels] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState<AdminUser | null>(null);
@@ -265,6 +266,7 @@ export default function UtilisateursPage() {
     setEditStatus(u.status ?? "ACTIVE");
     setEditFirst(u.firstName ?? "");
     setEditLast(u.lastName ?? "");
+    setEditGender(((u as { gender?: string | null }).gender ?? "") as string);
     setEditManagedCity(u.managedCity ?? "");
     const staffRole = normalizeAdminRole(nextRole);
     if (staffRole) {
@@ -385,6 +387,7 @@ export default function UtilisateursPage() {
         lastName: editLast,
         managedCity: editRole === "CITY_ADMIN" ? editManagedCity.trim() : null,
       };
+      (payload as { gender?: string }).gender = editGender;
       // Never send phone:"" — unique constraint / Prisma 500 on Google-only accounts.
       const phoneTrim = editPhone.trim();
       if (phoneTrim) {
@@ -977,6 +980,14 @@ Votre propre compte et (sauf Super admin) les comptes de l'équipe ne seront pas
             <div className="grid sm:grid-cols-2 gap-4">
               <label><FieldLabel>Prénom</FieldLabel><TextInput value={editFirst} onChange={setEditFirst} disabled={readOnly} /></label>
               <label><FieldLabel>Nom</FieldLabel><TextInput value={editLast} onChange={setEditLast} disabled={readOnly} /></label>
+              <label>
+                <FieldLabel>Genre (chauffeurs : vérifié sur la pièce)</FieldLabel>
+                <select className="w-full rounded border px-2 py-1.5 text-sm" value={editGender} onChange={(e) => setEditGender(e.target.value)} disabled={readOnly}>
+                  <option value="">Non précisé</option>
+                  <option value="F">Femme</option>
+                  <option value="M">Homme</option>
+                </select>
+              </label>
               <label><FieldLabel>Téléphone</FieldLabel><TextInput value={editPhone} onChange={setEditPhone} disabled={readOnly} /></label>
               <label>
                 <FieldLabel>E-mail</FieldLabel>

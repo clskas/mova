@@ -33,7 +33,14 @@ export class GrowthService {
     const already = await this.prisma.walletTransaction.findFirst({ where: { reference: ref, type: 'DEBIT' } });
     if (already) throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.CONFLICT, 'Vous avez déjà donné un pourboire pour cette course.');
     await this.wallet.debit(userId, amount, `Pourboire chauffeur — course ${rideId.slice(0, 8)}`, ref);
-    await this.wallet.credit(ride.driverId, amount, `Pourboire reçu — course ${rideId.slice(0, 8)}`, ref);
+    try {
+      await this.wallet.credit(ride.driverId, amount, `Pourboire reçu — course ${rideId.slice(0, 8)}`, ref);
+    } catch (e) {
+      // Never keep the passenger's money if the driver could not be paid.
+      await this.wallet.credit(userId, amount, `Pourboire remboursé — course ${rideId.slice(0, 8)}`, `TIP_REFUND:${rideId}`);
+      this.logger.warn(`tip credit failed ${rideId}: ${String(e)}`);
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, HttpStatus.BAD_GATEWAY, 'Pourboire non envoyé : votre argent vous a été rendu.');
+    }
     return { success: true, amountCdf: amount, message: `Merci ! ${formatCdf(amount)} envoyés à votre chauffeur.` };
   }
 
@@ -102,7 +109,16 @@ export class GrowthService {
       }
       await tx.loyaltyEvent.create({ data: { userId, points: -cfg.redeemPoints, reason: 'REDEEM', reference } });
     });
-    await this.wallet.grantPlatformBonus(userId, cfg.redeemValueCdf, `Points de fidélité SENGA (${cfg.redeemPoints} points)`, reference);
+    try {
+      await this.wallet.grantPlatformBonus(userId, cfg.redeemValueCdf, `Points de fidélité SENGA (${cfg.redeemPoints} points)`, reference);
+    } catch (e) {
+      await this.prisma.$transaction([
+        this.prisma.loyaltyAccount.update({ where: { userId }, data: { points: { increment: cfg.redeemPoints } } }),
+        this.prisma.loyaltyEvent.create({ data: { userId, points: cfg.redeemPoints, reason: 'REDEEM_FAILED', reference: `${reference}:back` } }),
+      ]);
+      this.logger.warn(`loyalty redeem failed ${userId}: ${String(e)}`);
+      throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED, HttpStatus.BAD_GATEWAY, 'Échange impossible pour le moment : vos points vous ont été rendus.');
+    }
     return { success: true, creditedCdf: cfg.redeemValueCdf, message: `${formatCdf(cfg.redeemValueCdf)} ajoutés à votre portefeuille.` };
   }
 }

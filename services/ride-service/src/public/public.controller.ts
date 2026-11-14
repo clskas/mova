@@ -1,3 +1,4 @@
+import { PlatformConfigService } from '../platform/platform-config.service';
 import { Controller, Get, Headers, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from '../prisma/prisma.service';
@@ -23,6 +24,7 @@ export class PublicController {
     private clientAppsConfig: ClientAppsConfigService,
     private translations: ContentTranslationService,
     private iosStoreVersions: IosStoreVersionService,
+    private platformConfig: PlatformConfigService,
   ) {}
 
   @Get('app-version')
@@ -49,7 +51,18 @@ export class PublicController {
     summary: 'Config client (visibilité opérateurs MM + mode maintenance par app)',
   })
   getClientConfig() {
-    return this.clientAppsConfig.getPublic();
+    const a = this.platformConfig.get().automations;
+    // Growth switches the apps need (Admin → Automatisations); amounts only, no secrets.
+    return {
+      ...this.clientAppsConfig.getPublic(),
+      growth: {
+        priceOffer: a.priceOffer,
+        tips: a.tips,
+        favoriteDrivers: { enabled: a.favoriteDrivers.enabled },
+        womenPreference: a.womenPreference,
+        loyalty: a.loyalty,
+      },
+    };
   }
 
   @Get('cgu')

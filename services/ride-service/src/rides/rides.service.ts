@@ -29,6 +29,8 @@ import {
   fetchActivePlan,
   filterDriversForCustomer,
   fetchDemoAccountIds,
+  clampProposedFare,
+  favoriteDriversFirst,
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -49,7 +51,7 @@ import { tripDistanceKm } from '../common/geo.util';
 import { RoutingService } from '../geo/routing.service';
 import { assertDriverCanReceiveJobs, assertDriverEligibleForRide, assertNotOwnRequest, driverAcceptsRides, driverFitsRideGroup, driverApprovedVehicleTypes, driverCanReceiveJobs, fetchDriverProfileSnapshot, filterDriversAcceptingRides } from '../common/driver-eligibility.util';
 import { fetchDriverDebtStatus, filterDriversNotDebtBlocked } from '../common/driver-debt.util';
-import { fetchAuthUserBrief } from '../common/internal-lookup.util';
+import { fetchUserGenders, fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { TripShareService } from '../share/trip-share.service';
 import { publishDriverJobAlert, publishDriverJobStop } from '../common/driver-job-alert.util';
 import {
@@ -304,6 +306,8 @@ export class RidesService {
       promoCode?: string;
       roundTrip?: boolean;
       passengerCount?: number;
+      proposedFareCdf?: number;
+      womenDriverOnly?: boolean;
     },
   ) {
     const active = await this.prisma.ride.findFirst({
@@ -344,6 +348,14 @@ export class RidesService {
       passengerId,
     );
     const distanceKm = estimate.distanceKm;
+    const automations = this.platformConfig.get().automations;
+    // Price proposed by the passenger, kept between the admin bounds (Automatisations → Prix proposé).
+    const proposedFareCdf =
+      automations.priceOffer.enabled && data.proposedFareCdf
+        ? clampProposedFare(estimate.totalCdf, data.proposedFareCdf, automations.priceOffer)
+        : null;
+    const womenDriverOnly =
+      data.womenDriverOnly === true && automations.womenPreference.enabled && (await this.isWomanUser(passengerId));
     const ride = await this.prisma.ride.create({
       data: {
         passengerId,
@@ -355,7 +367,10 @@ export class RidesService {
         dropoffLat: data.dropoffLat,
         dropoffLng: data.dropoffLng,
         dropoffAddress: data.dropoffAddress,
-        estimatedFareCdf: estimate.totalCdf,
+        estimatedFareCdf: proposedFareCdf ?? estimate.totalCdf,
+        proposedFareCdf,
+        listFareCdf: proposedFareCdf != null ? estimate.totalCdf : null,
+        womenDriverOnly,
         promoCode: estimate.promoCode,
         discountCdf: estimate.discountCdf ?? undefined,
         distanceKm,
@@ -374,7 +389,7 @@ export class RidesService {
       rideId: ride.id,
       passengerId,
       vehicleType: data.vehicleType,
-      estimatedFareCdf: estimate.totalCdf,
+      estimatedFareCdf: proposedFareCdf ?? estimate.totalCdf,
     };
     await this.redis.publish(MOVA_EVENTS.RIDE_CREATED, payload);
 
@@ -462,6 +477,8 @@ export class RidesService {
     estimatedFareCdf?: number | null;
     roundTrip?: boolean | null;
     passengerCount?: number | null;
+    proposedFareCdf?: number | null;
+    womenDriverOnly?: boolean | null;
   }) {
     if (ride.status === RideStatus.REQUESTED) {
       await this.prisma.ride.update({ where: { id: ride.id }, data: { status: RideStatus.SEARCHING } });
@@ -477,11 +494,25 @@ export class RidesService {
     // Exclure les chauffeurs déjà en course / livraison / commission (pas de 2ᵉ sonnerie).
     const onDuty = new Set((await this.listOnDutyDriverIds()).driverIds);
     // Store-review demo accounts never meet real customers (and the other way round).
-    const drivers = filterDriversForCustomer(
+    let drivers = filterDriversForCustomer(
       driversRaw.filter((d) => !onDuty.has(d.userId)),
       ride.passengerId ?? '',
       await fetchDemoAccountIds(),
     );
+    const growth = this.platformConfig.get().automations;
+    // Passenger asked for a woman driver: only drivers who declared themselves women.
+    if (ride.womenDriverOnly && growth.womenPreference.enabled && drivers.length) {
+      const genders = await fetchUserGenders(drivers.map((d) => d.userId));
+      drivers = drivers.filter((d) => genders[d.userId] === 'F');
+    }
+    // Favourite drivers get the request first (first rounds only).
+    if (growth.favoriteDrivers.enabled && ride.passengerId && drivers.length) {
+      const favs = await this.prisma.favoriteDriver.findMany({
+        where: { passengerId: ride.passengerId },
+        select: { driverUserId: true },
+      });
+      drivers = favoriteDriversFirst(drivers, new Set(favs.map((f) => f.driverUserId)), attempts, growth.favoriteDrivers.priorityAttempts);
+    }
     await this.prisma.rideEvent.create({
       data: {
         rideId: ride.id,
@@ -496,7 +527,9 @@ export class RidesService {
     });
     if (drivers.length > 0) {
       const pickup = ride.pickupAddress?.trim() || 'près de vous';
-      const fare = ride.estimatedFareCdf != null ? ` · ${ride.estimatedFareCdf} FC` : '';
+      const fare = ride.estimatedFareCdf != null
+        ? ` · ${ride.estimatedFareCdf} FC${ride.proposedFareCdf != null ? ' (prix proposé par le client)' : ''}`
+        : '';
       const ar = ride.roundTrip ? ' · Aller-retour' : '';
       const group = groupSize > 1 ? ` · ${groupSize} passagers` : '';
       let driverUserIds = await filterDriversNotDebtBlocked(drivers.map((d) => d.userId));
@@ -565,6 +598,34 @@ export class RidesService {
       drivers: [],
       matchingWeights: this.platformConfig.get().matching.scoreWeights,
     };
+  }
+
+  private async isWomanUser(userId: string): Promise<boolean> {
+    const g = await fetchUserGenders([userId]);
+    return g[userId] === 'F';
+  }
+
+  /**
+   * The passenger raises (or lowers) the price proposed while no driver has accepted yet.
+   * Bounds: Automatisations → Prix proposé, around the SENGA price.
+   */
+  async updateProposedFare(rideId: string, passengerId: string, proposedFareCdf: number) {
+    const cfg = this.platformConfig.get().automations.priceOffer;
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride || ride.passengerId !== passengerId) throw new MovaHttpException(MovaErrorCode.RIDE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (!cfg.enabled || ride.listFareCdf == null) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Le prix proposé n’est pas activé pour cette course.');
+    }
+    if (ride.status !== RideStatus.REQUESTED && ride.status !== RideStatus.SEARCHING) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.CONFLICT, 'Un chauffeur a déjà accepté : le prix ne peut plus changer.');
+    }
+    const price = clampProposedFare(ride.listFareCdf, proposedFareCdf, cfg);
+    const updated = await this.prisma.ride.update({
+      where: { id: rideId },
+      data: { proposedFareCdf: price, estimatedFareCdf: price },
+    });
+    await this.prisma.rideEvent.create({ data: { rideId, event: 'PRICE_PROPOSED', metadata: { proposedFareCdf: price } } });
+    return { ...this.formatRideDetail(updated), proposedFareCdf: price };
   }
 
   private async notifyRideStatusSms(rideId: string, userId: string, status: RideStatus) {

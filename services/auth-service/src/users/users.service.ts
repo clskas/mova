@@ -470,6 +470,12 @@ export class UsersService {
    * Accounts whose activity is not real customer activity, left out of the reports:
    * store-review demo phones (+2439000000xx), Google Play test robots, and staff accounts.
    */
+  /** Store-review demo accounts only (not staff, who test with real drivers). */
+  async storeReviewDemoIds() {
+    const demo = await this.prisma.user.findMany({ where: { phone: { startsWith: '+2439000000' } }, select: { id: true, phone: true } });
+    return { ids: demo.filter((u) => u.phone && SEED_DEMO_PHONE_RE.test(u.phone)).map((u) => u.id) };
+  }
+
   async reportTestAccountIds() {
     const staffRoles = [
       UserRole.SUPER_ADMIN,

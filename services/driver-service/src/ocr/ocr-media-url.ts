@@ -4,7 +4,11 @@ export function isAllowedOcrMediaHostname(hostname: string, extraHosts: Iterable
   const host = hostname.toLowerCase().replace(/\.$/, '');
   if (!host) return false;
   if (OCR_ALLOWED_HOSTS.has(host)) return true;
-  if (host === 'supabase.co' || host.endsWith('.supabase.co')) return true;
+  if (host === 'supabase.co' || host.endsWith('.supabase.co')) {
+    // Only SENGA's own Supabase project when it is known (security audit), any project otherwise.
+    const own = hostnameFromUrl(process.env.SUPABASE_URL);
+    return !own || host === own;
+  }
   for (const extra of extraHosts) {
     if (extra && extra.toLowerCase() === host) return true;
   }

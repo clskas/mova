@@ -109,6 +109,8 @@ full_ride() {
   RID=$(TOKEN="$PTOKEN" call POST /rides "$TRIP" | field '.id // .ride.id // .data.id') || return 1
   [ -n "$RID" ] || return 1
   echo "full ride $RID"
+  # Dispatch first (the ride must be searching a driver before it can be accepted).
+  TOKEN="$PTOKEN" call POST "/rides/$RID/search" '{}' >/dev/null || true
   TOKEN="$DTOKEN" call POST "/rides/$RID/accept" '{}' >/dev/null || { TOKEN="$PTOKEN" call POST "/rides/$RID/cancel" '{"reason":"journey"}' >/dev/null || true; return 1; }
   for s in ARRIVING IN_PROGRESS COMPLETED; do
     TOKEN="$DTOKEN" call PATCH "/rides/$RID/status" "{\"status\":\"$s\"}" >/dev/null || return 1

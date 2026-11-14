@@ -131,8 +131,8 @@ export class InternalController {
   }
 
   @Get('users/report-test-accounts')
-  reportTestAccounts() {
-    return this.users.reportTestAccountIds();
+  reportTestAccounts(@Query('scope') scope?: string) {
+    return scope === 'demo' ? this.users.storeReviewDemoIds() : this.users.reportTestAccountIds();
   }
 
   @Get('users/play-prelaunch')

@@ -227,3 +227,30 @@ export async function postStaffAlert(alert: {
     /* best effort */
   }
 }
+
+let demoCache: { at: number; ids: Set<string> } | null = null;
+
+/**
+ * Store-review demo accounts (+2439000000xx, code 123456 when ALLOW_TEST_OTP is on), cached
+ * 5 minutes. They must never meet real customers nor take money out (security audit).
+ */
+export async function fetchDemoAccountIds(): Promise<Set<string>> {
+  if (demoCache && Date.now() - demoCache.at < 300_000) return demoCache.ids;
+  try {
+    const res = await fetch(serviceUrl('auth', '/internal/users/report-test-accounts?scope=demo'), {
+      headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      signal: AbortSignal.timeout(4000),
+    });
+    const body = res.ok ? ((await res.json()) as { ids?: string[] }) : { ids: [] };
+    demoCache = { at: Date.now(), ids: new Set(body.ids ?? []) };
+  } catch {
+    demoCache = { at: Date.now(), ids: demoCache?.ids ?? new Set() };
+  }
+  return demoCache.ids;
+}
+
+/** Demo customers only meet demo drivers, real customers never meet them (pure, tested). */
+export function filterDriversForCustomer<T extends { userId: string }>(drivers: T[], customerId: string, demoIds: Set<string>): T[] {
+  const demoCustomer = demoIds.has(customerId);
+  return drivers.filter((d) => demoIds.has(d.userId) === demoCustomer);
+}

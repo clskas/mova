@@ -3718,7 +3718,7 @@ export type TestCleanupPreview = {
   money: { items: TestCleanupMoneyItem[]; platformCommissionCdf?: number };
   unknownAccounts?: string[];
 };
-export type TestCleanupFilter = { before?: string; accounts?: string[]; maxMinutes?: number };
+export type TestCleanupFilter = { before?: string; accounts?: string[]; maxMinutes?: number; includeCancelled?: boolean };
 
 export function previewTestCleanup(filter: TestCleanupFilter) {
   return apiFetch<TestCleanupPreview>("/api/admin/test-cleanup/preview", { method: "POST", body: JSON.stringify(filter) });

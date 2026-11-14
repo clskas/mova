@@ -25,6 +25,7 @@ export default function TestCleanupPage() {
   const [before, setBefore] = useState("");
   const [accounts, setAccounts] = useState("");
   const [maxMinutes, setMaxMinutes] = useState("5");
+  const [includeCancelled, setIncludeCancelled] = useState(false);
   const [preview, setPreview] = useState<TestCleanupPreview | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -35,6 +36,7 @@ export default function TestCleanupPage() {
     before: before.trim() || undefined,
     accounts: accounts.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean),
     maxMinutes: Number(maxMinutes) || 5,
+    includeCancelled,
   });
 
   const runPreview = async () => {
@@ -115,6 +117,13 @@ export default function TestCleanupPage() {
             />
           </label>
         </div>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" checked={includeCancelled} onChange={(e) => setIncludeCancelled(e.target.checked)} />
+          <span>
+            Inclure aussi les <strong>demandes annulées</strong> (quelle que soit leur durée) : elles sortent des rapports
+            (taux d&apos;annulation) et leurs frais d&apos;annulation éventuels sont annulés. Rien n&apos;est effacé.
+          </span>
+        </label>
         <BtnPrimary onClick={runPreview} disabled={busy}>
           {busy ? "…" : "Voir l'aperçu (ne modifie rien)"}
         </BtnPrimary>

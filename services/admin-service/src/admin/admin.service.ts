@@ -790,7 +790,10 @@ export class AdminService {
   }
 
   /** Test rides / services to void in accounting — preview changes nothing. */
-  async testCleanupPreview(actorRole: string, body: { before?: string; accounts?: string[]; maxMinutes?: number }) {
+  async testCleanupPreview(
+    actorRole: string,
+    body: { before?: string; accounts?: string[]; maxMinutes?: number; includeCancelled?: boolean },
+  ) {
     this.assertSuperAdmin(actorRole);
     const accounts = await this.resolveTestAccounts(body.accounts ?? []);
     if ((body.accounts ?? []).length > 0 && accounts.ids.length === 0) {
@@ -798,14 +801,19 @@ export class AdminService {
     }
     const result = await this.proxy('ride', '/internal/test-cleanup/preview', {
       method: 'POST',
-      body: JSON.stringify({ before: body.before, userIds: accounts.ids, maxMinutes: body.maxMinutes }),
+      body: JSON.stringify({
+        before: body.before,
+        userIds: accounts.ids,
+        maxMinutes: body.maxMinutes,
+        includeCancelled: body.includeCancelled === true,
+      }),
     });
     return { ...(result as object), unknownAccounts: accounts.unknown, accountIds: accounts.ids };
   }
 
   async testCleanupApply(
     actorRole: string,
-    body: { before?: string; accounts?: string[]; maxMinutes?: number; confirmKeys?: string[] },
+    body: { before?: string; accounts?: string[]; maxMinutes?: number; includeCancelled?: boolean; confirmKeys?: string[] },
   ) {
     this.assertSuperAdmin(actorRole);
     const accounts = await this.resolveTestAccounts(body.accounts ?? []);
@@ -815,6 +823,7 @@ export class AdminService {
         before: body.before,
         userIds: accounts.ids,
         maxMinutes: body.maxMinutes,
+        includeCancelled: body.includeCancelled === true,
         confirmKeys: body.confirmKeys ?? [],
       }),
     });

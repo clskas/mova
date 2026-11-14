@@ -9,6 +9,8 @@ export type TestCleanupFilter = {
   userIds?: string[];
   /** Real duration below this many minutes (default 5). */
   maxMinutes?: number;
+  /** Also the cancelled requests (no trip, often no money): they only leave the reports. */
+  includeCancelled?: boolean;
 };
 
 export type TestCleanupItem = {
@@ -22,6 +24,8 @@ export type TestCleanupItem = {
   driverId: string | null;
   label: string;
   extraIds: string[];
+  /** Already cancelled: only marked as a test (testVoidedAt), its status stays. */
+  cancelled?: boolean;
 };
 
 const minutes = (from?: Date | null, to?: Date | null) =>
@@ -47,11 +51,11 @@ export class TestCleanupService {
       );
     }
     const maxMinutes = Math.min(30, Math.max(1, Number(f.maxMinutes) || 5));
-    return { before, userIds, maxMinutes };
+    return { before, userIds, maxMinutes, includeCancelled: f.includeCancelled === true };
   }
 
   async select(filter: TestCleanupFilter): Promise<TestCleanupItem[]> {
-    const { before, userIds, maxMinutes } = this.parseFilter(filter);
+    const { before, userIds, maxMinutes, includeCancelled } = this.parseFilter(filter);
     const created = before ? { createdAt: { lte: before } } : {};
     const who = (fields: string[]) =>
       userIds.length ? { OR: fields.map((f) => ({ [f]: { in: userIds } })) } : {};
@@ -81,13 +85,14 @@ export class TestCleanupService {
     const deliveries = await this.prisma.delivery.findMany({
       where: { status: 'DELIVERED', ...created, ...notVoided, ...who(['userId', 'driverId']) },
       select: {
-        id: true, type: true, createdAt: true, pickedUpAt: true, deliveredAt: true, userId: true, driverId: true,
+        id: true, type: true, createdAt: true, pickedUpAt: true, deliveredAt: true, updatedAt: true, userId: true, driverId: true,
         finalPriceCdf: true, estimatedPriceCdf: true, dropoffAddress: true, deliveryAddress: true,
       },
       take,
     });
     for (const x of deliveries) {
-      const d = minutes(x.pickedUpAt ?? x.createdAt, x.deliveredAt);
+      // Delivered without a recorded time (old app, admin action): last update instead.
+      const d = minutes(x.pickedUpAt ?? x.createdAt, x.deliveredAt ?? x.updatedAt);
       if (d >= maxMinutes) continue;
       items.push({
         key: `DELIVERY:${x.id}`, type: 'DELIVERY', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: Math.round(d * 10) / 10,
@@ -193,6 +198,47 @@ export class TestCleanupService {
       });
     }
 
+    if (includeCancelled) {
+      const cancelledWhere = (fields: string[]) => ({ status: 'CANCELLED' as const, ...created, ...notVoided, ...who(fields) });
+      const add = (type: TestCleanupItem['type'], x: { id: string; createdAt: Date }, customerId: string | null, driverId: string | null, priceCdf: number, label: string) =>
+        items.push({
+          key: `${type}:${x.id}`, type, id: x.id, createdAt: x.createdAt.toISOString(), durationMin: 0,
+          priceCdf, customerId, driverId, label: `Annulée — ${label}`.slice(0, 90), extraIds: [], cancelled: true,
+        });
+      const [cRides, cDeliveries, cErrands, cMoves, cScheduled] = await Promise.all([
+        this.prisma.ride.findMany({
+          where: cancelledWhere(['passengerId', 'driverId']),
+          select: { id: true, createdAt: true, passengerId: true, driverId: true, cancellationFeeCdf: true, pickupAddress: true, dropoffAddress: true },
+          take,
+        }),
+        this.prisma.delivery.findMany({
+          where: cancelledWhere(['userId', 'driverId']),
+          select: { id: true, createdAt: true, userId: true, driverId: true, type: true, dropoffAddress: true },
+          take,
+        }),
+        this.prisma.errandOrder.findMany({
+          where: cancelledWhere(['userId', 'driverId']),
+          select: { id: true, createdAt: true, userId: true, driverId: true },
+          take,
+        }),
+        this.prisma.movingRequest.findMany({
+          where: cancelledWhere(['userId', 'driverId']),
+          select: { id: true, createdAt: true, userId: true, driverId: true, pickupAddress: true },
+          take,
+        }),
+        this.prisma.scheduledRide.findMany({
+          where: cancelledWhere(['passengerId', 'driverId']),
+          select: { id: true, createdAt: true, passengerId: true, driverId: true, cancellationFeeCdf: true, pickupAddress: true },
+          take,
+        }),
+      ]);
+      for (const x of cRides) add('RIDE', x, x.passengerId, x.driverId, x.cancellationFeeCdf ?? 0, `${x.pickupAddress ?? ''} → ${x.dropoffAddress ?? ''}`);
+      for (const x of cDeliveries) add('DELIVERY', x, x.userId, x.driverId, 0, `${x.type} · ${x.dropoffAddress ?? ''}`);
+      for (const x of cErrands) add('ERRAND', x, x.userId, x.driverId, 0, 'Courses & commissions');
+      for (const x of cMoves) add('MOVING', x, x.userId, x.driverId, 0, `Déménagement ${x.pickupAddress ?? ''}`);
+      for (const x of cScheduled) add('SCHEDULED', x, x.passengerId, x.driverId, x.cancellationFeeCdf ?? 0, `Planifiée ${x.pickupAddress ?? ''}`);
+    }
+
     return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
@@ -228,6 +274,16 @@ export class TestCleanupService {
     const reason = 'Test annulé en comptabilité (durée < seuil)';
     for (const i of items) {
       const ids = { where: { id: i.id } };
+      if (i.cancelled) {
+        // Already cancelled: only out of the reports (and its cancellation fee reversed above).
+        const mark = { ...ids, data: { testVoidedAt: now } };
+        if (i.type === 'RIDE') await this.prisma.ride.update(mark);
+        else if (i.type === 'DELIVERY') await this.prisma.delivery.update(mark);
+        else if (i.type === 'ERRAND') await this.prisma.errandOrder.update(mark);
+        else if (i.type === 'MOVING') await this.prisma.movingRequest.update(mark);
+        else if (i.type === 'SCHEDULED') await this.prisma.scheduledRide.update(mark);
+        continue;
+      }
       if (i.type === 'RIDE') await this.prisma.ride.update({ ...ids, data: { status: 'CANCELLED', cancelledAt: now, cancelReason: reason, testVoidedAt: now } });
       else if (i.type === 'DELIVERY') await this.prisma.delivery.update({ ...ids, data: { status: 'CANCELLED', cancelledAt: now, testVoidedAt: now } });
       else if (i.type === 'ERRAND') await this.prisma.errandOrder.update({ ...ids, data: { status: 'CANCELLED', cancelledAt: now, testVoidedAt: now } });

@@ -207,7 +207,7 @@ export class AdminController {
   @ApiOperation({ summary: 'Courses / services de test à annuler en comptabilité — aperçu (SUPER_ADMIN)' })
   testCleanupPreview(
     @Request() req: { user: { role: string } },
-    @Body() body: { before?: string; accounts?: string[]; maxMinutes?: number },
+    @Body() body: { before?: string; accounts?: string[]; maxMinutes?: number; includeCancelled?: boolean },
   ) {
     return this.adminService.testCleanupPreview(req.user.role, body ?? {});
   }
@@ -217,7 +217,7 @@ export class AdminController {
   @ApiOperation({ summary: 'Annuler en comptabilité les éléments de test validés (SUPER_ADMIN)' })
   testCleanupApply(
     @Request() req: { user: { role: string } },
-    @Body() body: { before?: string; accounts?: string[]; maxMinutes?: number; confirmKeys?: string[] },
+    @Body() body: { before?: string; accounts?: string[]; maxMinutes?: number; includeCancelled?: boolean; confirmKeys?: string[] },
   ) {
     return this.adminService.testCleanupApply(req.user.role, body ?? {});
   }

@@ -1,3 +1,4 @@
+import '../passenger/passenger_voice_announcer.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -175,8 +176,9 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
   void _goToTracking() {
     PassengerAlertService.notify(
       title: tr('Chauffeur trouvé'),
-      body: 'Votre chauffeur est en route.',
+      body: tr('Votre chauffeur est en route vers vous.'),
     );
+    PassengerVoiceAnnouncer.announce('Votre chauffeur est en route vers vous.');
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(

@@ -11,6 +11,7 @@ import '../../core/offline/connectivity_service.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../passenger/passenger_voice_announcer.dart';
 import 'account_link_card.dart';
 import 'referral_screen.dart';
 
@@ -38,6 +39,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    PassengerVoiceAnnouncer.load();
     _load();
   }
 
@@ -167,6 +169,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const LanguagePickerCard(),
+                const SizedBox(height: 12),
+                MovaCard(
+                  key: const Key('voiceAnnounceToggle'),
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: PassengerVoiceAnnouncer.enabled,
+                    builder: (context, on, _) => SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Icon(Icons.record_voice_over_outlined, color: MovaColors.violet),
+                      title: Text(tr('Annonces vocales'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text(
+                        tr('Une voix annonce les étapes de votre course ou livraison (chauffeur arrivé, course terminée…).'),
+                        style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                      ),
+                      value: on,
+                      onChanged: (v) => PassengerVoiceAnnouncer.setEnabled(v),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 if (_profile.isNotEmpty) ...[
                   AccountLinkCard(profile: _profile, onChanged: _load),

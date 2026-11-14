@@ -1,4 +1,5 @@
-# Security updates of the libraries, grouped so they arrive as one weekly PR per area.
+# Libraries: security fixes only for npm (limit 0 = no routine version PRs; Dependabot security
+# updates still open), and never a major version automatically (they need a tested migration).
 version: 2
 updates:
   - package-ecosystem: npm
@@ -6,7 +7,7 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     groups:
       security:
         applies-to: security-updates
@@ -14,10 +15,16 @@ updates:
   - package-ecosystem: pub
     directory: /mobile
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']

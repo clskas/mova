@@ -26,6 +26,7 @@ export default function TestCleanupPage() {
   const [accounts, setAccounts] = useState("");
   const [maxMinutes, setMaxMinutes] = useState("5");
   const [includeCancelled, setIncludeCancelled] = useState(false);
+  const [anyDuration, setAnyDuration] = useState(false);
   const [preview, setPreview] = useState<TestCleanupPreview | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -37,6 +38,7 @@ export default function TestCleanupPage() {
     accounts: accounts.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean),
     maxMinutes: Number(maxMinutes) || 5,
     includeCancelled,
+    anyDuration,
   });
 
   const runPreview = async () => {
@@ -122,6 +124,13 @@ export default function TestCleanupPage() {
           <span>
             Inclure aussi les <strong>demandes annulées</strong> (quelle que soit leur durée) : elles sortent des rapports
             (taux d&apos;annulation) et leurs frais d&apos;annulation éventuels sont annulés. Rien n&apos;est effacé.
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" checked={anyDuration} onChange={(e) => setAnyDuration(e.target.checked)} />
+          <span>
+            <strong>Toute durée</strong> pour les comptes de test indiqués ci-dessus (une commande de test qui a duré
+            longtemps). Sans compte indiqué, cette case est ignorée : la durée reste obligatoire.
           </span>
         </label>
         <BtnPrimary onClick={runPreview} disabled={busy}>

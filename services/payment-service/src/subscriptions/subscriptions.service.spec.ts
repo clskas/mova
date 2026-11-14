@@ -5,11 +5,11 @@ import { MovaHttpException } from '@mova/shared';
 describe('SubscriptionsService', () => {
   const prisma = {
     subscriptionPlan: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
-    userSubscription: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    userSubscription: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     $transaction: jest.fn(),
   };
 
-  const wallet = { debit: jest.fn().mockResolvedValue({ balanceCdf: 0 }) };
+  const wallet = { debit: jest.fn().mockResolvedValue({ balanceCdf: 0 }), creditPlatformFee: jest.fn().mockResolvedValue(null) };
   const service = new SubscriptionsService(prisma as never, wallet as never);
 
   beforeEach(() => jest.clearAllMocks());
@@ -59,6 +59,39 @@ describe('SubscriptionsService', () => {
       expect(wallet.debit).toHaveBeenCalledTimes(2);
       expect(refs[0]).not.toBe(refs[1]);
       expect(String(refs[0])).toMatch(/^SUBSCRIBE:u1:PASSENGER:/);
+    });
+
+    it('the price paid goes to SENGA (platform wallet), same reference as the debit', async () => {
+      await service.subscribe('u1', 'p1');
+      const debitRef = wallet.debit.mock.calls[0][3];
+      expect(wallet.creditPlatformFee).toHaveBeenCalledWith(15000, 'Abonnement SENGA Plus', debitRef);
+    });
+
+    it('renewal also credits SENGA', async () => {
+      const endsAt = new Date(Date.now() + 6 * 3600 * 1000);
+      prisma.userSubscription.findMany.mockResolvedValue([{ id: 's1', userId: 'u1', endsAt, plan }]);
+      prisma.userSubscription.update = jest.fn().mockResolvedValue({});
+      const renewed = await service.renewDue({ autoRenew: true, remindDaysBefore: 3 }, async () => undefined);
+      expect(renewed).toBe(1);
+      const ref = wallet.debit.mock.calls[0][3];
+      expect(wallet.creditPlatformFee).toHaveBeenCalledWith(15000, expect.stringContaining('renouvellement'), ref);
+    });
+
+    it('cancel keeps the paid month: no renewal, benefits until the end date', async () => {
+      const endsAt = new Date(Date.now() + 20 * 86_400_000);
+      prisma.userSubscription.findFirst.mockResolvedValue({ id: 's1', status: 'ACTIVE', endsAt, plan });
+      prisma.userSubscription.update.mockResolvedValue({ id: 's1', status: 'CANCELLED', endsAt, plan });
+      const res = await service.cancel('u1');
+      expect(prisma.userSubscription.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: 'CANCELLED' } }),
+      );
+      expect(res.message).toContain('restent actifs');
+      // still counted as running until endsAt
+      prisma.userSubscription.findMany.mockResolvedValue([{ id: 's1', status: 'CANCELLED', endsAt, plan }]);
+      await expect(service.getActiveSubscription('u1')).resolves.toMatchObject({ id: 's1' });
+      expect(prisma.userSubscription.findMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({ where: { userId: 'u1', status: { in: ['ACTIVE', 'CANCELLED'] }, endsAt: { gt: expect.any(Date) } } }),
+      );
     });
 
     it('expires subscriptions past their end date', async () => {

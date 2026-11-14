@@ -40,3 +40,19 @@ export async function fetchAuthUserBrief(userId: string): Promise<UserBrief | nu
     return null;
   }
 }
+
+/** Self-declared gender of drivers / passengers ('F' | 'M' | null). Never throws. */
+export async function fetchUserGenders(ids: string[]): Promise<Record<string, string | null>> {
+  if (!ids.length) return {};
+  try {
+    const res = await fetch(serviceUrl('auth', '/internal/users/genders'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+      body: JSON.stringify({ ids }),
+      signal: AbortSignal.timeout(4000),
+    });
+    return res.ok ? ((await res.json()) as Record<string, string | null>) : {};
+  } catch {
+    return {};
+  }
+}

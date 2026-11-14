@@ -118,14 +118,23 @@ export class UsersService {
     return recovered;
   }
 
+  /** Self-declared gender of several users (woman-driver preference). */
+  async gendersOf(ids: string[]): Promise<Record<string, string | null>> {
+    const list = [...new Set(ids.filter(Boolean))].slice(0, 500);
+    if (!list.length) return {};
+    const rows = await this.prisma.user.findMany({ where: { id: { in: list } }, select: { id: true, gender: true } });
+    return Object.fromEntries(rows.map((r) => [r.id, r.gender ?? null]));
+  }
+
   async updateProfile(
     id: string,
-    data: { firstName?: string | null; lastName?: string | null; email?: string | null; language?: string | null },
+    data: { firstName?: string | null; lastName?: string | null; email?: string | null; language?: string | null; gender?: string | null },
   ) {
     const normalize = (value?: string | null) => (value == null ? null : value.trim() || null);
     const current = await this.prisma.user.findUnique({ where: { id } });
     if (!current) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
-    const patch: { firstName?: string | null; lastName?: string | null; email?: string | null; language?: string } = {};
+    const patch: { firstName?: string | null; lastName?: string | null; email?: string | null; language?: string; gender?: string | null } = {};
+    if (data.gender !== undefined) patch.gender = data.gender === 'F' || data.gender === 'M' ? data.gender : null;
     if (['fr', 'en', 'sw', 'ln'].includes(data.language ?? '')) patch.language = data.language as string;
     if (data.firstName !== undefined) patch.firstName = normalize(data.firstName);
     if (data.lastName !== undefined) patch.lastName = normalize(data.lastName);

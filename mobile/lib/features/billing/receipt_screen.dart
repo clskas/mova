@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import '../growth/growth_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
@@ -522,6 +523,10 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                       isLoading: _actionLoading,
                       onPressed: _actionLoading ? null : _sendEmail,
                     ),
+                    if (widget.rideId != null) ...[
+                      const SizedBox(height: 16),
+                      RideTipFavoriteCard(rideId: widget.rideId!),
+                    ],
                     const SizedBox(height: 16),
                     MovaButton(
                       label: widget.showRatingAfter ? tr('Continuer') : tr('Terminer'),

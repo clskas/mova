@@ -1,3 +1,4 @@
+import { IntegrationsInternalController } from './integrations.internal.controller';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { RedisModule } from '@mova/shared';
@@ -10,7 +11,7 @@ import { InternalModule } from './internal/internal.module';
 import { AuthModule } from './auth/auth.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 
-@Module({
+@Module({ controllers: [IntegrationsInternalController],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     RedisModule,

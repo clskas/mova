@@ -1,3 +1,4 @@
+import { IntegrationsInternalController } from './integrations.internal.controller';
 import { AssistantModule } from './assistant/assistant.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -10,7 +11,7 @@ import { InternalModule } from './internal/internal.module';
 import { AuthModule } from './auth/auth.module';
 import { SmileIdModule } from './smile-id/smile-id.module';
 import { AiSwitchService } from './common/ai-switch.service';
-@Module({
+@Module({ controllers: [IntegrationsInternalController],
   imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, HealthModule, AuthModule, DriversModule, IncidentsModule, InternalModule, AssistantModule, SmileIdModule],
   providers: [AiSwitchService],
 })

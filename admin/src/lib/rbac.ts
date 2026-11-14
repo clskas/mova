@@ -220,6 +220,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/operateurs-mm", label: "Opérateurs Mobile Money", short: "MM", section: "systeme" },
   { href: "/services-senga", label: "Services SENGA", short: "Serv.", section: "systeme" },
   { href: "/automatisations", label: "Automatisations", short: "Auto.", section: "systeme" },
+  { href: "/plateformes", label: "Plateformes externes", short: "Plat.", section: "systeme" },
   { href: "/entreprises", label: "Comptes entreprises", short: "Entr.", section: "portefeuille" },
   { href: "/abonnements-externes", label: "Hébergements & plateformes", short: "Échéances", section: "systeme" },
   { href: "/alertes-sos", label: "Alertes SOS", short: "SOS", section: "systeme" },

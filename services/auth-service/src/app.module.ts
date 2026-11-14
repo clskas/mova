@@ -1,3 +1,4 @@
+import { IntegrationsInternalController } from './integrations.internal.controller';
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { RedisModule, RequestIdMiddleware } from '@mova/shared';
@@ -6,7 +7,7 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { InternalModule } from './internal/internal.module';
-@Module({
+@Module({ controllers: [IntegrationsInternalController],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     RedisModule,

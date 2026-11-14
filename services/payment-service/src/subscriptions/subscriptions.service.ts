@@ -5,6 +5,9 @@ import { MovaErrorCode, MovaHttpException, formatCdf } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
 
+/** Subscriptions that still give their benefits (a cancelled one runs until its paid end). */
+const RUNNING_STATUSES: SubscriptionStatus[] = [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED];
+
 @Injectable()
 export class SubscriptionsService {
   constructor(
@@ -86,7 +89,7 @@ export class SubscriptionsService {
   /** Drivers whose active plan gives priority in dispatch. */
   async priorityDriverIds(): Promise<string[]> {
     const rows = await this.prisma.userSubscription.findMany({
-      where: { status: SubscriptionStatus.ACTIVE, endsAt: { gt: new Date() }, plan: { target: SubscriptionTarget.DRIVER, priorityMatching: true } },
+      where: { status: { in: RUNNING_STATUSES }, endsAt: { gt: new Date() }, plan: { target: SubscriptionTarget.DRIVER, priorityMatching: true } },
       select: { userId: true },
       take: 5000,
     });
@@ -112,6 +115,8 @@ export class SubscriptionsService {
         const ref = `RENEW:${s.id}:${endsAt.toISOString().slice(0, 10)}`;
         try {
           await this.wallet.debit(s.userId, s.plan.monthlyPriceCdf, `Renouvellement ${s.plan.name}`, ref);
+          // The month paid is SENGA's revenue (Trésorerie), not money that disappears.
+          await this.wallet.creditPlatformFee(s.plan.monthlyPriceCdf, `Abonnement ${s.plan.name} (renouvellement)`, ref);
           const next = new Date(endsAt);
           next.setMonth(next.getMonth() + 1);
           await this.prisma.userSubscription.update({ where: { id: s.id }, data: { endsAt: next } });
@@ -135,9 +140,11 @@ export class SubscriptionsService {
 
   async getActiveSubscription(userId: string, target?: SubscriptionTarget) {
     await this.expireEnded(userId);
+    // A cancelled subscription keeps its benefits until the end of the month already paid.
     const subs = await this.prisma.userSubscription.findMany({
-      where: { userId, status: SubscriptionStatus.ACTIVE },
+      where: { userId, status: { in: RUNNING_STATUSES }, endsAt: { gt: new Date() } },
       include: { plan: true },
+      orderBy: { createdAt: 'desc' },
     });
     return subs.find((s) => !target || s.plan.target === target) ?? null;
   }
@@ -158,13 +165,15 @@ export class SubscriptionsService {
       // sees the subscription created by the first one (and rolls back its debit).
       await this.wallet.debit(userId, plan.monthlyPriceCdf, `Abonnement ${plan.name}`, subscribeRef, tx);
       const existing = await tx.userSubscription.findFirst({
-        where: { userId, status: SubscriptionStatus.ACTIVE, plan: { target: plan.target } },
+        where: { userId, status: { in: RUNNING_STATUSES }, endsAt: { gt: new Date() }, plan: { target: plan.target } },
       });
       if (existing) {
         throw new MovaHttpException(
           MovaErrorCode.VALIDATION_ERROR,
           HttpStatus.CONFLICT,
-          'Vous avez déjà un abonnement actif pour ce profil.',
+          existing.status === SubscriptionStatus.CANCELLED && existing.endsAt
+            ? `Votre abonnement reste actif jusqu’au ${existing.endsAt.toLocaleDateString('fr-FR')} : vous pourrez vous réabonner ensuite.`
+            : 'Vous avez déjà un abonnement actif pour ce profil.',
         );
       }
       return tx.userSubscription.create({
@@ -177,26 +186,39 @@ export class SubscriptionsService {
         include: { plan: true },
       });
     });
+    // The price paid is SENGA's revenue: credited to the platform wallet (Trésorerie).
+    await this.wallet.creditPlatformFee(plan.monthlyPriceCdf, `Abonnement ${plan.name}`, subscribeRef);
     return {
       subscription: sub,
       message: `Abonnement ${plan.name} activé pour ${formatCdf(plan.monthlyPriceCdf)} / mois.`,
     };
   }
 
+  /**
+   * Cancel = no renewal. The month already paid is kept: benefits stay until its end date
+   * (before, cancelling ended them at once and the paid days were lost).
+   */
   async cancel(userId: string) {
-    const sub = await this.getActiveSubscription(userId);
+    await this.expireEnded(userId);
+    const sub = await this.prisma.userSubscription.findFirst({
+      where: { userId, status: SubscriptionStatus.ACTIVE },
+      include: { plan: true },
+    });
     if (!sub) {
       throw new MovaHttpException(MovaErrorCode.SUBSCRIPTION_NOT_FOUND, HttpStatus.NOT_FOUND, 'Aucun abonnement actif.');
     }
     const updated = await this.prisma.userSubscription.update({
       where: { id: sub.id },
-      data: { status: SubscriptionStatus.CANCELLED, endsAt: new Date() },
+      data: { status: SubscriptionStatus.CANCELLED },
       include: { plan: true },
     });
+    const until = updated.endsAt ? updated.endsAt.toLocaleDateString('fr-FR') : null;
     return {
       subscription: updated,
       success: true,
-      message: `Abonnement ${updated.plan.name} annulé.`,
+      message: until
+        ? `Abonnement ${updated.plan.name} résilié : il ne sera pas renouvelé. Vos avantages restent actifs jusqu’au ${until}.`
+        : `Abonnement ${updated.plan.name} résilié.`,
     };
   }
 }

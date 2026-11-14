@@ -6,7 +6,7 @@ import { RedisService } from '@mova/shared';
 import { assertServiceAreaCoords, assertServiceAreaDestination, assertServiceAreaPair, DEFAULT_PICKUP } from '../common/address.util';
 import { fetchAuthUserBrief } from '../common/internal-lookup.util';
 import { assertDriverCanReceiveJobs, assertDriverEligibleForRide } from '../common/driver-eligibility.util';
-import { debitWallet } from '../common/wallet-hold.util';
+import { collectCancelFee } from '../common/cancel-fee.util';
 import { MatchingService } from '../matching/matching.service';
 import { TripShareService } from '../share/trip-share.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -284,13 +284,14 @@ export class ScheduledRidesService {
         (ride.estimatedPriceCdf ?? 0) * (this.schedCfg().lateCancelFeePct / 100),
       );
       if (cancellationFeeCdf > 0) {
-        await debitWallet(
+        // Same rule as an instant ride: the fee goes to the driver who reserved the slot (or to
+        // SENGA without a driver). Before, it was only taken from the passenger and went nowhere.
+        await collectCancelFee({
           passengerId,
-          cancellationFeeCdf,
-          `Frais annulation tardive course planifiée ${id}`,
-          'SCHEDULED',
-          id,
-        ).catch(() => undefined);
+          driverId: ride.driverId ?? null,
+          amountCdf: cancellationFeeCdf,
+          rideId: `scheduled:${id}`,
+        });
       }
     }
     return this.prisma.scheduledRide.update({

@@ -118,6 +118,21 @@ export class UsersService {
     return recovered;
   }
 
+  /**
+   * USSD / WhatsApp booking: the account of this phone, created as a passenger when it does
+   * not exist yet (a feature phone can book without the app).
+   */
+  async ensurePassengerByPhone(rawPhone: string) {
+    const phone = normalizePhoneRdc(String(rawPhone ?? '').trim());
+    if (!validatePhoneRdc(phone)) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Numéro invalide.');
+    }
+    const found = await this.prisma.user.findUnique({ where: { phone } });
+    if (found) return { id: found.id, created: false, active: found.status === UserStatus.ACTIVE, language: found.language };
+    const user = await this.prisma.user.create({ data: { phone, role: UserRole.PASSENGER, status: UserStatus.ACTIVE } });
+    return { id: user.id, created: true, active: true, language: user.language };
+  }
+
   /** Self-declared gender of several users (woman-driver preference). */
   async gendersOf(ids: string[]): Promise<Record<string, string | null>> {
     const list = [...new Set(ids.filter(Boolean))].slice(0, 500);

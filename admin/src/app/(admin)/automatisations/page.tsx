@@ -24,6 +24,11 @@ type Automations = {
   favoriteDrivers: { enabled: boolean; priorityAttempts: number };
   womenPreference: { enabled: boolean };
   loyalty: { enabled: boolean; pointsPer1000Cdf: number; redeemPoints: number; redeemValueCdf: number };
+  ussdBooking: { enabled: boolean };
+  whatsappBooking: { enabled: boolean };
+  driverDestination: { enabled: boolean; maxPerDay: number; radiusKm: number };
+  tripInsurance: { enabled: boolean; feeCdf: number; partnerName: string };
+  familyMode: { enabled: boolean };
 };
 
 type Blocked = { userId: string; qualityBlockedAt: string; qualityBlockReason?: string | null; ratingAvg?: number };
@@ -47,6 +52,11 @@ const DEFAULTS: Automations = {
   favoriteDrivers: { enabled: false, priorityAttempts: 1 },
   womenPreference: { enabled: false },
   loyalty: { enabled: false, pointsPer1000Cdf: 1, redeemPoints: 100, redeemValueCdf: 1000 },
+  ussdBooking: { enabled: false },
+  whatsappBooking: { enabled: false },
+  driverDestination: { enabled: false, maxPerDay: 2, radiusKm: 3 },
+  tripInsurance: { enabled: false, feeCdf: 200, partnerName: "" },
+  familyMode: { enabled: false },
 };
 
 function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disabled: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -107,6 +117,11 @@ export default function AutomatisationsPage() {
         favoriteDrivers: { ...DEFAULTS.favoriteDrivers, ...cfg.favoriteDrivers },
         womenPreference: { ...DEFAULTS.womenPreference, ...cfg.womenPreference },
         loyalty: { ...DEFAULTS.loyalty, ...cfg.loyalty },
+        ussdBooking: { ...DEFAULTS.ussdBooking, ...cfg.ussdBooking },
+        whatsappBooking: { ...DEFAULTS.whatsappBooking, ...cfg.whatsappBooking },
+        driverDestination: { ...DEFAULTS.driverDestination, ...cfg.driverDestination },
+        tripInsurance: { ...DEFAULTS.tripInsurance, ...cfg.tripInsurance },
+        familyMode: { ...DEFAULTS.familyMode, ...cfg.familyMode },
       };
       setBlocked(await apiFetch<Blocked[]>("/api/admin/drivers-quality-blocked").catch(() => []));
       setA(next);
@@ -509,6 +524,74 @@ export default function AutomatisationsPage() {
         {editable && (
           <BtnPrimary disabled={saving === "loyalty"} onClick={() => void save("loyalty", a.loyalty)}>
             {saving === "loyalty" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Mode famille (pour quelqu&apos;un d&apos;autre)</h2>
+        <p className="text-sm text-slate-600">
+          Le passager commande pour un enfant, un parent ou un ami : il indique son nom et son téléphone. La personne reçoit un SMS avec le lien de suivi, le chauffeur voit son nom et peut l&apos;appeler. Le passager paie.
+        </p>
+        <Toggle label="Activé" checked={a.familyMode.enabled} disabled={ro} onChange={(v) => set("familyMode", { enabled: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "familyMode"} onClick={() => void save("familyMode", a.familyMode)}>
+            {saving === "familyMode" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Assurance trajet</h2>
+        <p className="text-sm text-slate-600">
+          Option proposée à la commande : un montant fixe par course, prélevé sur le portefeuille au départ et versé au portefeuille SENGA, à reverser à l&apos;assureur partenaire. <strong>À activer seulement après la signature avec un assureur.</strong>
+        </p>
+        <Toggle label="Activé" checked={a.tripInsurance.enabled} disabled={ro} onChange={(v) => set("tripInsurance", { enabled: v })} />
+        <Num label="Prix par course (FC)" value={a.tripInsurance.feeCdf} disabled={ro} onChange={(v) => set("tripInsurance", { feeCdf: v })} />
+        <label className="block text-sm">
+          Nom de l&apos;assureur partenaire
+          <input className="mt-1 w-full rounded border px-2 py-1" value={a.tripInsurance.partnerName} disabled={ro} onChange={(e) => set("tripInsurance", { partnerName: e.target.value })} />
+        </label>
+        {editable && (
+          <BtnPrimary disabled={saving === "tripInsurance"} onClick={() => void save("tripInsurance", a.tripInsurance)}>
+            {saving === "tripInsurance" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Destination chauffeur</h2>
+        <p className="text-sm text-slate-600">
+          Le chauffeur indique où il va (par exemple chez lui) : pendant 3 heures, il ne reçoit que les courses qui le rapprochent de cette destination.
+        </p>
+        <Toggle label="Activé" checked={a.driverDestination.enabled} disabled={ro} onChange={(v) => set("driverDestination", { enabled: v })} />
+        <Num label="Utilisations par jour" value={a.driverDestination.maxPerDay} disabled={ro} onChange={(v) => set("driverDestination", { maxPerDay: v })} />
+        <Num label="Rayon autour de la destination (km)" value={a.driverDestination.radiusKm} disabled={ro} onChange={(v) => set("driverDestination", { radiusKm: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "driverDestination"} onClick={() => void save("driverDestination", a.driverDestination)}>
+            {saving === "driverDestination" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Réservation par USSD (sans smartphone)</h2>
+        <p className="text-sm text-slate-600">
+          Commande d&apos;une moto ou d&apos;un taxi en composant un code *xxx# : départ, destination, prix, confirmation. Paiement en espèces, suivi par SMS. Le compte est créé automatiquement avec le numéro. <strong>Demande un contrat avec un agrégateur USSD</strong> (ex. Africa&apos;s Talking) : adresse de rappel <code>https://api.afri-soft.com/api/public/booking/ussd?key=…</code> et variable <code>USSD_WEBHOOK_KEY</code> sur le service ride.
+        </p>
+        <Toggle label="Activé" checked={a.ussdBooking.enabled} disabled={ro} onChange={(v) => set("ussdBooking", { enabled: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "ussdBooking"} onClick={() => void save("ussdBooking", a.ussdBooking)}>
+            {saving === "ussdBooking" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Réservation par WhatsApp</h2>
+        <p className="text-sm text-slate-600">
+          Le client écrit au numéro WhatsApp de SENGA : le robot demande le véhicule, le départ, la destination, donne le prix et commande après confirmation. <strong>Demande un compte WhatsApp Business (Meta)</strong> : webhook <code>https://api.afri-soft.com/api/public/booking/whatsapp</code> et variables <code>WHATSAPP_TOKEN</code>, <code>WHATSAPP_PHONE_NUMBER_ID</code>, <code>WHATSAPP_VERIFY_TOKEN</code>, <code>WHATSAPP_APP_SECRET</code> sur le service ride.
+        </p>
+        <Toggle label="Activé" checked={a.whatsappBooking.enabled} disabled={ro} onChange={(v) => set("whatsappBooking", { enabled: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "whatsappBooking"} onClick={() => void save("whatsappBooking", a.whatsappBooking)}>
+            {saving === "whatsappBooking" ? "…" : "Enregistrer"}
           </BtnPrimary>
         )}
       </Card>

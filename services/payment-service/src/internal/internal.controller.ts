@@ -266,6 +266,11 @@ export class InternalController {
     return this.wallet.collectCancelFee(body);
   }
 
+  @Post('insurance/collect')
+  collectInsurance(@Body() body: { passengerId: string; rideId: string; amountCdf: number; partnerName?: string }) {
+    return this.wallet.collectInsurance(body);
+  }
+
   @Post('wallets/:userId/debit')
   debit(
     @Param('userId') userId: string,

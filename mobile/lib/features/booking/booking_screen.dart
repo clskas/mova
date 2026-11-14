@@ -31,6 +31,7 @@ import 'widgets/mova_ride_map.dart';
 import 'widgets/passenger_count_selector.dart';
 import 'widgets/vehicle_selector.dart';
 import '../growth/growth_widgets.dart';
+import '../growth/growth_lot2_widgets.dart';
 import '../../core/cache/user_profile_cache.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
@@ -88,6 +89,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   int? _proposedFare;
   bool _womenOnly = false;
   bool _isWoman = false;
+  bool _forOther = false;
+  bool _insurance = false;
+  final _riderNameController = TextEditingController();
+  final _riderPhoneController = TextEditingController();
   List<Map<String, dynamic>> _poiPlaces = [];
   String? _poiCategoryFilter;
   int _poiLoadGeneration = 0;
@@ -386,6 +391,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   void dispose() {
     _nearbyPollTimer?.cancel();
     _pickupController.dispose();
+    _riderNameController.dispose();
+    _riderPhoneController.dispose();
     _destinationController.dispose();
     _promoController.dispose();
     super.dispose();
@@ -850,6 +857,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             if (_effectivePassengerCount > 1) 'passengerCount': _effectivePassengerCount,
             if (_proposedFare != null) 'proposedFareCdf': _proposedFare,
             if (_womenOnly) 'womenDriverOnly': true,
+            if (_forOther && _riderPhoneController.text.trim().isNotEmpty) ...{
+              'riderPhone': _riderPhoneController.text.trim(),
+              'riderName': _riderNameController.text.trim(),
+            },
+            if (_insurance) 'insurance': true,
           });
 
     if (!mounted) return;
@@ -1161,6 +1173,16 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       showWomen: _growth.on('womenPreference') && _isWoman,
                       womenOnly: _womenOnly,
                       onWomenOnly: (v) => setState(() => _womenOnly = v),
+                    ),
+                    const SizedBox(height: 12),
+                    FamilyInsuranceOptions(
+                      config: _growth,
+                      forOther: _forOther,
+                      onForOther: (v) => setState(() => _forOther = v),
+                      nameController: _riderNameController,
+                      phoneController: _riderPhoneController,
+                      insurance: _insurance,
+                      onInsurance: (v) => setState(() => _insurance = v),
                     ),
                   ],
                   if (_selectedEstimate != null && total != null) ...[

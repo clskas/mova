@@ -41,6 +41,16 @@ export type AutomationsConfig = {
   womenPreference: { enabled: boolean };
   /** Loyalty points: N points per 1 000 FC paid; P points = V FC of wallet credit (paid by SENGA). */
   loyalty: { enabled: boolean; pointsPer1000Cdf: number; redeemPoints: number; redeemValueCdf: number };
+  /** Booking by USSD (*xxx#, no smartphone / internet) through an aggregator. */
+  ussdBooking: { enabled: boolean };
+  /** Booking by WhatsApp message (WhatsApp Business Cloud API). */
+  whatsappBooking: { enabled: boolean };
+  /** Driver going home: only rides that bring him closer (N times a day). */
+  driverDestination: { enabled: boolean; maxPerDay: number; radiusKm: number };
+  /** Optional trip insurance: fixed fee per ride, from the wallet (partner insurer). */
+  tripInsurance: { enabled: boolean; feeCdf: number; partnerName: string };
+  /** Book for someone else (child, parent…): rider's name and phone, SMS with tracking. */
+  familyMode: { enabled: boolean };
 };
 
 export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
@@ -63,6 +73,11 @@ export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
   favoriteDrivers: { enabled: false, priorityAttempts: 1 },
   womenPreference: { enabled: false },
   loyalty: { enabled: false, pointsPer1000Cdf: 1, redeemPoints: 100, redeemValueCdf: 1000 },
+  ussdBooking: { enabled: false },
+  whatsappBooking: { enabled: false },
+  driverDestination: { enabled: false, maxPerDay: 2, radiusKm: 3 },
+  tripInsurance: { enabled: false, feeCdf: 200, partnerName: '' },
+  familyMode: { enabled: false },
 };
 
 const int = (v: unknown, fallback: number, min: number, max: number) => {
@@ -189,6 +204,19 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
       redeemPoints: int(o.loyalty?.redeemPoints, base.loyalty.redeemPoints, 10, 100_000),
       redeemValueCdf: int(o.loyalty?.redeemValueCdf, base.loyalty.redeemValueCdf, 100, 1_000_000),
     },
+    ussdBooking: { enabled: bool(o.ussdBooking?.enabled, base.ussdBooking.enabled) },
+    whatsappBooking: { enabled: bool(o.whatsappBooking?.enabled, base.whatsappBooking.enabled) },
+    driverDestination: {
+      enabled: bool(o.driverDestination?.enabled, base.driverDestination.enabled),
+      maxPerDay: int(o.driverDestination?.maxPerDay, base.driverDestination.maxPerDay, 1, 10),
+      radiusKm: int(o.driverDestination?.radiusKm, base.driverDestination.radiusKm, 1, 20),
+    },
+    tripInsurance: {
+      enabled: bool(o.tripInsurance?.enabled, base.tripInsurance.enabled),
+      feeCdf: int(o.tripInsurance?.feeCdf, base.tripInsurance.feeCdf, 50, 50_000),
+      partnerName: String(o.tripInsurance?.partnerName ?? base.tripInsurance.partnerName).trim().slice(0, 80),
+    },
+    familyMode: { enabled: bool(o.familyMode?.enabled, base.familyMode.enabled) },
   };
 }
 
@@ -319,4 +347,34 @@ export function favoriteDriversFirst<T extends { userId: string }>(drivers: T[],
   if (favorites.size === 0 || attempt >= priorityAttempts) return drivers;
   const fav = drivers.filter((d) => favorites.has(d.userId));
   return fav.length ? fav : drivers;
+}
+
+/** Straight-line distance in km (pure). */
+export function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const r = (d: number) => (d * Math.PI) / 180;
+  const dLat = r(bLat - aLat);
+  const dLng = r(bLng - aLng);
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(r(aLat)) * Math.cos(r(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(x)));
+}
+
+/**
+ * Driver heading home: a ride fits when its drop-off is near the driver's destination, or
+ * brings him at least 1 km closer to it than where he is now (pure, tested).
+ */
+export function rideFitsDriverDestination(
+  driver: { lat: number; lng: number },
+  dest: { lat: number; lng: number },
+  dropoff: { lat: number; lng: number },
+  radiusKm: number,
+): boolean {
+  const fromDropoff = haversineKm(dropoff.lat, dropoff.lng, dest.lat, dest.lng);
+  if (fromDropoff <= radiusKm) return true;
+  return fromDropoff <= haversineKm(driver.lat, driver.lng, dest.lat, dest.lng) - 1;
+}
+
+/** USSD (Africa's Talking style): the cumulative input « 1*Gombe*Limete*1 » split into steps (pure). */
+export function ussdSteps(text: string | undefined | null): string[] {
+  const t = String(text ?? '').trim();
+  return t ? t.split('*').map((x) => x.trim()) : [];
 }

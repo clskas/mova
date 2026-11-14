@@ -206,3 +206,8 @@ Cinq interrupteurs, tous désactivés au départ :
 - **Chauffeurs favoris** : nombre de tours de recherche réservés aux favoris (par défaut 1), puis tous les chauffeurs.
 - **Chauffeure femme** : basé sur le genre déclaré dans le profil (passagère et chauffeure).
 - **Points de fidélité** : points par 1 000 FC payés, nombre de points à échanger et crédit obtenu. **Coûte de l'argent à SENGA** (crédit payé par le portefeuille SENGA).
+- **Mode famille** : commande pour une autre personne (nom + téléphone, SMS de suivi).
+- **Assurance trajet** : prix par course et nom de l'assureur ; montant versé au portefeuille SENGA, à reverser à l'assureur. À activer seulement après un accord avec un assureur.
+- **Destination chauffeur** : utilisations par jour et rayon (km) ; 3 heures par utilisation.
+- **Réservation par USSD** : demande un contrat avec un agrégateur USSD ; adresse de rappel `https://api.afri-soft.com/api/public/booking/ussd?key=…` et variable `USSD_WEBHOOK_KEY` (service ride).
+- **Réservation par WhatsApp** : demande un compte WhatsApp Business (Meta) ; webhook `https://api.afri-soft.com/api/public/booking/whatsapp`, variables `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (service ride).

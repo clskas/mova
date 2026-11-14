@@ -184,3 +184,6 @@ WhatsApp +243 971163574 — dev@afri-soft.com
 - **Pourboire** : un passager peut vous laisser un pourboire après la course. Il arrive sur votre portefeuille, **100 % pour vous** (SENGA ne prend rien).
 - **Chauffeur favori** : un passager satisfait peut vous ajouter à ses favoris ; vous recevez alors ses demandes en premier.
 - **Chauffeure femme** : chauffeures, indiquez « Femme » dans **Mon profil → Genre** pour recevoir les demandes des passagères qui veulent une chauffeure femme.
+- **Ma destination** : sur l'accueil, touchez « Choisir » dans « Ma destination » et tapez où vous allez (par exemple chez vous). Pendant 3 heures, vous ne recevez que les courses qui vous en rapprochent. Utilisable quelques fois par jour ; « Retirer » pour recevoir à nouveau toutes les courses.
+- **Personne transportée** : quand un passager commande pour quelqu'un d'autre, la carte « Personne transportée » affiche son nom et son téléphone : c'est elle qu'il faut prendre en charge (bouton pour l'appeler).
+- **Courses USSD / WhatsApp** : certaines courses viennent de clients sans application. Elles se paient en espèces, comme d'habitude.

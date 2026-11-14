@@ -2070,5 +2070,20 @@ export const UI_SOURCE_STRINGS: readonly string[] = [
  "Sert seulement à l’option « chauffeure femme ».",
  "Non précisé",
  "Femme",
- "Homme"
+ "Homme",
+ "Pour quelqu’un d’autre",
+ "Enfant, parent, ami : il reçoit un SMS pour suivre le chauffeur. Vous payez.",
+ "Nom de la personne",
+ "Téléphone de la personne",
+ "Assurance trajet (+{v1})",
+ "Prélevée sur votre portefeuille au départ de la course.",
+ "Où allez-vous ?",
+ "Quartier, avenue, repère",
+ "Lieu introuvable. Précisez la commune.",
+ "Ma destination",
+ "Seulement des courses vers : {v1}",
+ "Rentrer chez vous en travaillant ({v1}/{v2} aujourd’hui)",
+ "Choisir",
+ "Personne transportée",
+ "la personne transportée"
 ];

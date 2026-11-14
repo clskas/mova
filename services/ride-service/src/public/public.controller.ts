@@ -61,6 +61,9 @@ export class PublicController {
         favoriteDrivers: { enabled: a.favoriteDrivers.enabled },
         womenPreference: a.womenPreference,
         loyalty: a.loyalty,
+        familyMode: a.familyMode,
+        tripInsurance: { enabled: a.tripInsurance.enabled, feeCdf: a.tripInsurance.feeCdf },
+        driverDestination: { enabled: a.driverDestination.enabled },
       },
     };
   }

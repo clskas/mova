@@ -98,6 +98,10 @@
         <intent>
             <action android:name="android.speech.RecognitionService"/>
         </intent>
+        <!-- Passenger voice announcements: the phone's text-to-speech engine -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE"/>
+        </intent>
         <!-- Android 11+ package visibility — Google Sign-In / Play Services -->
         <package android:name="com.google.android.gms"/>
         <intent>

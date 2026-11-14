@@ -1,7 +1,7 @@
-﻿name: mova
+name: mova
 description: SENGA — Plateforme de mobilité RDC
 publish_to: 'none'
-version: 1.0.71+222
+version: 1.0.72+223
 
 environment:
   sdk: ^3.8.1
@@ -51,6 +51,7 @@ dependencies:
   audioplayers: ^6.6.0
   # Android SMS User Consent (OTP fill). iOS uses system AutofillHints.oneTimeCode.
   smart_auth: ^3.2.0
+  flutter_tts: ^4.2.5
 
 dev_dependencies:
   flutter_test:

@@ -170,7 +170,8 @@ Carte en **dernière ligne** de l'accueil (ou icône portefeuille dans la barre 
 - **Après une course en espèces**, vous pouvez **commander une nouvelle course** même si le chauffeur n’a pas encore confirmé. Le paiement reste en attente jusqu’à **Cash reçu**, votre déclaration **« J’ai payé en espèces »**, ou une **clôture automatique sous 24 h**.
 - Le bouton **J’ai payé en espèces** est sur l’écran de paiement espèces, sur le **suivi** tant que le paiement est en attente, et dans la fenêtre de **litige** si le chauffeur ou le livreur a cliqué **Cash non reçu**. Cette déclaration n’efface pas le litige : le chauffeur doit encore confirmer **J’ai reçu les espèces**, ou vous payez autrement, ou le support clôture le dossier.
 - Si le chauffeur signale **Cash non reçu**, un **litige** s’ouvre : vous ne pourrez plus commander tant que le litige n’est pas résolu (confirmation chauffeur, paiement alternatif, ou support SENGA).
-- Les changements de statut de course (acceptée, chauffeur arrivé, en cours, terminée) et les rappels de course planifiée arrivent par **notification de l’application**. Aucun SMS opérateur n’est envoyé pour ces messages.
+- Les changements de statut de course (acceptée, chauffeur arrivé, en cours, terminée, annulée) et les rappels de course planifiée arrivent par **notification de l’application**. Aucun SMS opérateur n’est envoyé pour ces messages.
+- **Annonces vocales** : quand l'application est ouverte, une voix annonce aussi chaque étape de votre course ou livraison (« Votre chauffeur vous attend au point de prise en charge », « Votre livraison arrive bientôt »…). La voix parle français, anglais ou swahili selon la langue de l'application (en lingala, elle parle français). Pour la couper : **Mon profil → Annonces vocales**. Montez le volume du téléphone pour l'entendre.
 
 ## 12. Historique
 

@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 
-import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../sos/notification_tap_router.dart';
 import '../../core/i18n/i18n.dart';
+import 'passenger_voice_announcer.dart';
 
 /// Alertes passager : chauffeur trouvé, arrivée, course terminée.
 class PassengerAlertService {
@@ -80,6 +80,27 @@ class PassengerAlertService {
     }
   }
 
+  /// Phrase française annoncée à voix haute pour un statut de course (pure, testée).
+  static String? rideSpeech(String status) => switch (status.toUpperCase()) {
+        'DRIVER_ASSIGNED' || 'ACCEPTED' => 'Votre chauffeur est en route vers vous.',
+        'ARRIVING' || 'DRIVER_ARRIVED' => 'Votre chauffeur vous attend au point de prise en charge.',
+        'IN_PROGRESS' => 'Bon voyage avec SENGA !',
+        'COMPLETED' => "Course terminée. Merci d'avoir voyagé avec SENGA.",
+        'CANCELLED' => 'Votre course a été annulée.',
+        _ => null,
+      };
+
+  /// Phrase française annoncée à voix haute pour un statut de livraison (pure, testée).
+  static String? deliverySpeech(String status) => switch (status.toUpperCase()) {
+        'RESTAURANT_CONFIRMED' => 'Le restaurant a confirmé votre commande.',
+        'READY_FOR_PICKUP' => 'Un livreur va prendre en charge votre commande.',
+        'PICKED_UP' => 'Votre livreur a récupéré votre commande.',
+        'IN_TRANSIT' => 'Votre livraison arrive bientôt.',
+        'DELIVERED' => "Merci d'avoir utilisé SENGA !",
+        'CANCELLED' => 'Votre livraison a été annulée.',
+        _ => null,
+      };
+
   static Future<void> notifyRideStatus(String status) async {
     switch (status) {
       case 'DRIVER_ASSIGNED':
@@ -92,9 +113,13 @@ class PassengerAlertService {
         await notify(title: tr('Course en cours'), body: tr('Bon voyage avec SENGA !'));
       case 'COMPLETED':
         await notify(title: tr('Course terminée'), body: tr('Pensez à régler le paiement si nécessaire.'));
+      case 'CANCELLED':
+        await notify(title: tr('Course annulée'), body: tr('Votre course a été annulée.'));
       default:
         break;
     }
+    final speech = rideSpeech(status);
+    if (speech != null) await PassengerVoiceAnnouncer.announce(speech);
   }
 
   static Future<void> notifyDeliveryStatus(String status) async {
@@ -107,8 +132,14 @@ class PassengerAlertService {
         await notify(title: tr('Livraison terminée'), body: tr('Merci d\'avoir utilisé SENGA !'));
       case 'READY_FOR_PICKUP':
         await notify(title: tr('Commande prête'), body: tr('Un livreur va prendre en charge votre commande.'));
+      case 'RESTAURANT_CONFIRMED':
+        await notify(title: tr('Commande confirmée'), body: tr('Le restaurant a confirmé votre commande.'));
+      case 'CANCELLED':
+        await notify(title: tr('Livraison annulée'), body: tr('Votre livraison a été annulée.'));
       default:
         break;
     }
+    final speech = deliverySpeech(status);
+    if (speech != null) await PassengerVoiceAnnouncer.announce(speech);
   }
 }

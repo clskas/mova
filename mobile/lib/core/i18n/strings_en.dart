@@ -2043,4 +2043,11 @@ const Map<String, String> kStringsEn = {
   "Tripoteur": "Cargo tricycle",
   "Camionnette": "Van",
   "Nous proposons le véhicule adapté à votre colis. Vous pouvez en choisir un autre.": "We suggest the vehicle that suits your parcel. You can choose another one.",
+  "Votre course a été annulée.": "Your ride has been cancelled.",
+  "Course terminée. Merci d'avoir voyagé avec SENGA.": "Ride completed. Thank you for travelling with SENGA.",
+  "Le restaurant a confirmé votre commande.": "The restaurant has confirmed your order.",
+  "Livraison annulée": "Delivery cancelled",
+  "Votre livraison a été annulée.": "Your delivery has been cancelled.",
+  "Annonces vocales": "Voice announcements",
+  "Une voix annonce les étapes de votre course ou livraison (chauffeur arrivé, course terminée…).": "A voice announces each step of your ride or delivery (driver arrived, ride completed…).",
 };

@@ -2042,5 +2042,12 @@ export const UI_SOURCE_STRINGS: readonly string[] = [
  "Voiture",
  "Tripoteur",
  "Camionnette",
- "Nous proposons le véhicule adapté à votre colis. Vous pouvez en choisir un autre."
+ "Nous proposons le véhicule adapté à votre colis. Vous pouvez en choisir un autre.",
+ "Votre course a été annulée.",
+ "Course terminée. Merci d'avoir voyagé avec SENGA.",
+ "Le restaurant a confirmé votre commande.",
+ "Livraison annulée",
+ "Votre livraison a été annulée.",
+ "Annonces vocales",
+ "Une voix annonce les étapes de votre course ou livraison (chauffeur arrivé, course terminée…)."
 ];

@@ -36,7 +36,8 @@ class CallRingService {
   static Timer? _safetyTimer;
   static const _maxRing = Duration(seconds: 60);
   static const _assetSound = 'sounds/senga_job.wav';
-  static const _channelId = 'mova_voice_call_v2';
+  /// v3 : canal muet, la boucle AudioPlayer est le seul son (v2 = son système + boucle).
+  static const _channelId = 'mova_voice_call_v3';
   static const _channelName = 'Appels vocaux SENGA';
 
   /// Après raccroché / refus : ignore les relances chat tant qu’un nouvel
@@ -134,11 +135,17 @@ class CallRingService {
         tr(_channelName),
         description: tr('Appels vocaux livraison SENGA'),
         importance: Importance.max,
-        playSound: true,
+        playSound: false,
         enableVibration: true,
       ),
     );
     await android?.requestNotificationsPermission();
+    _initialized = true;
+  }
+
+  /// Contexte audio « sonnerie ». Réappliqué à chaque appel : après un raccroché il est
+  /// passé en « ambient » (iOS : muet avec le bouton silence) pour libérer le micro.
+  static Future<void> _applyRingContext() async {
     try {
       // Focus transitoire : LiveKit doit pouvoir reprendre le micro après stop.
       await _player.setAudioContext(
@@ -162,7 +169,6 @@ class CallRingService {
     } catch (_) {
       /* ignore */
     }
-    _initialized = true;
   }
 
   /// Démarre sonnerie + overlay (ignore si on est l'appelant).
@@ -220,7 +226,7 @@ class CallRingService {
             priority: Priority.max,
             category: AndroidNotificationCategory.call,
             fullScreenIntent: true,
-            playSound: true,
+            playSound: false,
             enableVibration: true,
             ongoing: true,
           ),
@@ -244,6 +250,7 @@ class CallRingService {
     }
     _ringing = true;
     _armSafety();
+    await _applyRingContext();
     try {
       await _player.stop();
       await _player.setReleaseMode(ReleaseMode.loop);

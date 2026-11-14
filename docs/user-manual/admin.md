@@ -147,6 +147,10 @@ Pour les véhicules **VIP**, **Confort** ou autres catégories réglementées :
 - **Gamme Familiale** (par défaut 5–8 places) : affiche la gamme dans l'app passager ; Standard, Confort et VIP sont alors limités au maximum voiture (4 par défaut). N'activez qu'avec des véhicules Familiale validés. Tarif : **Tarifs → Familiale**.
 - **Gamme Tricycle** (par défaut 1–3 places) : affiche la gamme Tricycle (tricycle à passagers) dans l'app passager. Activez-la ville par ville une fois assez de tricycles validés (10 à 20 conseillés). Tarif de départ ≈ Standard − 30 % : **Tarifs → Tricycle**. Les **tripoteurs** (marchandises) n'en dépendent pas : ils reçoivent colis, commissions et déménagements « camionnette » dès la validation de leur type d'engin.
 
+## Plateformes externes (super admin)
+
+**Système → Plateformes externes** : la liste de tous les services extérieurs utilisés par SENGA (Render, Supabase, GitHub, domaine, hub AfriSoft Pay, Apple, Google Play, SerdiPay et opérateurs Mobile Money, Firebase, SMS, e-mail, Mapbox, OpenStreetMap, Claude, OpenAI, Document AI, Smile ID, connexions Google et Apple, Sentry). Pour chacun : à quoi il sert, son état sur les serveurs (configuré, incomplet, non configuré — les clés ne sont jamais affichées), le lien vers la console du fournisseur, les réglages correspondants dans l'admin et la prochaine échéance de paiement.
+
 ## Automatisations (super admin)
 
 **Système → Automatisations** : chaque tâche automatique a son interrupteur et ses réglages.

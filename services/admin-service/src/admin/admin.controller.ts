@@ -1686,6 +1686,13 @@ export class AdminController {
     return this.adminService.updateMovingVehicleCategory(category, body, req.user.role);
   }
 
+  @Get('external-platforms')
+  @RequirePermissions(AdminPermission.SYSTEM_READ)
+  @ApiOperation({ summary: 'Plateformes externes : état de configuration et échéances (SuperAdmin)' })
+  externalPlatforms(@Request() req: { user: AdminJwtUser }) {
+    return this.adminService.externalPlatforms(req.user.role);
+  }
+
   @Get('drivers-quality-blocked')
   @RequirePermissions(AdminPermission.RULES_READ)
   qualityBlockedDrivers() {

@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { incidentStatusForOutcome,
+import {
+  incidentStatusForOutcome,
   INTERNAL_API_KEY,
   MovaErrorCode,
   MovaHttpException,
@@ -8,6 +9,8 @@ import { incidentStatusForOutcome,
   parseCommerceType,
   resolveCityFromCoords,
   serviceUrl,
+  EXTERNAL_PLATFORMS,
+  platformStatus,
 } from '@mova/shared';
 import { filterRowsByManagedCity, filterRowsByCityName, assertCityMatch, forceCityOnBody, assertCoordsInManagedCity } from '../common/city-scope.util';
 
@@ -759,6 +762,38 @@ export class AdminService {
     return this.fetchJson('auth', '/internal/users/play-prelaunch');
   }
   /** Phones / ids typed by the admin → user ids (test accounts). */
+  // ---------- External platforms (super admin) ----------
+  async externalPlatforms(actorRole?: string) {
+    if (actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Réservé au super administrateur.');
+    }
+    const services = ['auth', 'ride', 'payment', 'driver', 'notification'] as const;
+    const reports = await Promise.all(
+      services.map(async (s) => {
+        try {
+          const r = await this.fetchJson<{ present?: Record<string, boolean> }>(s, '/internal/integrations/env');
+          return { service: s, ok: true, present: r?.present ?? {} };
+        } catch {
+          return { service: s, ok: false, present: {} as Record<string, boolean> };
+        }
+      }),
+    );
+    const present: Record<string, boolean> = {};
+    for (const r of reports) for (const [k, v] of Object.entries(r.present)) present[k] = present[k] || v;
+    const vendors = await this.fetchJson<Array<Record<string, unknown>>>('ride', '/internal/platform-vendors').catch(() => []);
+    return {
+      services: reports.map((r) => ({ service: r.service, reachable: r.ok })),
+      platforms: EXTERNAL_PLATFORMS.map((p) => ({
+        ...p,
+        status: platformStatus(p, present),
+        missing: (p.envRequired ?? []).filter((n) => !present[n]),
+        vendors: (Array.isArray(vendors) ? vendors : []).filter(
+          (v) => p.vendorProvider && String(v.provider ?? '').toLowerCase() === p.vendorProvider.toLowerCase(),
+        ),
+      })),
+    };
+  }
+
   // ---------- Driver quality blocks ----------
   qualityBlockedDrivers() {
     return this.fetchJson('driver', '/internal/drivers/quality-blocked');

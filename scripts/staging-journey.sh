@@ -97,6 +97,35 @@ else
 fi
 echo "Familiale price=$FAM_PRICE CDF (switch=$FAM_FLAG)"
 
+step "Full ride: driver accepts, arrives, starts, finishes; cash paid and confirmed"
+# Non-blocking for now (FULL_RIDE_STRICT=1 makes it blocking): it needs an approved staging driver.
+full_ride() {
+  local DRIVER_PHONE="${JOURNEY_DRIVER_PHONE:-+243900000023}" DTOKEN PTOKEN="$TOKEN" RID
+  call POST /auth/otp/request "{\"phone\":\"$DRIVER_PHONE\"}" >/dev/null || return 1
+  DTOKEN=$(TOKEN="" call POST /auth/otp/verify "{\"phone\":\"$DRIVER_PHONE\",\"code\":\"123456\",\"role\":\"DRIVER\"}" | field '.accessToken // .data.accessToken') || return 1
+  [ -n "$DTOKEN" ] || return 1
+  TOKEN="$DTOKEN" call POST /drivers/location '{"lat":-4.3217,"lng":15.3125}' >/dev/null || true
+  TOKEN="$DTOKEN" call PATCH /drivers/availability '{"isAvailable":true}' >/dev/null || true
+  RID=$(TOKEN="$PTOKEN" call POST /rides "$TRIP" | field '.id // .ride.id // .data.id') || return 1
+  [ -n "$RID" ] || return 1
+  echo "full ride $RID"
+  TOKEN="$DTOKEN" call POST "/rides/$RID/accept" '{}' >/dev/null || { TOKEN="$PTOKEN" call POST "/rides/$RID/cancel" '{"reason":"journey"}' >/dev/null || true; return 1; }
+  for s in ARRIVING IN_PROGRESS COMPLETED; do
+    TOKEN="$DTOKEN" call PATCH "/rides/$RID/status" "{\"status\":\"$s\"}" >/dev/null || return 1
+  done
+  TOKEN="$PTOKEN" call POST "/payments/rides/$RID" '{"method":"CASH"}' >/dev/null || return 1
+  TOKEN="$DTOKEN" call POST "/payments/rides/$RID/cash/confirm" '{}' >/dev/null || return 1
+  TOKEN="$PTOKEN" call GET "/payments/rides/$RID/status" | jq -e '(.isPaid // .paid // (.status == "COMPLETED")) == true' >/dev/null || return 1
+  TOKEN="$DTOKEN" call PATCH /drivers/availability '{"isAvailable":false}' >/dev/null || true
+}
+if full_ride; then
+  echo "full ride OK (accept → finish → cash confirmed)"
+elif [ "${FULL_RIDE_STRICT:-0}" = "1" ]; then
+  fail "full ride"
+else
+  echo "::warning::Full ride journey did not complete on staging (non-blocking)."
+fi
+
 step "Wallet (payment-service)"
 call GET /wallet >/dev/null || fail "GET /wallet"
 

@@ -161,6 +161,8 @@ Pour les véhicules **VIP**, **Confort** ou autres catégories réglementées :
 - **Vérification du visage** (désactivée par défaut) : selfie quotidienne du chauffeur comparée par l'IA à sa photo validée ; visage différent = refus + alerte. Option : bloquer le passage en ligne tant que la selfie du jour n'est pas faite.
 - **Trajet anormal** : arrêt prolongé ou grand détour pendant une course → « Tout va bien ? » au passager (avec SOS) et alerte à l'équipe.
 - **Qualité des chauffeurs** : alerte (et suspension automatique en option) sous un seuil de moyenne sur les N dernières notes ; liste des chauffeurs suspendus avec bouton « Débloquer ».
+- **Résumé des erreurs (Sentry)** (désactivé par défaut) : chaque matin, les erreurs des applications des dernières 24 h dans la cloche. Ajoutez la variable `SENTRY_READ_TOKEN` (jeton Sentry en lecture seule, créé par vous) au service ride sur Render.
+- **Tâches GitHub** (hors interrupteurs de l'admin) : sauvegarde chiffrée nocturne de chaque base (30 jours) avec essai de restauration le 1er du mois — secrets `BACKUP_DATABASE_URLS` et `BACKUP_PASSPHRASE` à créer par vous ; suivi quotidien de la validation iOS (ticket GitHub quand une app est validée, aucune soumission automatique) ; course complète jouée en pré-production à chaque mise en production.
 - **Suivi des dettes espèces** : rappel quotidien aux chauffeurs qui doivent des espèces ; option pour suspendre leurs missions au-delà de N jours (0 = jamais).
 
 ## Opérations (lecture + mise à jour)

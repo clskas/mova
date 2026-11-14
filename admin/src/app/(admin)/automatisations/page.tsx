@@ -18,6 +18,7 @@ type Automations = {
   faceCheck: { enabled: boolean; blockUntilChecked: boolean };
   routeAnomaly: { enabled: boolean; stopMinutes: number; detourKm: number };
   ratingQuality: { enabled: boolean; minAvg: number; minRatings: number; autoBlock: boolean };
+  sentryDigest: { enabled: boolean; hourKinshasa: number };
 };
 
 type Blocked = { userId: string; qualityBlockedAt: string; qualityBlockReason?: string | null; ratingAvg?: number };
@@ -35,6 +36,7 @@ const DEFAULTS: Automations = {
   faceCheck: { enabled: false, blockUntilChecked: true },
   routeAnomaly: { enabled: true, stopMinutes: 10, detourKm: 3 },
   ratingQuality: { enabled: true, minAvg: 3.5, minRatings: 10, autoBlock: false },
+  sentryDigest: { enabled: false, hourKinshasa: 8 },
 };
 
 function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disabled: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -89,6 +91,7 @@ export default function AutomatisationsPage() {
         faceCheck: { ...DEFAULTS.faceCheck, ...cfg.faceCheck },
         routeAnomaly: { ...DEFAULTS.routeAnomaly, ...cfg.routeAnomaly },
         ratingQuality: { ...DEFAULTS.ratingQuality, ...cfg.ratingQuality },
+        sentryDigest: { ...DEFAULTS.sentryDigest, ...cfg.sentryDigest },
       };
       setBlocked(await apiFetch<Blocked[]>("/api/admin/drivers-quality-blocked").catch(() => []));
       setA(next);
@@ -407,6 +410,38 @@ export default function AutomatisationsPage() {
             </ul>
           </div>
         )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Résumé quotidien des erreurs (Sentry)</h2>
+        <p className="text-sm text-slate-600">
+          Chaque matin, les erreurs des applications vues en 24 h arrivent dans la cloche de l&apos;admin. Demande la
+          variable <code>SENTRY_READ_TOKEN</code> (jeton Sentry en lecture seule, créé par vous) sur le service ride.
+        </p>
+        <Toggle label="Activé" checked={a.sentryDigest.enabled} disabled={ro} onChange={(v) => set("sentryDigest", { enabled: v })} />
+        <Num label="Heure d'envoi (Kinshasa)" value={a.sentryDigest.hourKinshasa} disabled={ro} onChange={(v) => set("sentryDigest", { hourKinshasa: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "sentryDigest"} onClick={() => void save("sentryDigest", a.sentryDigest)}>
+            {saving === "sentryDigest" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-2">
+        <h2 className="font-semibold">Tâches gérées dans GitHub</h2>
+        <ul className="list-disc pl-5 text-sm text-slate-600 space-y-1">
+          <li>
+            <strong>Sauvegardes</strong> : chaque nuit, copie chiffrée de chaque base (30 jours) et, le 1er du mois, essai de
+            restauration. Demande les secrets GitHub <code>BACKUP_DATABASE_URLS</code> et <code>BACKUP_PASSPHRASE</code>.
+          </li>
+          <li>
+            <strong>Validation iOS</strong> : chaque matin, lecture de l&apos;état chez Apple ; une app validée ouvre un ticket
+            GitHub. Rien n&apos;est soumis automatiquement.
+          </li>
+          <li>
+            <strong>Test de bout en bout</strong> : à chaque mise en production, une course complète est jouée en
+            pré-production (acceptation, trajet, paiement espèces confirmé).
+          </li>
+        </ul>
       </Card>
     </div>
   );

@@ -29,6 +29,8 @@ export type AutomationsConfig = {
   routeAnomaly: { enabled: boolean; stopMinutes: number; detourKm: number };
   /** Driver quality: alert (and optional block) under an average on the last N ratings. */
   ratingQuality: { enabled: boolean; minAvg: number; minRatings: number; autoBlock: boolean };
+  /** Morning summary of the app errors (Sentry) in the admin alerts; needs SENTRY_READ_TOKEN. */
+  sentryDigest: { enabled: boolean; hourKinshasa: number };
 };
 
 export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
@@ -45,6 +47,7 @@ export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
   faceCheck: { enabled: false, blockUntilChecked: true },
   routeAnomaly: { enabled: true, stopMinutes: 10, detourKm: 3 },
   ratingQuality: { enabled: true, minAvg: 3.5, minRatings: 10, autoBlock: false },
+  sentryDigest: { enabled: false, hourKinshasa: 8 },
 };
 
 const int = (v: unknown, fallback: number, min: number, max: number) => {
@@ -68,6 +71,7 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
   const fc = o.faceCheck ?? {};
   const ra = o.routeAnomaly ?? {};
   const rq = o.ratingQuality ?? {};
+  const sd = o.sentryDigest ?? {};
   const minJobs = int(db.minJobs, base.driverBonus.minJobs, 1, 200);
   const days = Array.isArray(de.daysBefore)
     ? [...new Set((de.daysBefore as unknown[]).map((d) => int(d, 0, 0, 90)).filter((d) => d > 0))].sort((a, b) => b - a)
@@ -134,6 +138,10 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
       minAvg: Math.min(5, Math.max(1, Number.isFinite(Number(rq.minAvg)) ? Number(rq.minAvg) : base.ratingQuality.minAvg)),
       minRatings: int(rq.minRatings, base.ratingQuality.minRatings, 3, 200),
       autoBlock: bool(rq.autoBlock, base.ratingQuality.autoBlock),
+    },
+    sentryDigest: {
+      enabled: bool(sd.enabled, base.sentryDigest.enabled),
+      hourKinshasa: int(sd.hourKinshasa, base.sentryDigest.hourKinshasa, 0, 23),
     },
   };
 }

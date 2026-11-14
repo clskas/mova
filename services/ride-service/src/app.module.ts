@@ -1,3 +1,4 @@
+import { TextBookingModule } from './text-booking/text-booking.module';
 import { IntegrationsInternalController } from './integrations.internal.controller';
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -32,7 +33,8 @@ import { CompanyContactsModule } from './company-contacts/company-contacts.modul
 import { LegalDocumentsModule } from './legal-documents/legal-documents.module';
 
 import { ContentTranslationModule } from './content-translation/content-translation.module';
-@Module({ controllers: [IntegrationsInternalController], imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, PlatformConfigModule, HealthModule, AuthModule, RidesModule, DeliveriesModule, ServicesCatalogModule, CarpoolModule, ErrandsModule, RentalModule, GeoModule, RatingsModule, MatchingModule, WebsocketModule, InternalModule, HistoryModule, MovingModule, ExpressModule, UploadsModule, RestaurantModule, RentalPartnerModule, TrackingModule, PublicModule, PromoModule, BillingModule, PublicitesModule, CompanyContactsModule, LegalDocumentsModule, ContentTranslationModule] })
+@Module({ controllers: [IntegrationsInternalController], imports: [
+    TextBookingModule,ConfigModule.forRoot({ isGlobal: true }), RedisModule, PrismaModule, PlatformConfigModule, HealthModule, AuthModule, RidesModule, DeliveriesModule, ServicesCatalogModule, CarpoolModule, ErrandsModule, RentalModule, GeoModule, RatingsModule, MatchingModule, WebsocketModule, InternalModule, HistoryModule, MovingModule, ExpressModule, UploadsModule, RestaurantModule, RentalPartnerModule, TrackingModule, PublicModule, PromoModule, BillingModule, PublicitesModule, CompanyContactsModule, LegalDocumentsModule, ContentTranslationModule] })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });

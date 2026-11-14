@@ -55,6 +55,10 @@ class UpdateUserDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() status?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() firstName?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() lastName?: string;
+  @ApiProperty({ required: false, description: "Genre 'F' | 'M' | '' (chauffeurs : vérifié sur la pièce d'identité)" })
+  @IsOptional()
+  @IsString()
+  gender?: string;
   @ApiProperty({ required: false, description: 'CITY_ADMIN only: service-area city name' })
   @IsOptional()
   @Transform(({ value }) => (value === null || value === '' ? null : value))

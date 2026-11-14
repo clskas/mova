@@ -1,3 +1,4 @@
+import { GrowthAutomationsService } from './growth-automations.service';
 import { Module } from '@nestjs/common';
 import { RidesController } from './rides.controller';
 import { RideGrowthController } from './ride-growth.controller';
@@ -29,7 +30,8 @@ import { UploadsModule } from '../uploads/uploads.module';
 @Module({
   imports: [MatchingModule, WebsocketModule, TrackingModule, ShareModule, GeoModule, UploadsModule],
   controllers: [RideGrowthController, RidesController, RidePoolController],
-  providers: [RidesService, RidePoolService, ScheduledRidesService, RideSearchScheduler, ScheduledRidesScheduler, UnpaidFollowupScheduler, DemandSurgeService, AutomationsScheduler, DriverIncentivesService, RideSafetyService, PricingService, PricingTimeWindowService, PricingAdminService, CommissionService, SurchargeService, PromoService, RideChatService, FraudService],
+  providers: [
+    GrowthAutomationsService,RidesService, RidePoolService, ScheduledRidesService, RideSearchScheduler, ScheduledRidesScheduler, UnpaidFollowupScheduler, DemandSurgeService, AutomationsScheduler, DriverIncentivesService, RideSafetyService, PricingService, PricingTimeWindowService, PricingAdminService, CommissionService, SurchargeService, PromoService, RideChatService, FraudService],
   exports: [RidesService, RidePoolService, ScheduledRidesService, PricingService, PricingTimeWindowService, PricingAdminService, CommissionService, SurchargeService, PromoService, ShareModule, FraudService, RideChatService, GeoModule],
 })
 export class RidesModule {}

@@ -41,6 +41,44 @@ export type AutomationsConfig = {
   womenPreference: { enabled: boolean };
   /** Loyalty points: N points per 1 000 FC paid; P points = V FC of wallet credit (paid by SENGA). */
   loyalty: { enabled: boolean; pointsPer1000Cdf: number; redeemPoints: number; redeemValueCdf: number };
+  /** Booking by USSD (*xxx#, no smartphone / internet) through an aggregator. */
+  ussdBooking: { enabled: boolean };
+  /** Booking by WhatsApp message (WhatsApp Business Cloud API). */
+  whatsappBooking: { enabled: boolean };
+  /** Driver going home: only rides that bring him closer (N times a day). */
+  driverDestination: { enabled: boolean; maxPerDay: number; radiusKm: number };
+  /** Optional trip insurance: fixed fee per ride, from the wallet (partner insurer). */
+  tripInsurance: { enabled: boolean; feeCdf: number; partnerName: string };
+  /** Book for someone else (child, parent…): rider's name and phone, SMS with tracking. */
+  familyMode: { enabled: boolean };
+  /** No driver after N minutes: tips to the passenger and an optional SENGA pickup bonus. */
+  rideRescue: { enabled: boolean; afterMinutes: number; bonusCdf: number };
+  /** Many passengers waiting in a city: offline drivers there are called. */
+  driverCallout: { enabled: boolean; minWaiting: number };
+  /** Price looked at but no order: reminder N minutes later (once a day). */
+  abandonedBooking: { enabled: boolean; afterMinutes: number };
+  /** Inactive passengers (N days) and drivers (N days) get a message; optional credit. */
+  winBack: { enabled: boolean; passengerDays: number; passengerCreditCdf: number; driverDays: number };
+  /** Rain forecast and planned events raise prices and warn drivers. */
+  weatherEvents: { enabled: boolean; rainMm: number; rainMultiplier: number; eventsText: string };
+  /** Fraud signals (repeated pairs, too-short rides); optional block. */
+  fraudWatch: { enabled: boolean; autoBlock: boolean; minPairRides: number; shortRideKm: number };
+  /** Nightly check: Mobile Money top-ups paid but never credited. */
+  ledgerCheck: { enabled: boolean };
+  /** A Mobile Money operator failing: customers warned, team alerted. */
+  operatorWatch: { enabled: boolean; minAttempts: number; failRatePct: number };
+  /** Driver cancels after the passenger waited N minutes: apology credit (SENGA). */
+  autoCompensation: { enabled: boolean; waitedMinutes: number; creditCdf: number };
+  /** Rating of N stars or less: ticket in Alertes staff. */
+  lowRatingTicket: { enabled: boolean; maxStars: number };
+  /** Driver files not finished: reminder every N days, at most M times. */
+  onboardingReminders: { enabled: boolean; everyDays: number; maxReminders: number };
+  /** Weekly payout to the driver's own Mobile Money (drivers who opted in). */
+  autoPayouts: { enabled: boolean; weekday: number; hourKinshasa: number; minCdf: number };
+  /** Monthly income statement to drivers and companies' totals to the team. */
+  statements: { enabled: boolean };
+  /** Maintenance reminder every N km driven with SENGA. */
+  maintenanceReminder: { enabled: boolean; everyKm: number };
 };
 
 export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
@@ -63,6 +101,25 @@ export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
   favoriteDrivers: { enabled: false, priorityAttempts: 1 },
   womenPreference: { enabled: false },
   loyalty: { enabled: false, pointsPer1000Cdf: 1, redeemPoints: 100, redeemValueCdf: 1000 },
+  ussdBooking: { enabled: false },
+  whatsappBooking: { enabled: false },
+  driverDestination: { enabled: false, maxPerDay: 2, radiusKm: 3 },
+  tripInsurance: { enabled: false, feeCdf: 200, partnerName: '' },
+  familyMode: { enabled: false },
+  rideRescue: { enabled: false, afterMinutes: 3, bonusCdf: 0 },
+  driverCallout: { enabled: false, minWaiting: 5 },
+  abandonedBooking: { enabled: false, afterMinutes: 10 },
+  winBack: { enabled: false, passengerDays: 21, passengerCreditCdf: 0, driverDays: 7 },
+  weatherEvents: { enabled: false, rainMm: 2, rainMultiplier: 1.2, eventsText: '' },
+  fraudWatch: { enabled: false, autoBlock: false, minPairRides: 4, shortRideKm: 0.3 },
+  ledgerCheck: { enabled: false },
+  operatorWatch: { enabled: false, minAttempts: 10, failRatePct: 50 },
+  autoCompensation: { enabled: false, waitedMinutes: 10, creditCdf: 500 },
+  lowRatingTicket: { enabled: false, maxStars: 2 },
+  onboardingReminders: { enabled: false, everyDays: 3, maxReminders: 5 },
+  autoPayouts: { enabled: false, weekday: 1, hourKinshasa: 9, minCdf: 5000 },
+  statements: { enabled: false },
+  maintenanceReminder: { enabled: false, everyKm: 5000 },
 };
 
 const int = (v: unknown, fallback: number, min: number, max: number) => {
@@ -188,6 +245,81 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
       pointsPer1000Cdf: int(o.loyalty?.pointsPer1000Cdf, base.loyalty.pointsPer1000Cdf, 1, 100),
       redeemPoints: int(o.loyalty?.redeemPoints, base.loyalty.redeemPoints, 10, 100_000),
       redeemValueCdf: int(o.loyalty?.redeemValueCdf, base.loyalty.redeemValueCdf, 100, 1_000_000),
+    },
+    ussdBooking: { enabled: bool(o.ussdBooking?.enabled, base.ussdBooking.enabled) },
+    whatsappBooking: { enabled: bool(o.whatsappBooking?.enabled, base.whatsappBooking.enabled) },
+    driverDestination: {
+      enabled: bool(o.driverDestination?.enabled, base.driverDestination.enabled),
+      maxPerDay: int(o.driverDestination?.maxPerDay, base.driverDestination.maxPerDay, 1, 10),
+      radiusKm: int(o.driverDestination?.radiusKm, base.driverDestination.radiusKm, 1, 20),
+    },
+    tripInsurance: {
+      enabled: bool(o.tripInsurance?.enabled, base.tripInsurance.enabled),
+      feeCdf: int(o.tripInsurance?.feeCdf, base.tripInsurance.feeCdf, 50, 50_000),
+      partnerName: String(o.tripInsurance?.partnerName ?? base.tripInsurance.partnerName).trim().slice(0, 80),
+    },
+    familyMode: { enabled: bool(o.familyMode?.enabled, base.familyMode.enabled) },
+    rideRescue: {
+      enabled: bool(o.rideRescue?.enabled, base.rideRescue.enabled),
+      afterMinutes: int(o.rideRescue?.afterMinutes, base.rideRescue.afterMinutes, 1, 30),
+      bonusCdf: int(o.rideRescue?.bonusCdf, base.rideRescue.bonusCdf, 0, 20_000),
+    },
+    driverCallout: {
+      enabled: bool(o.driverCallout?.enabled, base.driverCallout.enabled),
+      minWaiting: int(o.driverCallout?.minWaiting, base.driverCallout.minWaiting, 1, 500),
+    },
+    abandonedBooking: {
+      enabled: bool(o.abandonedBooking?.enabled, base.abandonedBooking.enabled),
+      afterMinutes: int(o.abandonedBooking?.afterMinutes, base.abandonedBooking.afterMinutes, 5, 120),
+    },
+    winBack: {
+      enabled: bool(o.winBack?.enabled, base.winBack.enabled),
+      passengerDays: int(o.winBack?.passengerDays, base.winBack.passengerDays, 7, 180),
+      passengerCreditCdf: int(o.winBack?.passengerCreditCdf, base.winBack.passengerCreditCdf, 0, 20_000),
+      driverDays: int(o.winBack?.driverDays, base.winBack.driverDays, 3, 90),
+    },
+    weatherEvents: {
+      enabled: bool(o.weatherEvents?.enabled, base.weatherEvents.enabled),
+      rainMm: Math.min(50, Math.max(0.5, Number(o.weatherEvents?.rainMm) || base.weatherEvents.rainMm)),
+      rainMultiplier: Math.min(2, Math.max(1, Number(o.weatherEvents?.rainMultiplier) || base.weatherEvents.rainMultiplier)),
+      eventsText: String(o.weatherEvents?.eventsText ?? base.weatherEvents.eventsText).slice(0, 4000),
+    },
+    fraudWatch: {
+      enabled: bool(o.fraudWatch?.enabled, base.fraudWatch.enabled),
+      autoBlock: bool(o.fraudWatch?.autoBlock, base.fraudWatch.autoBlock),
+      minPairRides: int(o.fraudWatch?.minPairRides, base.fraudWatch.minPairRides, 2, 50),
+      shortRideKm: Math.min(2, Math.max(0.05, Number(o.fraudWatch?.shortRideKm) || base.fraudWatch.shortRideKm)),
+    },
+    ledgerCheck: { enabled: bool(o.ledgerCheck?.enabled, base.ledgerCheck.enabled) },
+    operatorWatch: {
+      enabled: bool(o.operatorWatch?.enabled, base.operatorWatch.enabled),
+      minAttempts: int(o.operatorWatch?.minAttempts, base.operatorWatch.minAttempts, 3, 1000),
+      failRatePct: int(o.operatorWatch?.failRatePct, base.operatorWatch.failRatePct, 10, 100),
+    },
+    autoCompensation: {
+      enabled: bool(o.autoCompensation?.enabled, base.autoCompensation.enabled),
+      waitedMinutes: int(o.autoCompensation?.waitedMinutes, base.autoCompensation.waitedMinutes, 3, 60),
+      creditCdf: int(o.autoCompensation?.creditCdf, base.autoCompensation.creditCdf, 100, 20_000),
+    },
+    lowRatingTicket: {
+      enabled: bool(o.lowRatingTicket?.enabled, base.lowRatingTicket.enabled),
+      maxStars: int(o.lowRatingTicket?.maxStars, base.lowRatingTicket.maxStars, 1, 3),
+    },
+    onboardingReminders: {
+      enabled: bool(o.onboardingReminders?.enabled, base.onboardingReminders.enabled),
+      everyDays: int(o.onboardingReminders?.everyDays, base.onboardingReminders.everyDays, 1, 30),
+      maxReminders: int(o.onboardingReminders?.maxReminders, base.onboardingReminders.maxReminders, 1, 20),
+    },
+    autoPayouts: {
+      enabled: bool(o.autoPayouts?.enabled, base.autoPayouts.enabled),
+      weekday: int(o.autoPayouts?.weekday, base.autoPayouts.weekday, 0, 6),
+      hourKinshasa: int(o.autoPayouts?.hourKinshasa, base.autoPayouts.hourKinshasa, 0, 23),
+      minCdf: int(o.autoPayouts?.minCdf, base.autoPayouts.minCdf, 500, 10_000_000),
+    },
+    statements: { enabled: bool(o.statements?.enabled, base.statements.enabled) },
+    maintenanceReminder: {
+      enabled: bool(o.maintenanceReminder?.enabled, base.maintenanceReminder.enabled),
+      everyKm: int(o.maintenanceReminder?.everyKm, base.maintenanceReminder.everyKm, 500, 50_000),
     },
   };
 }
@@ -319,4 +451,73 @@ export function favoriteDriversFirst<T extends { userId: string }>(drivers: T[],
   if (favorites.size === 0 || attempt >= priorityAttempts) return drivers;
   const fav = drivers.filter((d) => favorites.has(d.userId));
   return fav.length ? fav : drivers;
+}
+
+/** Straight-line distance in km (pure). */
+export function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const r = (d: number) => (d * Math.PI) / 180;
+  const dLat = r(bLat - aLat);
+  const dLng = r(bLng - aLng);
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(r(aLat)) * Math.cos(r(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(x)));
+}
+
+/**
+ * Driver heading home: a ride fits when its drop-off is near the driver's destination, or
+ * brings him at least 1 km closer to it than where he is now (pure, tested).
+ */
+export function rideFitsDriverDestination(
+  driver: { lat: number; lng: number },
+  dest: { lat: number; lng: number },
+  dropoff: { lat: number; lng: number },
+  radiusKm: number,
+): boolean {
+  const fromDropoff = haversineKm(dropoff.lat, dropoff.lng, dest.lat, dest.lng);
+  if (fromDropoff <= radiusKm) return true;
+  return fromDropoff <= haversineKm(driver.lat, driver.lng, dest.lat, dest.lng) - 1;
+}
+
+/** USSD (Africa's Talking style): the cumulative input « 1*Gombe*Limete*1 » split into steps (pure). */
+export function ussdSteps(text: string | undefined | null): string[] {
+  const t = String(text ?? '').trim();
+  return t ? t.split('*').map((x) => x.trim()) : [];
+}
+
+export type SurgeEvent = { city: string; label: string; start: Date; end: Date; multiplier: number };
+
+/** Admin events, one per line: « Kinshasa;Match au stade;2026-12-01T16:00;2026-12-01T22:00;1.3 » (pure, tested). */
+export function parseSurgeEvents(text: string): SurgeEvent[] {
+  return String(text ?? '')
+    .split(/\r?\n/)
+    .map((l) => l.split(';').map((x) => x.trim()))
+    .filter((p) => p.length >= 5)
+    .map(([city, label, start, end, m]) => ({
+      city,
+      label,
+      start: new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(start) ? start : `${start}+01:00`),
+      end: new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(end) ? end : `${end}+01:00`),
+      multiplier: Math.min(2, Math.max(1, Number(m) || 1)),
+    }))
+    .filter((e) => e.city && !Number.isNaN(e.start.getTime()) && !Number.isNaN(e.end.getTime()) && e.end > e.start);
+}
+
+/** Highest multiplier of the events running now in this city (1 = none) (pure, tested). */
+export function eventMultiplier(events: SurgeEvent[], city: string | null | undefined, now = new Date()): number {
+  const c = String(city ?? '').toLowerCase();
+  return events
+    .filter((e) => e.city.toLowerCase() === c && e.start <= now && now < e.end)
+    .reduce((m, e) => Math.max(m, e.multiplier), 1);
+}
+
+/** Operator failing: enough attempts and too many left unpaid (pure, tested). */
+export function operatorDegraded(attempts: number, succeeded: number, cfg: { minAttempts: number; failRatePct: number }): boolean {
+  if (attempts < cfg.minAttempts) return false;
+  return ((attempts - succeeded) * 100) / attempts >= cfg.failRatePct;
+}
+
+/** Maintenance milestone crossed between two km totals (0 = none) (pure, tested). */
+export function maintenanceMilestone(previousKm: number, totalKm: number, everyKm: number): number {
+  const prev = Math.floor(Math.max(0, previousKm) / everyKm);
+  const now = Math.floor(Math.max(0, totalKm) / everyKm);
+  return now > prev ? now * everyKm : 0;
 }

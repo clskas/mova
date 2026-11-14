@@ -246,6 +246,13 @@ model Ride {
   listFareCdf     Int?
   /// The passenger asked for a woman driver.
   womenDriverOnly Boolean @default(false)
+  /// Booked for someone else (Automatisations → Mode famille): who travels.
+  riderName       String?
+  riderPhone      String?
+  /// Trip insurance fee (Automatisations → Assurance trajet), collected at the start.
+  insuranceFeeCdf Int?
+  /// APP | USSD | WHATSAPP
+  bookedVia       String?
   @@index([status])
   @@index([passengerId])
   @@index([driverId])

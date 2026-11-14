@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../growth/growth_widgets.dart';
+import '../growth/automation_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/client_apps_config.dart';
 import '../../core/config/market_config.dart';
@@ -471,6 +472,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const LoyaltyCard(),
+          const WalletAutomationCards(),
           MovaCard(
             child: Column(
               children: [

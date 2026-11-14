@@ -1,3 +1,4 @@
+import { DriverGrowthInternalController, DriverGrowthService } from './driver-growth.service';
 import { FaceCheckService } from './face-check.service';
 import { DocExpiryScheduler } from './doc-expiry.scheduler';
 import { Module } from '@nestjs/common';
@@ -9,8 +10,8 @@ import { SmileIdModule } from '../smile-id/smile-id.module';
 
 @Module({
   imports: [OcrModule, SmileIdModule],
-  controllers: [DriversController],
-  providers: [DriversService, MatchingConfigService, DocExpiryScheduler, FaceCheckService],
+  controllers: [DriverGrowthInternalController, DriversController],
+  providers: [DriverGrowthService, DriversService, MatchingConfigService, DocExpiryScheduler, FaceCheckService],
   exports: [FaceCheckService, DriversService],
 })
 export class DriversModule {}

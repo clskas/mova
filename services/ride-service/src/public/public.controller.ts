@@ -1,3 +1,4 @@
+import { RedisService } from '@mova/shared';
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { Controller, Get, Headers, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -25,6 +26,7 @@ export class PublicController {
     private translations: ContentTranslationService,
     private iosStoreVersions: IosStoreVersionService,
     private platformConfig: PlatformConfigService,
+    private redis: RedisService,
   ) {}
 
   @Get('app-version')
@@ -50,17 +52,28 @@ export class PublicController {
   @ApiOperation({
     summary: 'Config client (visibilité opérateurs MM + mode maintenance par app)',
   })
-  getClientConfig() {
+  async getClientConfig() {
     const a = this.platformConfig.get().automations;
+    // Mobile Money operators failing right now (Automatisations → Panne d'opérateur).
+    const ops = ['MPESA', 'AIRTEL_MONEY', 'ORANGE_MONEY', 'AFRIMONEY'];
+    const flags = a.operatorWatch.enabled
+      ? await Promise.all(ops.map((o) => this.redis.client.get(`mm:degraded:${o}`).catch(() => null)))
+      : [];
+    const mmDegraded = ops.filter((_, i) => Boolean(flags[i]));
     // Growth switches the apps need (Admin → Automatisations); amounts only, no secrets.
     return {
       ...this.clientAppsConfig.getPublic(),
+      mmDegraded,
       growth: {
         priceOffer: a.priceOffer,
         tips: a.tips,
         favoriteDrivers: { enabled: a.favoriteDrivers.enabled },
         womenPreference: a.womenPreference,
         loyalty: a.loyalty,
+        familyMode: a.familyMode,
+        tripInsurance: { enabled: a.tripInsurance.enabled, feeCdf: a.tripInsurance.feeCdf },
+        driverDestination: { enabled: a.driverDestination.enabled },
+        autoPayouts: { enabled: a.autoPayouts.enabled },
       },
     };
   }

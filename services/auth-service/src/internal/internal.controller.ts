@@ -28,6 +28,8 @@ class UpdateUserAdminDto {
   @IsOptional() managedCity?: string | null;
   @IsOptional() @IsString() homeCity?: string | null;
   @IsOptional() @IsString() avatarUrl?: string | null;
+  /** 'F' | 'M' | '' — drivers: checked by the team on the ID. */
+  @IsOptional() @IsString() gender?: string | null;
   @IsOptional() @IsArray() @IsString({ each: true }) adminPermissions?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) accessLevelIds?: string[];
 }
@@ -161,6 +163,10 @@ export class InternalController {
   @Post('users/purge-play-prelaunch')
   purgePlayPrelaunch(@Body() body: PurgeUserDto) {
     return this.users.purgePlayPrelaunchUsers(body?.actorId);
+  }
+  @Post('users/ensure-passenger')
+  ensurePassenger(@Body() body: { phone?: string }) {
+    return this.users.ensurePassengerByPhone(String(body?.phone ?? ''));
   }
   @Post('users/genders')
   genders(@Body() body: { ids?: string[] }) {

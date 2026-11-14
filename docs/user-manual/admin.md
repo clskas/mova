@@ -204,5 +204,17 @@ Cinq interrupteurs, tous désactivés au départ :
 - **Le passager propose son prix** : minimum et maximum en % du prix SENGA (par défaut 80 % – 150 %). Le passager peut augmenter son offre tant qu'aucun chauffeur n'a accepté.
 - **Pourboire** : trois montants proposés et un maximum. Payé depuis le portefeuille du passager, 100 % au chauffeur.
 - **Chauffeurs favoris** : nombre de tours de recherche réservés aux favoris (par défaut 1), puis tous les chauffeurs.
-- **Chauffeure femme** : basé sur le genre déclaré dans le profil (passagère et chauffeure).
+- **Chauffeure femme** : la passagère déclare son genre dans son profil ; le genre des **chauffeurs** est saisi par l'équipe dans **Utilisateurs → fiche → Genre**, après vérification de la pièce d'identité (un chauffeur ne peut pas le changer lui-même).
 - **Points de fidélité** : points par 1 000 FC payés, nombre de points à échanger et crédit obtenu. **Coûte de l'argent à SENGA** (crédit payé par le portefeuille SENGA).
+- **Mode famille** : commande pour une autre personne (nom + téléphone, SMS de suivi).
+- **Assurance trajet** : prix par course et nom de l'assureur ; montant versé au portefeuille SENGA, à reverser à l'assureur. À activer seulement après un accord avec un assureur.
+- **Destination chauffeur** : utilisations par jour et rayon (km) ; 3 heures par utilisation.
+- **Réservation par USSD** : demande un contrat avec un agrégateur USSD ; adresse de rappel `https://api.afri-soft.com/api/public/booking/ussd?key=…` et variable `USSD_WEBHOOK_KEY` (service ride).
+- **Réservation par WhatsApp** : demande un compte WhatsApp Business (Meta) ; webhook `https://api.afri-soft.com/api/public/booking/whatsapp`, variables `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (service ride).
+
+## Automatisations (lot 6)
+
+- **Gagner plus de courses** : sauver les demandes sans chauffeur (conseils + prime facultative), appeler les chauffeurs hors ligne là où les clients attendent, relancer les réservations abandonnées, réveiller les clients / chauffeurs inactifs (crédit facultatif), pluie (Open-Meteo) et événements (une ligne « Ville;Libellé;début;fin;multiplicateur »).
+- **Protéger l'argent** : détection de fraude (suspension facultative), contrôle nocturne des recharges non créditées, panne d'opérateur Mobile Money (avertissement dans l'app + alerte).
+- **Moins de travail** : dédommagement automatique, ticket sur mauvaise note (Alertes staff), relance des dossiers chauffeurs, paiement hebdomadaire des chauffeurs volontaires (vers leur propre numéro seulement), relevés mensuels, rappel d'entretien.
+- Tout est **désactivé** au départ ; les options qui coûtent de l'argent sont signalées.

@@ -118,6 +118,21 @@ export class UsersService {
     return recovered;
   }
 
+  /**
+   * USSD / WhatsApp booking: the account of this phone, created as a passenger when it does
+   * not exist yet (a feature phone can book without the app).
+   */
+  async ensurePassengerByPhone(rawPhone: string) {
+    const phone = normalizePhoneRdc(String(rawPhone ?? '').trim());
+    if (!validatePhoneRdc(phone)) {
+      throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Numéro invalide.');
+    }
+    const found = await this.prisma.user.findUnique({ where: { phone } });
+    if (found) return { id: found.id, created: false, active: found.status === UserStatus.ACTIVE, language: found.language };
+    const user = await this.prisma.user.create({ data: { phone, role: UserRole.PASSENGER, status: UserStatus.ACTIVE } });
+    return { id: user.id, created: true, active: true, language: user.language };
+  }
+
   /** Self-declared gender of several users (woman-driver preference). */
   async gendersOf(ids: string[]): Promise<Record<string, string | null>> {
     const list = [...new Set(ids.filter(Boolean))].slice(0, 500);
@@ -134,7 +149,10 @@ export class UsersService {
     const current = await this.prisma.user.findUnique({ where: { id } });
     if (!current) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
     const patch: { firstName?: string | null; lastName?: string | null; email?: string | null; language?: string; gender?: string | null } = {};
-    if (data.gender !== undefined) patch.gender = data.gender === 'F' || data.gender === 'M' ? data.gender : null;
+    // Drivers: gender is checked by the team on the ID (woman-driver option = passenger safety).
+    if (data.gender !== undefined && current.role !== UserRole.DRIVER) {
+      patch.gender = data.gender === 'F' || data.gender === 'M' ? data.gender : null;
+    }
     if (['fr', 'en', 'sw', 'ln'].includes(data.language ?? '')) patch.language = data.language as string;
     if (data.firstName !== undefined) patch.firstName = normalize(data.firstName);
     if (data.lastName !== undefined) patch.lastName = normalize(data.lastName);
@@ -754,6 +772,7 @@ export class UsersService {
       managedCity?: string | null;
       homeCity?: string | null;
       avatarUrl?: string | null;
+      gender?: string | null;
       adminPermissions?: string[];
       accessLevelIds?: string[];
     },
@@ -782,8 +801,10 @@ export class UsersService {
       accessLevelIds,
       phone: rawPhone,
       avatarUrl: rawAvatar,
+      gender: rawGender,
       ...rest
     } = data;
+    const gender = rawGender === undefined ? undefined : rawGender === 'F' || rawGender === 'M' ? rawGender : null;
     // Empty string "" is not a valid unique phone (Google-only accounts) — coerce to null / omit.
     let phone: string | null | undefined = undefined;
     if (rawPhone !== undefined) {
@@ -814,6 +835,7 @@ export class UsersService {
       const updated = await this.prisma.user.update({
         where: { id },
         data: {
+          ...(gender !== undefined ? { gender } : {}),
           ...rest,
           managedCity,
           ...(homeCity !== undefined ? { homeCity } : {}),

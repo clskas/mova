@@ -324,3 +324,13 @@ model LoyaltyEvent {
   @@index([userId])
   @@map("loyalty_events")
 }
+
+/// Weekly payout to the driver's own Mobile Money number (Automatisations).
+model AutoPayoutSetting {
+  userId    String   @id
+  provider  String
+  enabled   Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@map("auto_payout_settings")
+}

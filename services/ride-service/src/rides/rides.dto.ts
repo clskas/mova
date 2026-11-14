@@ -45,6 +45,18 @@ export class CreateRideDto extends EstimateRideDto {
   @IsOptional()
   @IsBoolean()
   womenDriverOnly?: boolean;
+  @ApiProperty({ required: false, description: 'Mode famille : nom de la personne transportée' })
+  @IsOptional()
+  @IsString()
+  riderName?: string;
+  @ApiProperty({ required: false, description: 'Mode famille : téléphone de la personne transportée' })
+  @IsOptional()
+  @IsString()
+  riderPhone?: string;
+  @ApiProperty({ required: false, description: 'Assurance trajet demandée' })
+  @IsOptional()
+  @IsBoolean()
+  insurance?: boolean;
 }
 
 export class ProposedFareDto {

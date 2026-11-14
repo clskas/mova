@@ -1,4 +1,5 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { GrowthAutomationsService } from './growth-automations.service';
 import { RideStatus } from '@prisma/client';
 import { formatCdf, kinshasaClock, postStaffAlert, RedisService, resolveCityFromCoords } from '@mova/shared';
 import { PlatformConfigService } from '../platform/platform-config.service';
@@ -39,6 +40,7 @@ export class AutomationsScheduler implements OnModuleInit, OnModuleDestroy {
     private platformConfig: PlatformConfigService,
     private incentives: DriverIncentivesService,
     private safety: RideSafetyService,
+    @Optional() private growth?: GrowthAutomationsService,
   ) {}
 
   private safetyTimer?: ReturnType<typeof setInterval>;
@@ -88,6 +90,7 @@ export class AutomationsScheduler implements OnModuleInit, OnModuleDestroy {
     if (a.anomalyAlerts.enabled) {
       await this.anomalies(a.anomalyAlerts).catch((e: unknown) => this.logger.warn(`anomalies: ${String(e)}`));
     }
+    await this.growth?.tick().catch((e: unknown) => this.logger.warn(`growth: ${String(e)}`));
   }
 
   /**

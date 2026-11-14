@@ -257,6 +257,17 @@ describe('UsersService owner lock', () => {
     });
   });
 
+  it('a driver cannot declare his own gender (woman-driver safety), a passenger can', async () => {
+    prisma.user.findUnique.mockResolvedValue({ id: 'drv-2', role: UserRole.DRIVER, googleId: null });
+    prisma.user.update.mockResolvedValue({ id: 'drv-2', role: UserRole.DRIVER });
+    await service.updateProfile('drv-2', { gender: 'F' });
+    expect(prisma.user.update).toHaveBeenLastCalledWith({ where: { id: 'drv-2' }, data: {} });
+    prisma.user.findUnique.mockResolvedValue({ id: 'pax-1', role: UserRole.PASSENGER, googleId: null });
+    prisma.user.update.mockResolvedValue({ id: 'pax-1', role: UserRole.PASSENGER });
+    await service.updateProfile('pax-1', { gender: 'F' });
+    expect(prisma.user.update).toHaveBeenLastCalledWith({ where: { id: 'pax-1' }, data: { gender: 'F' } });
+  });
+
   it('refuses to purge a Play bot that does not match the safe pattern', async () => {
     prisma.$queryRaw.mockResolvedValue([{ id: 'real-gmail' }]);
     prisma.user.findMany.mockResolvedValue([

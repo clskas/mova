@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { RedisService, eventMultiplier, parseSurgeEvents, resolveCityFromCoords } from '@mova/shared';
+import { rainSurgeKey } from './growth-automations.service';
+import { Injectable, Optional } from '@nestjs/common';
 import { RideStatus, VehicleType } from '@prisma/client';
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -33,14 +35,27 @@ export class DemandSurgeService {
     private prisma: PrismaService,
     private matching: MatchingService,
     private platformConfig: PlatformConfigService,
+    @Optional() private redis?: RedisService,
   ) {}
+
+  /** Rain forecast and planned events (Automatisations → Pluie et événements). */
+  private async extraMultiplier(lat: number, lng: number): Promise<number> {
+    const w = this.platformConfig.get().automations.weatherEvents;
+    if (!w.enabled) return 1;
+    const city = resolveCityFromCoords(lat, lng);
+    if (!city) return 1;
+    const events = eventMultiplier(parseSurgeEvents(w.eventsText), city);
+    const rain = Number(await this.redis?.client.get(rainSurgeKey(city)).catch(() => null)) || 1;
+    return Math.max(1, events, rain);
+  }
 
   async multiplier(lat: number, lng: number, vehicleType: VehicleType): Promise<{ level: DemandLevel; multiplier: number }> {
     const p = this.platformConfig.get().pricing;
-    if (!p.demandSurgeEnabled) return { level: 0, multiplier: 1 };
+    const extra = await this.extraMultiplier(lat, lng).catch(() => 1);
+    if (!p.demandSurgeEnabled) return { level: 0, multiplier: extra };
     const level = await this.level(lat, lng, vehicleType, p.demandSurgeMinRequests).catch(() => 0 as DemandLevel);
     const multiplier = level === 2 ? p.demandSurgeHighMultiplier : level === 1 ? p.demandSurgeMediumMultiplier : 1;
-    return { level, multiplier: Math.max(1, multiplier) };
+    return { level, multiplier: Math.max(1, multiplier, extra) };
   }
 
   private async level(lat: number, lng: number, vehicleType: VehicleType, minRequests: number): Promise<DemandLevel> {

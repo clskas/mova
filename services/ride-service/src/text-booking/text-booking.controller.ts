@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, Logger, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Header, Headers, HttpCode, Logger, Post, Query, Req, Res } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { createHmac, timingSafeEqual } from 'crypto';
 import type { Request, Response } from 'express';
@@ -24,15 +24,12 @@ export class TextBookingController {
 
   @Post('ussd')
   @HttpCode(200)
-  async ussd(
-    @Query('key') key: string | undefined,
-    @Body() body: { phoneNumber?: string; text?: string },
-    @Res() res: Response,
-  ) {
-    res.type('text/plain');
-    if (!sameSecret(key, process.env.USSD_WEBHOOK_KEY?.trim())) return res.status(403).send('END Accès refusé.');
-    const out = await this.booking.ussd(String(body?.phoneNumber ?? ''), String(body?.text ?? ''));
-    return res.send(out);
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async ussd(@Query('key') key: string | undefined, @Body() body: { phoneNumber?: string; text?: string }): Promise<string> {
+    if (!sameSecret(key, process.env.USSD_WEBHOOK_KEY?.trim())) throw new ForbiddenException('END Accès refusé.');
+    // Replies are SENGA's own texts (the customer's input is never echoed back).
+    return this.booking.ussd(String(body?.phoneNumber ?? ''), String(body?.text ?? ''));
   }
 
   @Get('whatsapp')
@@ -42,8 +39,10 @@ export class TextBookingController {
     @Query('hub.challenge') challenge: string,
     @Res() res: Response,
   ) {
-    if (mode === 'subscribe' && sameSecret(token, process.env.WHATSAPP_VERIFY_TOKEN?.trim())) {
-      return res.status(200).type('text/plain').send(challenge);
+    // Meta's challenge is a number: sent back as a number only.
+    const n = /^\d{1,32}$/.test(String(challenge ?? '')) ? Number(challenge) : NaN;
+    if (mode === 'subscribe' && Number.isFinite(n) && sameSecret(token, process.env.WHATSAPP_VERIFY_TOKEN?.trim())) {
+      return res.status(200).type('text/plain').send(String(n));
     }
     return res.status(403).send('forbidden');
   }

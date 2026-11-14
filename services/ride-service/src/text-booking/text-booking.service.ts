@@ -89,9 +89,9 @@ export class TextBookingService {
     if (s.length === 1) return 'CON Lieu de départ (quartier, avenue, repère) :';
     if (s.length === 2) return 'CON Destination :';
     const pickup = await this.firstPlace(s[1]);
-    if (!pickup) return `END Départ « ${s[1].slice(0, 40)} » introuvable. Précisez la commune.`;
+    if (!pickup) return 'END Lieu de départ introuvable. Précisez la commune ou un repère.';
     const dropoff = await this.firstPlace(s[2]);
-    if (!dropoff) return `END Destination « ${s[2].slice(0, 40)} » introuvable. Précisez la commune.`;
+    if (!dropoff) return 'END Destination introuvable. Précisez la commune ou un repère.';
     if (s.length === 3) {
       const price = await this.quote(v.type, pickup, dropoff);
       return `CON ${v.label} : ${pickup.label.slice(0, 40)} -> ${dropoff.label.slice(0, 40)}\nPrix : ${price ?? '?'} FC (espèces)\n1. Confirmer\n2. Annuler`;
@@ -124,13 +124,13 @@ export class TextBookingService {
     }
     if (st.step === 'pickup') {
       const pickup = await this.firstPlace(text);
-      if (!pickup) return `Je ne trouve pas « ${text.slice(0, 40)} ». Précisez la commune ou un repère.`;
+      if (!pickup) return 'Je ne trouve pas ce lieu. Précisez la commune ou un repère.';
       await save({ ...st, step: 'dropoff', pickup });
       return `Départ : ${pickup.label}\nDestination ?`;
     }
     if (st.step === 'dropoff') {
       const dropoff = await this.firstPlace(text);
-      if (!dropoff) return `Je ne trouve pas « ${text.slice(0, 40)} ». Précisez la commune ou un repère.`;
+      if (!dropoff) return 'Je ne trouve pas ce lieu. Précisez la commune ou un repère.';
       const v = VEHICLES[st.v ?? '1'];
       const price = await this.quote(v.type, st.pickup!, dropoff);
       await save({ ...st, step: 'confirm', dropoff });

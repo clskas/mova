@@ -317,6 +317,12 @@ export class HubPaymentsService {
     if (!row) return { found: false };
     // providerRef falls back to the hub id when the aggregator returned none.
     if (options?.aggregatorRefOnly && row.providerRef === row.id) return { found: false };
+    // Unsigned « success » only in the hours after we started the payment (security audit):
+    // a leaked aggregator id cannot be replayed later.
+    if (options?.aggregatorRefOnly && outcome === 'COMPLETED' && unsignedCallbackTooLate(row.createdAt)) {
+      this.logger.warn(`Unsigned aggregator success ignored (too late) payment=${row.id}`);
+      return { found: true, payment_id: row.id, status: row.status };
+    }
 
     if (row.status === 'COMPLETED' || row.status === 'FAILED') {
       if (!row.notifiedAt) {
@@ -436,4 +442,9 @@ export class HubPaymentsService {
     }
     return false;
   }
+}
+
+/** Unsigned aggregator success accepted only within 6 hours of the payment (pure, tested). */
+export function unsignedCallbackTooLate(createdAt: Date, now = new Date()): boolean {
+  return now.getTime() - createdAt.getTime() > 6 * 3600 * 1000;
 }

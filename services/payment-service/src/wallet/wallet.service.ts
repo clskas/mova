@@ -36,6 +36,8 @@ import {
   timingSafeEqualString,
   validatePhoneRdc,
   type MobileMoneyOperator,
+  fetchDemoAccountIds,
+  isProductionRuntime,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { isPrismaUniqueViolation } from '../prisma/prisma-errors';
@@ -998,6 +1000,10 @@ export class WalletService {
       provider,
       phone,
     );
+    // Demo accounts (store review, code 123456) can never take real money out.
+    if (isProductionRuntime() && (await fetchDemoAccountIds()).has(userId)) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte de démonstration : retrait impossible.');
+    }
     await this.assertMmOperatorAllowed(userId, normalizedProvider, 'withdraw');
     const standing = this.getWithdrawStandingOtp();
     const otpDigits = String(opts.otp ?? '').replace(/\s/g, '');

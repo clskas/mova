@@ -27,6 +27,8 @@ import {
   normalizeRidePassengerCount,
   vehiclePhotoList,
   fetchActivePlan,
+  filterDriversForCustomer,
+  fetchDemoAccountIds,
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -451,6 +453,7 @@ export class RidesService {
 
   private async runSearchAttempt(ride: {
     id: string;
+    passengerId?: string;
     status: RideStatus;
     pickupLat: number;
     pickupLng: number;
@@ -473,7 +476,12 @@ export class RidesService {
     });
     // Exclure les chauffeurs déjà en course / livraison / commission (pas de 2ᵉ sonnerie).
     const onDuty = new Set((await this.listOnDutyDriverIds()).driverIds);
-    const drivers = driversRaw.filter((d) => !onDuty.has(d.userId));
+    // Store-review demo accounts never meet real customers (and the other way round).
+    const drivers = filterDriversForCustomer(
+      driversRaw.filter((d) => !onDuty.has(d.userId)),
+      ride.passengerId ?? '',
+      await fetchDemoAccountIds(),
+    );
     await this.prisma.rideEvent.create({
       data: {
         rideId: ride.id,

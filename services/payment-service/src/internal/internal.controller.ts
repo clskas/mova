@@ -1,3 +1,4 @@
+import { CorporateService } from '../corporate/corporate.service';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { TestVoidService } from '../wallet/test-void.service';
 import { ApiTags } from '@nestjs/swagger';
@@ -87,6 +88,7 @@ export class InternalController {
     private wallet: WalletService,
     private testVoidService: TestVoidService,
     private subscriptions: SubscriptionsService,
+    private corporate: CorporateService,
     private driverPayouts: DriverPayoutService,
     private payments: PaymentsService,
     private debtLedger: DriverDebtLedgerService,
@@ -355,6 +357,68 @@ export class InternalController {
     @Body() body: { ownerUserId: string },
   ) {
     return this.payments.confirmRentalCashByPartner(referenceId, body.ownerUserId);
+  }
+
+  @Get('corporate/accounts')
+  corporateList() {
+    return this.corporate.list();
+  }
+
+  @Post('corporate/accounts')
+  corporateCreate(@Body() body: Record<string, unknown>) {
+    return this.corporate.create(body as never);
+  }
+
+  @Patch('corporate/accounts/:id')
+  corporateUpdate(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.corporate.update(id, body as never);
+  }
+
+  @Get('corporate/accounts/:id/members')
+  corporateMembers(@Param('id') id: string) {
+    return this.corporate.members(id);
+  }
+
+  @Post('corporate/accounts/:id/members')
+  corporateAddMember(@Param('id') id: string, @Body() body: { userId?: string; label?: string }) {
+    return this.corporate.addMember(id, String(body?.userId ?? ''), body?.label);
+  }
+
+  @Post('corporate/members/:memberId/remove')
+  corporateRemoveMember(@Param('memberId') memberId: string) {
+    return this.corporate.removeMember(memberId);
+  }
+
+  @Post('corporate/accounts/:id/settle')
+  corporateSettle(@Param('id') id: string, @Body() body: { amountCdf?: number; note?: string }) {
+    return this.corporate.settle(id, Number(body?.amountCdf ?? 0), body?.note);
+  }
+
+  @Get('corporate/accounts/:id/statement')
+  corporateStatement(@Param('id') id: string) {
+    return this.corporate.statement(id);
+  }
+
+  @Get('subscriptions/active/:userId')
+  async activeSubscription(@Param('userId') userId: string, @Query('target') target?: string) {
+    const t = target === 'DRIVER' || target === 'PASSENGER' ? (target as SubscriptionTarget) : undefined;
+    const sub = await this.subscriptions.getActiveSubscription(userId, t);
+    return {
+      plan: sub
+        ? {
+            target: sub.plan.target,
+            code: sub.plan.code,
+            name: sub.plan.name,
+            feeReductionPercent: sub.plan.feeReductionPercent,
+            priorityMatching: sub.plan.priorityMatching,
+          }
+        : null,
+    };
+  }
+
+  @Get('subscriptions/priority-drivers')
+  async priorityDrivers() {
+    return { userIds: await this.subscriptions.priorityDriverIds() };
   }
 
   @Get('subscription-plans')

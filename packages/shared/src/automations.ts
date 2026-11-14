@@ -19,6 +19,10 @@ export type AutomationsConfig = {
   demandHeatmap: { enabled: boolean; windowMinutes: number };
   /** Referral: both get a credit when the new user finishes a first ride or delivery. */
   referral: { enabled: boolean; referrerRewardCdf: number; refereeRewardCdf: number; maxPerReferrer: number; codeEntryDays: number };
+  /** SENGA Plus benefits applied automatically (discount, lower commission, priority, renewal). */
+  subscriptions: { enabled: boolean; priorityBoost: number; autoRenew: boolean; remindDaysBefore: number };
+  /** Company accounts: members' rides paid by their company (monthly statement). */
+  corporate: { enabled: boolean };
 };
 
 export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
@@ -30,6 +34,8 @@ export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
   driverBonus: { enabled: false, minJobs: 10, bonusCdf: 5000, minJobs2: 20, bonus2Cdf: 12000 },
   demandHeatmap: { enabled: true, windowMinutes: 30 },
   referral: { enabled: false, referrerRewardCdf: 2000, refereeRewardCdf: 2000, maxPerReferrer: 20, codeEntryDays: 7 },
+  subscriptions: { enabled: false, priorityBoost: 0.15, autoRenew: true, remindDaysBefore: 3 },
+  corporate: { enabled: false },
 };
 
 const int = (v: unknown, fallback: number, min: number, max: number) => {
@@ -48,6 +54,8 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
   const db = o.driverBonus ?? {};
   const hm = o.demandHeatmap ?? {};
   const rf = o.referral ?? {};
+  const sb = o.subscriptions ?? {};
+  const co = o.corporate ?? {};
   const minJobs = int(db.minJobs, base.driverBonus.minJobs, 1, 200);
   const days = Array.isArray(de.daysBefore)
     ? [...new Set((de.daysBefore as unknown[]).map((d) => int(d, 0, 0, 90)).filter((d) => d > 0))].sort((a, b) => b - a)
@@ -93,7 +101,35 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
       maxPerReferrer: int(rf.maxPerReferrer, base.referral.maxPerReferrer, 1, 1000),
       codeEntryDays: int(rf.codeEntryDays, base.referral.codeEntryDays, 1, 90),
     },
+    subscriptions: {
+      enabled: bool(sb.enabled, base.subscriptions.enabled),
+      priorityBoost: Math.min(1, Math.max(0, Number.isFinite(Number(sb.priorityBoost)) ? Number(sb.priorityBoost) : base.subscriptions.priorityBoost)),
+      autoRenew: bool(sb.autoRenew, base.subscriptions.autoRenew),
+      remindDaysBefore: int(sb.remindDaysBefore, base.subscriptions.remindDaysBefore, 0, 15),
+    },
+    corporate: { enabled: bool(co.enabled, base.corporate.enabled) },
   };
+}
+
+/** Active SENGA Plus plan of a user (payment-service), cached 5 minutes; null if none. */
+const subCache = new Map<string, { at: number; value: ActivePlan | null }>();
+export type ActivePlan = { target: 'PASSENGER' | 'DRIVER'; code: string; name: string; feeReductionPercent: number; priorityMatching: boolean };
+export async function fetchActivePlan(userId: string, target: 'PASSENGER' | 'DRIVER'): Promise<ActivePlan | null> {
+  const key = `${userId}:${target}`;
+  const hit = subCache.get(key);
+  if (hit && Date.now() - hit.at < 300_000) return hit.value;
+  try {
+    const res = await fetch(serviceUrl('payment', `/internal/subscriptions/active/${userId}?target=${target}`), {
+      headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      signal: AbortSignal.timeout(4000),
+    });
+    const value = res.ok ? ((await res.json()) as { plan?: ActivePlan | null }).plan ?? null : null;
+    subCache.set(key, { at: Date.now(), value });
+    if (subCache.size > 5000) subCache.clear();
+    return value;
+  } catch {
+    return hit?.value ?? null;
+  }
 }
 
 /** Bonus earned for a number of jobs in a day (pure, tested): highest tier reached, else 0. */

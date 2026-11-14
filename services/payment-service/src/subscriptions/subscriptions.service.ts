@@ -83,6 +83,56 @@ export class SubscriptionsService {
     });
   }
 
+  /** Drivers whose active plan gives priority in dispatch. */
+  async priorityDriverIds(): Promise<string[]> {
+    const rows = await this.prisma.userSubscription.findMany({
+      where: { status: SubscriptionStatus.ACTIVE, endsAt: { gt: new Date() }, plan: { target: SubscriptionTarget.DRIVER, priorityMatching: true } },
+      select: { userId: true },
+      take: 5000,
+    });
+    return [...new Set(rows.map((r) => r.userId))];
+  }
+
+  /**
+   * Renewal (Admin → Automatisations → SENGA Plus): reminder N days before the end, and when
+   * auto-renewal is on, a new month paid from the wallet just before the end.
+   */
+  async renewDue(opts: { autoRenew: boolean; remindDaysBefore: number }, notify: (userId: string, title: string, body: string) => Promise<void>) {
+    const now = Date.now();
+    const soon = await this.prisma.userSubscription.findMany({
+      where: { status: SubscriptionStatus.ACTIVE, endsAt: { gt: new Date(now), lte: new Date(now + Math.max(1, opts.remindDaysBefore) * 86_400_000) } },
+      include: { plan: true },
+      take: 2000,
+    });
+    let renewed = 0;
+    for (const s of soon) {
+      const endsAt = s.endsAt!;
+      const hoursLeft = (endsAt.getTime() - now) / 3_600_000;
+      if (opts.autoRenew && hoursLeft <= 12 && s.plan.isActive) {
+        const ref = `RENEW:${s.id}:${endsAt.toISOString().slice(0, 10)}`;
+        try {
+          await this.wallet.debit(s.userId, s.plan.monthlyPriceCdf, `Renouvellement ${s.plan.name}`, ref);
+          const next = new Date(endsAt);
+          next.setMonth(next.getMonth() + 1);
+          await this.prisma.userSubscription.update({ where: { id: s.id }, data: { endsAt: next } });
+          await notify(s.userId, 'Abonnement renouvelé', `${s.plan.name} est renouvelé jusqu’au ${next.toLocaleDateString('fr-FR')} (${formatCdf(s.plan.monthlyPriceCdf)}).`);
+          renewed++;
+        } catch {
+          await notify(s.userId, 'Abonnement à renouveler', `Solde insuffisant pour renouveler ${s.plan.name} (${formatCdf(s.plan.monthlyPriceCdf)}). Rechargez votre portefeuille avant le ${endsAt.toLocaleDateString('fr-FR')}.`);
+        }
+      } else if (hoursLeft > 12) {
+        await notify(
+          s.userId,
+          'Votre abonnement se termine bientôt',
+          opts.autoRenew
+            ? `${s.plan.name} sera renouvelé le ${endsAt.toLocaleDateString('fr-FR')} (${formatCdf(s.plan.monthlyPriceCdf)}) : gardez ce montant sur votre portefeuille.`
+            : `${s.plan.name} se termine le ${endsAt.toLocaleDateString('fr-FR')}.`,
+        );
+      }
+    }
+    return renewed;
+  }
+
   async getActiveSubscription(userId: string, target?: SubscriptionTarget) {
     await this.expireEnded(userId);
     const subs = await this.prisma.userSubscription.findMany({

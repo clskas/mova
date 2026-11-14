@@ -111,6 +111,7 @@ const Map<String, String> kStringsEn = {
   "Commande non reconnue : « {text} ». Dites « accepter » ou « refuser ».": "Command not recognised: “{text}”. Say “accept” or “decline”.",
   "Dites « accepter » ou « refuser »": "Say “accept” or “decline”",
   "Répondre à la voix": "Answer by voice",
+  "Payé par {company}": "Paid by {company}",
   "Parrainage": "Referral",
   "Invitez vos proches et gagnez un crédit SENGA": "Invite friends and earn SENGA credit",
   "Le parrainage n’est pas ouvert pour le moment.": "Referral is not open yet.",

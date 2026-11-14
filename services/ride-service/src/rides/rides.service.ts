@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, CarpoolStatus, DeliveryStatus, DeliveryType, ErrandOrderStatus, MovingRequestStatus, RentalInquiryStatus, RideSharePassengerStatus, RideStatus, RoundTripLeg, ScheduledRideStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
-import { dayRangeFilter,
+import {
+  dayRangeFilter,
   formatCdf,
   fromMobileRideStatus,
   canCancelRide,
@@ -25,6 +26,7 @@ import { dayRangeFilter,
   isPassengerCountEnabled,
   normalizeRidePassengerCount,
   vehiclePhotoList,
+  fetchActivePlan,
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -138,6 +140,7 @@ export class RidesService {
     promoCode?: string,
     redeemPromo = false,
     roundTrip = false,
+    passengerId?: string,
   ) {
     const { pickupArea, isInterCity } = assertServiceAreaPair(pickupLat, pickupLng, dropoffLat, dropoffLng);
     const route = await this.routing.resolveRoadDistance(pickupLat, pickupLng, dropoffLat, dropoffLng);
@@ -184,6 +187,16 @@ export class RidesService {
     const promoApplied = await applyPromoCode(this.promo, base.totalCdf, promoCode, redeemPromo, {
       context: { serviceType: 'RIDE', city: pickupArea.name },
     });
+    // SENGA Plus (Admin → Automatisations): the passenger's plan discount, paid by SENGA like a promo.
+    if (passengerId && this.platformConfig.get().automations.subscriptions.enabled) {
+      const plan = await fetchActivePlan(passengerId, 'PASSENGER');
+      const pct = Math.min(50, Math.max(0, Number(plan?.feeReductionPercent) || 0));
+      if (pct > 0) {
+        const off = Math.floor((promoApplied.estimatedPriceCdf * pct) / 100);
+        promoApplied.estimatedPriceCdf -= off;
+        promoApplied.discountCdf = (promoApplied.discountCdf ?? 0) + off;
+      }
+    }
     return {
       ...base,
       estimatedFareCdf: promoApplied.estimatedPriceCdf,
@@ -326,6 +339,7 @@ export class RidesService {
       data.promoCode,
       true,
       roundTrip,
+      passengerId,
     );
     const distanceKm = estimate.distanceKm;
     const ride = await this.prisma.ride.create({
@@ -2064,8 +2078,15 @@ export class RidesService {
     }
     const rule = await this.commission.get(CommissionServiceType.RIDE);
     const gross = rideDriverGrossCdf(ride);
-    const { driverNetCdf } = this.commission.splitGross(gross, rule.platformPercent);
-    return { rideId, driverId: ride.driverId, driverNetCdf, grossCdf: gross };
+    // SENGA Plus driver plan: lower commission (feeReductionPercent of the platform's share).
+    let platformPercent = rule.platformPercent;
+    if (this.platformConfig.get().automations.subscriptions.enabled) {
+      const plan = await fetchActivePlan(ride.driverId, 'DRIVER');
+      const cut = Math.min(100, Math.max(0, Number(plan?.feeReductionPercent) || 0));
+      if (cut > 0) platformPercent = Math.round(platformPercent * (1 - cut / 100) * 100) / 100;
+    }
+    const { driverNetCdf } = this.commission.splitGross(gross, platformPercent);
+    return { rideId, driverId: ride.driverId, driverNetCdf, grossCdf: gross, platformPercent };
   }
 
   async getServicePayout(referenceType: string, referenceId: string) {

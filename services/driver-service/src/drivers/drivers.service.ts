@@ -36,6 +36,8 @@ import {
   vehiclePhotoList,
   vehicleFitsPassengers,
   vehiclePassengerSeats,
+  fetchAutomations,
+  INTERNAL_API_KEY,
 } from '@mova/shared';
 import { normalizeDocumentNumber } from '../ocr/document-forgery';
 import { PrismaService } from '../prisma/prisma.service';
@@ -251,6 +253,7 @@ export class DriversService {
       include: { vehicles: { where: { type: { in: compatibleTypes }, isActive: true, typeApprovalStatus: KycStatus.APPROVED } } },
     });
     const candidates: DriverCandidate[] = [];
+    const priority = await this.priorityDrivers();
     for (const driver of drivers) {
       if (!this.documentsStatusFor(driver).canOperate) continue;
       if (driver.currentLat == null || driver.currentLng == null) continue;
@@ -261,7 +264,8 @@ export class DriversService {
       if (distanceKm > effectiveRadius) continue;
       const sameCity = driver.operatingCity === pickupCity;
       const rating = driver.ratingAvg;
-      const baseScore = this.computeScore(distanceKm, rating, driver.totalRides);
+      const baseScore =
+        this.computeScore(distanceKm, rating, driver.totalRides) + (priority.ids.has(driver.userId) ? priority.boost : 0);
       candidates.push({
         driverId: driver.id,
         userId: driver.userId,
@@ -2006,6 +2010,28 @@ export class DriversService {
     await this.prisma.incident.deleteMany({ where: { userId } });
     await this.prisma.driverProfile.deleteMany({ where: { userId } });
     return { deleted: true, userId };
+  }
+
+  private priorityCache: { at: number; ids: Set<string>; boost: number } | null = null;
+
+  /** SENGA Plus drivers with « priorité » get a score boost (Admin → Automatisations). */
+  private async priorityDrivers(): Promise<{ ids: Set<string>; boost: number }> {
+    const cfg = (await fetchAutomations()).subscriptions;
+    if (!cfg.enabled || cfg.priorityBoost <= 0) return { ids: new Set(), boost: 0 };
+    if (this.priorityCache && Date.now() - this.priorityCache.at < 300_000) {
+      return { ids: this.priorityCache.ids, boost: cfg.priorityBoost };
+    }
+    try {
+      const res = await fetch(serviceUrl('payment', '/internal/subscriptions/priority-drivers'), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+        signal: AbortSignal.timeout(4000),
+      });
+      const body = res.ok ? ((await res.json()) as { userIds?: string[] }) : { userIds: [] };
+      this.priorityCache = { at: Date.now(), ids: new Set(body.userIds ?? []), boost: cfg.priorityBoost };
+    } catch {
+      this.priorityCache = { at: Date.now(), ids: this.priorityCache?.ids ?? new Set(), boost: cfg.priorityBoost };
+    }
+    return { ids: this.priorityCache.ids, boost: cfg.priorityBoost };
   }
 
   private computeScore(distanceKm: number, rating: number, totalRides: number, acceptanceRate = 0.85): number {

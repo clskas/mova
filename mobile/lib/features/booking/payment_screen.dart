@@ -69,9 +69,23 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   int _mmPollAttempts = 0;
   Set<String> _enabledMm = {'MPESA', 'AIRTEL_MONEY'};
 
-  List<(String, String, IconData, Color)> get _paymentMethods => _allPaymentMethods
-      .where((m) => !_mobileMoneyMethods.contains(m.$1) || _enabledMm.contains(m.$1))
-      .toList();
+  /// The passenger's company, when it pays their rides (Admin → Comptes entreprises).
+  String? _companyName;
+
+  List<(String, String, IconData, Color)> get _paymentMethods => [
+        // Company first: rides only (services are paid another way).
+        if (_companyName != null && widget.rideId != null)
+          ('CORPORATE', trf('Payé par {company}', {'company': _companyName!}), Icons.business, MovaColors.violet),
+        ..._allPaymentMethods.where((m) => !_mobileMoneyMethods.contains(m.$1) || _enabledMm.contains(m.$1)),
+      ];
+
+  Future<void> _loadCompany() async {
+    final result = await ref.read(apiClientProvider).get('/payments/corporate/me', skipCache: true);
+    if (!mounted) return;
+    if (result case Success(:final data) when data is Map && data['membership'] is Map) {
+      setState(() => _companyName = (data['membership'] as Map)['name']?.toString());
+    }
+  }
 
   @override
   void initState() {
@@ -80,6 +94,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     _loadPhone();
     _loadPaymentDetails();
     _loadMmVisibility();
+    _loadCompany();
   }
 
   Future<void> _loadMmVisibility() async {

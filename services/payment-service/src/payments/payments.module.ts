@@ -1,3 +1,4 @@
+import { CorporateModule } from '../corporate/corporate.module';
 import { Module } from '@nestjs/common';
 import { PaymentsController } from './payments.controller';
 import { PaymentsWebhookController } from './payments-webhook.controller';
@@ -11,7 +12,7 @@ import { RentalPayoutModule } from '../payouts/rental-payout.module';
 import { DriverDebtLedgerModule } from '../ledger/driver-debt-ledger.module';
 import { AirtelMoneyProvider, MockPaymentProvider, MpesaProvider, OrangeMoneyProvider } from './payment-providers';
 @Module({
-  imports: [
+  imports: [CorporateModule, 
     WalletModule,
     HubModule,
     DriverPayoutModule,

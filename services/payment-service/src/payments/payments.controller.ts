@@ -1,3 +1,4 @@
+import { CorporateService } from '../corporate/corporate.service';
 import { Body, Controller, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -9,7 +10,13 @@ import { PaymentsService } from './payments.service';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class PaymentsController {
-  constructor(private paymentsService: PaymentsService) {}
+  constructor(private paymentsService: PaymentsService, private corporate: CorporateService) {}
+
+  @Get('corporate/me')
+  @ApiOperation({ summary: 'Mon entreprise (paiement des courses par l’entreprise)' })
+  corporateMe(@Request() req: { user: { id: string } }) {
+    return this.corporate.membership(req.user.id).then((m) => ({ membership: m }));
+  }
 
   @Get('rides/unpaid')
   @ApiOperation({ summary: 'Course terminée en attente de paiement (passager)' })

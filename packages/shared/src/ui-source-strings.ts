@@ -111,6 +111,7 @@ export const UI_SOURCE_STRINGS: readonly string[] = [
  "Commande non reconnue : « {text} ». Dites « accepter » ou « refuser ».",
  "Dites « accepter » ou « refuser »",
  "Répondre à la voix",
+ "Payé par {company}",
  "Parrainage",
  "Invitez vos proches et gagnez un crédit SENGA",
  "Le parrainage n’est pas ouvert pour le moment.",

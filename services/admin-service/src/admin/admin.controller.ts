@@ -1686,6 +1686,55 @@ export class AdminController {
     return this.adminService.updateMovingVehicleCategory(category, body, req.user.role);
   }
 
+  @Get('corporate/accounts')
+  @RequirePermissions(AdminPermission.WALLETS_READ)
+  @ApiOperation({ summary: 'Comptes entreprises' })
+  corporateList() {
+    return this.adminService.corporateList();
+  }
+
+  @Post('corporate/accounts')
+  @RequirePermissions(AdminPermission.WALLETS_WRITE)
+  corporateCreate(@Body() body: Record<string, unknown>) {
+    return this.adminService.corporateCreate(body);
+  }
+
+  @Patch('corporate/accounts/:id')
+  @RequirePermissions(AdminPermission.WALLETS_WRITE)
+  corporateUpdate(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.corporateUpdate(id, body);
+  }
+
+  @Get('corporate/accounts/:id/members')
+  @RequirePermissions(AdminPermission.WALLETS_READ)
+  corporateMembers(@Param('id') id: string) {
+    return this.adminService.corporateMembers(id);
+  }
+
+  @Post('corporate/accounts/:id/members')
+  @RequirePermissions(AdminPermission.WALLETS_WRITE)
+  corporateAddMember(@Param('id') id: string, @Body() body: { phone?: string; label?: string }) {
+    return this.adminService.corporateAddMember(id, body ?? {});
+  }
+
+  @Post('corporate/members/:memberId/remove')
+  @RequirePermissions(AdminPermission.WALLETS_WRITE)
+  corporateRemoveMember(@Param('memberId') memberId: string) {
+    return this.adminService.corporateRemoveMember(memberId);
+  }
+
+  @Post('corporate/accounts/:id/settle')
+  @RequirePermissions(AdminPermission.WALLETS_WRITE)
+  corporateSettle(@Param('id') id: string, @Body() body: { amountCdf?: number; note?: string }) {
+    return this.adminService.corporateSettle(id, body ?? {});
+  }
+
+  @Get('corporate/accounts/:id/statement')
+  @RequirePermissions(AdminPermission.WALLETS_READ)
+  corporateStatement(@Param('id') id: string) {
+    return this.adminService.corporateStatement(id);
+  }
+
   @Get('platform-config')
   @RequirePermissions(AdminPermission.RULES_READ)
   @ApiOperation({ summary: 'Configuration plateforme (dispatch, inter-ville, livraison, etc.)' })

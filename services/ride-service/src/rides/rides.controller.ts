@@ -65,7 +65,7 @@ export class RidesController {
 
   @Post('estimate')
   @ApiOperation({ summary: 'Estimer tarif (CDF, Kinshasa)' })
-  estimate(@Body() dto: EstimateRideDto) {
+  estimate(@Body() dto: EstimateRideDto, @Request() req: { user?: { id?: string } }) {
     return this.ridesService.estimate(
       dto.pickupLat,
       dto.pickupLng,
@@ -75,6 +75,7 @@ export class RidesController {
       dto.promoCode,
       false,
       dto.roundTrip === true,
+      req.user?.id,
     );
   }
 

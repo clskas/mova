@@ -1,3 +1,4 @@
+import { SubscriptionRenewalScheduler } from './subscription-renewal.scheduler';
 import { Module } from '@nestjs/common';
 import { WalletModule } from '../wallet/wallet.module';
 import { SubscriptionsController } from './subscriptions.controller';
@@ -6,7 +7,7 @@ import { SubscriptionsService } from './subscriptions.service';
 @Module({
   imports: [WalletModule],
   controllers: [SubscriptionsController],
-  providers: [SubscriptionsService],
+  providers: [SubscriptionsService, SubscriptionRenewalScheduler],
   exports: [SubscriptionsService],
 })
 export class SubscriptionsModule {}

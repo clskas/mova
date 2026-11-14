@@ -1,4 +1,4 @@
-﻿name: Mobile Release
+name: Mobile Release
 
 # Internal-track builds (dispatched after each main deploy) share one group: a newer
 # one supersedes the older. Production releases (v* tags, manual store options) get a
@@ -251,7 +251,7 @@ jobs:
 
       # Save passenger AAB before the driver build so a later cancel still leaves an artifact.
       - name: Upload passenger AAB artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mova-passenger-aab
           path: mobile/build/app/outputs/bundle/passengerRelease/app-passenger-release.aab
@@ -285,7 +285,7 @@ jobs:
         run: bash mobile/tool/verify_aab_flavor.sh driver mobile/build/app/outputs/bundle/driverRelease/app-driver-release.aab
 
       - name: Upload driver AAB artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mova-driver-aab
           path: mobile/build/app/outputs/bundle/driverRelease/app-driver-release.aab
@@ -328,7 +328,7 @@ jobs:
       - name: Upload passenger APK artifact
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_apks == true }}
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mova-passenger-apk
           path: mobile/build/app/outputs/flutter-apk/app-passenger-release.apk
@@ -337,7 +337,7 @@ jobs:
       - name: Upload driver APK artifact
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_apks == true }}
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mova-driver-apk
           path: mobile/build/app/outputs/flutter-apk/app-driver-release.apk
@@ -772,7 +772,7 @@ jobs:
 
       - name: Upload ${{ matrix.flavor }} IPA artifact
         if: steps.build_ipa.outcome == 'success'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ runner.temp }}/mova-ipa/${{ matrix.flavor }}/*.ipa

@@ -1686,6 +1686,18 @@ export class AdminController {
     return this.adminService.updateMovingVehicleCategory(category, body, req.user.role);
   }
 
+  @Get('drivers-quality-blocked')
+  @RequirePermissions(AdminPermission.RULES_READ)
+  qualityBlockedDrivers() {
+    return this.adminService.qualityBlockedDrivers();
+  }
+
+  @Post('drivers/:userId/quality-unblock')
+  @RequirePermissions(AdminPermission.RULES_WRITE)
+  qualityUnblock(@Request() req: { user: AdminJwtUser }, @Param('userId') userId: string) {
+    return this.adminService.qualityUnblock(userId, req.user.role);
+  }
+
   @Get('corporate/accounts')
   @RequirePermissions(AdminPermission.WALLETS_READ)
   @ApiOperation({ summary: 'Comptes entreprises' })

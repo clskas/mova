@@ -759,6 +759,17 @@ export class AdminService {
     return this.fetchJson('auth', '/internal/users/play-prelaunch');
   }
   /** Phones / ids typed by the admin → user ids (test accounts). */
+  // ---------- Driver quality blocks ----------
+  qualityBlockedDrivers() {
+    return this.fetchJson('driver', '/internal/drivers/quality-blocked');
+  }
+  qualityUnblock(userId: string, actorRole?: string) {
+    if (actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Réservé au super administrateur.');
+    }
+    return this.proxy('driver', `/internal/drivers/${userId}/quality-unblock`, { method: 'POST', body: '{}' });
+  }
+
   // ---------- Company accounts ----------
   corporateList() {
     return this.fetchJson('payment', '/internal/corporate/accounts');

@@ -301,6 +301,8 @@ model Rating {
   toUserId   String
   score      Int
   comment    String?
+  /// Detailed marks 1–5 (cleanliness, driving, punctuality, courtesy), optional.
+  criteria   Json?
   createdAt  DateTime @default(now())
 
   @@unique([rideId, fromUserId])

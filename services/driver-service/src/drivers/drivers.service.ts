@@ -1,3 +1,4 @@
+import { FaceCheckService } from './face-check.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { KycStatus, VehicleType } from '@prisma/client';
 import * as crypto from 'crypto';
@@ -65,6 +66,7 @@ export class DriversService {
     private prisma: PrismaService,
     private ocrService: OcrService,
     private matchingConfig: MatchingConfigService,
+    private faceCheck?: FaceCheckService,
   ) {}
 
   private documentsStatusFor(profile: {
@@ -256,6 +258,7 @@ export class DriversService {
     const priority = await this.priorityDrivers();
     for (const driver of drivers) {
       if (!this.documentsStatusFor(driver).canOperate) continue;
+      if ((driver as { qualityBlockedAt?: Date | null }).qualityBlockedAt) continue;
       if (driver.currentLat == null || driver.currentLng == null) continue;
       // Group rides: only vehicles with enough passenger seats (undeclared = category default).
       const fitting = driver.vehicles.filter((v) => vehicleFitsPassengers(v, minSeats));
@@ -310,6 +313,14 @@ export class DriversService {
           : "Type d'engin en attente de validation SENGA — vous ne pouvez pas encore recevoir de courses.",
       );
     }
+    if (isAvailable && profile.qualityBlockedAt) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        undefined,
+        'Compte suspendu pour qualité de service (notes trop basses). Contactez SENGA.',
+      );
+    }
+    if (isAvailable) await this.faceCheck?.assertCanGoOnline(userId, profile.faceCheckedAt);
     const kyc = await this.getKycStatus(userId);
     const documentsStatus = this.documentsStatusFor(profile, kyc.checklist);
     if (isAvailable && !documentsStatus.canOperate) {

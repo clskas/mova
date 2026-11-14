@@ -1,3 +1,4 @@
+import '../../core/theme/mova_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/error/result.dart';
@@ -33,6 +34,14 @@ class RatingScreen extends ConsumerStatefulWidget {
 
 class _RatingScreenState extends ConsumerState<RatingScreen> {
   int _score = 5;
+  /// Detailed marks (passenger rating the driver), optional.
+  final Map<String, int> _criteria = {};
+  static const _criteriaLabels = {
+    'proprete': 'Propreté',
+    'conduite': 'Conduite',
+    'ponctualite': 'Ponctualité',
+    'amabilite': 'Amabilité',
+  };
   bool _loading = false;
   bool _loadingContext = true;
   bool _closing = false;
@@ -152,6 +161,7 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
         'toUserId': toUserId,
         'score': _score,
         if (comment.isNotEmpty) 'comment': comment,
+        if (_criteria.isNotEmpty) 'criteria': _criteria,
       });
     }
 
@@ -210,6 +220,23 @@ class _RatingScreenState extends ConsumerState<RatingScreen> {
                   starSize: 40,
                   onScoreChanged: (v) => setState(() => _score = v),
                 ),
+                if (!widget.ratePassenger && !widget.isErrand) ...[
+                  const SizedBox(height: 12),
+                  Text(tr('Détail (facultatif)'), style: const TextStyle(color: MovaColors.textSecondary)),
+                  for (final e in _criteriaLabels.entries)
+                    Row(
+                      children: [
+                        SizedBox(width: 110, child: Text(tr(e.value))),
+                        Expanded(
+                          child: MovaStarRating(
+                            score: _criteria[e.key] ?? 0,
+                            starSize: 24,
+                            onScoreChanged: (v) => setState(() => _criteria[e.key] = v),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
                 const SizedBox(height: 16),
                 TextField(
                   controller: _commentController,

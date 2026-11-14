@@ -1,3 +1,4 @@
+import { FaceCheckService } from '../drivers/face-check.service';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min, ValidateIf } from 'class-validator';
@@ -103,8 +104,21 @@ class CreateIncidentDto {
 @Controller('internal')
 @UseGuards(InternalApiGuard)
 export class InternalController {
-  constructor(private drivers: DriversService, private incidents: IncidentsService, private smileId: SmileIdService) {}
+  constructor(
+    private faceCheck: FaceCheckService,private drivers: DriversService, private incidents: IncidentsService, private smileId: SmileIdService) {}
   @Post('profiles') createProfile(@Body() dto: CreateProfileDto) { return this.drivers.createProfile(dto.userId); }
+  @Post('drivers/:userId/quality-block')
+  qualityBlock(@Param('userId') userId: string, @Body() body: { reason?: string }) {
+    return this.faceCheck.qualityBlock(userId, String(body?.reason ?? 'Notes trop basses'));
+  }
+  @Post('drivers/:userId/quality-unblock')
+  qualityUnblock(@Param('userId') userId: string) {
+    return this.faceCheck.qualityUnblock(userId);
+  }
+  @Get('drivers/quality-blocked')
+  qualityBlocked() {
+    return this.faceCheck.qualityBlocked();
+  }
   @Get('drivers/nearby') nearby(@Query() q: NearbyQuery) {
     return this.drivers.findNearby(
       q.lat,

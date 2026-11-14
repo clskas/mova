@@ -27,7 +27,14 @@ export class RatingsService {
     if (existing) throw new MovaHttpException(MovaErrorCode.RIDE_ALREADY_RATED);
 
     const rating = await this.prisma.rating.create({
-      data: { rideId: dto.rideId, fromUserId, toUserId: dto.toUserId, score: dto.score, comment: dto.comment },
+      data: {
+        rideId: dto.rideId,
+        fromUserId,
+        toUserId: dto.toUserId,
+        score: dto.score,
+        comment: dto.comment,
+        ...(cleanCriteria(dto.criteria) ? { criteria: cleanCriteria(dto.criteria)! } : {}),
+      },
     });
     // A passenger rated by the driver: their passenger note (shown on the next offers), not a
     // driver rating. The driver note only counts ratings received as the ride's driver.
@@ -46,4 +53,17 @@ export class RatingsService {
     }
     return rating;
   }
+}
+
+const CRITERIA = ['proprete', 'conduite', 'ponctualite', 'amabilite'] as const;
+
+/** Keeps the known criteria with a whole mark 1–5 (pure, tested). */
+export function cleanCriteria(raw: unknown): Record<string, number> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const out: Record<string, number> = {};
+  for (const k of CRITERIA) {
+    const v = Math.round(Number((raw as Record<string, unknown>)[k]));
+    if (Number.isFinite(v) && v >= 1 && v <= 5) out[k] = v;
+  }
+  return Object.keys(out).length ? out : null;
 }

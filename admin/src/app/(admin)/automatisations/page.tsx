@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchPlatformConfig, updatePlatformConfig } from "@/lib/api";
+import { apiFetch, fetchPlatformConfig, updatePlatformConfig } from "@/lib/api";
 import { useAdmin } from "@/components/AdminProvider";
 import { BtnPrimary, Card, ErrorBanner, LoadingState, PageHeader } from "@/components/ui";
 
@@ -15,7 +15,12 @@ type Automations = {
   referral: { enabled: boolean; referrerRewardCdf: number; refereeRewardCdf: number; maxPerReferrer: number; codeEntryDays: number };
   subscriptions: { enabled: boolean; priorityBoost: number; autoRenew: boolean; remindDaysBefore: number };
   corporate: { enabled: boolean };
+  faceCheck: { enabled: boolean; blockUntilChecked: boolean };
+  routeAnomaly: { enabled: boolean; stopMinutes: number; detourKm: number };
+  ratingQuality: { enabled: boolean; minAvg: number; minRatings: number; autoBlock: boolean };
 };
+
+type Blocked = { userId: string; qualityBlockedAt: string; qualityBlockReason?: string | null; ratingAvg?: number };
 
 const DEFAULTS: Automations = {
   dailyReport: { enabled: true, hourKinshasa: 7 },
@@ -27,6 +32,9 @@ const DEFAULTS: Automations = {
   referral: { enabled: false, referrerRewardCdf: 2000, refereeRewardCdf: 2000, maxPerReferrer: 20, codeEntryDays: 7 },
   subscriptions: { enabled: false, priorityBoost: 0.15, autoRenew: true, remindDaysBefore: 3 },
   corporate: { enabled: false },
+  faceCheck: { enabled: false, blockUntilChecked: true },
+  routeAnomaly: { enabled: true, stopMinutes: 10, detourKm: 3 },
+  ratingQuality: { enabled: true, minAvg: 3.5, minRatings: 10, autoBlock: false },
 };
 
 function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disabled: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -62,6 +70,7 @@ export default function AutomatisationsPage() {
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState<Blocked[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -77,7 +86,11 @@ export default function AutomatisationsPage() {
         referral: { ...DEFAULTS.referral, ...cfg.referral },
         subscriptions: { ...DEFAULTS.subscriptions, ...cfg.subscriptions },
         corporate: { ...DEFAULTS.corporate, ...cfg.corporate },
+        faceCheck: { ...DEFAULTS.faceCheck, ...cfg.faceCheck },
+        routeAnomaly: { ...DEFAULTS.routeAnomaly, ...cfg.routeAnomaly },
+        ratingQuality: { ...DEFAULTS.ratingQuality, ...cfg.ratingQuality },
       };
+      setBlocked(await apiFetch<Blocked[]>("/api/admin/drivers-quality-blocked").catch(() => []));
       setA(next);
       setDaysText(next.docExpiry.daysBefore.join(", "));
     } catch (e) {
@@ -303,6 +316,96 @@ export default function AutomatisationsPage() {
           <BtnPrimary disabled={saving === "corporate"} onClick={() => void save("corporate", a.corporate)}>
             {saving === "corporate" ? "…" : "Enregistrer"}
           </BtnPrimary>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Vérification du visage du chauffeur</h2>
+        <p className="text-sm text-slate-600">
+          Chaque jour, avant de passer en ligne, le chauffeur prend une selfie comparée par l&apos;IA à sa photo validée.
+          Visage différent : refus et alerte à l&apos;équipe. Si l&apos;IA est coupée, le chauffeur peut travailler et
+          l&apos;équipe est prévenue.
+        </p>
+        <Toggle label="Activé" checked={a.faceCheck.enabled} disabled={ro} onChange={(v) => set("faceCheck", { enabled: v })} />
+        <Toggle label="Bloquer le passage en ligne tant que la selfie du jour n'est pas faite" checked={a.faceCheck.blockUntilChecked} disabled={ro} onChange={(v) => set("faceCheck", { blockUntilChecked: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "faceCheck"} onClick={() => void save("faceCheck", a.faceCheck)}>
+            {saving === "faceCheck" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Trajet anormal pendant une course</h2>
+        <p className="text-sm text-slate-600">
+          Toutes les 3 minutes : si une course en cours reste arrêtée longtemps loin de la destination, ou fait un grand
+          détour, le passager reçoit « Tout va bien ? » (avec le bouton SOS) et l&apos;équipe une alerte.
+        </p>
+        <Toggle label="Activé" checked={a.routeAnomaly.enabled} disabled={ro} onChange={(v) => set("routeAnomaly", { enabled: v })} />
+        <div className="flex flex-wrap gap-4">
+          <Num label="Arrêt (minutes)" value={a.routeAnomaly.stopMinutes} disabled={ro} onChange={(v) => set("routeAnomaly", { stopMinutes: v })} />
+          <Num label="Détour (km)" value={a.routeAnomaly.detourKm} disabled={ro} onChange={(v) => set("routeAnomaly", { detourKm: v })} />
+        </div>
+        {editable && (
+          <BtnPrimary disabled={saving === "routeAnomaly"} onClick={() => void save("routeAnomaly", a.routeAnomaly)}>
+            {saving === "routeAnomaly" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Qualité des chauffeurs (notes)</h2>
+        <p className="text-sm text-slate-600">
+          Chaque matin : alerte pour les chauffeurs dont la moyenne des dernières notes est sous le seuil. Option : les
+          suspendre automatiquement (ils ne peuvent plus passer en ligne jusqu&apos;au déblocage ci-dessous). Les passagers
+          peuvent aussi noter la propreté, la conduite, la ponctualité et l&apos;amabilité.
+        </p>
+        <Toggle label="Activé" checked={a.ratingQuality.enabled} disabled={ro} onChange={(v) => set("ratingQuality", { enabled: v })} />
+        <Toggle label="Suspendre automatiquement sous le seuil" checked={a.ratingQuality.autoBlock} disabled={ro} onChange={(v) => set("ratingQuality", { autoBlock: v })} />
+        <div className="flex flex-wrap gap-4">
+          <label className="text-sm text-slate-700">
+            Seuil (moyenne sur 5)
+            <input
+              type="number"
+              step="0.1"
+              className="mt-1 block w-28 rounded border border-slate-300 px-2 py-1"
+              value={a.ratingQuality.minAvg}
+              disabled={ro}
+              onChange={(e) => set("ratingQuality", { minAvg: Number(e.target.value) })}
+            />
+          </label>
+          <Num label="Sur les N dernières notes" value={a.ratingQuality.minRatings} disabled={ro} onChange={(v) => set("ratingQuality", { minRatings: v })} />
+        </div>
+        {editable && (
+          <BtnPrimary disabled={saving === "ratingQuality"} onClick={() => void save("ratingQuality", a.ratingQuality)}>
+            {saving === "ratingQuality" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+        {blocked.length > 0 && (
+          <div className="border-t pt-3">
+            <p className="text-sm font-medium">Chauffeurs suspendus pour qualité</p>
+            <ul className="mt-2 space-y-1 text-sm">
+              {blocked.map((b) => (
+                <li key={b.userId} className="flex items-center justify-between gap-2">
+                  <span>
+                    {b.userId.slice(0, 8)} — {b.qualityBlockReason ?? ""} ({new Date(b.qualityBlockedAt).toLocaleDateString("fr-FR")})
+                  </span>
+                  {editable && (
+                    <button
+                      className="text-xs text-violet-700 underline"
+                      onClick={async () => {
+                        if (!window.confirm("Débloquer ce chauffeur ?")) return;
+                        await apiFetch(`/api/admin/drivers/${b.userId}/quality-unblock`, { method: "POST", body: "{}" });
+                        await load();
+                      }}
+                    >
+                      Débloquer
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </Card>
     </div>

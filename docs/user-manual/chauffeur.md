@@ -56,6 +56,11 @@ La **ville SENGA** sur l'accueil est détectée via GPS à l'ouverture (modifiab
 - **Zones de demande** : le bouton sur l'accueil ouvre une carte des demandes récentes autour de vous ; en rouge, les clients qui attendent encore un chauffeur.
 - **Parrainage** : Profil → Parrainage, partagez votre code. Quand votre filleul termine sa première mission, vous recevez tous les deux un crédit (si SENGA l'active).
 
+## Vérification du visage et qualité
+
+- **Selfie du jour** (si SENGA l'active) : au premier passage en ligne de la journée, l'app demande une selfie, comparée à votre photo validée. Mettez-vous face à la caméra, bien éclairé. Si elle ne correspond pas, vous ne pouvez pas passer en ligne : contactez SENGA.
+- **Notes** : les passagers notent aussi la propreté, la conduite, la ponctualité et l'amabilité. Une moyenne trop basse sur vos dernières notes peut entraîner une suspension par SENGA.
+
 ## Position GPS pendant les missions
 
 Pendant une course ou une livraison active, l'application envoie automatiquement votre position :

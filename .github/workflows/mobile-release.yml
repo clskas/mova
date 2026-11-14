@@ -1,4 +1,4 @@
-﻿name: Mobile Release
+name: Mobile Release
 
 # Internal-track builds (dispatched after each main deploy) share one group: a newer
 # one supersedes the older. Production releases (v* tags, manual store options) get a
@@ -897,7 +897,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 

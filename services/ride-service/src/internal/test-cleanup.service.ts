@@ -11,6 +11,8 @@ export type TestCleanupFilter = {
   maxMinutes?: number;
   /** Also the cancelled requests (no trip, often no money): they only leave the reports. */
   includeCancelled?: boolean;
+  /** Any duration — only honoured with test accounts listed (never for everybody). */
+  anyDuration?: boolean;
 };
 
 export type TestCleanupItem = {
@@ -51,11 +53,19 @@ export class TestCleanupService {
       );
     }
     const maxMinutes = Math.min(30, Math.max(1, Number(f.maxMinutes) || 5));
-    return { before, userIds, maxMinutes, includeCancelled: f.includeCancelled === true };
+    return {
+      before,
+      userIds,
+      maxMinutes,
+      includeCancelled: f.includeCancelled === true,
+      anyDuration: f.anyDuration === true && userIds.length > 0,
+    };
   }
 
   async select(filter: TestCleanupFilter): Promise<TestCleanupItem[]> {
-    const { before, userIds, maxMinutes, includeCancelled } = this.parseFilter(filter);
+    const { before, userIds, maxMinutes, includeCancelled, anyDuration } = this.parseFilter(filter);
+    const tooLong = (d: number) => !anyDuration && d >= maxMinutes;
+    const shown = (d: number) => (Number.isFinite(d) ? Math.round(d * 10) / 10 : -1);
     const created = before ? { createdAt: { lte: before } } : {};
     const who = (fields: string[]) =>
       userIds.length ? { OR: fields.map((f) => ({ [f]: { in: userIds } })) } : {};
@@ -74,9 +84,9 @@ export class TestCleanupService {
     });
     for (const r of rides) {
       const d = minutes(r.startedAt ?? r.acceptedAt, r.completedAt);
-      if (d >= maxMinutes) continue;
+      if (tooLong(d)) continue;
       items.push({
-        key: `RIDE:${r.id}`, type: 'RIDE', id: r.id, createdAt: r.createdAt.toISOString(), durationMin: Math.round(d * 10) / 10,
+        key: `RIDE:${r.id}`, type: 'RIDE', id: r.id, createdAt: r.createdAt.toISOString(), durationMin: shown(d),
         priceCdf: r.finalFareCdf ?? r.estimatedFareCdf ?? 0, customerId: r.passengerId, driverId: r.driverId,
         label: `${r.pickupAddress ?? 'Départ'} → ${r.dropoffAddress ?? 'Arrivée'}`, extraIds: r.sharePassengers.map((p) => p.id),
       });
@@ -93,9 +103,9 @@ export class TestCleanupService {
     for (const x of deliveries) {
       // Delivered without a recorded time (old app, admin action): last update instead.
       const d = minutes(x.pickedUpAt ?? x.createdAt, x.deliveredAt ?? x.updatedAt);
-      if (d >= maxMinutes) continue;
+      if (tooLong(d)) continue;
       items.push({
-        key: `DELIVERY:${x.id}`, type: 'DELIVERY', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: Math.round(d * 10) / 10,
+        key: `DELIVERY:${x.id}`, type: 'DELIVERY', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: shown(d),
         priceCdf: x.finalPriceCdf ?? x.estimatedPriceCdf ?? 0, customerId: x.userId, driverId: x.driverId,
         label: `${x.type} · ${x.dropoffAddress ?? x.deliveryAddress ?? ''}`, extraIds: [],
       });
@@ -108,9 +118,9 @@ export class TestCleanupService {
     });
     for (const x of errands) {
       const d = minutes(x.createdAt, x.completedAt);
-      if (d >= maxMinutes) continue;
+      if (tooLong(d)) continue;
       items.push({
-        key: `ERRAND:${x.id}`, type: 'ERRAND', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: Math.round(d * 10) / 10,
+        key: `ERRAND:${x.id}`, type: 'ERRAND', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: shown(d),
         priceCdf: (x.finalPriceCdf ?? x.estimatedPriceCdf ?? 0) + (x.purchaseTotalCdf ?? 0), customerId: x.userId, driverId: x.driverId,
         label: (x.description ?? 'Courses & commissions').slice(0, 80), extraIds: [],
       });
@@ -123,9 +133,9 @@ export class TestCleanupService {
     });
     for (const x of moves) {
       const d = minutes(x.createdAt, x.completedAt);
-      if (d >= maxMinutes) continue;
+      if (tooLong(d)) continue;
       items.push({
-        key: `MOVING:${x.id}`, type: 'MOVING', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: Math.round(d * 10) / 10,
+        key: `MOVING:${x.id}`, type: 'MOVING', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: shown(d),
         priceCdf: x.estimatedPriceCdf, customerId: x.userId, driverId: x.driverId,
         label: `${x.pickupAddress} → ${x.dropoffAddress}`, extraIds: [],
       });
@@ -141,9 +151,9 @@ export class TestCleanupService {
     });
     for (const x of rentals) {
       const d = minutes(x.createdAt, x.checkOutAt ?? x.updatedAt);
-      if (d >= maxMinutes) continue;
+      if (tooLong(d)) continue;
       items.push({
-        key: `RENTAL:${x.id}`, type: 'RENTAL', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: Math.round(d * 10) / 10,
+        key: `RENTAL:${x.id}`, type: 'RENTAL', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: shown(d),
         priceCdf: x.totalCdf ?? x.estimatedPriceCdf ?? 0, customerId: x.userId, driverId: x.vehicle?.ownerUserId ?? x.driverId,
         label: `Location ${[x.vehicle?.make, x.vehicle?.model].filter(Boolean).join(' ')}`.trim(), extraIds: [],
       });
@@ -159,9 +169,9 @@ export class TestCleanupService {
     });
     for (const x of trips) {
       const d = minutes(x.createdAt, x.updatedAt);
-      if (d >= maxMinutes) continue;
+      if (tooLong(d)) continue;
       items.push({
-        key: `CARPOOL:${x.id}`, type: 'CARPOOL', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: Math.round(d * 10) / 10,
+        key: `CARPOOL:${x.id}`, type: 'CARPOOL', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: shown(d),
         priceCdf: x.passengers.reduce((s, p) => s + p.seats * x.pricePerSeatCdf, 0), customerId: x.passengers[0]?.userId ?? null,
         driverId: x.driverId, label: `Covoiturage ${x.pickupAddress ?? ''} → ${x.dropoffAddress ?? ''}`, extraIds: x.passengers.map((p) => p.id),
       });
@@ -190,9 +200,9 @@ export class TestCleanupService {
       const r = linkedById.get(x.rideId!);
       if (!r) continue;
       const d = minutes(r.startedAt, r.completedAt ?? r.updatedAt);
-      if (d >= maxMinutes) continue;
+      if (tooLong(d)) continue;
       items.push({
-        key: `SCHEDULED:${x.id}`, type: 'SCHEDULED', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: Math.round(d * 10) / 10,
+        key: `SCHEDULED:${x.id}`, type: 'SCHEDULED', id: x.id, createdAt: x.createdAt.toISOString(), durationMin: shown(d),
         priceCdf: r.finalFareCdf ?? x.estimatedPriceCdf, customerId: x.passengerId, driverId: x.driverId,
         label: `Planifiée ${x.pickupAddress ?? ''} → ${x.dropoffAddress ?? ''}`, extraIds: [x.rideId!],
       });

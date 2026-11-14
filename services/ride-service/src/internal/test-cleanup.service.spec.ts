@@ -64,4 +64,10 @@ describe('TestCleanupService', () => {
     const items = await svc.select({ before: '2026-11-05', includeCancelled: true });
     expect(items.map((i) => [i.id, i.cancelled])).toEqual([['r-cancel', true]]);
   });
+
+  it('any duration only when test accounts are listed', async () => {
+    expect((await service.select({ before: '2026-11-05', anyDuration: true })).map((i) => i.id)).toEqual(['r-short']);
+    const items = await service.select({ userIds: ['p'], anyDuration: true });
+    expect(items.map((i) => i.id)).toEqual(['r-short', 'r-real']);
+  });
 });

@@ -792,7 +792,7 @@ export class AdminService {
   /** Test rides / services to void in accounting — preview changes nothing. */
   async testCleanupPreview(
     actorRole: string,
-    body: { before?: string; accounts?: string[]; maxMinutes?: number; includeCancelled?: boolean },
+    body: { before?: string; accounts?: string[]; maxMinutes?: number; includeCancelled?: boolean; anyDuration?: boolean },
   ) {
     this.assertSuperAdmin(actorRole);
     const accounts = await this.resolveTestAccounts(body.accounts ?? []);
@@ -806,6 +806,7 @@ export class AdminService {
         userIds: accounts.ids,
         maxMinutes: body.maxMinutes,
         includeCancelled: body.includeCancelled === true,
+        anyDuration: body.anyDuration === true,
       }),
     });
     return { ...(result as object), unknownAccounts: accounts.unknown, accountIds: accounts.ids };
@@ -813,7 +814,14 @@ export class AdminService {
 
   async testCleanupApply(
     actorRole: string,
-    body: { before?: string; accounts?: string[]; maxMinutes?: number; includeCancelled?: boolean; confirmKeys?: string[] },
+    body: {
+      before?: string;
+      accounts?: string[];
+      maxMinutes?: number;
+      includeCancelled?: boolean;
+      anyDuration?: boolean;
+      confirmKeys?: string[];
+    },
   ) {
     this.assertSuperAdmin(actorRole);
     const accounts = await this.resolveTestAccounts(body.accounts ?? []);
@@ -824,6 +832,7 @@ export class AdminService {
         userIds: accounts.ids,
         maxMinutes: body.maxMinutes,
         includeCancelled: body.includeCancelled === true,
+        anyDuration: body.anyDuration === true,
         confirmKeys: body.confirmKeys ?? [],
       }),
     });

@@ -5,6 +5,7 @@ import { PlatformConfigService } from '../platform/platform-config.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RidesService } from './rides.service';
 import { DriverIncentivesService } from './driver-incentives.service';
+import { RideSafetyService } from './ride-safety.service';
 
 const TICK_MS = 10 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
@@ -37,15 +38,21 @@ export class AutomationsScheduler implements OnModuleInit, OnModuleDestroy {
     private rides: RidesService,
     private platformConfig: PlatformConfigService,
     private incentives: DriverIncentivesService,
+    private safety: RideSafetyService,
   ) {}
+
+  private safetyTimer?: ReturnType<typeof setInterval>;
 
   onModuleInit() {
     if (process.env.AUTOMATIONS_DISABLED === 'true') return;
     this.timer = setInterval(() => void this.tick(), TICK_MS);
+    // Rides in progress are checked more often (long stop / detour).
+    this.safetyTimer = setInterval(() => void this.safety.checkRoutes().catch((e: unknown) => this.logger.warn(`routes: ${String(e)}`)), 3 * 60 * 1000);
   }
 
   onModuleDestroy() {
     if (this.timer) clearInterval(this.timer);
+    if (this.safetyTimer) clearInterval(this.safetyTimer);
   }
 
   /** Once per key across instances. */
@@ -71,6 +78,9 @@ export class AutomationsScheduler implements OnModuleInit, OnModuleDestroy {
     }
     if (a.referral.enabled && (await this.once(`auto:referral:${Math.floor(Date.now() / 3_600_000)}`, 2 * 3600))) {
       await this.incentives.payReferrals().catch((e: unknown) => this.logger.warn(`referral: ${String(e)}`));
+    }
+    if (a.ratingQuality.enabled && clock.hour === 6 && (await this.once(`auto:quality-run:${clock.day}`, 36 * 3600))) {
+      await this.safety.checkQuality().catch((e: unknown) => this.logger.warn(`quality: ${String(e)}`));
     }
     if (a.anomalyAlerts.enabled) {
       await this.anomalies(a.anomalyAlerts).catch((e: unknown) => this.logger.warn(`anomalies: ${String(e)}`));

@@ -1,3 +1,4 @@
+import { FaceCheckService } from './face-check.service';
 import { Body, Controller, Get, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsNumber, IsString } from 'class-validator';
@@ -18,6 +19,7 @@ class LocationDto { @ApiProperty() @IsNumber() lat: number; @ApiProperty() @IsNu
 @ApiBearerAuth()
 export class DriversController {
   constructor(
+    private faceCheck: FaceCheckService,
     private driversService: DriversService,
     private smileId: SmileIdService,
     private platformRules: MatchingConfigService,
@@ -36,6 +38,11 @@ export class DriversController {
     if (!view.visible || !view.canStart) return view;
     await this.smileId.createLink(req.user.id, { force: view.status != null && view.status !== 'PENDING' });
     return this.smileId.driverView(req.user.id, true);
+  }
+
+  @Post('me/face-check')
+  faceCheckNow(@Request() req: { user: { id: string } }, @Body() body: { url?: string }) {
+    return this.faceCheck.check(req.user.id, String(body?.url ?? ''));
   }
 
   @Patch('availability')

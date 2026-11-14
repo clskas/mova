@@ -46,6 +46,9 @@ import '../notifications/notifications_inbox_screen.dart';
 import '../sos/notification_tap_router.dart';
 import '../../core/location/location_permission.dart';
 import 'demand_heatmap_screen.dart';
+import 'dart:io' show File;
+import 'package:image_picker/image_picker.dart' show ImagePicker, ImageSource, CameraDevice;
+import '../../core/media/image_pick_util.dart' show pickMovaImage, showImagePickError;
 
 enum _DriverMenuAction {
   earnings,
@@ -1502,7 +1505,51 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
           await DriverBackgroundService.stop();
         }
       case Failure(:final error):
-        setState(() => _availabilityError = error.message);
+        // Daily face check (Admin → Automatisations): take the selfie, then go online again.
+        if (value && error.message.contains('Vérification du visage requise')) {
+          final passed = await _runFaceCheck();
+          if (passed && mounted) return _toggleAvailability(true);
+        }
+        if (mounted) setState(() => _availabilityError = error.message);
+    }
+  }
+
+  /// Selfie compared with the validated photo; true when SENGA accepts it.
+  Future<bool> _runFaceCheck() async {
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('Vérification du visage')),
+        content: Text(tr('Pour la sécurité des passagers, prenez une selfie avant de passer en ligne (une fois par jour).')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Plus tard'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Prendre la selfie'))),
+        ],
+      ),
+    );
+    if (go != true || !mounted) return false;
+    final picked = await pickMovaImage(ImagePicker(), ImageSource.camera, preferredCameraDevice: CameraDevice.front);
+    if (picked == null || !mounted) {
+      if (mounted) showImagePickError(context);
+      return false;
+    }
+    final api = ref.read(apiClientProvider);
+    final upload = await api.uploadKycPhoto(File(picked.path));
+    if (!mounted) return false;
+    switch (upload) {
+      case Success(:final data):
+        final check = await api.post('/drivers/me/face-check', {'url': data});
+        if (!mounted) return false;
+        switch (check) {
+          case Success():
+            return true;
+          case Failure(:final error):
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+            return false;
+        }
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        return false;
     }
   }
 

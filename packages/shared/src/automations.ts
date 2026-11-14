@@ -23,6 +23,12 @@ export type AutomationsConfig = {
   subscriptions: { enabled: boolean; priorityBoost: number; autoRenew: boolean; remindDaysBefore: number };
   /** Company accounts: members' rides paid by their company (monthly statement). */
   corporate: { enabled: boolean };
+  /** Daily selfie compared with the validated photo before going online. */
+  faceCheck: { enabled: boolean; blockUntilChecked: boolean };
+  /** During a ride: long stop or big detour → the passenger and the team are alerted. */
+  routeAnomaly: { enabled: boolean; stopMinutes: number; detourKm: number };
+  /** Driver quality: alert (and optional block) under an average on the last N ratings. */
+  ratingQuality: { enabled: boolean; minAvg: number; minRatings: number; autoBlock: boolean };
 };
 
 export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
@@ -36,6 +42,9 @@ export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
   referral: { enabled: false, referrerRewardCdf: 2000, refereeRewardCdf: 2000, maxPerReferrer: 20, codeEntryDays: 7 },
   subscriptions: { enabled: false, priorityBoost: 0.15, autoRenew: true, remindDaysBefore: 3 },
   corporate: { enabled: false },
+  faceCheck: { enabled: false, blockUntilChecked: true },
+  routeAnomaly: { enabled: true, stopMinutes: 10, detourKm: 3 },
+  ratingQuality: { enabled: true, minAvg: 3.5, minRatings: 10, autoBlock: false },
 };
 
 const int = (v: unknown, fallback: number, min: number, max: number) => {
@@ -56,6 +65,9 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
   const rf = o.referral ?? {};
   const sb = o.subscriptions ?? {};
   const co = o.corporate ?? {};
+  const fc = o.faceCheck ?? {};
+  const ra = o.routeAnomaly ?? {};
+  const rq = o.ratingQuality ?? {};
   const minJobs = int(db.minJobs, base.driverBonus.minJobs, 1, 200);
   const days = Array.isArray(de.daysBefore)
     ? [...new Set((de.daysBefore as unknown[]).map((d) => int(d, 0, 0, 90)).filter((d) => d > 0))].sort((a, b) => b - a)
@@ -108,6 +120,21 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
       remindDaysBefore: int(sb.remindDaysBefore, base.subscriptions.remindDaysBefore, 0, 15),
     },
     corporate: { enabled: bool(co.enabled, base.corporate.enabled) },
+    faceCheck: {
+      enabled: bool(fc.enabled, base.faceCheck.enabled),
+      blockUntilChecked: bool(fc.blockUntilChecked, base.faceCheck.blockUntilChecked),
+    },
+    routeAnomaly: {
+      enabled: bool(ra.enabled, base.routeAnomaly.enabled),
+      stopMinutes: int(ra.stopMinutes, base.routeAnomaly.stopMinutes, 3, 60),
+      detourKm: int(ra.detourKm, base.routeAnomaly.detourKm, 1, 50),
+    },
+    ratingQuality: {
+      enabled: bool(rq.enabled, base.ratingQuality.enabled),
+      minAvg: Math.min(5, Math.max(1, Number.isFinite(Number(rq.minAvg)) ? Number(rq.minAvg) : base.ratingQuality.minAvg)),
+      minRatings: int(rq.minRatings, base.ratingQuality.minRatings, 3, 200),
+      autoBlock: bool(rq.autoBlock, base.ratingQuality.autoBlock),
+    },
   };
 }
 

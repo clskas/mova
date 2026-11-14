@@ -54,6 +54,11 @@ model DriverProfile {
   technicalInspectionExpiry DateTime?
   fiscalStickerExpiry       DateTime?
   documentsRenewalPending   Boolean   @default(false)
+  /// Last daily face check passed (selfie compared with the validated photo).
+  faceCheckedAt             DateTime?
+  /// Blocked for low ratings (Admin → Automatisations), until a super admin unblocks.
+  qualityBlockedAt          DateTime?
+  qualityBlockReason        String?
   documentsRenewalRequestedAt DateTime?
   payoutProvider            String?
   payoutPhone               String?

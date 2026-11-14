@@ -22,12 +22,13 @@ import { UnpaidFollowupScheduler } from './unpaid-followup.scheduler';
 import { DemandSurgeService } from './demand-surge.service';
 import { AutomationsScheduler } from './automations.scheduler';
 import { DriverIncentivesService } from './driver-incentives.service';
+import { RideSafetyService } from './ride-safety.service';
 import { UploadsModule } from '../uploads/uploads.module';
 
 @Module({
   imports: [MatchingModule, WebsocketModule, TrackingModule, ShareModule, GeoModule, UploadsModule],
   controllers: [RidesController, RidePoolController],
-  providers: [RidesService, RidePoolService, ScheduledRidesService, RideSearchScheduler, ScheduledRidesScheduler, UnpaidFollowupScheduler, DemandSurgeService, AutomationsScheduler, DriverIncentivesService, PricingService, PricingTimeWindowService, PricingAdminService, CommissionService, SurchargeService, PromoService, RideChatService, FraudService],
+  providers: [RidesService, RidePoolService, ScheduledRidesService, RideSearchScheduler, ScheduledRidesScheduler, UnpaidFollowupScheduler, DemandSurgeService, AutomationsScheduler, DriverIncentivesService, RideSafetyService, PricingService, PricingTimeWindowService, PricingAdminService, CommissionService, SurchargeService, PromoService, RideChatService, FraudService],
   exports: [RidesService, RidePoolService, ScheduledRidesService, PricingService, PricingTimeWindowService, PricingAdminService, CommissionService, SurchargeService, PromoService, ShareModule, FraudService, RideChatService, GeoModule],
 })
 export class RidesModule {}

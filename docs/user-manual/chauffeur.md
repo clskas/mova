@@ -187,3 +187,6 @@ WhatsApp +243 971163574 — dev@afri-soft.com
 - **Ma destination** : sur l'accueil, touchez « Choisir » dans « Ma destination » et tapez où vous allez (par exemple chez vous). Pendant 3 heures, vous ne recevez que les courses qui vous en rapprochent. Utilisable quelques fois par jour ; « Retirer » pour recevoir à nouveau toutes les courses.
 - **Personne transportée** : quand un passager commande pour quelqu'un d'autre, la carte « Personne transportée » affiche son nom et son téléphone : c'est elle qu'il faut prendre en charge (bouton pour l'appeler).
 - **Courses USSD / WhatsApp** : certaines courses viennent de clients sans application. Elles se paient en espèces, comme d'habitude.
+- **Prime SENGA** : certaines offres affichent « +X FC prime SENGA » (un client attendait depuis longtemps). La prime arrive sur votre portefeuille à la fin de la course.
+- **Messages automatiques** : « des clients vous attendent » quand beaucoup de clients attendent dans votre ville, pluie annoncée, rappel d'entretien tous les X km, relevé de vos revenus le 1er du mois, rappels pour terminer votre dossier.
+- **Paiement automatique chaque semaine** : dans **Portefeuille**, activez-le et choisissez votre opérateur. Votre solde est envoyé chaque semaine sur **votre propre numéro** (jamais un autre).

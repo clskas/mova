@@ -2085,5 +2085,8 @@ export const UI_SOURCE_STRINGS: readonly string[] = [
  "Rentrer chez vous en travaillant ({v1}/{v2} aujourd’hui)",
  "Choisir",
  "Personne transportée",
- "la personne transportée"
+ "la personne transportée",
+ "{v1} a des difficultés en ce moment : utilisez un autre opérateur ou les espèces.",
+ "Paiement automatique chaque semaine",
+ "Votre solde (dès {v1}) est envoyé sur votre propre numéro Mobile Money."
 ];

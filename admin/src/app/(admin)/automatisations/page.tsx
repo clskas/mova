@@ -29,6 +29,20 @@ type Automations = {
   driverDestination: { enabled: boolean; maxPerDay: number; radiusKm: number };
   tripInsurance: { enabled: boolean; feeCdf: number; partnerName: string };
   familyMode: { enabled: boolean };
+  rideRescue: { enabled: boolean; afterMinutes: number; bonusCdf: number };
+  driverCallout: { enabled: boolean; minWaiting: number };
+  abandonedBooking: { enabled: boolean; afterMinutes: number };
+  winBack: { enabled: boolean; passengerDays: number; passengerCreditCdf: number; driverDays: number };
+  weatherEvents: { enabled: boolean; rainMm: number; rainMultiplier: number; eventsText: string };
+  fraudWatch: { enabled: boolean; autoBlock: boolean; minPairRides: number; shortRideKm: number };
+  ledgerCheck: { enabled: boolean };
+  operatorWatch: { enabled: boolean; minAttempts: number; failRatePct: number };
+  autoCompensation: { enabled: boolean; waitedMinutes: number; creditCdf: number };
+  lowRatingTicket: { enabled: boolean; maxStars: number };
+  onboardingReminders: { enabled: boolean; everyDays: number; maxReminders: number };
+  autoPayouts: { enabled: boolean; weekday: number; hourKinshasa: number; minCdf: number };
+  statements: { enabled: boolean };
+  maintenanceReminder: { enabled: boolean; everyKm: number };
 };
 
 type Blocked = { userId: string; qualityBlockedAt: string; qualityBlockReason?: string | null; ratingAvg?: number };
@@ -57,6 +71,20 @@ const DEFAULTS: Automations = {
   driverDestination: { enabled: false, maxPerDay: 2, radiusKm: 3 },
   tripInsurance: { enabled: false, feeCdf: 200, partnerName: "" },
   familyMode: { enabled: false },
+  rideRescue: { enabled: false, afterMinutes: 3, bonusCdf: 0 },
+  driverCallout: { enabled: false, minWaiting: 5 },
+  abandonedBooking: { enabled: false, afterMinutes: 10 },
+  winBack: { enabled: false, passengerDays: 21, passengerCreditCdf: 0, driverDays: 7 },
+  weatherEvents: { enabled: false, rainMm: 2, rainMultiplier: 1.2, eventsText: "" },
+  fraudWatch: { enabled: false, autoBlock: false, minPairRides: 4, shortRideKm: 0.3 },
+  ledgerCheck: { enabled: false },
+  operatorWatch: { enabled: false, minAttempts: 10, failRatePct: 50 },
+  autoCompensation: { enabled: false, waitedMinutes: 10, creditCdf: 500 },
+  lowRatingTicket: { enabled: false, maxStars: 2 },
+  onboardingReminders: { enabled: false, everyDays: 3, maxReminders: 5 },
+  autoPayouts: { enabled: false, weekday: 1, hourKinshasa: 9, minCdf: 5000 },
+  statements: { enabled: false },
+  maintenanceReminder: { enabled: false, everyKm: 5000 },
 };
 
 function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disabled: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -122,6 +150,20 @@ export default function AutomatisationsPage() {
         driverDestination: { ...DEFAULTS.driverDestination, ...cfg.driverDestination },
         tripInsurance: { ...DEFAULTS.tripInsurance, ...cfg.tripInsurance },
         familyMode: { ...DEFAULTS.familyMode, ...cfg.familyMode },
+        rideRescue: { ...DEFAULTS.rideRescue, ...cfg.rideRescue },
+        driverCallout: { ...DEFAULTS.driverCallout, ...cfg.driverCallout },
+        abandonedBooking: { ...DEFAULTS.abandonedBooking, ...cfg.abandonedBooking },
+        winBack: { ...DEFAULTS.winBack, ...cfg.winBack },
+        weatherEvents: { ...DEFAULTS.weatherEvents, ...cfg.weatherEvents },
+        fraudWatch: { ...DEFAULTS.fraudWatch, ...cfg.fraudWatch },
+        ledgerCheck: { ...DEFAULTS.ledgerCheck, ...cfg.ledgerCheck },
+        operatorWatch: { ...DEFAULTS.operatorWatch, ...cfg.operatorWatch },
+        autoCompensation: { ...DEFAULTS.autoCompensation, ...cfg.autoCompensation },
+        lowRatingTicket: { ...DEFAULTS.lowRatingTicket, ...cfg.lowRatingTicket },
+        onboardingReminders: { ...DEFAULTS.onboardingReminders, ...cfg.onboardingReminders },
+        autoPayouts: { ...DEFAULTS.autoPayouts, ...cfg.autoPayouts },
+        statements: { ...DEFAULTS.statements, ...cfg.statements },
+        maintenanceReminder: { ...DEFAULTS.maintenanceReminder, ...cfg.maintenanceReminder },
       };
       setBlocked(await apiFetch<Blocked[]>("/api/admin/drivers-quality-blocked").catch(() => []));
       setA(next);
@@ -592,6 +634,205 @@ export default function AutomatisationsPage() {
         {editable && (
           <BtnPrimary disabled={saving === "whatsappBooking"} onClick={() => void save("whatsappBooking", a.whatsappBooking)}>
             {saving === "whatsappBooking" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <h2 className="text-lg font-semibold pt-2">Gagner plus de courses</h2>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Sauver les demandes sans chauffeur</h2>
+        <p className="text-sm text-slate-600">
+          Après N minutes sans chauffeur, le passager reçoit des conseils (essayer la moto, augmenter son prix) et la recherche continue. Option : une prime SENGA pour le chauffeur qui prend la course (affichée dans l&apos;offre, payée à la fin de la course). <strong>La prime coûte de l&apos;argent à SENGA.</strong>
+        </p>
+        <Toggle label="Activé" checked={a.rideRescue.enabled} disabled={ro} onChange={(v) => set("rideRescue", { enabled: v })} />
+        <Num label="Après (minutes)" value={a.rideRescue.afterMinutes} disabled={ro} onChange={(v) => set("rideRescue", { afterMinutes: v })} />
+        <Num label="Prime chauffeur (FC, 0 = aucune)" value={a.rideRescue.bonusCdf} disabled={ro} onChange={(v) => set("rideRescue", { bonusCdf: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "rideRescue"} onClick={() => void save("rideRescue", a.rideRescue)}>
+            {saving === "rideRescue" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Appeler les chauffeurs là où il y a des clients</h2>
+        <p className="text-sm text-slate-600">
+          Quand beaucoup de clients attendent dans une ville, les chauffeurs hors ligne de cette ville reçoivent « X clients attendent, connectez-vous » (au plus une fois par heure).
+        </p>
+        <Toggle label="Activé" checked={a.driverCallout.enabled} disabled={ro} onChange={(v) => set("driverCallout", { enabled: v })} />
+        <Num label="Clients en attente (minimum)" value={a.driverCallout.minWaiting} disabled={ro} onChange={(v) => set("driverCallout", { minWaiting: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "driverCallout"} onClick={() => void save("driverCallout", a.driverCallout)}>
+            {saving === "driverCallout" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Relancer les réservations abandonnées</h2>
+        <p className="text-sm text-slate-600">
+          Un client a regardé un prix sans commander : un rappel part N minutes plus tard (une fois par jour au plus).
+        </p>
+        <Toggle label="Activé" checked={a.abandonedBooking.enabled} disabled={ro} onChange={(v) => set("abandonedBooking", { enabled: v })} />
+        <Num label="Après (minutes)" value={a.abandonedBooking.afterMinutes} disabled={ro} onChange={(v) => set("abandonedBooking", { afterMinutes: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "abandonedBooking"} onClick={() => void save("abandonedBooking", a.abandonedBooking)}>
+            {saving === "abandonedBooking" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Réveiller les clients et chauffeurs inactifs</h2>
+        <p className="text-sm text-slate-600">
+          Message aux clients sans course depuis N jours (avec un crédit si vous le voulez) et aux chauffeurs sans course depuis N jours. Envoyé à 10 h. <strong>Le crédit coûte de l&apos;argent à SENGA.</strong>
+        </p>
+        <Toggle label="Activé" checked={a.winBack.enabled} disabled={ro} onChange={(v) => set("winBack", { enabled: v })} />
+        <Num label="Clients inactifs depuis (jours)" value={a.winBack.passengerDays} disabled={ro} onChange={(v) => set("winBack", { passengerDays: v })} />
+        <Num label="Crédit de retour (FC, 0 = aucun)" value={a.winBack.passengerCreditCdf} disabled={ro} onChange={(v) => set("winBack", { passengerCreditCdf: v })} />
+        <Num label="Chauffeurs inactifs depuis (jours)" value={a.winBack.driverDays} disabled={ro} onChange={(v) => set("winBack", { driverDays: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "winBack"} onClick={() => void save("winBack", a.winBack)}>
+            {saving === "winBack" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Pluie et événements</h2>
+        <p className="text-sm text-slate-600">
+          Pluie prévue dans les 2 heures (Open-Meteo) : prix augmentés et chauffeurs prévenus. Événements : une ligne par événement « Ville;Libellé;début;fin;multiplicateur », par exemple « Kinshasa;Match au stade;2026-12-01T16:00;2026-12-01T22:00;1.3 » (heure de Kinshasa).
+        </p>
+        <Toggle label="Activé" checked={a.weatherEvents.enabled} disabled={ro} onChange={(v) => set("weatherEvents", { enabled: v })} />
+        <Num label="Pluie (mm/heure) à partir de" value={a.weatherEvents.rainMm} disabled={ro} onChange={(v) => set("weatherEvents", { rainMm: v })} />
+        <Num label="Multiplicateur pluie (1 à 2)" value={a.weatherEvents.rainMultiplier} disabled={ro} onChange={(v) => set("weatherEvents", { rainMultiplier: v })} />
+        <label className="block text-sm">
+          Événements
+          <textarea className="mt-1 w-full rounded border px-2 py-1 font-mono text-xs" rows={4} value={a.weatherEvents.eventsText} disabled={ro} onChange={(e) => set("weatherEvents", { eventsText: e.target.value })} />
+        </label>
+        {editable && (
+          <BtnPrimary disabled={saving === "weatherEvents"} onClick={() => void save("weatherEvents", a.weatherEvents)}>
+            {saving === "weatherEvents" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <h2 className="text-lg font-semibold pt-2">Protéger l&apos;argent</h2>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Détection de fraude</h2>
+        <p className="text-sm text-slate-600">
+          Chaque matin : alerte pour les mêmes passager et chauffeur ensemble trop souvent, et pour les chauffeurs avec beaucoup de courses très courtes. Option : suspendre ces chauffeurs (à débloquer après vérification).
+        </p>
+        <Toggle label="Activé" checked={a.fraudWatch.enabled} disabled={ro} onChange={(v) => set("fraudWatch", { enabled: v })} />
+        <Toggle label="Suspendre automatiquement" checked={a.fraudWatch.autoBlock} disabled={ro} onChange={(v) => set("fraudWatch", { autoBlock: v })} />
+        <Num label="Même passager + chauffeur (courses / jour)" value={a.fraudWatch.minPairRides} disabled={ro} onChange={(v) => set("fraudWatch", { minPairRides: v })} />
+        <Num label="Course trop courte (km)" value={a.fraudWatch.shortRideKm} disabled={ro} onChange={(v) => set("fraudWatch", { shortRideKm: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "fraudWatch"} onClick={() => void save("fraudWatch", a.fraudWatch)}>
+            {saving === "fraudWatch" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Contrôle quotidien des recharges</h2>
+        <p className="text-sm text-slate-600">
+          Chaque nuit : liste des recharges Mobile Money commencées mais jamais créditées (le client a peut-être payé). Alerte dans Alertes staff.
+        </p>
+        <Toggle label="Activé" checked={a.ledgerCheck.enabled} disabled={ro} onChange={(v) => set("ledgerCheck", { enabled: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "ledgerCheck"} onClick={() => void save("ledgerCheck", a.ledgerCheck)}>
+            {saving === "ledgerCheck" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Panne d&apos;un opérateur Mobile Money</h2>
+        <p className="text-sm text-slate-600">
+          Si trop de recharges échouent chez un opérateur en une heure : les clients voient un avertissement dans le portefeuille et l&apos;équipe est alertée.
+        </p>
+        <Toggle label="Activé" checked={a.operatorWatch.enabled} disabled={ro} onChange={(v) => set("operatorWatch", { enabled: v })} />
+        <Num label="Tentatives minimum (1 h)" value={a.operatorWatch.minAttempts} disabled={ro} onChange={(v) => set("operatorWatch", { minAttempts: v })} />
+        <Num label="Échecs à partir de (%)" value={a.operatorWatch.failRatePct} disabled={ro} onChange={(v) => set("operatorWatch", { failRatePct: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "operatorWatch"} onClick={() => void save("operatorWatch", a.operatorWatch)}>
+            {saving === "operatorWatch" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <h2 className="text-lg font-semibold pt-2">Moins de travail pour l&apos;équipe</h2>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Dédommagement automatique</h2>
+        <p className="text-sm text-slate-600">
+          Le chauffeur annule après que le client a attendu N minutes : crédit d&apos;excuse au client, sans passer par le support. <strong>Coûte de l&apos;argent à SENGA.</strong>
+        </p>
+        <Toggle label="Activé" checked={a.autoCompensation.enabled} disabled={ro} onChange={(v) => set("autoCompensation", { enabled: v })} />
+        <Num label="Attente du client (minutes)" value={a.autoCompensation.waitedMinutes} disabled={ro} onChange={(v) => set("autoCompensation", { waitedMinutes: v })} />
+        <Num label="Crédit d&apos;excuse (FC)" value={a.autoCompensation.creditCdf} disabled={ro} onChange={(v) => set("autoCompensation", { creditCdf: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "autoCompensation"} onClick={() => void save("autoCompensation", a.autoCompensation)}>
+            {saving === "autoCompensation" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Mauvaise note : ticket automatique</h2>
+        <p className="text-sm text-slate-600">
+          Une note basse crée un ticket dans Alertes staff avec la course et le commentaire, pour rappeler le client.
+        </p>
+        <Toggle label="Activé" checked={a.lowRatingTicket.enabled} disabled={ro} onChange={(v) => set("lowRatingTicket", { enabled: v })} />
+        <Num label="Note maximum (étoiles)" value={a.lowRatingTicket.maxStars} disabled={ro} onChange={(v) => set("lowRatingTicket", { maxStars: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "lowRatingTicket"} onClick={() => void save("lowRatingTicket", a.lowRatingTicket)}>
+            {saving === "lowRatingTicket" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Relance des dossiers chauffeurs</h2>
+        <p className="text-sm text-slate-600">
+          Les chauffeurs inscrits dont le dossier n&apos;est pas validé reçoivent un rappel (10 h), tous les N jours, au plus M fois (le 2ᵉ aussi par SMS).
+        </p>
+        <Toggle label="Activé" checked={a.onboardingReminders.enabled} disabled={ro} onChange={(v) => set("onboardingReminders", { enabled: v })} />
+        <Num label="Tous les (jours)" value={a.onboardingReminders.everyDays} disabled={ro} onChange={(v) => set("onboardingReminders", { everyDays: v })} />
+        <Num label="Nombre maximum de rappels" value={a.onboardingReminders.maxReminders} disabled={ro} onChange={(v) => set("onboardingReminders", { maxReminders: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "onboardingReminders"} onClick={() => void save("onboardingReminders", a.onboardingReminders)}>
+            {saving === "onboardingReminders" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Paiement automatique des chauffeurs</h2>
+        <p className="text-sm text-slate-600">
+          Les chauffeurs qui le choisissent dans leur portefeuille reçoivent chaque semaine leur solde sur leur propre numéro Mobile Money (jamais un autre numéro). Jour : 0 = dimanche, 1 = lundi…
+        </p>
+        <Toggle label="Activé" checked={a.autoPayouts.enabled} disabled={ro} onChange={(v) => set("autoPayouts", { enabled: v })} />
+        <Num label="Jour de la semaine (0–6)" value={a.autoPayouts.weekday} disabled={ro} onChange={(v) => set("autoPayouts", { weekday: v })} />
+        <Num label="Heure (Kinshasa)" value={a.autoPayouts.hourKinshasa} disabled={ro} onChange={(v) => set("autoPayouts", { hourKinshasa: v })} />
+        <Num label="Solde minimum (FC)" value={a.autoPayouts.minCdf} disabled={ro} onChange={(v) => set("autoPayouts", { minCdf: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "autoPayouts"} onClick={() => void save("autoPayouts", a.autoPayouts)}>
+            {saving === "autoPayouts" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Relevés mensuels</h2>
+        <p className="text-sm text-slate-600">
+          Le 1ᵉʳ du mois : chaque chauffeur reçoit ses revenus du mois passé ; l&apos;équipe reçoit le total à facturer aux entreprises.
+        </p>
+        <Toggle label="Activé" checked={a.statements.enabled} disabled={ro} onChange={(v) => set("statements", { enabled: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "statements"} onClick={() => void save("statements", a.statements)}>
+            {saving === "statements" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Rappel d&apos;entretien du véhicule</h2>
+        <p className="text-sm text-slate-600">
+          Tous les N km faits avec SENGA, le chauffeur reçoit un rappel (vidange, freins, pneus).
+        </p>
+        <Toggle label="Activé" checked={a.maintenanceReminder.enabled} disabled={ro} onChange={(v) => set("maintenanceReminder", { enabled: v })} />
+        <Num label="Tous les (km)" value={a.maintenanceReminder.everyKm} disabled={ro} onChange={(v) => set("maintenanceReminder", { everyKm: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "maintenanceReminder"} onClick={() => void save("maintenanceReminder", a.maintenanceReminder)}>
+            {saving === "maintenanceReminder" ? "…" : "Enregistrer"}
           </BtnPrimary>
         )}
       </Card>

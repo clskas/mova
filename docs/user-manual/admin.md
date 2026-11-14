@@ -211,3 +211,10 @@ Cinq interrupteurs, tous désactivés au départ :
 - **Destination chauffeur** : utilisations par jour et rayon (km) ; 3 heures par utilisation.
 - **Réservation par USSD** : demande un contrat avec un agrégateur USSD ; adresse de rappel `https://api.afri-soft.com/api/public/booking/ussd?key=…` et variable `USSD_WEBHOOK_KEY` (service ride).
 - **Réservation par WhatsApp** : demande un compte WhatsApp Business (Meta) ; webhook `https://api.afri-soft.com/api/public/booking/whatsapp`, variables `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (service ride).
+
+## Automatisations (lot 6)
+
+- **Gagner plus de courses** : sauver les demandes sans chauffeur (conseils + prime facultative), appeler les chauffeurs hors ligne là où les clients attendent, relancer les réservations abandonnées, réveiller les clients / chauffeurs inactifs (crédit facultatif), pluie (Open-Meteo) et événements (une ligne « Ville;Libellé;début;fin;multiplicateur »).
+- **Protéger l'argent** : détection de fraude (suspension facultative), contrôle nocturne des recharges non créditées, panne d'opérateur Mobile Money (avertissement dans l'app + alerte).
+- **Moins de travail** : dédommagement automatique, ticket sur mauvaise note (Alertes staff), relance des dossiers chauffeurs, paiement hebdomadaire des chauffeurs volontaires (vers leur propre numéro seulement), relevés mensuels, rappel d'entretien.
+- Tout est **désactivé** au départ ; les options qui coûtent de l'argent sont signalées.

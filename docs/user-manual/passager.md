@@ -252,3 +252,6 @@ Ces options apparaissent seulement si l'équipe SENGA les a activées.
 - **Assurance trajet** : cochez « Assurance trajet » à la commande. Le montant affiché est prélevé sur votre portefeuille au départ de la course (s'il manque de l'argent, la course part sans assurance).
 - **Sans smartphone ni internet (USSD)** : composez le code SENGA *xxx# (communiqué par SENGA), choisissez Moto-taxi ou Taxi, tapez le départ puis la destination, confirmez le prix. Paiement en espèces ; un SMS vous prévient quand un chauffeur accepte.
 - **Par WhatsApp** : écrivez « course » au numéro WhatsApp de SENGA et répondez aux questions (véhicule, départ, destination). La commande part après votre confirmation ; paiement en espèces. Écrivez « annuler » pour arrêter.
+- **Messages automatiques** : SENGA peut vous écrire si aucun chauffeur n'est encore trouvé (conseils : essayer la moto, augmenter votre prix), si vous avez regardé un prix sans commander, ou après une longue absence (parfois avec un cadeau). Si un chauffeur annule après votre attente, un crédit d'excuse peut arriver sur votre portefeuille.
+- **Pluie et événements** : les prix peuvent augmenter un peu quand il pleut ou pendant un grand événement (forte demande).
+- **Opérateur Mobile Money en panne** : le portefeuille affiche un avertissement ; utilisez un autre opérateur ou les espèces.

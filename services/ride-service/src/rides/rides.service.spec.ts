@@ -166,6 +166,7 @@ describe('RidesService', () => {
       vehicleType: VehicleType.STANDARD,
     });
     prisma.rideEvent.count.mockResolvedValue(0);
+    prisma.ride.findMany.mockResolvedValue([]);
     prisma.ride.update.mockResolvedValue({});
     matching.findDrivers.mockResolvedValue([{ driverId: 'd1', userId: 'u1', lat: -4.32, lng: 15.31, rating: 4.8, distanceKm: 0.5, score: 0.9 }]);
 

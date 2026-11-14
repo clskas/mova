@@ -1,3 +1,4 @@
+import { ESTIMATE_PENDING_KEY } from './growth-automations.service';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { CommissionServiceType, CarpoolStatus, DeliveryStatus, DeliveryType, ErrandOrderStatus, MovingRequestStatus, RentalInquiryStatus, RideSharePassengerStatus, RideStatus, RoundTripLeg, ScheduledRideStatus, TrackingReferenceType, VehicleType } from '@prisma/client';
 import {
@@ -194,6 +195,10 @@ export class RidesService {
     const promoApplied = await applyPromoCode(this.promo, base.totalCdf, promoCode, redeemPromo, {
       context: { serviceType: 'RIDE', city: pickupArea.name },
     });
+    // Abandoned booking reminder (Automatisations): remember the price this passenger looked at.
+    if (passengerId && !redeemPromo && this.platformConfig.get().automations.abandonedBooking.enabled) {
+      void this.redis.client?.zadd(ESTIMATE_PENDING_KEY, Date.now(), passengerId).catch(() => undefined);
+    }
     // SENGA Plus (Admin → Automatisations): the passenger's plan discount, paid by SENGA like a promo.
     if (passengerId && this.platformConfig.get().automations.subscriptions.enabled) {
       const plan = await fetchActivePlan(passengerId, 'PASSENGER');
@@ -561,8 +566,9 @@ export class RidesService {
     });
     if (drivers.length > 0) {
       const pickup = ride.pickupAddress?.trim() || 'près de vous';
+      const rescueBonus = Number((await this.redis.client?.get(`ride:rescue-bonus:${ride.id}`).catch(() => null)) ?? 0) || 0;
       const fare = ride.estimatedFareCdf != null
-        ? ` · ${ride.estimatedFareCdf} FC${ride.proposedFareCdf != null ? ' (prix proposé par le client)' : ''}`
+        ? ` · ${ride.estimatedFareCdf} FC${ride.proposedFareCdf != null ? ' (prix proposé par le client)' : ''}${rescueBonus > 0 ? ` · +${rescueBonus} FC prime SENGA` : ''}`
         : '';
       const ar = ride.roundTrip ? ' · Aller-retour' : '';
       const group = groupSize > 1 ? ` · ${groupSize} passagers` : '';

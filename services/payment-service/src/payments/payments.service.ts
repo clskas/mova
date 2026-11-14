@@ -1,3 +1,4 @@
+import { CorporateService } from '../corporate/corporate.service';
 import { planDriverPayout } from '../payouts/payout-plan';
 import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -83,6 +84,7 @@ export class PaymentsService {
     mpesa: MpesaProvider,
     airtel: AirtelMoneyProvider,
     @Optional() private readonly hubPayments?: HubPaymentsService,
+    @Optional() private readonly corporate?: CorporateService,
   ) {
     this.providers = new Map<PaymentMethod, PaymentProvider>([
       [PaymentMethod.ORANGE_MONEY, orange],
@@ -647,6 +649,19 @@ export class PaymentsService {
     }
 
     try {
+      if (method === PaymentMethod.CORPORATE) {
+        if (!this.corporate) throw new MovaHttpException(MovaErrorCode.PAYMENT_FAILED);
+        const charged = await this.corporate.chargeRide(userId, rideId, amountCdf);
+        const payment = await this.prisma.payment.upsert({
+          where: { rideId },
+          create: { rideId, userId, amountCdf, method, status: PaymentStatus.COMPLETED, providerRef: `corporate_${rideId}` },
+          update: { status: PaymentStatus.COMPLETED, method, amountCdf },
+        });
+        await this.publishPaymentCompleted({ rideId, userId, amountCdf, method: method.toString() });
+        await this.creditDriverAfterRidePayment(rideId);
+        await this.releasePayLock('RIDE', rideId);
+        return { success: true, payment, message: `Course payée par ${charged.accountName}` };
+      }
       if (method === PaymentMethod.WALLET) {
         await this.walletService.debit(userId, amountCdf, `Paiement course ${rideId}`, `RIDE:${rideId}`);
         const payment = await this.prisma.payment.upsert({

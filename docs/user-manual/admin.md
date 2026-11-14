@@ -156,6 +156,8 @@ Pour les véhicules **VIP**, **Confort** ou autres catégories réglementées :
 - **Bonus chauffeurs** (désactivé par défaut, payé par SENGA) : prime pour un nombre de missions dans la journée, deux paliers possibles, versée la nuit suivante.
 - **Carte de la demande** : « Zones de demande » dans SENGA Driver (demandes des N dernières minutes).
 - **Parrainage** (désactivé par défaut, payé par SENGA) : crédit au parrain et au filleul après la première course ou livraison du filleul ; plafond de filleuls récompensés par parrain.
+- **SENGA Plus** (désactivé par défaut) : applique les avantages des plans — réduction du passager (payée par SENGA), commission réduite du chauffeur abonné, priorité dans la répartition, rappel et renouvellement automatique depuis le portefeuille.
+- **Comptes entreprises** (désactivé par défaut) : **Portefeuille → Comptes entreprises** pour créer l'entreprise, son plafond et ses membres (par téléphone), voir le relevé du mois et enregistrer ses règlements. Les membres voient « Payé par … » au paiement de leurs courses.
 - **Suivi des dettes espèces** : rappel quotidien aux chauffeurs qui doivent des espèces ; option pour suspendre leurs missions au-delà de N jours (0 = jamais).
 
 ## Opérations (lecture + mise à jour)

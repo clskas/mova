@@ -1,3 +1,4 @@
+import { CorporateModule } from '../corporate/corporate.module';
 import { Module } from '@nestjs/common';
 import { InternalController } from './internal.controller';
 import { WalletModule } from '../wallet/wallet.module';
@@ -9,7 +10,7 @@ import { RentalPayoutModule } from '../payouts/rental-payout.module';
 import { MoneyControlModule } from '../controls/money-control.module';
 
 @Module({
-  imports: [WalletModule, SubscriptionsModule, DriverPayoutModule, PaymentsModule, DriverDebtLedgerModule, RentalPayoutModule, MoneyControlModule],
+  imports: [CorporateModule, WalletModule, SubscriptionsModule, DriverPayoutModule, PaymentsModule, DriverDebtLedgerModule, RentalPayoutModule, MoneyControlModule],
   controllers: [InternalController],
 })
 export class InternalModule {}

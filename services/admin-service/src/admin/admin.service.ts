@@ -759,6 +759,39 @@ export class AdminService {
     return this.fetchJson('auth', '/internal/users/play-prelaunch');
   }
   /** Phones / ids typed by the admin → user ids (test accounts). */
+  // ---------- Company accounts ----------
+  corporateList() {
+    return this.fetchJson('payment', '/internal/corporate/accounts');
+  }
+  corporateCreate(body: Record<string, unknown>) {
+    return this.proxy('payment', '/internal/corporate/accounts', { method: 'POST', body: JSON.stringify(body) });
+  }
+  corporateUpdate(id: string, body: Record<string, unknown>) {
+    return this.proxy('payment', `/internal/corporate/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+  corporateMembers(id: string) {
+    return this.fetchJson('payment', `/internal/corporate/accounts/${id}/members`);
+  }
+  async corporateAddMember(id: string, body: { phone?: string; label?: string }) {
+    const found = await this.resolveTestAccounts([String(body?.phone ?? '')]);
+    if (!found.ids[0]) {
+      throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND, 'Aucun compte SENGA avec ce numéro.');
+    }
+    return this.proxy('payment', `/internal/corporate/accounts/${id}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ userId: found.ids[0], label: body?.label ?? body?.phone }),
+    });
+  }
+  corporateRemoveMember(memberId: string) {
+    return this.proxy('payment', `/internal/corporate/members/${memberId}/remove`, { method: 'POST', body: '{}' });
+  }
+  corporateSettle(id: string, body: { amountCdf?: number; note?: string }) {
+    return this.proxy('payment', `/internal/corporate/accounts/${id}/settle`, { method: 'POST', body: JSON.stringify(body) });
+  }
+  corporateStatement(id: string) {
+    return this.fetchJson('payment', `/internal/corporate/accounts/${id}/statement`);
+  }
+
   private async resolveTestAccounts(entries: string[]): Promise<{ ids: string[]; unknown: string[] }> {
     const ids: string[] = [];
     const unknown: string[] = [];

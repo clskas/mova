@@ -14,6 +14,8 @@ enum PaymentMethod {
   MPESA
   AIRTEL_MONEY
   CASH
+  /// Paid by the member's company (monthly statement).
+  CORPORATE
 }
 
 enum PaymentStatus {
@@ -270,4 +272,34 @@ model MoneyControlRun {
 
   @@index([startedAt])
   @@map("money_control_runs")
+}
+
+/// Company account: its members' rides are paid by the company, settled from a monthly statement.
+model CorporateAccount {
+  id             String            @id @default(uuid())
+  name           String
+  contactName    String?
+  contactPhone   String?
+  contactEmail   String?
+  /// How far the company may owe SENGA before members can no longer charge it.
+  creditLimitCdf Int               @default(500000)
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  members        CorporateMember[]
+
+  @@map("corporate_accounts")
+}
+
+model CorporateMember {
+  id        String           @id @default(uuid())
+  accountId String
+  account   CorporateAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  userId    String           @unique
+  label     String?
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+
+  @@index([accountId])
+  @@map("corporate_members")
 }

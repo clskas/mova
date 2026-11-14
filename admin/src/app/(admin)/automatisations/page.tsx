@@ -13,6 +13,8 @@ type Automations = {
   driverBonus: { enabled: boolean; minJobs: number; bonusCdf: number; minJobs2: number; bonus2Cdf: number };
   demandHeatmap: { enabled: boolean; windowMinutes: number };
   referral: { enabled: boolean; referrerRewardCdf: number; refereeRewardCdf: number; maxPerReferrer: number; codeEntryDays: number };
+  subscriptions: { enabled: boolean; priorityBoost: number; autoRenew: boolean; remindDaysBefore: number };
+  corporate: { enabled: boolean };
 };
 
 const DEFAULTS: Automations = {
@@ -23,6 +25,8 @@ const DEFAULTS: Automations = {
   driverBonus: { enabled: false, minJobs: 10, bonusCdf: 5000, minJobs2: 20, bonus2Cdf: 12000 },
   demandHeatmap: { enabled: true, windowMinutes: 30 },
   referral: { enabled: false, referrerRewardCdf: 2000, refereeRewardCdf: 2000, maxPerReferrer: 20, codeEntryDays: 7 },
+  subscriptions: { enabled: false, priorityBoost: 0.15, autoRenew: true, remindDaysBefore: 3 },
+  corporate: { enabled: false },
 };
 
 function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disabled: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -71,6 +75,8 @@ export default function AutomatisationsPage() {
         driverBonus: { ...DEFAULTS.driverBonus, ...cfg.driverBonus },
         demandHeatmap: { ...DEFAULTS.demandHeatmap, ...cfg.demandHeatmap },
         referral: { ...DEFAULTS.referral, ...cfg.referral },
+        subscriptions: { ...DEFAULTS.subscriptions, ...cfg.subscriptions },
+        corporate: { ...DEFAULTS.corporate, ...cfg.corporate },
       };
       setA(next);
       setDaysText(next.docExpiry.daysBefore.join(", "));
@@ -252,6 +258,50 @@ export default function AutomatisationsPage() {
         {editable && (
           <BtnPrimary disabled={saving === "referral"} onClick={() => void save("referral", a.referral)}>
             {saving === "referral" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">SENGA Plus (abonnements)</h2>
+        <p className="text-sm text-slate-600">
+          Applique automatiquement les avantages des plans (Tarifs → Abonnements) : réduction du passager sur ses
+          courses (payée par SENGA), commission réduite pour le chauffeur abonné, priorité dans la répartition des
+          courses, rappel avant la fin et renouvellement depuis le portefeuille.
+        </p>
+        <Toggle label="Activé" checked={a.subscriptions.enabled} disabled={ro} onChange={(v) => set("subscriptions", { enabled: v })} />
+        <Toggle label="Renouvellement automatique" checked={a.subscriptions.autoRenew} disabled={ro} onChange={(v) => set("subscriptions", { autoRenew: v })} />
+        <div className="flex flex-wrap gap-4">
+          <Num label="Rappel (jours avant la fin)" value={a.subscriptions.remindDaysBefore} disabled={ro} onChange={(v) => set("subscriptions", { remindDaysBefore: v })} />
+          <label className="text-sm text-slate-700">
+            Priorité (bonus de score, 0 à 1)
+            <input
+              type="number"
+              step="0.05"
+              className="mt-1 block w-28 rounded border border-slate-300 px-2 py-1"
+              value={a.subscriptions.priorityBoost}
+              disabled={ro}
+              onChange={(e) => set("subscriptions", { priorityBoost: Number(e.target.value) })}
+            />
+          </label>
+        </div>
+        {editable && (
+          <BtnPrimary disabled={saving === "subscriptions"} onClick={() => void save("subscriptions", a.subscriptions)}>
+            {saving === "subscriptions" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Comptes entreprises</h2>
+        <p className="text-sm text-slate-600">
+          Les membres d&apos;une entreprise peuvent choisir « Payé par mon entreprise » pour leurs courses ; l&apos;entreprise
+          règle SENGA à partir du relevé mensuel. Gestion des entreprises : <a className="text-violet-700 underline" href="/entreprises">Comptes entreprises</a>.
+        </p>
+        <Toggle label="Activé" checked={a.corporate.enabled} disabled={ro} onChange={(v) => set("corporate", { enabled: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "corporate"} onClick={() => void save("corporate", a.corporate)}>
+            {saving === "corporate" ? "…" : "Enregistrer"}
           </BtnPrimary>
         )}
       </Card>

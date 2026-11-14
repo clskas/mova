@@ -217,6 +217,9 @@ class DriverJobAlertService {
 
     _ringing = true;
     _armRingSafety();
+    // L'app est ouverte : la boucle in-app prend le relais de la sonnerie native
+    // (Android MediaPlayer / iOS notifications répétées) — jamais les deux à la fois.
+    await NativeJobWake.stopRing();
     try {
       await _player.stop();
       await _player.setReleaseMode(ReleaseMode.loop);

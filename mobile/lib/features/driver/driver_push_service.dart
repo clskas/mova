@@ -153,7 +153,9 @@ class DriverPushService {
 
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission(alert: true, badge: true, sound: true);
-      await messaging.setForegroundNotificationPresentationOptions(alert: true, badge: true, sound: true);
+      // App ouverte : SENGA affiche et sonne elle-même (notif locale / boucle).
+      // Sinon iOS joue le son APNs + la boucle = sonnerie doublée.
+      await messaging.setForegroundNotificationPresentationOptions(alert: false, badge: true, sound: false);
 
       FirebaseMessaging.onMessage.listen((message) async {
         if (_isJobStopData(message.data)) {

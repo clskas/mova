@@ -18,6 +18,29 @@ const SCHEMA = {
   additionalProperties: false,
 } as const;
 
+/**
+ * The SENGA upload path of a selfie: `/api/uploads/kyc/<file>` as given, or rebuilt from our
+ * storage's signed link. Anything else is refused (pure, tested).
+ */
+export function selfieUploadPath(raw: string): string | null {
+  const value = String(raw ?? '').trim();
+  let file: string | null = null;
+  const direct = value.match(/^(?:https?:\/\/[^/]+)?\/(?:api\/)?uploads\/kyc\/([^/?#]+)(?:[?#].*)?$/i);
+  if (direct) file = direct[1]!;
+  else {
+    const signed = value.match(/^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/(?:sign|public)\/[^/]+\/kyc\/([^/?#]+)(?:[?#].*)?$/i);
+    if (signed) file = signed[1]!;
+  }
+  if (!file) return null;
+  let name: string;
+  try {
+    name = decodeURIComponent(file);
+  } catch {
+    return null;
+  }
+  return /^[A-Za-z0-9._-]{1,200}$/.test(name) ? `/api/uploads/kyc/${name}` : null;
+}
+
 /** Passed today (Kinshasa calendar)? (pure, tested) */
 export function faceCheckedToday(at: Date | null | undefined, now = new Date()): boolean {
   return Boolean(at) && kinshasaClock(at!).day === kinshasaClock(now).day;
@@ -52,7 +75,10 @@ export class FaceCheckService {
       orderBy: { createdAt: 'desc' },
     });
     if (!reference) throw fail('Aucune photo validée pour comparer : contactez SENGA.');
-    const [fresh, ref] = await Promise.all([this.ocr.fetchImageBuffer(url), this.ocr.fetchImageBuffer(reference.url)]);
+    // Only a selfie uploaded through SENGA (never an arbitrary address sent by the app).
+    const own = selfieUploadPath(url);
+    if (!own) throw fail('Photo non reconnue : reprenez la selfie dans l’application.');
+    const [fresh, ref] = await Promise.all([this.ocr.fetchImageBuffer(own), this.ocr.fetchImageBuffer(reference.url)]);
     if (!fresh) throw fail('Impossible de lire la selfie : reprenez la photo.');
     if (!ref || !claudeAvailable()) {
       // Without the AI (switched off or unreachable) the check cannot be done: let the driver

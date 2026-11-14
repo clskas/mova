@@ -1,0 +1,109 @@
+name: DB Backup
+
+# Nightly encrypted dump of every SENGA database, kept 30 days as a workflow artifact, and on
+# the 1st of the month (or on demand) a restore into a throw-away Postgres to prove the dump works.
+#
+# Needs two repository secrets, created by the owner (never committed):
+#   BACKUP_DATABASE_URLS  one postgres:// URL per line (each service database)
+#   BACKUP_PASSPHRASE     long random passphrase; keep a copy outside GitHub to decrypt dumps
+# Without them the job only prints a notice.
+on:
+  schedule:
+    - cron: '30 1 * * *'   # 02:30 Kinshasa
+  workflow_dispatch:
+    inputs:
+      restore_test:
+        description: 'Also restore the dumps into a temporary database'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.repository != 'afri-soft-com/mova'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      restore:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: restore
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      BACKUP_DATABASE_URLS: ${{ secrets.BACKUP_DATABASE_URLS }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check configuration
+        id: cfg
+        run: |
+          if [ -z "$BACKUP_DATABASE_URLS" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::notice::Sauvegardes non configurées : créez les secrets BACKUP_DATABASE_URLS et BACKUP_PASSPHRASE."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install pg tools
+        if: steps.cfg.outputs.ready == 'true'
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-16
+
+      - name: Dump and encrypt
+        if: steps.cfg.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p dumps
+          i=0
+          while IFS= read -r url; do
+            url="$(echo "$url" | tr -d '\r' | xargs)"
+            [ -z "$url" ] && continue
+            i=$((i+1))
+            name="db$i"
+            echo "::add-mask::$url"
+            /usr/lib/postgresql/16/bin/pg_dump --no-owner --no-privileges -Fc "$url" -f "dumps/$name.dump"
+            gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" --symmetric --cipher-algo AES256 -o "dumps/$name.dump.gpg" "dumps/$name.dump"
+            echo "$name: $(stat -c %s "dumps/$name.dump") bytes"
+          done <<< "$BACKUP_DATABASE_URLS"
+          [ "$i" -gt 0 ] || { echo "::error::Aucune URL de base dans BACKUP_DATABASE_URLS"; exit 1; }
+
+      - name: Restore test
+        if: steps.cfg.outputs.ready == 'true'
+        env:
+          PGPASSWORD: restore
+        run: |
+          set -euo pipefail
+          day=$(TZ=Africa/Kinshasa date +%d)
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "$day" != "01" ]; then
+            echo "Restore test runs on the 1st of the month."; exit 0
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.restore_test }}" != "true" ]; then
+            echo "Restore test skipped."; exit 0
+          fi
+          for f in dumps/*.dump; do
+            db="restore_$(basename "$f" .dump)"
+            /usr/lib/postgresql/16/bin/psql -h localhost -U postgres -c "CREATE DATABASE $db" >/dev/null
+            /usr/lib/postgresql/16/bin/pg_restore --no-owner --no-privileges -h localhost -U postgres -d "$db" "$f" || true
+            tables=$(/usr/lib/postgresql/16/bin/psql -h localhost -U postgres -d "$db" -Atc "select count(*) from information_schema.tables where table_schema not in ('pg_catalog','information_schema')")
+            echo "$db: $tables tables restored"
+            [ "$tables" -gt 0 ] || { echo "::error::Restauration vide pour $db"; exit 1; }
+          done
+          echo "Restore test OK"
+
+      - name: Keep encrypted dumps (30 days)
+        if: steps.cfg.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: senga-db-backup-${{ github.run_id }}
+          path: dumps/*.gpg
+          retention-days: 30

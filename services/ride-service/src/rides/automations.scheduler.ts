@@ -79,12 +79,47 @@ export class AutomationsScheduler implements OnModuleInit, OnModuleDestroy {
     if (a.referral.enabled && (await this.once(`auto:referral:${Math.floor(Date.now() / 3_600_000)}`, 2 * 3600))) {
       await this.incentives.payReferrals().catch((e: unknown) => this.logger.warn(`referral: ${String(e)}`));
     }
+    if (a.sentryDigest.enabled && clock.hour === a.sentryDigest.hourKinshasa && (await this.once(`auto:sentry:${clock.day}`, 36 * 3600))) {
+      await this.sentryDigest().catch((e: unknown) => this.logger.warn(`sentry digest: ${String(e)}`));
+    }
     if (a.ratingQuality.enabled && clock.hour === 6 && (await this.once(`auto:quality-run:${clock.day}`, 36 * 3600))) {
       await this.safety.checkQuality().catch((e: unknown) => this.logger.warn(`quality: ${String(e)}`));
     }
     if (a.anomalyAlerts.enabled) {
       await this.anomalies(a.anomalyAlerts).catch((e: unknown) => this.logger.warn(`anomalies: ${String(e)}`));
     }
+  }
+
+  /**
+   * Errors seen by the apps in the last 24 h (Sentry, read-only token SENGA_SENTRY / SENTRY_READ_TOKEN
+   * set on the server by the owner). Nothing is sent to Sentry.
+   */
+  private async sentryDigest() {
+    const token = process.env.SENTRY_READ_TOKEN?.trim();
+    const org = process.env.SENTRY_ORG?.trim() || 'afrisoft-g0';
+    if (!token) {
+      await postStaffAlert({
+        severity: 'INFO',
+        title: 'Résumé Sentry non disponible',
+        body: 'Ajoutez la variable SENTRY_READ_TOKEN (jeton Sentry en lecture seule) au service ride sur Render pour recevoir le résumé quotidien des erreurs.',
+        href: '/automatisations',
+      });
+      return;
+    }
+    const res = await fetch(
+      `https://sentry.io/api/0/organizations/${encodeURIComponent(org)}/issues/?query=is:unresolved%20lastSeen:-24h&statsPeriod=24h&sort=freq&limit=10`,
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) },
+    );
+    if (!res.ok) throw new Error(`sentry HTTP ${res.status}`);
+    const issues = (await res.json()) as Array<{ shortId?: string; title?: string; count?: string; project?: { slug?: string } }>;
+    await postStaffAlert({
+      severity: issues.length ? 'WARNING' : 'INFO',
+      title: issues.length ? `${issues.length} erreur(s) d’application en 24 h` : 'Aucune nouvelle erreur d’application',
+      body: issues.length
+        ? issues.map((i) => `${i.shortId ?? '?'} (${i.count ?? '?'}×) ${String(i.title ?? '').slice(0, 90)}`).join(' · ')
+        : 'Sentry ne signale aucune erreur non résolue vue ces dernières 24 h.',
+      href: '/automatisations',
+    });
   }
 
   private async dailyReport(today: string) {

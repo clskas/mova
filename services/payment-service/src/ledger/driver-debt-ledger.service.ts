@@ -1,3 +1,4 @@
+import { fetchAutomations } from '@mova/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { CashDebtCashRequestStatus, CashDebtCategory, CashDebtStatus } from '@prisma/client';
 import * as crypto from 'crypto';
@@ -420,6 +421,21 @@ export class DriverDebtLedgerService {
     });
   }
 
+  /**
+   * Cash owed for too long (Admin → Automatisations, « bloquer après N jours »): offers stop
+   * until the driver settles at the counter. Off when the setting is 0.
+   */
+  async debtTooOld(driverUserId: string): Promise<boolean> {
+    const cfg = (await fetchAutomations()).cashDebt;
+    if (!cfg.enabled || cfg.blockAfterDays <= 0) return false;
+    const oldest = await this.prisma.driverCashDebt.findFirst({
+      where: { driverUserId, status: CashDebtStatus.OPEN },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    });
+    return Boolean(oldest && Date.now() - oldest.createdAt.getTime() > cfg.blockAfterDays * 24 * 3600 * 1000);
+  }
+
   async getDebtStatus(driverUserId: string) {
     const [summary, policy, wallet] = await Promise.all([
       this.getSummary(driverUserId),
@@ -427,16 +443,19 @@ export class DriverDebtLedgerService {
       this.wallet.createWallet(driverUserId),
     ]);
     const availableCdf = Math.max(0, (wallet.balanceCdf ?? 0) - (wallet.heldBalanceCdf ?? 0));
+    const ageBlocked = await this.debtTooOld(driverUserId);
     const debtBlocked =
-      policy.isActive &&
-      policy.blockOffers &&
-      policy.maxOpenDebtCdf > 0 &&
-      summary.totalOpenCdf > policy.maxOpenDebtCdf;
+      ageBlocked ||
+      (policy.isActive &&
+        policy.blockOffers &&
+        policy.maxOpenDebtCdf > 0 &&
+        summary.totalOpenCdf > policy.maxOpenDebtCdf);
     const walletBlocked =
       policy.requirePositiveWalletBalance === true && availableCdf <= 0;
     return {
       debtBlocked,
       walletBlocked,
+      ageBlocked,
       offersBlocked: debtBlocked || walletBlocked,
       openDebtCdf: summary.totalOpenCdf,
       debtThresholdCdf: policy.maxOpenDebtCdf,
@@ -453,11 +472,13 @@ export class DriverDebtLedgerService {
     const debtGate =
       policy.isActive && policy.blockOffers && policy.maxOpenDebtCdf > 0;
     const walletGate = policy.requirePositiveWalletBalance === true;
-    if (!debtGate && !walletGate) {
+    const ageGate = (await fetchAutomations()).cashDebt;
+    if (!debtGate && !walletGate && !(ageGate.enabled && ageGate.blockAfterDays > 0)) {
       return driverUserIds;
     }
     const allowed: string[] = [];
     for (const id of driverUserIds) {
+      if (await this.debtTooOld(id)) continue;
       if (debtGate) {
         const summary = await this.getSummary(id);
         if (summary.totalOpenCdf > policy.maxOpenDebtCdf) continue;

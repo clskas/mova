@@ -1,4 +1,4 @@
-import { MARKET_RDC, normalizeDocumentTypeList } from '@mova/shared';
+import { DEFAULT_AUTOMATIONS, MARKET_RDC, normalizeDocumentTypeList, type AutomationsConfig } from '@mova/shared';
 
 export type DriverOpsConfig = {
   /** When true, missing required docs block ride/delivery offers after grace period. */
@@ -79,6 +79,8 @@ export type PlatformConfigOverrides = {
   cashPayment?: Partial<CashPaymentConfig>;
   unpaidFollowup?: Partial<UnpaidFollowupConfig>;
   identityVerification?: Partial<IdentityVerificationConfig>;
+  /** Automations (super admin): raw, normalised on read. */
+  automations?: Record<string, unknown>;
 };
 
 export type MergedPlatformConfig = {
@@ -137,6 +139,7 @@ export type MergedPlatformConfig = {
   cashPayment: CashPaymentConfig;
   unpaidFollowup: UnpaidFollowupConfig;
   identityVerification: IdentityVerificationConfig;
+  automations: AutomationsConfig;
 };
 
 export const UNPAID_FOLLOWUP_DEFAULTS: UnpaidFollowupConfig = {
@@ -184,6 +187,7 @@ export const PLATFORM_CONFIG_DEFAULTS: MergedPlatformConfig = {
   },
   unpaidFollowup: { ...UNPAID_FOLLOWUP_DEFAULTS },
   identityVerification: { smileIdInApp: false },
+  automations: DEFAULT_AUTOMATIONS,
 };
 
 export function mergeIdentityVerification(

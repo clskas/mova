@@ -8,14 +8,16 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 
 /** Sonnerie SENGA + plein écran pour une offre course/livraison, process mort compris. */
 object JobRing {
-    /** v7 : MediaPlayer + son SENGA ; les canaux Android sont immuables. */
-    const val CHANNEL_ID = "mova_driver_jobs_v7"
+    /**
+     * Canal muet : la boucle MediaPlayer est le seul son (avant, son du canal + boucle
+     * jouaient ensemble = sonnerie doublée). Les canaux Android sont immuables.
+     */
+    const val CHANNEL_ID = "senga_job_ring_v1"
     private const val NOTIF_ID = 7701
     private var mediaPlayer: MediaPlayer? = null
 
@@ -48,8 +50,7 @@ object JobRing {
         val kindRaw = data["jobKind"] ?: data["type"] ?: "RIDE"
         val id = data["referenceId"] ?: data["rideId"] ?: data["deliveryId"] ?: ""
         val kind = if (kindRaw.contains("DELIVERY")) "delivery" else "ride"
-        val sound = Uri.parse("android.resource://${context.packageName}/${R.raw.senga_job}")
-        ensureChannel(context, sound)
+        ensureChannel(context)
 
         val launch = launchIntent(context, kind, id)
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -65,7 +66,7 @@ object JobRing {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setAutoCancel(true)
-            .setSound(sound)
+            .setSilent(true)
             .setVibrate(longArrayOf(0, 700, 300, 700, 300, 700))
             .setFullScreenIntent(fullPi, true)
             .setContentIntent(contentPi)
@@ -97,21 +98,17 @@ object JobRing {
         }
     }
 
-    private fun ensureChannel(context: Context, sound: Uri) {
+    private fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < 26) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (nm.getNotificationChannel(CHANNEL_ID) != null) return
-        val attrs = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .build()
         val channel = NotificationChannel(
             CHANNEL_ID,
             "Missions & courses SENGA",
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
             description = "Courses et livraisons — sonnerie SENGA même app fermée"
-            setSound(sound, attrs)
+            setSound(null, null)
             enableVibration(true)
             vibrationPattern = longArrayOf(0, 700, 300, 700)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC

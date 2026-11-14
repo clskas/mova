@@ -50,6 +50,12 @@ La **ville SENGA** sur l'accueil est détectée via GPS à l'ouverture (modifiab
 - **Attente payée** : appuyez sur « Je suis arrivé » dès que vous êtes au point de départ. Après les minutes gratuites (5 par défaut), chaque minute d'attente jusqu'au démarrage est ajoutée au prix de la course (plafond fixé par SENGA) ; vous touchez votre part comme sur le reste de la course.
 - **Forte demande** : quand beaucoup de passagers attendent près d'un endroit et que peu de chauffeurs sont libres, le prix augmente (+20 % ou +40 % par défaut). Restez en ligne dans ces zones : vos gains par course y sont plus élevés.
 
+## Bonus du jour, zones de demande et parrainage
+
+- **Bonus du jour** (si SENGA l'active) : la carte « Bonus du jour » sur l'accueil montre vos missions de la journée (courses, livraisons, courses & commissions) et combien il en reste pour la prime. La prime est versée dans votre portefeuille la nuit suivante.
+- **Zones de demande** : le bouton sur l'accueil ouvre une carte des demandes récentes autour de vous ; en rouge, les clients qui attendent encore un chauffeur.
+- **Parrainage** : Profil → Parrainage, partagez votre code. Quand votre filleul termine sa première mission, vous recevez tous les deux un crédit (si SENGA l'active).
+
 ## Position GPS pendant les missions
 
 Pendant une course ou une livraison active, l'application envoie automatiquement votre position :

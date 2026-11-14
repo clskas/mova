@@ -12,6 +12,7 @@ import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
 import 'account_link_card.dart';
+import 'referral_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key, this.title = 'Mon profil'});
@@ -171,6 +172,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   AccountLinkCard(profile: _profile, onChanged: _load),
                   const SizedBox(height: 12),
                 ],
+                MovaCard(
+                  key: const Key('referralEntry'),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ReferralScreen()),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.card_giftcard, color: MovaColors.violet),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(tr('Parrainage'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                            Text(
+                              tr('Invitez vos proches et gagnez un crédit SENGA'),
+                              style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 MovaCard(
                   key: const Key('trustedContactsEntry'),
                   onTap: () => Navigator.push(

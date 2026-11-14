@@ -48,10 +48,16 @@ model User {
   language  String     @default("fr")
   /// Super-admin overrides of AdminPermission values. Empty = use role defaults.
   adminPermissions String[] @default([])
+  /// Referral: own code (made on first view), who invited this user, and when both were rewarded.
+  referralCode       String?   @unique
+  referredById       String?
+  referredAt         DateTime?
+  referralRewardedAt DateTime?
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
   @@index([homeCity])
+  @@index([referredById])
   @@map("users")
 }
 

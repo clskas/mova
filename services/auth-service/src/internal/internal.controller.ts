@@ -1,3 +1,4 @@
+import { ReferralService } from '../users/referral.service';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { UserRole, UserStatus } from '@prisma/client';
@@ -57,7 +58,16 @@ export class InternalController {
     private users: UsersService,
     private auth: AuthService,
     private moderation: ModerationService,
+    private referral: ReferralService,
   ) {}
+  @Get('referrals/pending')
+  referralsPending(@Query('max') max?: string) {
+    return this.referral.pending(Math.max(1, Number(max) || 20));
+  }
+  @Post('referrals/:userId/rewarded')
+  referralRewarded(@Param('userId') userId: string) {
+    return this.referral.markRewarded(userId);
+  }
   @Get('users/count')
   async count(
     @Query('from') from?: string,

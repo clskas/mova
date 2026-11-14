@@ -4,6 +4,7 @@ import { formatCdf, kinshasaClock, postStaffAlert, RedisService, resolveCityFrom
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RidesService } from './rides.service';
+import { DriverIncentivesService } from './driver-incentives.service';
 
 const TICK_MS = 10 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
@@ -35,6 +36,7 @@ export class AutomationsScheduler implements OnModuleInit, OnModuleDestroy {
     private redis: RedisService,
     private rides: RidesService,
     private platformConfig: PlatformConfigService,
+    private incentives: DriverIncentivesService,
   ) {}
 
   onModuleInit() {
@@ -61,6 +63,14 @@ export class AutomationsScheduler implements OnModuleInit, OnModuleDestroy {
     const clock = kinshasaClock();
     if (a.dailyReport.enabled && clock.hour === a.dailyReport.hourKinshasa) {
       await this.dailyReport(clock.day).catch((e: unknown) => this.logger.warn(`daily report: ${String(e)}`));
+    }
+    if (a.driverBonus.enabled && clock.hour === 1 && (await this.once(`auto:bonus:${clock.day}`, 36 * 3600))) {
+      const y = new Date(`${clock.day}T12:00:00+01:00`);
+      y.setDate(y.getDate() - 1);
+      await this.incentives.payDailyBonuses(kinshasaClock(y).day).catch((e: unknown) => this.logger.warn(`bonus: ${String(e)}`));
+    }
+    if (a.referral.enabled && (await this.once(`auto:referral:${Math.floor(Date.now() / 3_600_000)}`, 2 * 3600))) {
+      await this.incentives.payReferrals().catch((e: unknown) => this.logger.warn(`referral: ${String(e)}`));
     }
     if (a.anomalyAlerts.enabled) {
       await this.anomalies(a.anomalyAlerts).catch((e: unknown) => this.logger.warn(`anomalies: ${String(e)}`));

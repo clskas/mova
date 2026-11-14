@@ -16,6 +16,7 @@ import { CancelScheduledRideDto, CreateScheduledRideDto } from './scheduled-ride
 import { MobileScheduledEstimateDto } from '../deliveries/deliveries-mobile.dto';
 import { ScheduledRidesService } from './scheduled-rides.service';
 import { RidesService } from './rides.service';
+import { DriverIncentivesService } from './driver-incentives.service';
 import { RidePoolService } from './ride-pool.service';
 import { RideChatService } from '../chat/ride-chat.service';
 import { SendRideChatDto } from '../chat/ride-chat.dto';
@@ -32,6 +33,7 @@ export class RidesController {
     private ridePoolService: RidePoolService,
     private uploadsService: UploadsService,
     private voiceOrder: VoiceOrderService,
+    private incentives: DriverIncentivesService,
   ) {}
 
   @Get(':id/driver-photo')
@@ -47,6 +49,18 @@ export class RidesController {
   @ApiOperation({ summary: 'Commande vocale : phrase → départ, destination, gamme (le passager confirme ensuite)' })
   voiceParse(@Body() body: { text?: string; city?: string; lat?: number; lng?: number }) {
     return this.voiceOrder.parse(body ?? {});
+  }
+
+  @Get('driver/bonus')
+  @ApiOperation({ summary: 'Bonus du jour du chauffeur (missions et paliers)' })
+  driverBonus(@Request() req: { user: { id: string } }) {
+    return this.incentives.bonusProgress(req.user.id);
+  }
+
+  @Get('demand-heatmap')
+  @ApiOperation({ summary: 'Carte de la demande autour du chauffeur' })
+  demandHeatmap(@Query('lat') lat: string, @Query('lng') lng: string) {
+    return this.incentives.heatmap(Number(lat), Number(lng));
   }
 
   @Post('estimate')

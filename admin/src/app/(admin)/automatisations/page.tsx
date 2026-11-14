@@ -10,6 +10,9 @@ type Automations = {
   anomalyAlerts: { enabled: boolean; minRequestsPerHour: number; cancelRatePct: number; unservedPerHour: number };
   docExpiry: { enabled: boolean; daysBefore: number[] };
   cashDebt: { enabled: boolean; remindAfterHours: number; blockAfterDays: number };
+  driverBonus: { enabled: boolean; minJobs: number; bonusCdf: number; minJobs2: number; bonus2Cdf: number };
+  demandHeatmap: { enabled: boolean; windowMinutes: number };
+  referral: { enabled: boolean; referrerRewardCdf: number; refereeRewardCdf: number; maxPerReferrer: number; codeEntryDays: number };
 };
 
 const DEFAULTS: Automations = {
@@ -17,6 +20,9 @@ const DEFAULTS: Automations = {
   anomalyAlerts: { enabled: true, minRequestsPerHour: 10, cancelRatePct: 60, unservedPerHour: 5 },
   docExpiry: { enabled: true, daysBefore: [30, 7, 1] },
   cashDebt: { enabled: true, remindAfterHours: 24, blockAfterDays: 0 },
+  driverBonus: { enabled: false, minJobs: 10, bonusCdf: 5000, minJobs2: 20, bonus2Cdf: 12000 },
+  demandHeatmap: { enabled: true, windowMinutes: 30 },
+  referral: { enabled: false, referrerRewardCdf: 2000, refereeRewardCdf: 2000, maxPerReferrer: 20, codeEntryDays: 7 },
 };
 
 function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disabled: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -62,6 +68,9 @@ export default function AutomatisationsPage() {
         anomalyAlerts: { ...DEFAULTS.anomalyAlerts, ...cfg.anomalyAlerts },
         docExpiry: { ...DEFAULTS.docExpiry, ...cfg.docExpiry },
         cashDebt: { ...DEFAULTS.cashDebt, ...cfg.cashDebt },
+        driverBonus: { ...DEFAULTS.driverBonus, ...cfg.driverBonus },
+        demandHeatmap: { ...DEFAULTS.demandHeatmap, ...cfg.demandHeatmap },
+        referral: { ...DEFAULTS.referral, ...cfg.referral },
       };
       setA(next);
       setDaysText(next.docExpiry.daysBefore.join(", "));
@@ -186,6 +195,63 @@ export default function AutomatisationsPage() {
         {editable && (
           <BtnPrimary disabled={saving === "cashDebt"} onClick={() => void save("cashDebt", a.cashDebt)}>
             {saving === "cashDebt" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Bonus chauffeurs</h2>
+        <p className="text-sm text-slate-600">
+          Prime versée par SENGA dans le portefeuille du chauffeur ou livreur qui atteint un nombre de missions dans la
+          journée (courses, livraisons, courses &amp; commissions). Payée la nuit suivante ; l&apos;app chauffeur montre
+          la progression. <strong>Coûte de l&apos;argent à SENGA</strong> : désactivé par défaut.
+        </p>
+        <Toggle label="Activé" checked={a.driverBonus.enabled} disabled={ro} onChange={(v) => set("driverBonus", { enabled: v })} />
+        <div className="flex flex-wrap gap-4">
+          <Num label="Palier 1 : missions" value={a.driverBonus.minJobs} disabled={ro} onChange={(v) => set("driverBonus", { minJobs: v })} />
+          <Num label="Palier 1 : prime (FC)" value={a.driverBonus.bonusCdf} disabled={ro} onChange={(v) => set("driverBonus", { bonusCdf: v })} />
+          <Num label="Palier 2 : missions (0 = aucun)" value={a.driverBonus.minJobs2} disabled={ro} onChange={(v) => set("driverBonus", { minJobs2: v })} />
+          <Num label="Palier 2 : prime (FC)" value={a.driverBonus.bonus2Cdf} disabled={ro} onChange={(v) => set("driverBonus", { bonus2Cdf: v })} />
+        </div>
+        {editable && (
+          <BtnPrimary disabled={saving === "driverBonus"} onClick={() => void save("driverBonus", a.driverBonus)}>
+            {saving === "driverBonus" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Carte de la demande (chauffeurs)</h2>
+        <p className="text-sm text-slate-600">
+          Dans SENGA Driver, « Zones de demande » montre où les clients ont demandé une course ou une livraison
+          récemment (et ceux qui attendent encore), pour aller vers eux.
+        </p>
+        <Toggle label="Activé" checked={a.demandHeatmap.enabled} disabled={ro} onChange={(v) => set("demandHeatmap", { enabled: v })} />
+        <Num label="Fenêtre (minutes, 5–180)" value={a.demandHeatmap.windowMinutes} disabled={ro} onChange={(v) => set("demandHeatmap", { windowMinutes: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "demandHeatmap"} onClick={() => void save("demandHeatmap", a.demandHeatmap)}>
+            {saving === "demandHeatmap" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Parrainage</h2>
+        <p className="text-sm text-slate-600">
+          Chaque utilisateur a un code à partager (Profil → Parrainage). Le nouvel utilisateur saisit le code dans les
+          premiers jours ; quand il termine sa première course ou livraison, les deux reçoivent un crédit SENGA.
+          <strong> Coûte de l&apos;argent à SENGA</strong> : désactivé par défaut.
+        </p>
+        <Toggle label="Activé" checked={a.referral.enabled} disabled={ro} onChange={(v) => set("referral", { enabled: v })} />
+        <div className="flex flex-wrap gap-4">
+          <Num label="Récompense parrain (FC)" value={a.referral.referrerRewardCdf} disabled={ro} onChange={(v) => set("referral", { referrerRewardCdf: v })} />
+          <Num label="Récompense filleul (FC)" value={a.referral.refereeRewardCdf} disabled={ro} onChange={(v) => set("referral", { refereeRewardCdf: v })} />
+          <Num label="Filleuls récompensés max / parrain" value={a.referral.maxPerReferrer} disabled={ro} onChange={(v) => set("referral", { maxPerReferrer: v })} />
+          <Num label="Jours pour saisir un code" value={a.referral.codeEntryDays} disabled={ro} onChange={(v) => set("referral", { codeEntryDays: v })} />
+        </div>
+        {editable && (
+          <BtnPrimary disabled={saving === "referral"} onClick={() => void save("referral", a.referral)}>
+            {saving === "referral" ? "…" : "Enregistrer"}
           </BtnPrimary>
         )}
       </Card>

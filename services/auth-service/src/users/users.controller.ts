@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Patch, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsEmail, IsIn, IsOptional, IsString, ValidateIf } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
+import { ReferralService } from './referral.service';
 class UpdateProfileDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() firstName?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() lastName?: string;
@@ -23,7 +24,17 @@ class UpdateProfileDto {
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  constructor(private usersService: UsersService, private referral: ReferralService) {}
+  @Get('me/referral')
+  @ApiOperation({ summary: 'Parrainage : mon code et mes filleuls' })
+  myReferral(@Request() req: { user: { id: string } }) {
+    return this.referral.mine(req.user.id);
+  }
+  @Post('me/referral')
+  @ApiOperation({ summary: 'Saisir le code de son parrain' })
+  applyReferral(@Request() req: { user: { id: string } }, @Body() body: { code?: string }) {
+    return this.referral.applyCode(req.user.id, String(body?.code ?? ''));
+  }
   @Get('me')
   @ApiOperation({ summary: 'Profil utilisateur' })
   me(@Request() req: { user: { id: string } }) { return this.usersService.findById(req.user.id); }

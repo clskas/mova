@@ -13,6 +13,12 @@ export type AutomationsConfig = {
   docExpiry: { enabled: boolean; daysBefore: number[] };
   /** Cash owed at the counter: daily reminder after N hours, offers blocked after N days (0 = never). */
   cashDebt: { enabled: boolean; remindAfterHours: number; blockAfterDays: number };
+  /** Daily bonus for drivers / couriers reaching N jobs (paid by SENGA the next night). */
+  driverBonus: { enabled: boolean; minJobs: number; bonusCdf: number; minJobs2: number; bonus2Cdf: number };
+  /** Map of the demand for drivers (requests of the last N minutes). */
+  demandHeatmap: { enabled: boolean; windowMinutes: number };
+  /** Referral: both get a credit when the new user finishes a first ride or delivery. */
+  referral: { enabled: boolean; referrerRewardCdf: number; refereeRewardCdf: number; maxPerReferrer: number; codeEntryDays: number };
 };
 
 export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
@@ -20,6 +26,10 @@ export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
   anomalyAlerts: { enabled: true, minRequestsPerHour: 10, cancelRatePct: 60, unservedPerHour: 5 },
   docExpiry: { enabled: true, daysBefore: [30, 7, 1] },
   cashDebt: { enabled: true, remindAfterHours: 24, blockAfterDays: 0 },
+  // Money paid by SENGA: off until the super admin turns them on.
+  driverBonus: { enabled: false, minJobs: 10, bonusCdf: 5000, minJobs2: 20, bonus2Cdf: 12000 },
+  demandHeatmap: { enabled: true, windowMinutes: 30 },
+  referral: { enabled: false, referrerRewardCdf: 2000, refereeRewardCdf: 2000, maxPerReferrer: 20, codeEntryDays: 7 },
 };
 
 const int = (v: unknown, fallback: number, min: number, max: number) => {
@@ -35,6 +45,10 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
   const an = o.anomalyAlerts ?? {};
   const de = o.docExpiry ?? {};
   const cd = o.cashDebt ?? {};
+  const db = o.driverBonus ?? {};
+  const hm = o.demandHeatmap ?? {};
+  const rf = o.referral ?? {};
+  const minJobs = int(db.minJobs, base.driverBonus.minJobs, 1, 200);
   const days = Array.isArray(de.daysBefore)
     ? [...new Set((de.daysBefore as unknown[]).map((d) => int(d, 0, 0, 90)).filter((d) => d > 0))].sort((a, b) => b - a)
     : base.docExpiry.daysBefore;
@@ -58,7 +72,36 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
       remindAfterHours: int(cd.remindAfterHours, base.cashDebt.remindAfterHours, 1, 720),
       blockAfterDays: int(cd.blockAfterDays, base.cashDebt.blockAfterDays, 0, 90),
     },
+    driverBonus: {
+      enabled: bool(db.enabled, base.driverBonus.enabled),
+      minJobs,
+      bonusCdf: int(db.bonusCdf, base.driverBonus.bonusCdf, 0, 1_000_000),
+      // Second tier: above the first one, 0 = none.
+      minJobs2: Math.max(0, int(db.minJobs2, base.driverBonus.minJobs2, 0, 500)) > minJobs
+        ? int(db.minJobs2, base.driverBonus.minJobs2, 0, 500)
+        : 0,
+      bonus2Cdf: int(db.bonus2Cdf, base.driverBonus.bonus2Cdf, 0, 2_000_000),
+    },
+    demandHeatmap: {
+      enabled: bool(hm.enabled, base.demandHeatmap.enabled),
+      windowMinutes: int(hm.windowMinutes, base.demandHeatmap.windowMinutes, 5, 180),
+    },
+    referral: {
+      enabled: bool(rf.enabled, base.referral.enabled),
+      referrerRewardCdf: int(rf.referrerRewardCdf, base.referral.referrerRewardCdf, 0, 100_000),
+      refereeRewardCdf: int(rf.refereeRewardCdf, base.referral.refereeRewardCdf, 0, 100_000),
+      maxPerReferrer: int(rf.maxPerReferrer, base.referral.maxPerReferrer, 1, 1000),
+      codeEntryDays: int(rf.codeEntryDays, base.referral.codeEntryDays, 1, 90),
+    },
   };
+}
+
+/** Bonus earned for a number of jobs in a day (pure, tested): highest tier reached, else 0. */
+export function bonusForJobs(jobs: number, b: AutomationsConfig['driverBonus']): number {
+  if (!b.enabled) return 0;
+  if (b.minJobs2 > 0 && jobs >= b.minJobs2) return b.bonus2Cdf;
+  if (jobs >= b.minJobs) return b.bonusCdf;
+  return 0;
 }
 
 let cache: { at: number; value: AutomationsConfig } | null = null;

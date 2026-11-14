@@ -183,6 +183,9 @@ class SyncQueue {
     if (method == 'PATCH') {
       if (RegExp(r'^/rides/[^/]+/status$').hasMatch(path)) return true;
       if (RegExp(r'^/deliveries/[^/]+/status$').hasMatch(path)) return true;
+      // Moving and scheduled missions: start / finish replayed when the network is back.
+      if (RegExp(r'^/moving/[^/]+/driver-status$').hasMatch(path)) return true;
+      if (RegExp(r'^/rides/scheduled/[^/]+/driver-status$').hasMatch(path)) return true;
       return false;
     }
     if (method == 'POST') {
@@ -190,6 +193,8 @@ class SyncQueue {
       if (RegExp(r'^/rides/[^/]+/reject$').hasMatch(path)) return true;
       if (RegExp(r'^/deliveries/[^/]+/accept$').hasMatch(path)) return true;
       if (RegExp(r'^/deliveries/[^/]+/reject$').hasMatch(path)) return true;
+      // Pool: passenger picked up / dropped off.
+      if (RegExp(r'^/rides/[^/]+/share-passengers/[^/]+/(pickup|dropoff)$').hasMatch(path)) return true;
     }
     if (method != 'POST') return false;
     if (path.contains('/auth/')) return false;

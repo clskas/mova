@@ -1,0 +1,49 @@
+name: iOS Review Watch
+
+# Daily read-only check of the App Store review state. When an app becomes approved / ready
+# for sale, opens one GitHub issue so the owner can decide the next submission. Never submits.
+on:
+  schedule:
+    - cron: '0 7 * * *'   # 08:00 Kinshasa
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    if: github.repository != 'afri-soft-com/mova'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read App Store states
+        id: asc
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_STORE_CONNECT_API_KEY}" ]; then echo "::notice::ASC non configuré"; exit 0; fi
+          pip install -q pyjwt cryptography
+          python scripts/asc_review_watch.py | tee states.json
+          echo "json=$(cat states.json)" >> "$GITHUB_OUTPUT"
+      - name: Open an issue when an app is approved
+        if: steps.asc.outputs.json != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATES: ${{ steps.asc.outputs.json }}
+        run: |
+          set -euo pipefail
+          for app in passenger driver; do
+            ready=$(echo "$STATES" | jq -r --arg a "$app" '.[$a][] | select(.state=="READY_FOR_SALE" or .state=="PENDING_DEVELOPER_RELEASE" or .state=="ACCEPTED") | .version' | head -1)
+            [ -z "$ready" ] && continue
+            title="iOS : SENGA $app $ready validé par Apple"
+            if gh issue list --state all --search "\"$title\" in:title" --json number -q '.[0].number' | grep -q .; then continue; fi
+            gh issue create --title "$title" --body "Apple a validé **$app $ready** (état : $(echo "$STATES" | jq -c --arg a "$app" '.[$a]')). Aucune soumission automatique : demandez à Claude de soumettre la version suivante si vous le souhaitez."
+          done

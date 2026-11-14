@@ -82,3 +82,4 @@ rental-partner/public/version.json
 
 # Local uploaded media (served from DB / Supabase in production)
 services/ride-service/uploads/
+__pycache__/

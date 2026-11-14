@@ -161,6 +161,19 @@ export class InternalController {
     return this.wallet.listTransactionsAdmin(Number(skip ?? 0), Number(take ?? 50), userId, kind);
   }
 
+  @Post('wallets/:userId/platform-bonus')
+  platformBonus(
+    @Param('userId') userId: string,
+    @Body() body: { amountCdf?: number; description?: string; reference?: string },
+  ) {
+    return this.wallet.grantPlatformBonus(
+      userId,
+      Number(body?.amountCdf ?? 0),
+      String(body?.description ?? 'Bonus SENGA'),
+      String(body?.reference ?? ''),
+    );
+  }
+
   @Post('wallets/:userId/write-off-deleted')
   writeOffDeleted(@Param('userId') userId: string, @Body() body: { reason?: string }) {
     return this.wallet.writeOffDeletedUser(userId, String(body?.reason ?? ''));

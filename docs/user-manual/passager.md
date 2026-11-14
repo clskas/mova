@@ -42,6 +42,8 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 7. Sous la carte, utilisez les **filtres POI** (Marchés, Hôpitaux, Universités, Pharmacies) pour afficher les points d'intérêt à proximité.
 8. L'autocomplétion de destination inclut les **lieux SENGA** (marchés, hôpitaux, etc.) en plus des communes.
 
+**Parrainage** : Profil → Parrainage. Partagez votre code ; quand votre proche termine sa première course ou livraison, vous recevez tous les deux un crédit sur votre portefeuille (quand SENGA ouvre le parrainage). Si quelqu'un vous a invité, saisissez son code dans les premiers jours après l'inscription.
+
 **Attente du chauffeur** : quand votre chauffeur est arrivé, les **5 premières minutes d'attente sont gratuites** (vous recevez un SMS). Au-delà, chaque minute est ajoutée au prix de la course, au tarif par minute de la gamme, avec un plafond (20 minutes facturées au plus). Soyez prêt quand le chauffeur arrive !
 
 **Forte demande** : quand beaucoup de passagers cherchent un chauffeur au même endroit et que peu de chauffeurs sont libres, le prix peut augmenter (par exemple +20 % ou +40 %). L'app affiche **« Forte demande »** avec le pourcentage **avant** que vous commandiez : vous pouvez attendre quelques minutes ou choisir une autre gamme.

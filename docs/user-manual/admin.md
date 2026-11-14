@@ -153,6 +153,9 @@ Pour les véhicules **VIP**, **Confort** ou autres catégories réglementées :
 - **Rapport quotidien** : résumé de la veille dans la cloche de l'admin, à l'heure choisie (Kinshasa).
 - **Alertes d'anomalie** : toutes les heures, par ville, si les annulations dépassent le seuil ou si des passagers restent sans chauffeur.
 - **Rappels de documents chauffeurs** : avant l'expiration du permis, de l'assurance, du contrôle technique et de la vignette (30, 7 et 1 jours par défaut ; SMS à partir de 7 jours).
+- **Bonus chauffeurs** (désactivé par défaut, payé par SENGA) : prime pour un nombre de missions dans la journée, deux paliers possibles, versée la nuit suivante.
+- **Carte de la demande** : « Zones de demande » dans SENGA Driver (demandes des N dernières minutes).
+- **Parrainage** (désactivé par défaut, payé par SENGA) : crédit au parrain et au filleul après la première course ou livraison du filleul ; plafond de filleuls récompensés par parrain.
 - **Suivi des dettes espèces** : rappel quotidien aux chauffeurs qui doivent des espèces ; option pour suspendre leurs missions au-delà de N jours (0 = jamais).
 
 ## Opérations (lecture + mise à jour)

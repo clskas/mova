@@ -445,6 +445,20 @@ export class WalletService {
    * A promo funded by SENGA: the extra paid to a driver / partner leaves the treasury.
    * The treasury may go below zero (it is SENGA's own account); idempotent on `reference`.
    */
+  /**
+   * Bonus paid by SENGA (driver daily bonus, referral): credit to the user, the same amount out
+   * of the treasury. Idempotent on `reference`.
+   */
+  async grantPlatformBonus(userId: string, amountCdf: number, description: string, reference: string) {
+    const amount = Math.round(amountCdf);
+    if (amount <= 0 || !reference) return { granted: false };
+    if (await this.findExistingLedger(reference, 'CREDIT')) return { granted: false, alreadyGranted: true };
+    await this.createWallet(userId);
+    await this.credit(userId, amount, description, reference);
+    await this.recordPlatformPromoCost(amount, description, `COST:${reference}`);
+    return { granted: true, amountCdf: amount };
+  }
+
   async recordPlatformPromoCost(amountCdf: number, description: string, reference: string) {
     const amount = Math.round(amountCdf);
     if (amount <= 0) return null;

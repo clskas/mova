@@ -45,6 +45,7 @@ import '../delivery/delivery_payment_state.dart';
 import '../notifications/notifications_inbox_screen.dart';
 import '../sos/notification_tap_router.dart';
 import '../../core/location/location_permission.dart';
+import 'demand_heatmap_screen.dart';
 
 enum _DriverMenuAction {
   earnings,
@@ -102,6 +103,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   List<Map<String, dynamic>> _movingOffers = [];
   String? _acceptingMovingId;
   List<Map<String, dynamic>> _publicites = const [];
+  Map<String, dynamic>? _bonus;
   final Set<String> _knownMissionKeys = {};
   final Set<String> _knownOfferKeys = {};
   bool _missionAlertsSeeded = false;
@@ -610,7 +612,57 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
       _loadPendingCashRide(),
       _loadActiveDelivery(),
       _loadPublicites(),
+      _loadBonus(),
     ]);
+  }
+
+  /// Today's bonus progress (Admin → Automatisations → Bonus chauffeurs).
+  Future<void> _loadBonus() async {
+    final result = await ref.read(apiClientProvider).get('/rides/driver/bonus', skipCache: true);
+    if (!mounted) return;
+    if (result case Success(:final data) when data is Map) {
+      setState(() => _bonus = Map<String, dynamic>.from(data));
+    }
+  }
+
+  Widget _bonusCard() {
+    final b = _bonus!;
+    final jobs = (b['todayJobs'] as num?)?.toInt() ?? 0;
+    final tiers = (b['tiers'] as List? ?? const []).whereType<Map>().toList();
+    final next = tiers.firstWhere((t) => jobs < ((t['jobs'] as num?)?.toInt() ?? 0), orElse: () => const {});
+    final earned = (b['earnedCdf'] as num?)?.toInt() ?? 0;
+    final target = (next['jobs'] as num?)?.toInt();
+    return MovaCard(
+      child: Row(
+        children: [
+          const Icon(Icons.emoji_events_outlined, color: MovaColors.orange),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tr('Bonus du jour'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(
+                  target != null
+                      ? trf('{jobs} missions aujourd’hui — encore {left} pour {bonus}', {
+                          'jobs': jobs,
+                          'left': target - jobs,
+                          'bonus': MarketConfig.formatCdf((next['bonusCdf'] as num?)?.toInt() ?? 0),
+                        })
+                      : trf('{jobs} missions aujourd’hui — bonus de {bonus} gagné', {'jobs': jobs, 'bonus': MarketConfig.formatCdf(earned)}),
+                  style: const TextStyle(color: MovaColors.textSecondary),
+                ),
+                if (target != null) ...[
+                  const SizedBox(height: 6),
+                  LinearProgressIndicator(value: target > 0 ? (jobs / target).clamp(0, 1).toDouble() : 0),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadPublicites() async {
@@ -1748,6 +1800,17 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             PubliciteCarousel(items: _publicites),
             const SizedBox(height: _sectionGap),
           ],
+          if (_bonus?['enabled'] == true) ...[
+            _bonusCard(),
+            const SizedBox(height: _sectionGap),
+          ],
+          OutlinedButton.icon(
+            key: const Key('demandHeatmapButton'),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DemandHeatmapScreen())),
+            icon: const Icon(Icons.local_fire_department_outlined),
+            label: Text(tr('Zones de demande')),
+          ),
+          const SizedBox(height: _sectionGap),
           if (_kycStatus != null && _kycStatus != 'APPROVED') ...[
             MovaCard(
               child: Row(

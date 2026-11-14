@@ -912,6 +912,35 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
             const SizedBox(height: 12),
             MovaErrorBanner(message: _error!),
           ],
+          if ((_ride['riderPhone']?.toString() ?? '').isNotEmpty) ...[
+            const SizedBox(height: 16),
+            MovaCard(
+              key: const Key('riderInfoCard'),
+              child: Row(
+                children: [
+                  const Icon(Icons.family_restroom, color: MovaColors.violet),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(tr('Personne transportée'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text('${_ride['riderName'] ?? ''} ${_ride['riderPhone']}'.trim()),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.phone, color: MovaColors.green),
+                    onPressed: () => showCallWhatsAppSheet(
+                      context,
+                      phone: _ride['riderPhone']?.toString(),
+                      peerLabel: _ride['riderName']?.toString() ?? tr('la personne transportée'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Row(
             children: [

@@ -36,7 +36,7 @@ process.on('unhandledRejection', (reason) => {
 async function bootstrap() {
   assertProductionSecurity('ride-service');
   installErrorReporting('ride-service');
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false, rawBody: true });
   // Base64 parcel photos (~3 Mo fichier → ~4 Mo JSON) dépassent la limite Express par défaut (100 kb).
   app.useBodyParser('json', { limit: '8mb' });
   app.useBodyParser('urlencoded', { limit: '8mb', extended: true });

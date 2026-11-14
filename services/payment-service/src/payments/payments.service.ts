@@ -1,3 +1,4 @@
+import { GrowthService } from './growth.service';
 import { CorporateService } from '../corporate/corporate.service';
 import { planDriverPayout } from '../payouts/payout-plan';
 import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
@@ -85,6 +86,7 @@ export class PaymentsService {
     airtel: AirtelMoneyProvider,
     @Optional() private readonly hubPayments?: HubPaymentsService,
     @Optional() private readonly corporate?: CorporateService,
+    @Optional() private readonly growth?: GrowthService,
   ) {
     this.providers = new Map<PaymentMethod, PaymentProvider>([
       [PaymentMethod.ORANGE_MONEY, orange],
@@ -194,6 +196,8 @@ export class PaymentsService {
   }
 
   private async publishPaymentCompleted(payload: PaymentCompletedPayload) {
+    // Loyalty points for the ride paid (Automatisations → Points de fidélité), once per ride.
+    void this.growth?.awardLoyalty(payload.userId, payload.amountCdf, `RIDE:${payload.rideId}`);
     try {
       await this.redis.publish(MOVA_EVENTS.PAYMENT_COMPLETED, payload);
     } catch (e) {

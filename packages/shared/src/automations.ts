@@ -31,6 +31,26 @@ export type AutomationsConfig = {
   ratingQuality: { enabled: boolean; minAvg: number; minRatings: number; autoBlock: boolean };
   /** Morning summary of the app errors (Sentry) in the admin alerts; needs SENTRY_READ_TOKEN. */
   sentryDigest: { enabled: boolean; hourKinshasa: number };
+  /** Passenger proposes the ride price (between minPct and maxPct of the estimate); drivers accept or not. */
+  priceOffer: { enabled: boolean; minPct: number; maxPct: number };
+  /** Tip after the ride, from the wallet, 100 % for the driver. */
+  tips: { enabled: boolean; presetsCdf: number[]; maxCdf: number };
+  /** Favourite drivers get the passenger's request first (first N search rounds). */
+  favoriteDrivers: { enabled: boolean; priorityAttempts: number };
+  /** Women passengers can ask for a woman driver (self-declared profile). */
+  womenPreference: { enabled: boolean };
+  /** Loyalty points: N points per 1 000 FC paid; P points = V FC of wallet credit (paid by SENGA). */
+  loyalty: { enabled: boolean; pointsPer1000Cdf: number; redeemPoints: number; redeemValueCdf: number };
+  /** Booking by USSD (*xxx#, no smartphone / internet) through an aggregator. */
+  ussdBooking: { enabled: boolean };
+  /** Booking by WhatsApp message (WhatsApp Business Cloud API). */
+  whatsappBooking: { enabled: boolean };
+  /** Driver going home: only rides that bring him closer (N times a day). */
+  driverDestination: { enabled: boolean; maxPerDay: number; radiusKm: number };
+  /** Optional trip insurance: fixed fee per ride, from the wallet (partner insurer). */
+  tripInsurance: { enabled: boolean; feeCdf: number; partnerName: string };
+  /** Book for someone else (child, parent…): rider's name and phone, SMS with tracking. */
+  familyMode: { enabled: boolean };
 };
 
 export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
@@ -48,6 +68,16 @@ export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
   routeAnomaly: { enabled: true, stopMinutes: 10, detourKm: 3 },
   ratingQuality: { enabled: true, minAvg: 3.5, minRatings: 10, autoBlock: false },
   sentryDigest: { enabled: false, hourKinshasa: 8 },
+  priceOffer: { enabled: false, minPct: 80, maxPct: 150 },
+  tips: { enabled: false, presetsCdf: [500, 1000, 2000], maxCdf: 20000 },
+  favoriteDrivers: { enabled: false, priorityAttempts: 1 },
+  womenPreference: { enabled: false },
+  loyalty: { enabled: false, pointsPer1000Cdf: 1, redeemPoints: 100, redeemValueCdf: 1000 },
+  ussdBooking: { enabled: false },
+  whatsappBooking: { enabled: false },
+  driverDestination: { enabled: false, maxPerDay: 2, radiusKm: 3 },
+  tripInsurance: { enabled: false, feeCdf: 200, partnerName: '' },
+  familyMode: { enabled: false },
 };
 
 const int = (v: unknown, fallback: number, min: number, max: number) => {
@@ -143,6 +173,50 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
       enabled: bool(sd.enabled, base.sentryDigest.enabled),
       hourKinshasa: int(sd.hourKinshasa, base.sentryDigest.hourKinshasa, 0, 23),
     },
+    priceOffer: (() => {
+      const po = o.priceOffer ?? {};
+      const minPct = int(po.minPct, base.priceOffer.minPct, 50, 100);
+      return {
+        enabled: bool(po.enabled, base.priceOffer.enabled),
+        minPct,
+        maxPct: Math.max(minPct, int(po.maxPct, base.priceOffer.maxPct, 100, 300)),
+      };
+    })(),
+    tips: (() => {
+      const tp = o.tips ?? {};
+      const presets = Array.isArray(tp.presetsCdf)
+        ? (tp.presetsCdf as unknown[]).map((v) => int(v, 0, 0, 100_000)).filter((v) => v > 0).slice(0, 4)
+        : base.tips.presetsCdf;
+      return {
+        enabled: bool(tp.enabled, base.tips.enabled),
+        presetsCdf: presets.length ? presets : base.tips.presetsCdf,
+        maxCdf: int(tp.maxCdf, base.tips.maxCdf, 100, 200_000),
+      };
+    })(),
+    favoriteDrivers: {
+      enabled: bool(o.favoriteDrivers?.enabled, base.favoriteDrivers.enabled),
+      priorityAttempts: int(o.favoriteDrivers?.priorityAttempts, base.favoriteDrivers.priorityAttempts, 1, 5),
+    },
+    womenPreference: { enabled: bool(o.womenPreference?.enabled, base.womenPreference.enabled) },
+    loyalty: {
+      enabled: bool(o.loyalty?.enabled, base.loyalty.enabled),
+      pointsPer1000Cdf: int(o.loyalty?.pointsPer1000Cdf, base.loyalty.pointsPer1000Cdf, 1, 100),
+      redeemPoints: int(o.loyalty?.redeemPoints, base.loyalty.redeemPoints, 10, 100_000),
+      redeemValueCdf: int(o.loyalty?.redeemValueCdf, base.loyalty.redeemValueCdf, 100, 1_000_000),
+    },
+    ussdBooking: { enabled: bool(o.ussdBooking?.enabled, base.ussdBooking.enabled) },
+    whatsappBooking: { enabled: bool(o.whatsappBooking?.enabled, base.whatsappBooking.enabled) },
+    driverDestination: {
+      enabled: bool(o.driverDestination?.enabled, base.driverDestination.enabled),
+      maxPerDay: int(o.driverDestination?.maxPerDay, base.driverDestination.maxPerDay, 1, 10),
+      radiusKm: int(o.driverDestination?.radiusKm, base.driverDestination.radiusKm, 1, 20),
+    },
+    tripInsurance: {
+      enabled: bool(o.tripInsurance?.enabled, base.tripInsurance.enabled),
+      feeCdf: int(o.tripInsurance?.feeCdf, base.tripInsurance.feeCdf, 50, 50_000),
+      partnerName: String(o.tripInsurance?.partnerName ?? base.tripInsurance.partnerName).trim().slice(0, 80),
+    },
+    familyMode: { enabled: bool(o.familyMode?.enabled, base.familyMode.enabled) },
   };
 }
 
@@ -253,4 +327,54 @@ export async function fetchDemoAccountIds(): Promise<Set<string>> {
 export function filterDriversForCustomer<T extends { userId: string }>(drivers: T[], customerId: string, demoIds: Set<string>): T[] {
   const demoCustomer = demoIds.has(customerId);
   return drivers.filter((d) => demoIds.has(d.userId) === demoCustomer);
+}
+
+/** Price a passenger may propose: clamped between minPct and maxPct of the estimate (pure, tested). */
+export function clampProposedFare(estimateCdf: number, proposedCdf: number, cfg: { minPct: number; maxPct: number }): number {
+  const min = Math.ceil((estimateCdf * cfg.minPct) / 100 / 100) * 100;
+  const max = Math.floor((estimateCdf * cfg.maxPct) / 100 / 100) * 100;
+  const p = Math.round(proposedCdf / 100) * 100;
+  return Math.min(Math.max(p, min), Math.max(min, max));
+}
+
+/** Loyalty points earned for an amount paid (pure, tested). */
+export function loyaltyPointsFor(paidCdf: number, pointsPer1000Cdf: number): number {
+  return Math.max(0, Math.floor(paidCdf / 1000) * pointsPer1000Cdf);
+}
+
+/** Favourite drivers first during the first rounds, everyone after (pure, tested). */
+export function favoriteDriversFirst<T extends { userId: string }>(drivers: T[], favorites: Set<string>, attempt: number, priorityAttempts: number): T[] {
+  if (favorites.size === 0 || attempt >= priorityAttempts) return drivers;
+  const fav = drivers.filter((d) => favorites.has(d.userId));
+  return fav.length ? fav : drivers;
+}
+
+/** Straight-line distance in km (pure). */
+export function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const r = (d: number) => (d * Math.PI) / 180;
+  const dLat = r(bLat - aLat);
+  const dLng = r(bLng - aLng);
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(r(aLat)) * Math.cos(r(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(x)));
+}
+
+/**
+ * Driver heading home: a ride fits when its drop-off is near the driver's destination, or
+ * brings him at least 1 km closer to it than where he is now (pure, tested).
+ */
+export function rideFitsDriverDestination(
+  driver: { lat: number; lng: number },
+  dest: { lat: number; lng: number },
+  dropoff: { lat: number; lng: number },
+  radiusKm: number,
+): boolean {
+  const fromDropoff = haversineKm(dropoff.lat, dropoff.lng, dest.lat, dest.lng);
+  if (fromDropoff <= radiusKm) return true;
+  return fromDropoff <= haversineKm(driver.lat, driver.lng, dest.lat, dest.lng) - 1;
+}
+
+/** USSD (Africa's Talking style): the cumulative input « 1*Gombe*Limete*1 » split into steps (pure). */
+export function ussdSteps(text: string | undefined | null): string[] {
+  const t = String(text ?? '').trim();
+  return t ? t.split('*').map((x) => x.trim()) : [];
 }

@@ -19,6 +19,16 @@ type Automations = {
   routeAnomaly: { enabled: boolean; stopMinutes: number; detourKm: number };
   ratingQuality: { enabled: boolean; minAvg: number; minRatings: number; autoBlock: boolean };
   sentryDigest: { enabled: boolean; hourKinshasa: number };
+  priceOffer: { enabled: boolean; minPct: number; maxPct: number };
+  tips: { enabled: boolean; presetsCdf: number[]; maxCdf: number };
+  favoriteDrivers: { enabled: boolean; priorityAttempts: number };
+  womenPreference: { enabled: boolean };
+  loyalty: { enabled: boolean; pointsPer1000Cdf: number; redeemPoints: number; redeemValueCdf: number };
+  ussdBooking: { enabled: boolean };
+  whatsappBooking: { enabled: boolean };
+  driverDestination: { enabled: boolean; maxPerDay: number; radiusKm: number };
+  tripInsurance: { enabled: boolean; feeCdf: number; partnerName: string };
+  familyMode: { enabled: boolean };
 };
 
 type Blocked = { userId: string; qualityBlockedAt: string; qualityBlockReason?: string | null; ratingAvg?: number };
@@ -37,6 +47,16 @@ const DEFAULTS: Automations = {
   routeAnomaly: { enabled: true, stopMinutes: 10, detourKm: 3 },
   ratingQuality: { enabled: true, minAvg: 3.5, minRatings: 10, autoBlock: false },
   sentryDigest: { enabled: false, hourKinshasa: 8 },
+  priceOffer: { enabled: false, minPct: 80, maxPct: 150 },
+  tips: { enabled: false, presetsCdf: [500, 1000, 2000], maxCdf: 20000 },
+  favoriteDrivers: { enabled: false, priorityAttempts: 1 },
+  womenPreference: { enabled: false },
+  loyalty: { enabled: false, pointsPer1000Cdf: 1, redeemPoints: 100, redeemValueCdf: 1000 },
+  ussdBooking: { enabled: false },
+  whatsappBooking: { enabled: false },
+  driverDestination: { enabled: false, maxPerDay: 2, radiusKm: 3 },
+  tripInsurance: { enabled: false, feeCdf: 200, partnerName: "" },
+  familyMode: { enabled: false },
 };
 
 function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disabled: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -92,6 +112,16 @@ export default function AutomatisationsPage() {
         routeAnomaly: { ...DEFAULTS.routeAnomaly, ...cfg.routeAnomaly },
         ratingQuality: { ...DEFAULTS.ratingQuality, ...cfg.ratingQuality },
         sentryDigest: { ...DEFAULTS.sentryDigest, ...cfg.sentryDigest },
+        priceOffer: { ...DEFAULTS.priceOffer, ...cfg.priceOffer },
+        tips: { ...DEFAULTS.tips, ...cfg.tips },
+        favoriteDrivers: { ...DEFAULTS.favoriteDrivers, ...cfg.favoriteDrivers },
+        womenPreference: { ...DEFAULTS.womenPreference, ...cfg.womenPreference },
+        loyalty: { ...DEFAULTS.loyalty, ...cfg.loyalty },
+        ussdBooking: { ...DEFAULTS.ussdBooking, ...cfg.ussdBooking },
+        whatsappBooking: { ...DEFAULTS.whatsappBooking, ...cfg.whatsappBooking },
+        driverDestination: { ...DEFAULTS.driverDestination, ...cfg.driverDestination },
+        tripInsurance: { ...DEFAULTS.tripInsurance, ...cfg.tripInsurance },
+        familyMode: { ...DEFAULTS.familyMode, ...cfg.familyMode },
       };
       setBlocked(await apiFetch<Blocked[]>("/api/admin/drivers-quality-blocked").catch(() => []));
       setA(next);
@@ -139,7 +169,7 @@ export default function AutomatisationsPage() {
         <h2 className="font-semibold">Rapport quotidien</h2>
         <p className="text-sm text-slate-600">
           Chaque matin, un résumé de la veille (courses, livraisons, revenus, commissions, annulations) arrive dans les
-          alertes de l&apos;admin (cloche).
+          Alertes staff.
         </p>
         <Toggle label="Activé" checked={a.dailyReport.enabled} disabled={ro} onChange={(v) => set("dailyReport", { enabled: v })} />
         <Num label="Heure d'envoi (Kinshasa, 0–23)" value={a.dailyReport.hourKinshasa} disabled={ro} onChange={(v) => set("dailyReport", { hourKinshasa: v })} />
@@ -414,7 +444,7 @@ export default function AutomatisationsPage() {
       <Card className="p-4 space-y-3">
         <h2 className="font-semibold">Résumé quotidien des erreurs (Sentry)</h2>
         <p className="text-sm text-slate-600">
-          Chaque matin, les erreurs des applications vues en 24 h arrivent dans la cloche de l&apos;admin. Demande la
+          Chaque matin, les erreurs des applications vues en 24 h arrivent dans Alertes staff. Demande la
           variable <code>SENTRY_READ_TOKEN</code> (jeton Sentry en lecture seule, créé par vous) sur le service ride.
         </p>
         <Toggle label="Activé" checked={a.sentryDigest.enabled} disabled={ro} onChange={(v) => set("sentryDigest", { enabled: v })} />
@@ -422,6 +452,146 @@ export default function AutomatisationsPage() {
         {editable && (
           <BtnPrimary disabled={saving === "sentryDigest"} onClick={() => void save("sentryDigest", a.sentryDigest)}>
             {saving === "sentryDigest" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <h2 className="text-lg font-semibold pt-2">Croissance (nouvelles fonctions)</h2>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Le passager propose son prix</h2>
+        <p className="text-sm text-slate-600">
+          Le passager peut proposer un autre prix que celui de SENGA, entre un minimum et un maximum (en % du prix SENGA). Les chauffeurs voient « prix proposé par le client » et acceptent ou non. Tant que personne n&apos;accepte, le passager peut augmenter son offre.
+        </p>
+        <Toggle label="Activé" checked={a.priceOffer.enabled} disabled={ro} onChange={(v) => set("priceOffer", { enabled: v })} />
+        <Num label="Minimum (% du prix SENGA, 50–100)" value={a.priceOffer.minPct} disabled={ro} onChange={(v) => set("priceOffer", { minPct: v })} />
+        <Num label="Maximum (% du prix SENGA, 100–300)" value={a.priceOffer.maxPct} disabled={ro} onChange={(v) => set("priceOffer", { maxPct: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "priceOffer"} onClick={() => void save("priceOffer", a.priceOffer)}>
+            {saving === "priceOffer" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Pourboire</h2>
+        <p className="text-sm text-slate-600">
+          Après la course, le passager peut laisser un pourboire depuis son portefeuille. 100 % pour le chauffeur, SENGA ne prend rien.
+        </p>
+        <Toggle label="Activé" checked={a.tips.enabled} disabled={ro} onChange={(v) => set("tips", { enabled: v })} />
+        <Num label="Montant proposé 1 (FC)" value={a.tips.presetsCdf[0] ?? 0} disabled={ro} onChange={(v) => set("tips", { presetsCdf: [v, a.tips.presetsCdf[1] ?? 0, a.tips.presetsCdf[2] ?? 0] })} />
+        <Num label="Montant proposé 2 (FC)" value={a.tips.presetsCdf[1] ?? 0} disabled={ro} onChange={(v) => set("tips", { presetsCdf: [a.tips.presetsCdf[0] ?? 0, v, a.tips.presetsCdf[2] ?? 0] })} />
+        <Num label="Montant proposé 3 (FC)" value={a.tips.presetsCdf[2] ?? 0} disabled={ro} onChange={(v) => set("tips", { presetsCdf: [a.tips.presetsCdf[0] ?? 0, a.tips.presetsCdf[1] ?? 0, v] })} />
+        <Num label="Pourboire maximum (FC)" value={a.tips.maxCdf} disabled={ro} onChange={(v) => set("tips", { maxCdf: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "tips"} onClick={() => void save("tips", a.tips)}>
+            {saving === "tips" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Chauffeurs favoris</h2>
+        <p className="text-sm text-slate-600">
+          Après une course, le passager peut ajouter le chauffeur à ses favoris (10 au maximum). Ses demandes partent d&apos;abord vers ses favoris disponibles, puis vers tous les chauffeurs.
+        </p>
+        <Toggle label="Activé" checked={a.favoriteDrivers.enabled} disabled={ro} onChange={(v) => set("favoriteDrivers", { enabled: v })} />
+        <Num label="Tours de recherche réservés aux favoris (1–5)" value={a.favoriteDrivers.priorityAttempts} disabled={ro} onChange={(v) => set("favoriteDrivers", { priorityAttempts: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "favoriteDrivers"} onClick={() => void save("favoriteDrivers", a.favoriteDrivers)}>
+            {saving === "favoriteDrivers" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Chauffeure femme</h2>
+        <p className="text-sm text-slate-600">
+          Une passagère (genre indiqué dans son profil) peut demander une chauffeure femme : seules les chauffeures qui ont indiqué « Femme » dans leur profil reçoivent la course. Si aucune n&apos;est disponible, la passagère peut relancer sans cette option.
+        </p>
+        <Toggle label="Activé" checked={a.womenPreference.enabled} disabled={ro} onChange={(v) => set("womenPreference", { enabled: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "womenPreference"} onClick={() => void save("womenPreference", a.womenPreference)}>
+            {saving === "womenPreference" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Points de fidélité</h2>
+        <p className="text-sm text-slate-600">
+          Chaque course payée rapporte des points. Le passager échange ses points contre un crédit portefeuille. <strong>Coûte de l&apos;argent à SENGA</strong> : désactivé par défaut.
+        </p>
+        <Toggle label="Activé" checked={a.loyalty.enabled} disabled={ro} onChange={(v) => set("loyalty", { enabled: v })} />
+        <Num label="Points par 1 000 FC payés" value={a.loyalty.pointsPer1000Cdf} disabled={ro} onChange={(v) => set("loyalty", { pointsPer1000Cdf: v })} />
+        <Num label="Points à échanger" value={a.loyalty.redeemPoints} disabled={ro} onChange={(v) => set("loyalty", { redeemPoints: v })} />
+        <Num label="Crédit obtenu (FC)" value={a.loyalty.redeemValueCdf} disabled={ro} onChange={(v) => set("loyalty", { redeemValueCdf: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "loyalty"} onClick={() => void save("loyalty", a.loyalty)}>
+            {saving === "loyalty" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Mode famille (pour quelqu&apos;un d&apos;autre)</h2>
+        <p className="text-sm text-slate-600">
+          Le passager commande pour un enfant, un parent ou un ami : il indique son nom et son téléphone. La personne reçoit un SMS avec le lien de suivi, le chauffeur voit son nom et peut l&apos;appeler. Le passager paie.
+        </p>
+        <Toggle label="Activé" checked={a.familyMode.enabled} disabled={ro} onChange={(v) => set("familyMode", { enabled: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "familyMode"} onClick={() => void save("familyMode", a.familyMode)}>
+            {saving === "familyMode" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Assurance trajet</h2>
+        <p className="text-sm text-slate-600">
+          Option proposée à la commande : un montant fixe par course, prélevé sur le portefeuille au départ et versé au portefeuille SENGA, à reverser à l&apos;assureur partenaire. <strong>À activer seulement après la signature avec un assureur.</strong>
+        </p>
+        <Toggle label="Activé" checked={a.tripInsurance.enabled} disabled={ro} onChange={(v) => set("tripInsurance", { enabled: v })} />
+        <Num label="Prix par course (FC)" value={a.tripInsurance.feeCdf} disabled={ro} onChange={(v) => set("tripInsurance", { feeCdf: v })} />
+        <label className="block text-sm">
+          Nom de l&apos;assureur partenaire
+          <input className="mt-1 w-full rounded border px-2 py-1" value={a.tripInsurance.partnerName} disabled={ro} onChange={(e) => set("tripInsurance", { partnerName: e.target.value })} />
+        </label>
+        {editable && (
+          <BtnPrimary disabled={saving === "tripInsurance"} onClick={() => void save("tripInsurance", a.tripInsurance)}>
+            {saving === "tripInsurance" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Destination chauffeur</h2>
+        <p className="text-sm text-slate-600">
+          Le chauffeur indique où il va (par exemple chez lui) : pendant 3 heures, il ne reçoit que les courses qui le rapprochent de cette destination.
+        </p>
+        <Toggle label="Activé" checked={a.driverDestination.enabled} disabled={ro} onChange={(v) => set("driverDestination", { enabled: v })} />
+        <Num label="Utilisations par jour" value={a.driverDestination.maxPerDay} disabled={ro} onChange={(v) => set("driverDestination", { maxPerDay: v })} />
+        <Num label="Rayon autour de la destination (km)" value={a.driverDestination.radiusKm} disabled={ro} onChange={(v) => set("driverDestination", { radiusKm: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "driverDestination"} onClick={() => void save("driverDestination", a.driverDestination)}>
+            {saving === "driverDestination" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Réservation par USSD (sans smartphone)</h2>
+        <p className="text-sm text-slate-600">
+          Commande d&apos;une moto ou d&apos;un taxi en composant un code *xxx# : départ, destination, prix, confirmation. Paiement en espèces, suivi par SMS. Le compte est créé automatiquement avec le numéro. <strong>Demande un contrat avec un agrégateur USSD</strong> (ex. Africa&apos;s Talking) : adresse de rappel <code>https://api.afri-soft.com/api/public/booking/ussd?key=…</code> et variable <code>USSD_WEBHOOK_KEY</code> sur le service ride.
+        </p>
+        <Toggle label="Activé" checked={a.ussdBooking.enabled} disabled={ro} onChange={(v) => set("ussdBooking", { enabled: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "ussdBooking"} onClick={() => void save("ussdBooking", a.ussdBooking)}>
+            {saving === "ussdBooking" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Réservation par WhatsApp</h2>
+        <p className="text-sm text-slate-600">
+          Le client écrit au numéro WhatsApp de SENGA : le robot demande le véhicule, le départ, la destination, donne le prix et commande après confirmation. <strong>Demande un compte WhatsApp Business (Meta)</strong> : webhook <code>https://api.afri-soft.com/api/public/booking/whatsapp</code> et variables <code>WHATSAPP_TOKEN</code>, <code>WHATSAPP_PHONE_NUMBER_ID</code>, <code>WHATSAPP_VERIFY_TOKEN</code>, <code>WHATSAPP_APP_SECRET</code> sur le service ride.
+        </p>
+        <Toggle label="Activé" checked={a.whatsappBooking.enabled} disabled={ro} onChange={(v) => set("whatsappBooking", { enabled: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "whatsappBooking"} onClick={() => void save("whatsappBooking", a.whatsappBooking)}>
+            {saving === "whatsappBooking" ? "…" : "Enregistrer"}
           </BtnPrimary>
         )}
       </Card>

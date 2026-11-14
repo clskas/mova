@@ -35,6 +35,32 @@ export class CreateRideDto extends EstimateRideDto {
   @Min(1)
   @Max(8)
   passengerCount?: number;
+  @ApiProperty({ required: false, description: 'Prix proposé par le passager (Automatisations → Prix proposé)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(100)
+  proposedFareCdf?: number;
+  @ApiProperty({ required: false, description: 'Passagère : chauffeure femme demandée' })
+  @IsOptional()
+  @IsBoolean()
+  womenDriverOnly?: boolean;
+  @ApiProperty({ required: false, description: 'Mode famille : nom de la personne transportée' })
+  @IsOptional()
+  @IsString()
+  riderName?: string;
+  @ApiProperty({ required: false, description: 'Mode famille : téléphone de la personne transportée' })
+  @IsOptional()
+  @IsString()
+  riderPhone?: string;
+  @ApiProperty({ required: false, description: 'Assurance trajet demandée' })
+  @IsOptional()
+  @IsBoolean()
+  insurance?: boolean;
+}
+
+export class ProposedFareDto {
+  @ApiProperty() @Type(() => Number) @IsInt() @Min(100) proposedFareCdf: number;
 }
 
 export class UpdateRideStatusDto {

@@ -22,12 +22,15 @@ class MatchingScreen extends ConsumerStatefulWidget {
     required this.pickupAddress,
     required this.dropoffAddress,
     required this.estimatedFareCdf,
+    this.proposedPrice = false,
   });
 
   final String rideId;
   final String pickupAddress;
   final String dropoffAddress;
   final int estimatedFareCdf;
+  /// The passenger proposed this price: they can raise it while searching.
+  final bool proposedPrice;
 
   @override
   ConsumerState<MatchingScreen> createState() => _MatchingScreenState();
@@ -199,6 +202,25 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
     voiceNotUnderstood(context, text, tr('annuler'));
   }
 
+  int? _fare;
+  bool _raising = false;
+
+  /// Raise the proposed price by 500 FC (bounded by the server).
+  Future<void> _raisePrice() async {
+    setState(() => _raising = true);
+    final next = (_fare ?? widget.estimatedFareCdf) + 500;
+    final r = await ref.read(apiClientProvider).post('/rides/${widget.rideId}/proposed-fare', {'proposedFareCdf': next});
+    if (!mounted) return;
+    setState(() => _raising = false);
+    switch (r) {
+      case Success(:final data):
+        final p = (data['proposedFareCdf'] as num?)?.toInt();
+        if (p != null) setState(() => _fare = p);
+      case Failure(:final error):
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
   Future<void> _cancel() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -338,7 +360,9 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            trf('Tarif estimé : {v1}', {'v1': MarketConfig.formatCdf(widget.estimatedFareCdf)}),
+                            widget.proposedPrice
+                                ? trf('Votre prix : {v1}', {'v1': MarketConfig.formatCdf(_fare ?? widget.estimatedFareCdf)})
+                                : trf('Tarif estimé : {v1}', {'v1': MarketConfig.formatCdf(widget.estimatedFareCdf)}),
                             textAlign: TextAlign.center,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -369,6 +393,16 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 8),
+                if (widget.proposedPrice && _searching) ...[
+                  MovaButton(
+                    key: const Key('raisePrice'),
+                    label: tr('Augmenter mon prix (+500 FC)'),
+                    icon: Icons.trending_up,
+                    isLoading: _raising,
+                    onPressed: _raising ? null : _raisePrice,
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 MovaButton(
                   label: tr('Annuler la recherche'),
                   isSecondary: true,

@@ -162,6 +162,14 @@ export class InternalController {
   purgePlayPrelaunch(@Body() body: PurgeUserDto) {
     return this.users.purgePlayPrelaunchUsers(body?.actorId);
   }
+  @Post('users/ensure-passenger')
+  ensurePassenger(@Body() body: { phone?: string }) {
+    return this.users.ensurePassengerByPhone(String(body?.phone ?? ''));
+  }
+  @Post('users/genders')
+  genders(@Body() body: { ids?: string[] }) {
+    return this.users.gendersOf(Array.isArray(body?.ids) ? body.ids.map(String) : []);
+  }
   @Get('users/:id')
   get(@Param('id') id: string) { return this.users.findById(id); }
   @Post('users')

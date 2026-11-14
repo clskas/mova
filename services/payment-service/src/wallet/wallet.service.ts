@@ -639,6 +639,24 @@ export class WalletService {
     return { collected: true, amountCdf: amount };
   }
 
+  /**
+   * Trip insurance (Automatisations → Assurance trajet): fee from the passenger's wallet,
+   * credited to SENGA's wallet to be paid to the partner insurer. Once per ride.
+   */
+  async collectInsurance(params: { passengerId: string; rideId: string; amountCdf: number; partnerName?: string }) {
+    const amount = Math.round(params.amountCdf);
+    this.assertPositiveIntAmount(amount, 'Assurance');
+    const ref = `INSURANCE:${params.rideId}`;
+    if (await this.findExistingLedger(ref, 'DEBIT')) return { collected: true, already: true, amountCdf: amount };
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId: params.passengerId } });
+    const available = (wallet?.balanceCdf ?? 0) - (wallet?.heldBalanceCdf ?? 0);
+    if (available < amount) return { collected: false, amountCdf: amount, availableCdf: Math.max(0, available) };
+    await this.debit(params.passengerId, amount, 'Assurance trajet', ref);
+    const partner = params.partnerName?.trim() ? ` (${params.partnerName.trim()})` : '';
+    await this.creditPlatformFee(amount, `Assurance trajet à reverser à l’assureur${partner}`, ref);
+    return { collected: true, amountCdf: amount };
+  }
+
   async internalDebit(userId: string, amountCdf: number, description: string, reference?: string) {
     return this.debit(userId, amountCdf, description, reference);
   }

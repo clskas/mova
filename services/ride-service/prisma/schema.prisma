@@ -240,6 +240,19 @@ model Ride {
 
   /// Voided as a test (accounting reversed, never really happened).
   testVoidedAt DateTime?
+  /// Price proposed by the passenger (Automatisations → Prix proposé). estimatedFareCdf = this price.
+  proposedFareCdf Int?
+  /// SENGA price before the passenger's proposal (bounds for raising the offer).
+  listFareCdf     Int?
+  /// The passenger asked for a woman driver.
+  womenDriverOnly Boolean @default(false)
+  /// Booked for someone else (Automatisations → Mode famille): who travels.
+  riderName       String?
+  riderPhone      String?
+  /// Trip insurance fee (Automatisations → Assurance trajet), collected at the start.
+  insuranceFeeCdf Int?
+  /// APP | USSD | WHATSAPP
+  bookedVia       String?
   @@index([status])
   @@index([passengerId])
   @@index([driverId])
@@ -1281,4 +1294,16 @@ model ContentTranslation {
 
   @@index([lang])
   @@map("content_translations")
+}
+
+/// A passenger's favourite drivers: they get the passenger's requests first.
+model FavoriteDriver {
+  id           String   @id @default(uuid())
+  passengerId  String
+  driverUserId String
+  createdAt    DateTime @default(now())
+
+  @@unique([passengerId, driverUserId])
+  @@index([passengerId])
+  @@map("favorite_drivers")
 }

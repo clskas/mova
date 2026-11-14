@@ -30,6 +30,9 @@ import '../geo/suggest_place_screen.dart';
 import 'widgets/mova_ride_map.dart';
 import 'widgets/passenger_count_selector.dart';
 import 'widgets/vehicle_selector.dart';
+import '../growth/growth_widgets.dart';
+import '../growth/growth_lot2_widgets.dart';
+import '../../core/cache/user_profile_cache.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
   const BookingScreen({
@@ -81,6 +84,15 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   /// Admin switch « gamme Tricycle » (tricycle à passagers, 1–3 places).
   bool _tricycleEnabled = false;
+  /// Admin → Automatisations (prix proposé, chauffeure femme…).
+  GrowthConfig _growth = GrowthConfig.empty;
+  int? _proposedFare;
+  bool _womenOnly = false;
+  bool _isWoman = false;
+  bool _forOther = false;
+  bool _insurance = false;
+  final _riderNameController = TextEditingController();
+  final _riderPhoneController = TextEditingController();
   List<Map<String, dynamic>> _poiPlaces = [];
   String? _poiCategoryFilter;
   int _poiLoadGeneration = 0;
@@ -139,6 +151,15 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     final result = await ref.read(apiClientProvider).get('/public/client-config');
     if (!mounted) return;
     if (result case Success(:final data)) {
+      final growth = GrowthConfig.from(data['growth']);
+      final snap = await UserProfileCache.load();
+      if (!mounted) return;
+      setState(() {
+        _growth = growth;
+        _isWoman = snap.profile?['gender'] == 'F';
+        if (!growth.on('priceOffer')) _proposedFare = null;
+        if (!growth.on('womenPreference')) _womenOnly = false;
+      });
       final seats = data['seatLimits'];
       if (seats is Map) applySeatLimits(Map<String, dynamic>.from(seats));
       final enabled = passengerCountFeatureEnabled(data['features']);
@@ -370,6 +391,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   void dispose() {
     _nearbyPollTimer?.cancel();
     _pickupController.dispose();
+    _riderNameController.dispose();
+    _riderPhoneController.dispose();
     _destinationController.dispose();
     _promoController.dispose();
     super.dispose();
@@ -832,6 +855,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             'pickupAddress': _pickupController.text.trim(),
             'dropoffAddress': _destinationController.text.trim(),
             if (_effectivePassengerCount > 1) 'passengerCount': _effectivePassengerCount,
+            if (_proposedFare != null) 'proposedFareCdf': _proposedFare,
+            if (_womenOnly) 'womenDriverOnly': true,
+            if (_forOther && _riderPhoneController.text.trim().isNotEmpty) ...{
+              'riderPhone': _riderPhoneController.text.trim(),
+              'riderName': _riderNameController.text.trim(),
+            },
+            if (_insurance) 'insurance': true,
           });
 
     if (!mounted) return;
@@ -868,7 +898,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   rideId: rideId,
                   pickupAddress: _pickupController.text.trim(),
                   dropoffAddress: _destinationController.text.trim(),
-                  estimatedFareCdf: fare,
+                  estimatedFareCdf: (!usePool ? _proposedFare : null) ?? fare,
+                  proposedPrice: !usePool && _proposedFare != null,
                 ),
               ),
             );
@@ -1128,6 +1159,31 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                         onChanged: _onPassengerCountChanged,
                       ),
                     ],
+                  ],
+                  if (_selectedEstimate != null && !_sharedPool) ...[
+                    const SizedBox(height: 12),
+                    GrowthBookingOptions(
+                      config: _growth,
+                      estimateCdf: ((_selectedEstimate?['estimatedFareCdf'] ??
+                              _selectedEstimate?['estimatedPriceCdf']) as num?)
+                              ?.toInt() ??
+                          0,
+                      proposedCdf: _proposedFare,
+                      onProposed: (v) => setState(() => _proposedFare = v),
+                      showWomen: _growth.on('womenPreference') && _isWoman,
+                      womenOnly: _womenOnly,
+                      onWomenOnly: (v) => setState(() => _womenOnly = v),
+                    ),
+                    const SizedBox(height: 12),
+                    FamilyInsuranceOptions(
+                      config: _growth,
+                      forOther: _forOther,
+                      onForOther: (v) => setState(() => _forOther = v),
+                      nameController: _riderNameController,
+                      phoneController: _riderPhoneController,
+                      insurance: _insurance,
+                      onInsurance: (v) => setState(() => _insurance = v),
+                    ),
                   ],
                   if (_selectedEstimate != null && total != null) ...[
                     const SizedBox(height: 16),

@@ -46,6 +46,7 @@ import '../notifications/notifications_inbox_screen.dart';
 import '../sos/notification_tap_router.dart';
 import '../../core/location/location_permission.dart';
 import 'demand_heatmap_screen.dart';
+import '../growth/growth_lot2_widgets.dart';
 import 'dart:io' show File;
 import 'package:image_picker/image_picker.dart' show ImagePicker, ImageSource, CameraDevice;
 import '../../core/media/image_pick_util.dart' show pickMovaImage, showImagePickError;
@@ -1857,6 +1858,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
             icon: const Icon(Icons.local_fire_department_outlined),
             label: Text(tr('Zones de demande')),
           ),
+          const SizedBox(height: _sectionGap),
+          const DriverDestinationCard(),
           const SizedBox(height: _sectionGap),
           if (_kycStatus != null && _kycStatus != 'APPROVED') ...[
             MovaCard(

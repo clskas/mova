@@ -18,6 +18,11 @@ class UpdateProfileDto {
   @IsOptional()
   @IsIn(['fr', 'en', 'sw', 'ln'])
   language?: 'fr' | 'en' | 'sw' | 'ln';
+  /** Self-declared: 'F', 'M' or '' (not said). Only used for the woman-driver preference. */
+  @ApiProperty({ required: false, enum: ['F', 'M', ''] })
+  @IsOptional()
+  @IsIn(['F', 'M', ''])
+  gender?: 'F' | 'M' | '';
 }
 @ApiTags('users')
 @Controller('users')

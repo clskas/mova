@@ -96,6 +96,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _isValidEmail(String email) =>
       RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
 
+  Future<void> _saveGender(String g) async {
+    final r = await ref.read(apiClientProvider).patch('/users/me', {'gender': g});
+    if (!mounted) return;
+    if (r case Success(:final data)) {
+      setState(() => _profile = {..._profile, ...Map<String, dynamic>.from(data), 'gender': g.isEmpty ? null : g});
+      await UserProfileCache.save(_profile);
+    }
+  }
+
   Future<void> _save() async {
     final firstName = _firstName.text.trim();
     final lastName = _lastName.text.trim();
@@ -169,6 +178,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const LanguagePickerCard(),
+                const SizedBox(height: 12),
+                MovaCard(
+                  key: const Key('genderCard'),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.person_outline, color: MovaColors.violet),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(tr('Genre (facultatif)'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                            Text(
+                              tr('Sert seulement à l’option « chauffeure femme ».'),
+                              style: const TextStyle(fontSize: 12, color: MovaColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      DropdownButton<String>(
+                        value: (_profile['gender'] ?? '').toString(),
+                        items: [
+                          DropdownMenuItem(value: '', child: Text(tr('Non précisé'))),
+                          DropdownMenuItem(value: 'F', child: Text(tr('Femme'))),
+                          DropdownMenuItem(value: 'M', child: Text(tr('Homme'))),
+                        ],
+                        onChanged: offline ? null : (v) => _saveGender(v ?? ''),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 12),
                 MovaCard(
                   key: const Key('voiceAnnounceToggle'),

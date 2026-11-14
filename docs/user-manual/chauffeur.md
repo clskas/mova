@@ -177,3 +177,10 @@ Menu ⋮ → **Historique missions** : toutes vos missions — courses taxi, liv
 - **Assistant SENGA (IA)** : dans **Aide**, posez votre question (en ligne, dossier, PIN, revenus…) dans votre langue et recevez une réponse immédiate tirée de ce manuel. Pour un litige, un paiement ou une urgence, contactez le support humain.
 
 WhatsApp +243 971163574 — dev@afri-soft.com
+
+## Options en plus (quand SENGA les active)
+
+- **Prix proposé par le client** : certaines offres affichent « prix proposé par le client ». Le montant affiché est le prix de la course : acceptez seulement s'il vous convient.
+- **Pourboire** : un passager peut vous laisser un pourboire après la course. Il arrive sur votre portefeuille, **100 % pour vous** (SENGA ne prend rien).
+- **Chauffeur favori** : un passager satisfait peut vous ajouter à ses favoris ; vous recevez alors ses demandes en premier.
+- **Chauffeure femme** : chauffeures, indiquez « Femme » dans **Mon profil → Genre** pour recevoir les demandes des passagères qui veulent une chauffeure femme.

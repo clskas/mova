@@ -196,3 +196,13 @@ Si un chauffeur ou passager ne peut plus se connecter (« Compte suspendu »), a
 | `+243900000005` | CONTENT |
 
 Voir [RBAC_TESTING.md](../RBAC_TESTING.md) pour les scénarios de test par rôle.
+
+## Croissance (Automatisations → Croissance)
+
+Cinq interrupteurs, tous désactivés au départ :
+
+- **Le passager propose son prix** : minimum et maximum en % du prix SENGA (par défaut 80 % – 150 %). Le passager peut augmenter son offre tant qu'aucun chauffeur n'a accepté.
+- **Pourboire** : trois montants proposés et un maximum. Payé depuis le portefeuille du passager, 100 % au chauffeur.
+- **Chauffeurs favoris** : nombre de tours de recherche réservés aux favoris (par défaut 1), puis tous les chauffeurs.
+- **Chauffeure femme** : basé sur le genre déclaré dans le profil (passagère et chauffeure).
+- **Points de fidélité** : points par 1 000 FC payés, nombre de points à échanger et crédit obtenu. **Coûte de l'argent à SENGA** (crédit payé par le portefeuille SENGA).

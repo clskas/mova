@@ -1,3 +1,5 @@
+import { GrowthController } from './growth.controller';
+import { GrowthService } from './growth.service';
 import { CorporateModule } from '../corporate/corporate.module';
 import { Module } from '@nestjs/common';
 import { PaymentsController } from './payments.controller';
@@ -20,8 +22,9 @@ import { AirtelMoneyProvider, MockPaymentProvider, MpesaProvider, OrangeMoneyPro
     RentalPayoutModule,
     DriverDebtLedgerModule,
   ],
-  controllers: [PaymentsController, PaymentsWebhookController],
+  controllers: [GrowthController, PaymentsController, PaymentsWebhookController],
   providers: [
+    GrowthService,
     PaymentsService,
     CashAutoConfirmScheduler,
     MockPaymentProvider,

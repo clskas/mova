@@ -19,6 +19,11 @@ type Automations = {
   routeAnomaly: { enabled: boolean; stopMinutes: number; detourKm: number };
   ratingQuality: { enabled: boolean; minAvg: number; minRatings: number; autoBlock: boolean };
   sentryDigest: { enabled: boolean; hourKinshasa: number };
+  priceOffer: { enabled: boolean; minPct: number; maxPct: number };
+  tips: { enabled: boolean; presetsCdf: number[]; maxCdf: number };
+  favoriteDrivers: { enabled: boolean; priorityAttempts: number };
+  womenPreference: { enabled: boolean };
+  loyalty: { enabled: boolean; pointsPer1000Cdf: number; redeemPoints: number; redeemValueCdf: number };
 };
 
 type Blocked = { userId: string; qualityBlockedAt: string; qualityBlockReason?: string | null; ratingAvg?: number };
@@ -37,6 +42,11 @@ const DEFAULTS: Automations = {
   routeAnomaly: { enabled: true, stopMinutes: 10, detourKm: 3 },
   ratingQuality: { enabled: true, minAvg: 3.5, minRatings: 10, autoBlock: false },
   sentryDigest: { enabled: false, hourKinshasa: 8 },
+  priceOffer: { enabled: false, minPct: 80, maxPct: 150 },
+  tips: { enabled: false, presetsCdf: [500, 1000, 2000], maxCdf: 20000 },
+  favoriteDrivers: { enabled: false, priorityAttempts: 1 },
+  womenPreference: { enabled: false },
+  loyalty: { enabled: false, pointsPer1000Cdf: 1, redeemPoints: 100, redeemValueCdf: 1000 },
 };
 
 function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disabled: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -92,6 +102,11 @@ export default function AutomatisationsPage() {
         routeAnomaly: { ...DEFAULTS.routeAnomaly, ...cfg.routeAnomaly },
         ratingQuality: { ...DEFAULTS.ratingQuality, ...cfg.ratingQuality },
         sentryDigest: { ...DEFAULTS.sentryDigest, ...cfg.sentryDigest },
+        priceOffer: { ...DEFAULTS.priceOffer, ...cfg.priceOffer },
+        tips: { ...DEFAULTS.tips, ...cfg.tips },
+        favoriteDrivers: { ...DEFAULTS.favoriteDrivers, ...cfg.favoriteDrivers },
+        womenPreference: { ...DEFAULTS.womenPreference, ...cfg.womenPreference },
+        loyalty: { ...DEFAULTS.loyalty, ...cfg.loyalty },
       };
       setBlocked(await apiFetch<Blocked[]>("/api/admin/drivers-quality-blocked").catch(() => []));
       setA(next);
@@ -139,7 +154,7 @@ export default function AutomatisationsPage() {
         <h2 className="font-semibold">Rapport quotidien</h2>
         <p className="text-sm text-slate-600">
           Chaque matin, un résumé de la veille (courses, livraisons, revenus, commissions, annulations) arrive dans les
-          alertes de l&apos;admin (cloche).
+          Alertes staff.
         </p>
         <Toggle label="Activé" checked={a.dailyReport.enabled} disabled={ro} onChange={(v) => set("dailyReport", { enabled: v })} />
         <Num label="Heure d'envoi (Kinshasa, 0–23)" value={a.dailyReport.hourKinshasa} disabled={ro} onChange={(v) => set("dailyReport", { hourKinshasa: v })} />
@@ -414,7 +429,7 @@ export default function AutomatisationsPage() {
       <Card className="p-4 space-y-3">
         <h2 className="font-semibold">Résumé quotidien des erreurs (Sentry)</h2>
         <p className="text-sm text-slate-600">
-          Chaque matin, les erreurs des applications vues en 24 h arrivent dans la cloche de l&apos;admin. Demande la
+          Chaque matin, les erreurs des applications vues en 24 h arrivent dans Alertes staff. Demande la
           variable <code>SENTRY_READ_TOKEN</code> (jeton Sentry en lecture seule, créé par vous) sur le service ride.
         </p>
         <Toggle label="Activé" checked={a.sentryDigest.enabled} disabled={ro} onChange={(v) => set("sentryDigest", { enabled: v })} />
@@ -422,6 +437,78 @@ export default function AutomatisationsPage() {
         {editable && (
           <BtnPrimary disabled={saving === "sentryDigest"} onClick={() => void save("sentryDigest", a.sentryDigest)}>
             {saving === "sentryDigest" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <h2 className="text-lg font-semibold pt-2">Croissance (nouvelles fonctions)</h2>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Le passager propose son prix</h2>
+        <p className="text-sm text-slate-600">
+          Le passager peut proposer un autre prix que celui de SENGA, entre un minimum et un maximum (en % du prix SENGA). Les chauffeurs voient « prix proposé par le client » et acceptent ou non. Tant que personne n&apos;accepte, le passager peut augmenter son offre.
+        </p>
+        <Toggle label="Activé" checked={a.priceOffer.enabled} disabled={ro} onChange={(v) => set("priceOffer", { enabled: v })} />
+        <Num label="Minimum (% du prix SENGA, 50–100)" value={a.priceOffer.minPct} disabled={ro} onChange={(v) => set("priceOffer", { minPct: v })} />
+        <Num label="Maximum (% du prix SENGA, 100–300)" value={a.priceOffer.maxPct} disabled={ro} onChange={(v) => set("priceOffer", { maxPct: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "priceOffer"} onClick={() => void save("priceOffer", a.priceOffer)}>
+            {saving === "priceOffer" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Pourboire</h2>
+        <p className="text-sm text-slate-600">
+          Après la course, le passager peut laisser un pourboire depuis son portefeuille. 100 % pour le chauffeur, SENGA ne prend rien.
+        </p>
+        <Toggle label="Activé" checked={a.tips.enabled} disabled={ro} onChange={(v) => set("tips", { enabled: v })} />
+        <Num label="Montant proposé 1 (FC)" value={a.tips.presetsCdf[0] ?? 0} disabled={ro} onChange={(v) => set("tips", { presetsCdf: [v, a.tips.presetsCdf[1] ?? 0, a.tips.presetsCdf[2] ?? 0] })} />
+        <Num label="Montant proposé 2 (FC)" value={a.tips.presetsCdf[1] ?? 0} disabled={ro} onChange={(v) => set("tips", { presetsCdf: [a.tips.presetsCdf[0] ?? 0, v, a.tips.presetsCdf[2] ?? 0] })} />
+        <Num label="Montant proposé 3 (FC)" value={a.tips.presetsCdf[2] ?? 0} disabled={ro} onChange={(v) => set("tips", { presetsCdf: [a.tips.presetsCdf[0] ?? 0, a.tips.presetsCdf[1] ?? 0, v] })} />
+        <Num label="Pourboire maximum (FC)" value={a.tips.maxCdf} disabled={ro} onChange={(v) => set("tips", { maxCdf: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "tips"} onClick={() => void save("tips", a.tips)}>
+            {saving === "tips" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Chauffeurs favoris</h2>
+        <p className="text-sm text-slate-600">
+          Après une course, le passager peut ajouter le chauffeur à ses favoris (10 au maximum). Ses demandes partent d&apos;abord vers ses favoris disponibles, puis vers tous les chauffeurs.
+        </p>
+        <Toggle label="Activé" checked={a.favoriteDrivers.enabled} disabled={ro} onChange={(v) => set("favoriteDrivers", { enabled: v })} />
+        <Num label="Tours de recherche réservés aux favoris (1–5)" value={a.favoriteDrivers.priorityAttempts} disabled={ro} onChange={(v) => set("favoriteDrivers", { priorityAttempts: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "favoriteDrivers"} onClick={() => void save("favoriteDrivers", a.favoriteDrivers)}>
+            {saving === "favoriteDrivers" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Chauffeure femme</h2>
+        <p className="text-sm text-slate-600">
+          Une passagère (genre indiqué dans son profil) peut demander une chauffeure femme : seules les chauffeures qui ont indiqué « Femme » dans leur profil reçoivent la course. Si aucune n&apos;est disponible, la passagère peut relancer sans cette option.
+        </p>
+        <Toggle label="Activé" checked={a.womenPreference.enabled} disabled={ro} onChange={(v) => set("womenPreference", { enabled: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "womenPreference"} onClick={() => void save("womenPreference", a.womenPreference)}>
+            {saving === "womenPreference" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Points de fidélité</h2>
+        <p className="text-sm text-slate-600">
+          Chaque course payée rapporte des points. Le passager échange ses points contre un crédit portefeuille. <strong>Coûte de l&apos;argent à SENGA</strong> : désactivé par défaut.
+        </p>
+        <Toggle label="Activé" checked={a.loyalty.enabled} disabled={ro} onChange={(v) => set("loyalty", { enabled: v })} />
+        <Num label="Points par 1 000 FC payés" value={a.loyalty.pointsPer1000Cdf} disabled={ro} onChange={(v) => set("loyalty", { pointsPer1000Cdf: v })} />
+        <Num label="Points à échanger" value={a.loyalty.redeemPoints} disabled={ro} onChange={(v) => set("loyalty", { redeemPoints: v })} />
+        <Num label="Crédit obtenu (FC)" value={a.loyalty.redeemValueCdf} disabled={ro} onChange={(v) => set("loyalty", { redeemValueCdf: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "loyalty"} onClick={() => void save("loyalty", a.loyalty)}>
+            {saving === "loyalty" ? "…" : "Enregistrer"}
           </BtnPrimary>
         )}
       </Card>

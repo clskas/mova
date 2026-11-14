@@ -303,3 +303,24 @@ model CorporateMember {
   @@index([accountId])
   @@map("corporate_members")
 }
+
+/// Loyalty points (Automatisations → Points de fidélité).
+model LoyaltyAccount {
+  userId    String   @id
+  points    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@map("loyalty_accounts")
+}
+
+model LoyaltyEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  points    Int
+  reason    String
+  reference String   @unique
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("loyalty_events")
+}

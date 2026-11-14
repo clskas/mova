@@ -46,6 +46,8 @@ model User {
   homeCity  String?
   /// Language chosen in the app ('fr' | 'en'): push, SMS and server texts follow it.
   language  String     @default("fr")
+  /// Self-declared, optional: 'F' | 'M'. Used only for the « woman driver » preference.
+  gender    String?
   /// Super-admin overrides of AdminPermission values. Empty = use role defaults.
   adminPermissions String[] @default([])
   /// Referral: own code (made on first view), who invited this user, and when both were rewarded.

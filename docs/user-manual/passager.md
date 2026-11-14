@@ -237,3 +237,14 @@ L'application fonctionne en **mode hors ligne réel** (pas seulement démo) :
 - **Indicateur** : « X actions en attente de synchronisation » lorsque la file n'est pas vide.
 
 Le mode démo (données fictives) n'est utilisé que dans les tests automatiques, pas en production hors ligne.
+
+## Options en plus (quand SENGA les active)
+
+Ces options apparaissent seulement si l'équipe SENGA les a activées.
+
+- **Proposer mon prix** : sur l'écran de commande, activez « Proposer mon prix » et choisissez votre montant avec − / + (dans les limites fixées par SENGA). Les chauffeurs voient « prix proposé par le client » et acceptent ou non. Pendant la recherche, le bouton **Augmenter mon prix (+500 FC)** aide à trouver un chauffeur plus vite.
+- **Chauffeure femme** : si vous avez indiqué « Femme » dans **Mon profil → Genre**, vous pouvez demander une chauffeure femme. Seules les chauffeures femmes reçoivent alors votre demande ; si aucune n'est disponible, relancez sans cette option.
+- **Pourboire** : après la course, sur le reçu, choisissez un montant. Il est pris sur votre portefeuille et va **à 100 % au chauffeur**. Une seule fois par course.
+- **Chauffeurs favoris** : sur le reçu, touchez « Ajouter ce chauffeur à mes favoris » (10 au maximum). Vos prochaines demandes partent d'abord vers vos favoris disponibles.
+- **Points de fidélité** : chaque course payée rapporte des points (affichés dans **Portefeuille**). Quand vous en avez assez, touchez **Échanger** : le crédit arrive sur votre portefeuille.
+- **Genre (facultatif)** : dans Mon profil. Il sert uniquement à l'option chauffeure femme.

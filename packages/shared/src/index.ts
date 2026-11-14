@@ -47,3 +47,4 @@ export * from './rental-addons.util';
 export * from './server-i18n';
 export * from './ui-source-strings';
 export * from './parcel-vehicles';
+export * from './automations';

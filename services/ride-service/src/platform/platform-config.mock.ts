@@ -1,3 +1,4 @@
+import { DEFAULT_AUTOMATIONS } from '@mova/shared';
 import { MARKET_RDC } from '@mova/shared';
 import type { PlatformConfigService } from '../platform/platform-config.service';
 import type { MergedPlatformConfig } from '../platform/platform-config.types';
@@ -49,6 +50,7 @@ export function mockPlatformConfig(
       autoDisputeHours: 24,
     },
     identityVerification: { smileIdInApp: false },
+    automations: DEFAULT_AUTOMATIONS,
   };
   return {
     get: () => ({ ...base, ...overrides }),

@@ -147,6 +147,14 @@ Pour les véhicules **VIP**, **Confort** ou autres catégories réglementées :
 - **Gamme Familiale** (par défaut 5–8 places) : affiche la gamme dans l'app passager ; Standard, Confort et VIP sont alors limités au maximum voiture (4 par défaut). N'activez qu'avec des véhicules Familiale validés. Tarif : **Tarifs → Familiale**.
 - **Gamme Tricycle** (par défaut 1–3 places) : affiche la gamme Tricycle (tricycle à passagers) dans l'app passager. Activez-la ville par ville une fois assez de tricycles validés (10 à 20 conseillés). Tarif de départ ≈ Standard − 30 % : **Tarifs → Tricycle**. Les **tripoteurs** (marchandises) n'en dépendent pas : ils reçoivent colis, commissions et déménagements « camionnette » dès la validation de leur type d'engin.
 
+## Automatisations (super admin)
+
+**Système → Automatisations** : chaque tâche automatique a son interrupteur et ses réglages.
+- **Rapport quotidien** : résumé de la veille dans la cloche de l'admin, à l'heure choisie (Kinshasa).
+- **Alertes d'anomalie** : toutes les heures, par ville, si les annulations dépassent le seuil ou si des passagers restent sans chauffeur.
+- **Rappels de documents chauffeurs** : avant l'expiration du permis, de l'assurance, du contrôle technique et de la vignette (30, 7 et 1 jours par défaut ; SMS à partir de 7 jours).
+- **Suivi des dettes espèces** : rappel quotidien aux chauffeurs qui doivent des espèces ; option pour suspendre leurs missions au-delà de N jours (0 = jamais).
+
 ## Opérations (lecture + mise à jour)
 
 Les modules **Locations**, **Déménagements**, **Covoiturage** et **Livraisons** affichent des demandes créées par les apps mobiles. L'admin peut :

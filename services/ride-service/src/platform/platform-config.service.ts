@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { MovaErrorCode, MovaHttpException } from '@mova/shared';
+import { MovaErrorCode, MovaHttpException, normalizeAutomations } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   MergedPlatformConfig,
@@ -32,6 +32,7 @@ function mergeConfig(overrides: PlatformConfigOverrides): MergedPlatformConfig {
     driverOps: mergeDriverOps(d.driverOps, o.driverOps),
     cashPayment: mergeCashPayment(d.cashPayment, o.cashPayment),
     unpaidFollowup: mergeUnpaidFollowup(d.unpaidFollowup, o.unpaidFollowup),
+    automations: normalizeAutomations(o.automations, d.automations),
     identityVerification: mergeIdentityVerification(d.identityVerification, o.identityVerification),
   };
 }
@@ -164,6 +165,17 @@ export class PlatformConfigService implements OnModuleInit {
             patch.unpaidFollowup,
           )
         : this.overrides.unpaidFollowup,
+      automations: patch.automations
+        ? (() => {
+            // Deep merge per automation (each card saves its own section).
+            const cur = (this.overrides.automations ?? {}) as Record<string, Record<string, unknown>>;
+            const next: Record<string, unknown> = { ...cur };
+            for (const [k, v] of Object.entries(patch.automations)) {
+              next[k] = v && typeof v === 'object' && !Array.isArray(v) ? { ...(cur[k] ?? {}), ...(v as object) } : v;
+            }
+            return next;
+          })()
+        : this.overrides.automations,
       identityVerification: patch.identityVerification
         ? mergeIdentityVerification(
             { smileIdInApp: this.overrides.identityVerification?.smileIdInApp === true },

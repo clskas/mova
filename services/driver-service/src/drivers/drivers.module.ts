@@ -1,3 +1,4 @@
+import { DocExpiryScheduler } from './doc-expiry.scheduler';
 import { Module } from '@nestjs/common';
 import { DriversController } from './drivers.controller';
 import { DriversService } from './drivers.service';
@@ -8,7 +9,7 @@ import { SmileIdModule } from '../smile-id/smile-id.module';
 @Module({
   imports: [OcrModule, SmileIdModule],
   controllers: [DriversController],
-  providers: [DriversService, MatchingConfigService],
+  providers: [DriversService, MatchingConfigService, DocExpiryScheduler],
   exports: [DriversService],
 })
 export class DriversModule {}

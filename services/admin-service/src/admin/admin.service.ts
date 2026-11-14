@@ -2507,6 +2507,13 @@ export class AdminService {
       );
     }
     // Payment timeouts (cash auto-close, unpaid reminders and automatic dispute): super-admin only.
+    if (body?.automations !== undefined && actorRole !== UserRole.SUPER_ADMIN) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Seul le super administrateur peut régler les automatisations.',
+      );
+    }
     if ((body?.unpaidFollowup !== undefined || body?.cashPayment !== undefined) && actorRole !== UserRole.SUPER_ADMIN) {
       throw new MovaHttpException(
         MovaErrorCode.AUTH_FORBIDDEN,

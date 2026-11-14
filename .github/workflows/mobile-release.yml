@@ -1,4 +1,4 @@
-﻿name: Mobile Release
+name: Mobile Release
 
 # Internal-track builds (dispatched after each main deploy) share one group: a newer
 # one supersedes the older. Production releases (v* tags, manual store options) get a
@@ -367,13 +367,13 @@ jobs:
           working-directory: mobile/android
 
       - name: Download passenger AAB
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: mova-passenger-aab
           path: mobile/build/app/outputs/bundle/passengerRelease/
 
       - name: Download driver AAB
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: mova-driver-aab
           path: mobile/build/app/outputs/bundle/driverRelease/
@@ -815,7 +815,7 @@ jobs:
       - name: Download passenger IPA
         if: contains(inputs.asc_apps || 'passenger,driver', 'passenger')
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: mova-passenger-ipa
           path: mobile/build/ios/ipa/passenger/
@@ -823,7 +823,7 @@ jobs:
       - name: Download driver IPA
         if: contains(inputs.asc_apps || 'passenger,driver', 'driver')
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: mova-driver-ipa
           path: mobile/build/ios/ipa/driver/

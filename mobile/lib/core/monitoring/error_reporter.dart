@@ -82,6 +82,13 @@ class ErrorReporter {
   static bool shouldIgnore(Object error) {
     final text = error.toString();
     if (text.contains('Failed to load font with url')) return true;
+    // A photo that could not be downloaded (expired link, network cut): the screens show a
+    // placeholder instead, nothing to fix in the app (Sentry SENGA-MOBILE-6 / -9).
+    if (text.contains('NetworkImageLoadException')) return true;
+    if ((text.contains('HttpException') || text.contains('ClientException') || text.contains('SocketException')) &&
+        RegExp(r'\.(jpe?g|png|webp|gif)(?![a-z])', caseSensitive: false).hasMatch(text)) {
+      return true;
+    }
     final isNetwork = text.contains('ClientException') ||
         text.contains('SocketException') ||
         text.contains('HttpException') ||

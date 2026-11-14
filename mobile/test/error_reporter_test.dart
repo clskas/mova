@@ -52,6 +52,21 @@ void main() {
       );
     });
 
+    test('photo that could not be downloaded (SENGA-MOBILE-6 / -9)', () {
+      expect(
+        ErrorReporter.shouldIgnore(Exception(
+          'NetworkImageLoadException: HTTP request failed, statusCode: 400, https://x.supabase.co/storage/v1/object/sign/kyc-docs/k.jpg?token=a',
+        )),
+        isTrue,
+      );
+      expect(
+        ErrorReporter.shouldIgnore(Exception(
+          'HttpException: Connection closed while receiving data, uri = https://mova-gateway.onrender.com/api/uploads/vehicles/a.jpg',
+        )),
+        isTrue,
+      );
+    });
+
     test('keeps real bugs and our own API failures', () {
       expect(ErrorReporter.shouldIgnore(StateError('Cannot use "ref" after the widget was disposed.')), isFalse);
       expect(

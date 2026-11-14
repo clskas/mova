@@ -289,6 +289,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   Future<void> _loadNearbyPoi() async {
+    if (!mounted) return;
     final generation = ++_poiLoadGeneration;
     final city = ServiceAreas.cityNameForCoords(_pickup);
     final result = await ref.read(apiClientProvider).geoPlaces(
@@ -377,6 +378,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   String get _vehicleCategory => MarketConfig.vehicleCategory(_vehicleType);
 
   Future<void> _loadNearbyVehicles() async {
+    // Called after awaits (position, estimates): the screen may be closed by then (Sentry SENGA-MOBILE-2).
+    if (!mounted) return;
     final generation = ++_nearbyLoadGeneration;
     final result = await ref.read(apiClientProvider).nearbyRideVehicles(
           lat: _pickup.latitude,
@@ -668,6 +671,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   Future<void> _fetchAllEstimates() async {
+    if (!mounted) return;
     final validation = _validate();
     if (validation != null) {
       setState(() => _validationError = validation);

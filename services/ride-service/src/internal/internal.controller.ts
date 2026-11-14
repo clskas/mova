@@ -84,12 +84,14 @@ export class InternalController {
 
   /** Test rides / services to void (preview changes nothing). */
   @Post('test-cleanup/preview')
-  testCleanupPreview(@Body() body: { before?: string; userIds?: string[]; maxMinutes?: number }) {
+  testCleanupPreview(@Body() body: { before?: string; userIds?: string[]; maxMinutes?: number; includeCancelled?: boolean }) {
     return this.testCleanup.preview(body ?? {});
   }
 
   @Post('test-cleanup/apply')
-  testCleanupApply(@Body() body: { before?: string; userIds?: string[]; maxMinutes?: number; confirmKeys?: string[] }) {
+  testCleanupApply(
+    @Body() body: { before?: string; userIds?: string[]; maxMinutes?: number; includeCancelled?: boolean; confirmKeys?: string[] },
+  ) {
     return this.testCleanup.apply(body ?? {}, body?.confirmKeys ?? []);
   }
 

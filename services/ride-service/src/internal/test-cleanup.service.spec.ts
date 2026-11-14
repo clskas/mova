@@ -49,4 +49,19 @@ describe('TestCleanupService', () => {
     expect(scheduled[0]!.extraIds).toEqual(['r-short']);
     expect(scheduled[0]!.durationMin).toBe(2);
   });
+
+  it('cancelled requests only with the option, then only marked as tests', async () => {
+    const cancelled = [{ id: 'r-cancel', createdAt: at('2026-11-01T09:00:00Z'), passengerId: 'p', driverId: null, cancellationFeeCdf: null, pickupAddress: 'A', dropoffAddress: 'B' }];
+    const svc = new TestCleanupService({
+      ...prisma,
+      ride: { ...prisma.ride, findMany: jest.fn().mockImplementation((q: { where: { status: string } }) => Promise.resolve(q.where.status === 'CANCELLED' ? cancelled : [])), update: jest.fn() },
+      delivery: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      errandOrder: { findMany: jest.fn().mockResolvedValue([]) },
+      movingRequest: { findMany: jest.fn().mockResolvedValue([]) },
+      scheduledRide: { findMany: jest.fn().mockResolvedValue([]) },
+    } as never);
+    expect((await svc.select({ before: '2026-11-05' })).map((i) => i.id)).toEqual([]);
+    const items = await svc.select({ before: '2026-11-05', includeCancelled: true });
+    expect(items.map((i) => [i.id, i.cancelled])).toEqual([['r-cancel', true]]);
+  });
 });

@@ -2596,6 +2596,8 @@ export class RidesService {
           86_400_000,
       ) + 1;
     const createdAtFilter = { gte: since, lte: until };
+    // Items voided as tests (Nettoyage des tests) never count, even with « Inclure les comptes de test ».
+    const notVoided = { testVoidedAt: null };
     const normalizeCity = (name: string) =>
       name
         .normalize('NFD')
@@ -2607,7 +2609,7 @@ export class RidesService {
     const [rides, deliveries, errands, moving, scheduled, carpool, rideRule, deliveryRule, foodRule] =
       await Promise.all([
         this.prisma.ride.findMany({
-          where: { createdAt: createdAtFilter },
+          where: { createdAt: createdAtFilter, ...notVoided },
           select: {
             createdAt: true,
             status: true,
@@ -2624,7 +2626,7 @@ export class RidesService {
           },
         }),
         this.prisma.delivery.findMany({
-          where: { createdAt: createdAtFilter },
+          where: { createdAt: createdAtFilter, ...notVoided },
           select: {
             createdAt: true,
             status: true,
@@ -2637,12 +2639,12 @@ export class RidesService {
           },
         }),
         this.prisma.errandOrder.findMany({
-          where: { createdAt: createdAtFilter },
+          where: { createdAt: createdAtFilter, ...notVoided },
           select: { createdAt: true, status: true, finalPriceCdf: true, pickupLat: true, pickupLng: true, userId: true },
         }),
-        this.prisma.movingRequest.count({ where: { createdAt: createdAtFilter } }),
-        this.prisma.scheduledRide.count({ where: { createdAt: createdAtFilter } }),
-        this.prisma.carpoolTrip.count({ where: { createdAt: createdAtFilter } }),
+        this.prisma.movingRequest.count({ where: { createdAt: createdAtFilter, ...notVoided } }),
+        this.prisma.scheduledRide.count({ where: { createdAt: createdAtFilter, ...notVoided } }),
+        this.prisma.carpoolTrip.count({ where: { createdAt: createdAtFilter, ...notVoided } }),
         this.commission.get(CommissionServiceType.RIDE),
         this.commission.get(CommissionServiceType.DELIVERY),
         this.commission.get(CommissionServiceType.FOOD),

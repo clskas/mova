@@ -10,6 +10,8 @@ import '../../core/i18n/i18n.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
 import '../../core/widgets/mova_widgets.dart';
+import '../../core/config/app_version.dart';
+import '../../core/referral/referral_invite.dart';
 
 /// Referral: my code to share, and the friend's code to enter in the first days.
 class ReferralScreen extends ConsumerStatefulWidget {
@@ -109,7 +111,7 @@ class _ReferralScreenState extends ConsumerState<ReferralScreen> {
                               ),
                               const SizedBox(width: 8),
                               FilledButton.icon(
-                                onPressed: () => Share.share(trf('Rejoins SENGA avec mon code {code} : tu reçois un crédit après ta première course.', {'code': code})),
+                                onPressed: () => Share.share(trf('Rejoins SENGA avec mon code {code} : tu reçois un crédit après ta première course. Inscris-toi ici : {link}', {'code': code, 'link': ReferralInvite.inviteLink(code, driver: AppFlavor.isDriver)})),
                                 icon: const Icon(Icons.share),
                                 label: Text(tr('Partager')),
                               ),

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { GoogleContinueButton, googleClientId } from "@/components/GoogleContinueButton";
 import { ApiError, apiFetch, checkGatewayHealth } from "@/lib/api";
 import { clearStoredPhone, dropTokenKeepPhone, getStoredPhone, getToken, isPinPending, isPinSessionUnlocked, isSeedDemoPhone, markPinSessionUnlocked, normalizeLoginPhone, phoneFromToken, setPinPending, setToken } from "@/lib/auth";
+import { ReferralInviteBanner } from "@/components/ReferralInviteBanner";
+import { applyPendingReferral, getPendingReferral, setPendingReferral } from "@/lib/referral";
 import { LOGIN_GOOGLE_UNAVAILABLE, LOGIN_OTP_UNAVAILABLE, toUserErrorMessage } from "@/lib/user-messages";
 import { AuthPayload, PinDigitPad, PinForgotLink, PinSetupForm, accountPhone, fetchPinEnabled, isEmailIdentity, maskPhoneDisplay, mustSetupPinAfterPhoneLogin, shouldRequirePinSetup } from "@/components/PinAuth";
 
@@ -28,6 +30,30 @@ export function OtpGate({ children }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [legalAccepted, setLegalAccepted] = useState(false);
+  const [referralCode, setReferralCode] = useState("");
+  const [referralOpen, setReferralOpen] = useState(false);
+  const [referralEnabled, setReferralEnabled] = useState(false);
+  const [referralNotice, setReferralNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    // The invitation banner (child) has already kept ?ref=CODE.
+    const pending = getPendingReferral();
+    if (pending) {
+      setReferralCode(pending);
+      setReferralOpen(true);
+    }
+    apiFetch<{ growth?: { referral?: { enabled?: boolean } } }>("/api/public/client-config")
+      .then((c) => setReferralEnabled(c?.growth?.referral?.enabled === true))
+      .catch(() => undefined);
+  }, []);
+
+  /** Account ready: send the referral code once (typed or from the link). */
+  function finishReferral() {
+    if (referralCode.trim()) setPendingReferral(referralCode);
+    void applyPendingReferral().then((r) => {
+      if (r === "ok") setReferralNotice("Code de parrainage enregistré. Votre crédit arrivera après votre première course.");
+    });
+  }
   const pinSubmitLock = useRef(false);
 
   const pinOnly = pinMode && !codeSent && !googleChallenge && !setupPin && !forgotPin;
@@ -137,6 +163,7 @@ export function OtpGate({ children }: Props) {
     }
     setPinPending(false);
     markPinSessionUnlocked();
+    finishReferral();
     setAuthenticated(true);
   }
 
@@ -293,6 +320,7 @@ export function OtpGate({ children }: Props) {
             setForgotPin(false);
             setSetupPin(false);
             markPinSessionUnlocked();
+            finishReferral();
             setAuthenticated(true);
           }}
         />
@@ -303,6 +331,7 @@ export function OtpGate({ children }: Props) {
   if (!authenticated) {
     return (
       <div className="max-w-sm mx-auto min-h-[100dvh] flex flex-col justify-center p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <ReferralInviteBanner />
         <h1 className="text-xl font-bold text-center mb-2">SENGA — Connexion</h1>
         <p className="text-sm text-gray-500 text-center mb-6">
           {googleChallenge
@@ -341,6 +370,22 @@ export function OtpGate({ children }: Props) {
             }}
             disabled={codeSent || Boolean(googleChallenge)}
           />
+        )}
+        {needsLegalAcceptance && !googleChallenge && (referralEnabled || referralOpen) && (
+          referralOpen ? (
+            <input
+              data-testid="signup-referral"
+              className="w-full rounded-xl border-0 bg-white p-3 shadow-sm mb-3 uppercase"
+              placeholder="Code de parrainage (facultatif)"
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value)}
+              autoCapitalize="characters"
+            />
+          ) : (
+            <button type="button" className="w-full mb-3 text-sm text-[#6C47FF] underline" onClick={() => setReferralOpen(true)}>
+              J’ai un code de parrainage
+            </button>
+          )
         )}
         {forgotPin && !codeSent && !googleChallenge && (
           <button
@@ -495,7 +540,17 @@ export function OtpGate({ children }: Props) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {referralNotice && (
+        <div role="status" className="fixed inset-x-4 bottom-4 z-[10060] mx-auto max-w-sm rounded-xl bg-[#2D1B69] p-3 text-sm text-white shadow-lg">
+          {referralNotice}
+          <button type="button" className="ml-2 underline" onClick={() => setReferralNotice(null)}>OK</button>
+        </div>
+      )}
+    </>
+  );
 }
 
 export function useLogout() {

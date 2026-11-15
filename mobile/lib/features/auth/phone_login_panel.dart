@@ -8,6 +8,7 @@ import '../../core/auth/google_sign_in.dart';
 import '../../core/config/market_config.dart';
 import '../../core/api/api_client.dart';
 import '../../core/error/result.dart';
+import '../../core/referral/referral_invite.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_widgets.dart';
 import '../help/legal_screen.dart';
@@ -43,6 +44,11 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
   final _phoneController = TextEditingController();
   final _codeController = TextEditingController();
   final _pinController = TextEditingController();
+  final _referralController = TextEditingController();
+
+  /// Referral open in Admin → Automatisations (client-config growth.referral).
+  bool _referralEnabled = false;
+  bool _referralOpen = false;
 
   PhoneLoginStep _step = PhoneLoginStep.phone;
   bool _loading = false;
@@ -75,8 +81,42 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
       _phoneController.text = widget.phoneHint;
     }
     _restoreSavedPhone();
+    unawaited(_loadReferral());
     _pinController.addListener(_onPinOrOtpChanged);
     _codeController.addListener(_onPinOrOtpChanged);
+  }
+
+  /// Shows « J'ai un code de parrainage » when referral is open; an invitation link fills it.
+  Future<void> _loadReferral() async {
+    final code = await ReferralInvite.captureInstallReferrer();
+    if (!mounted) return;
+    if (code != null) {
+      setState(() {
+        _referralController.text = code;
+        _referralOpen = true;
+      });
+    }
+    final result = await ref.read(apiClientProvider).get('/public/client-config');
+    if (!mounted) return;
+    if (result case Success(:final data)) {
+      final growth = data['growth'];
+      final referral = growth is Map ? growth['referral'] : null;
+      final on = referral is Map && referral['enabled'] == true;
+      if (on != _referralEnabled) setState(() => _referralEnabled = on);
+    }
+  }
+
+  /// Sends the referral code once the account exists, then continues.
+  Future<void> _finishAuthenticated(Map<String, dynamic> data) async {
+    final typed = ReferralInvite.normalize(_referralController.text);
+    if (typed != null) await ReferralInvite.savePending(typed);
+    final msg = await ReferralInvite.applyPending(ref.read(apiClientProvider), isNew: data['isNew'] == true);
+    if (msg != null && mounted) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+        content: Text(msg == 'ok' ? tr('Code de parrainage enregistré. Votre crédit arrivera après votre première course.') : msg),
+      ));
+    }
+    await widget.onAuthenticated(data);
   }
 
   void _applyAutofilledOtp(String six) {
@@ -166,6 +206,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
     _phoneController.dispose();
     _codeController.dispose();
     _pinController.dispose();
+    _referralController.dispose();
     super.dispose();
   }
 
@@ -520,7 +561,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
           await _presentPinSetupScreen(data: data, reset: resetPin);
           return;
         }
-        await widget.onAuthenticated(data);
+        await _finishAuthenticated(data);
       case Failure(:final error):
         setState(() => _error = error.message);
     }
@@ -547,7 +588,7 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             }
             if (!mounted) return;
             _forgotPinRecovery = false;
-            await widget.onAuthenticated(data);
+            await _finishAuthenticated(data);
           },
         ),
       ),
@@ -643,6 +684,29 @@ class _PhoneLoginPanelState extends ConsumerState<PhoneLoginPanel> {
             ),
             enabled: !_loading,
           ),
+          if (_step == PhoneLoginStep.phone && (_referralEnabled || _referralOpen)) ...[
+            if (_referralOpen) ...[
+              const SizedBox(height: 12),
+              TextField(
+                key: const Key('signupReferralCode'),
+                controller: _referralController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
+                  labelText: tr('Code de parrainage (facultatif)'),
+                  prefixIcon: const Icon(Icons.card_giftcard),
+                ),
+                enabled: !_loading,
+              ),
+            ] else
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _loading ? null : () => setState(() => _referralOpen = true),
+                  icon: const Icon(Icons.card_giftcard, size: 18),
+                  label: Text(tr('J’ai un code de parrainage')),
+                ),
+              ),
+          ],
           if (_step == PhoneLoginStep.forgot) ...[
             const SizedBox(height: 8),
             TextButton(

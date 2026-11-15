@@ -2091,4 +2091,8 @@ const Map<String, String> kStringsEn = {
   "Votre solde (dès {v1}) est envoyé sur votre propre numéro Mobile Money.": "Your balance (from {v1}) is sent to your own Mobile Money number.",
   "Vérifié par l’équipe SENGA sur votre pièce d’identité.": "Checked by the SENGA team on your ID.",
   "Dites « oui » ou « non »": "Say “yes” or “no”",
+  "Code de parrainage (facultatif)": "Referral code (optional)",
+  "J’ai un code de parrainage": "I have a referral code",
+  "Code de parrainage enregistré. Votre crédit arrivera après votre première course.": "Referral code saved. Your credit arrives after your first ride.",
+  "Rejoins SENGA avec mon code {code} : tu reçois un crédit après ta première course. Inscris-toi ici : {link}": "Join SENGA with my code {code}: you get a credit after your first ride. Sign up here: {link}",
 };

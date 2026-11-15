@@ -46,11 +46,13 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
   /// Micro automatique: opens by itself a few seconds after a key status (the voice
   /// announcement plays first, so the micro does not hear it).
   final VoiceAutoTrigger _voiceMoment = VoiceAutoTrigger();
+  Timer? _voiceMomentTimer;
 
   void _voiceMomentFor(String status) {
     if (!PassengerVoiceAnnouncer.autoListenActive) return;
     if (!PassengerVoiceAnnouncer.isVoiceMoment(status, delivery: true)) return;
-    Future<void>.delayed(const Duration(seconds: 4), () {
+    _voiceMomentTimer?.cancel();
+    _voiceMomentTimer = Timer(const Duration(seconds: 4), () {
       if (mounted) _voiceMoment.fire();
     });
   }
@@ -82,6 +84,7 @@ class _FoodTrackingScreenState extends ConsumerState<FoodTrackingScreen> {
 
   @override
   void dispose() {
+    _voiceMomentTimer?.cancel();
     _pollTimer?.cancel();
     _pollTimer = null;
     _liveTracking.dispose();

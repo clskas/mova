@@ -86,11 +86,13 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   /// Micro automatique: opens by itself a few seconds after a key status (the voice
   /// announcement plays first, so the micro does not hear it).
   final VoiceAutoTrigger _voiceMoment = VoiceAutoTrigger();
+  Timer? _voiceMomentTimer;
 
   void _voiceMomentFor(String status) {
     if (!PassengerVoiceAnnouncer.autoListenActive) return;
     if (!PassengerVoiceAnnouncer.isVoiceMoment(status, delivery: false)) return;
-    Future<void>.delayed(const Duration(seconds: 4), () {
+    _voiceMomentTimer?.cancel();
+    _voiceMomentTimer = Timer(const Duration(seconds: 4), () {
       if (mounted) _voiceMoment.fire();
     });
   }
@@ -135,6 +137,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
 
   @override
   void dispose() {
+    _voiceMomentTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _mockTimer?.cancel();

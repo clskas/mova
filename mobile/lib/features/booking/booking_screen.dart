@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import '../billing/cash_paid_claim_button.dart';
 import '../../core/api/api_client.dart';
 import '../../core/voice/voice_command_button.dart';
+import '../passenger/passenger_voice_announcer.dart';
 import '../../core/config/test_runtime_config.dart';
 import '../../core/location/destination_coords.dart';
 import '../../core/location/location_service.dart';
@@ -1044,6 +1045,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   VoiceCommandButton(
                     onText: _onVoiceOrder,
                     hint: tr('Dites par exemple : « une moto pour Limete, 7e rue »'),
+                    // Micro automatique: opens by itself a few seconds on this screen.
+                    autoListen: PassengerVoiceAnnouncer.autoListenActive,
+                    autoListenFor: const Duration(seconds: 8),
                   ),
                 ],
               ),

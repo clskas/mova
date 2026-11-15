@@ -1,5 +1,6 @@
 import '../../core/i18n/i18n.dart';
 import '../../core/voice/voice_command_button.dart';
+import '../passenger/passenger_voice_announcer.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -82,6 +83,18 @@ class TrackingScreen extends ConsumerStatefulWidget {
 
 class _TrackingScreenState extends ConsumerState<TrackingScreen>
     with WidgetsBindingObserver {
+  /// Micro automatique: opens by itself a few seconds after a key status (the voice
+  /// announcement plays first, so the micro does not hear it).
+  final VoiceAutoTrigger _voiceMoment = VoiceAutoTrigger();
+
+  void _voiceMomentFor(String status) {
+    if (!PassengerVoiceAnnouncer.autoListenActive) return;
+    if (!PassengerVoiceAnnouncer.isVoiceMoment(status, delivery: false)) return;
+    Future<void>.delayed(const Duration(seconds: 4), () {
+      if (mounted) _voiceMoment.fire();
+    });
+  }
+
   Map<String, dynamic>? _ride;
   Map<String, dynamic>? _driver;
   String _status = 'ACCEPTED';
@@ -347,6 +360,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     if (newStatus != _status) {
       PassengerAlertService.notifyRideStatus(newStatus);
       _lastAlertedStatus = newStatus;
+      _voiceMomentFor(newStatus);
     }
     _status = newStatus;
     _driver = _normalizeDriver(data['driver'] as Map<String, dynamic>?);
@@ -833,6 +847,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         VoiceCommandButton(
           onText: _onTrackingVoice,
           hint: tr('Dites : appeler, partager, SOS, annuler, payer, j’ai payé'),
+          trigger: _voiceMoment,
+          autoListenFor: const Duration(seconds: 8),
         ),
         sosAppBarButton(onPressed: ([bool skip = false]) => _triggerSos(skipConfirm: skip)),
         IconButton(

@@ -22,6 +22,7 @@ import 'delivery_payment_state.dart';
 import 'widgets/delivery_tracking_map.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/voice/voice_command_button.dart';
+import '../passenger/passenger_voice_announcer.dart';
 
 class ParcelTrackingScreen extends ConsumerStatefulWidget {
   const ParcelTrackingScreen({super.key, required this.parcelId});
@@ -33,6 +34,18 @@ class ParcelTrackingScreen extends ConsumerStatefulWidget {
 }
 
 class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
+  /// Micro automatique: opens by itself a few seconds after a key status (the voice
+  /// announcement plays first, so the micro does not hear it).
+  final VoiceAutoTrigger _voiceMoment = VoiceAutoTrigger();
+
+  void _voiceMomentFor(String status) {
+    if (!PassengerVoiceAnnouncer.autoListenActive) return;
+    if (!PassengerVoiceAnnouncer.isVoiceMoment(status, delivery: true)) return;
+    Future<void>.delayed(const Duration(seconds: 4), () {
+      if (mounted) _voiceMoment.fire();
+    });
+  }
+
   Map<String, dynamic>? _delivery;
   bool _loading = true;
   bool _cancelling = false;
@@ -95,6 +108,7 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
     if (newStatus != null && newStatus != _lastStatus) {
       _lastStatus = newStatus;
       PassengerAlertService.notifyDeliveryStatus(newStatus);
+      _voiceMomentFor(newStatus);
     }
     if (hadPrevious && isPaid && !wasPaid) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -333,6 +347,8 @@ class _ParcelTrackingScreenState extends ConsumerState<ParcelTrackingScreen> {
         VoiceCommandButton(
           onText: _onDeliveryVoice,
           hint: tr('Dites : annuler, payer, j’ai payé, colis reçu'),
+          trigger: _voiceMoment,
+          autoListenFor: const Duration(seconds: 8),
         ),
         IconButton(icon: const Icon(Icons.refresh), onPressed: () => _load()),
       ],

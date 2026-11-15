@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { CommissionServiceType, SurchargeType, VehicleType } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { invalidateCommissionCache } from './commission.service';
 
 const DELIVERY_CATEGORY_TO_TYPE: Record<string, SurchargeType> = {
   PARCEL: SurchargeType.DELIVERY_PARCEL,
@@ -296,7 +297,7 @@ export class PricingAdminService {
     if (platformPercent < 0 || platformPercent > 100) {
       throw new MovaHttpException(MovaErrorCode.VALIDATION_ERROR, HttpStatus.BAD_REQUEST, 'Commission entre 0 et 100 %.');
     }
-    return this.prisma.platformCommission.update({
+    const row = await this.prisma.platformCommission.update({
       where: { serviceType },
       data: {
         ...data,
@@ -304,6 +305,8 @@ export class PricingAdminService {
         driverPercent: 100 - platformPercent,
       },
     });
+    invalidateCommissionCache();
+    return row;
   }
 
   listCancellationPolicies() {

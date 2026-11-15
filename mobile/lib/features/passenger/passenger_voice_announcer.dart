@@ -3,6 +3,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/i18n/i18n.dart';
+import '../../core/voice/voice_command_button.dart';
 
 /// Annonce vocale des étapes d'une course / livraison côté passager
 /// (« Votre chauffeur est arrivé »). Désactivable dans Mon profil.
@@ -11,6 +12,32 @@ class PassengerVoiceAnnouncer {
 
   static const prefKey = 'passenger_voice_announce';
   static final ValueNotifier<bool> enabled = ValueNotifier<bool>(true);
+
+  /// « Micro automatique » (Mon profil): the micro opens by itself at key moments.
+  static const autoListenPrefKey = 'passenger_voice_auto_listen';
+  static final ValueNotifier<bool> autoListen = ValueNotifier<bool>(true);
+
+  /// Admin switch and the passenger's own switch both on.
+  static bool get autoListenActive => kPassengerVoiceAutoListen && autoListen.value;
+
+  /// Status after which the micro opens by itself (pure, tested): driver at the pickup
+  /// (« j'arrive », « appelle »), ride over (« j'ai payé »), delivery near / delivered (« reçu »).
+  static bool isVoiceMoment(String status, {bool delivery = false}) {
+    final s = status.toUpperCase();
+    return delivery
+        ? (s == 'IN_TRANSIT' || s == 'DELIVERED')
+        : (s == 'ARRIVING' || s == 'DRIVER_ARRIVED' || s == 'COMPLETED');
+  }
+
+  static Future<void> setAutoListen(bool on) async {
+    autoListen.value = on;
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setBool(autoListenPrefKey, on);
+    } catch (_) {
+      /* ignore */
+    }
+  }
   static FlutterTts? _tts;
   static bool _loaded = false;
   static String? _lastText;
@@ -22,6 +49,7 @@ class PassengerVoiceAnnouncer {
     try {
       final p = await SharedPreferences.getInstance();
       enabled.value = p.getBool(prefKey) ?? true;
+      autoListen.value = p.getBool(autoListenPrefKey) ?? true;
     } catch (_) {
       /* tests : garder la valeur par défaut */
     }

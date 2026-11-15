@@ -25,6 +25,7 @@ import 'features/driver/driver_job_alert_service.dart';
 import 'features/driver/native_job_wake.dart';
 import 'features/driver/driver_push_service.dart';
 import 'features/passenger/passenger_alert_service.dart';
+import 'features/passenger/passenger_voice_announcer.dart';
 import 'features/sos/notification_tap_router.dart';
 import 'features/splash/mova_splash_screen.dart';
 
@@ -44,6 +45,7 @@ Future<void> runMovaPassengerApp() async {
   await loadAppLanguage();
   await SyncQueue.init();
   await PassengerAlertService.init();
+  await PassengerVoiceAnnouncer.load(); // « Micro automatique » / « Annonces vocales » switches
   await ChatAlertService.init();
   await CallRingService.init();
   _wireCallRingSocketHooks();

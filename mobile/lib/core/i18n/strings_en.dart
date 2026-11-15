@@ -2095,4 +2095,6 @@ const Map<String, String> kStringsEn = {
   "J’ai un code de parrainage": "I have a referral code",
   "Code de parrainage enregistré. Votre crédit arrivera après votre première course.": "Referral code saved. Your credit arrives after your first ride.",
   "Rejoins SENGA avec mon code {code} : tu reçois un crédit après ta première course. Inscris-toi ici : {link}": "Join SENGA with my code {code}: you get a credit after your first ride. Sign up here: {link}",
+  "Micro automatique": "Automatic microphone",
+  "Le micro s’ouvre seul quelques secondes pour commander, quand le chauffeur arrive et à la fin de la course : parlez sans toucher l’écran.": "The microphone opens by itself for a few seconds to order, when the driver arrives and at the end of the ride: speak without touching the screen.",
 };

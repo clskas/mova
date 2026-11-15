@@ -331,10 +331,15 @@ String voiceLocaleId() => switch (appLanguage.value) {
 bool kDriverVoiceAutoListen = true;
 int kDriverVoiceAutoListenSeconds = 10;
 
+/// Admin switch for SENGA (passenger): micro opened by itself at key moments.
+bool kPassengerVoiceAutoListen = true;
+
 void applyDriverVoiceConfig(Object? raw) {
   if (raw is! Map) return;
   final on = raw['autoListenEnabled'];
   if (on is bool) kDriverVoiceAutoListen = on;
+  final pax = raw['passengerAutoListenEnabled'];
+  if (pax is bool) kPassengerVoiceAutoListen = pax;
   final s = raw['autoListenSeconds'];
   final n = s is num ? s.round() : int.tryParse(s?.toString() ?? '');
   if (n != null && n >= 5 && n <= 30) kDriverVoiceAutoListenSeconds = n;

@@ -159,9 +159,11 @@ export type DriverVoiceConfig = {
   autoListenEnabled: boolean;
   /** How long it listens, in seconds (5–30). */
   autoListenSeconds: number;
+  /** SENGA (passenger): micro opens by itself at key moments (booking, driver arrived, ride over). */
+  passengerAutoListenEnabled: boolean;
 };
 
-export const DEFAULT_DRIVER_VOICE_CONFIG: DriverVoiceConfig = { autoListenEnabled: true, autoListenSeconds: 10 };
+export const DEFAULT_DRIVER_VOICE_CONFIG: DriverVoiceConfig = { autoListenEnabled: true, autoListenSeconds: 10, passengerAutoListenEnabled: true };
 
 export function normalizeDriverVoiceConfig(
   raw: unknown,
@@ -171,6 +173,7 @@ export function normalizeDriverVoiceConfig(
   if (!raw || typeof raw !== 'object') return out;
   const o = raw as Record<string, unknown>;
   if (typeof o.autoListenEnabled === 'boolean') out.autoListenEnabled = o.autoListenEnabled;
+  if (typeof o.passengerAutoListenEnabled === 'boolean') out.passengerAutoListenEnabled = o.passengerAutoListenEnabled;
   const n = Math.round(Number(o.autoListenSeconds));
   if (Number.isFinite(n) && n >= 5 && n <= 30) out.autoListenSeconds = n;
   return out;

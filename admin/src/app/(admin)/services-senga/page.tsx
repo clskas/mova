@@ -128,7 +128,7 @@ export default function ServicesSengaPage() {
   }
 
   /** SENGA Driver voice answers: saved at once (super admin only). */
-  async function saveDriverVoice(next: { autoListenEnabled: boolean; autoListenSeconds: number }) {
+  async function saveDriverVoice(next: { autoListenEnabled: boolean; autoListenSeconds: number; passengerAutoListenEnabled?: boolean }) {
     if (!config || !canEditServices) return;
     const secs = Math.round(next.autoListenSeconds);
     if (!Number.isFinite(secs) || secs < 5 || secs > 30) {
@@ -139,9 +139,15 @@ export default function ServicesSengaPage() {
     setError(null);
     setOk(null);
     try {
-      const updated = await updateClientAppsConfig({ driverVoice: { ...next, autoListenSeconds: secs } });
+      const updated = await updateClientAppsConfig({
+        driverVoice: {
+          ...next,
+          autoListenSeconds: secs,
+          passengerAutoListenEnabled: next.passengerAutoListenEnabled ?? config.driverVoice?.passengerAutoListenEnabled !== false,
+        },
+      });
       setConfig(updated);
-      setOk("Écoute vocale SENGA Driver enregistrée.");
+      setOk("Écoute vocale enregistrée.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Enregistrement impossible");
     } finally {
@@ -223,7 +229,7 @@ export default function ServicesSengaPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-800">SENGA Driver — réponse vocale aux offres</h2>
+        <h2 className="text-sm font-semibold text-slate-800">Micro automatique (SENGA Driver et SENGA)</h2>
         {!canEditServices && <p className="text-sm text-amber-700">Réservé au super administrateur.</p>}
         <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3">
           <span className="text-sm text-slate-800">
@@ -265,6 +271,28 @@ export default function ServicesSengaPage() {
                 });
               }
             }}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3">
+          <span className="text-sm text-slate-800">
+            <span className="font-medium block">SENGA (passager) — micro ouvert aux moments clés</span>
+            <span className="text-xs text-slate-500">
+              Le micro s&apos;ouvre seul quelques secondes à l&apos;écran de commande, quand le chauffeur arrive et à la
+              fin de la course ou de la livraison : le client parle sans toucher le micro. Seulement si le client a déjà
+              autorisé le micro ; il peut le couper dans Mon profil.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={config.driverVoice?.passengerAutoListenEnabled !== false}
+            disabled={!canEditServices || saving}
+            onChange={(e) =>
+              void saveDriverVoice({
+                autoListenEnabled: config.driverVoice?.autoListenEnabled !== false,
+                autoListenSeconds: config.driverVoice?.autoListenSeconds ?? 10,
+                passengerAutoListenEnabled: e.target.checked,
+              })
+            }
           />
         </label>
       </section>

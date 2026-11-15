@@ -2094,5 +2094,7 @@ export const UI_SOURCE_STRINGS: readonly string[] = [
  "Code de parrainage (facultatif)",
  "J’ai un code de parrainage",
  "Code de parrainage enregistré. Votre crédit arrivera après votre première course.",
- "Rejoins SENGA avec mon code {code} : tu reçois un crédit après ta première course. Inscris-toi ici : {link}"
+ "Rejoins SENGA avec mon code {code} : tu reçois un crédit après ta première course. Inscris-toi ici : {link}",
+ "Micro automatique",
+ "Le micro s’ouvre seul quelques secondes pour commander, quand le chauffeur arrive et à la fin de la course : parlez sans toucher l’écran."
 ];

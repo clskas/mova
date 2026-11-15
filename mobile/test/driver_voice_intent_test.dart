@@ -38,4 +38,17 @@ void main() {
     expect(kDriverVoiceAutoListenSeconds, 15);
     applyDriverVoiceConfig({'autoListenEnabled': true, 'autoListenSeconds': 10});
   });
+
+  test('hands-free confirmation: « oui » / « non » in every language', () {
+    for (final yes in ['Oui', 'oui oui', 'ouais', "d'accord", 'OK', 'vas-y', 'Yes', 'ndiyo', 'sawa', 'iyo']) {
+      expect(parseVoiceYesNo(yes), isTrue, reason: yes);
+    }
+    for (final no in ['Non', 'non merci', 'pas encore', 'attends', 'annule', 'No', 'hapana', 'te']) {
+      expect(parseVoiceYesNo(no), isFalse, reason: no);
+    }
+    for (final other in ['', 'bonjour', 'nouvelle course', 'onze']) {
+      expect(parseVoiceYesNo(other), isNull, reason: other);
+    }
+  });
 }
+

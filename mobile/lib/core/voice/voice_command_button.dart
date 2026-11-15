@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../i18n/i18n.dart';
@@ -343,15 +344,145 @@ void applyDriverVoiceConfig(Object? raw) {
 Future<bool> confirmVoiceAction(BuildContext context, String title, String yesLabel) async {
   final ok = await showDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(title),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Non'))),
-        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(yesLabel)),
-      ],
-    ),
+    builder: (_) => _VoiceConfirmDialog(title: title, yesLabel: yesLabel),
   );
   return ok == true && context.mounted;
+}
+
+/// « oui » → true, « non » → false, anything else → null (pure, tested).
+/// Whole words only: « non » is checked first, so « non merci » is a no.
+bool? parseVoiceYesNo(String text) {
+  final t = ' ${_norm(text).replaceAll(RegExp(r'[^a-z0-9 ]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim()} ';
+  bool has(List<String> words) => words.any((w) => t.contains(' $w '));
+  if (has(['non', 'pas', 'annule', 'annuler', 'stop', 'attends', 'attendez', 'no', 'nope', 'cancel', 'wait', 'hapana', 'sitaki', 'ngai te', 'te'])) return false;
+  if (has(['oui', 'ouais', 'ouai', 'd accord', 'dac', 'ok', 'okay', 'confirme', 'confirmer', 'je confirme', 'vas y', 'valide', 'valider', 'termine', 'terminer', 'c est bon', 'yes', 'yeah', 'yep', 'sure', 'confirm', 'ndiyo', 'ndio', 'sawa', 'iyo', 'eh', 'ee'])) return true;
+  return null;
+}
+
+/// The confirmation reads its question aloud and listens for « oui » / « non », so a driver
+/// keeps both hands on the wheel. The buttons stay for those who prefer to tap.
+class _VoiceConfirmDialog extends StatefulWidget {
+  const _VoiceConfirmDialog({required this.title, required this.yesLabel});
+
+  final String title;
+  final String yesLabel;
+
+  @override
+  State<_VoiceConfirmDialog> createState() => _VoiceConfirmDialogState();
+}
+
+class _VoiceConfirmDialogState extends State<_VoiceConfirmDialog> {
+  final SpeechToText _speech = SpeechToText();
+  FlutterTts? _tts;
+  bool _listening = false;
+  bool _closed = false;
+  String _heard = '';
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_run());
+  }
+
+  @override
+  void dispose() {
+    _closed = true;
+    unawaited(_tts?.stop());
+    if (_listening) unawaited(_speech.stop());
+    super.dispose();
+  }
+
+  void _close(bool value) {
+    if (_closed || !mounted) return;
+    _closed = true;
+    Navigator.of(context).pop(value);
+  }
+
+  Future<void> _run() async {
+    // Lingala has no phone voice: the question is shown, the micro still listens.
+    if (appLanguage.value != 'ln') {
+      try {
+        final tts = _tts = FlutterTts();
+        await tts.awaitSpeakCompletion(true);
+        await tts.setLanguage(switch (appLanguage.value) { 'en' => 'en-US', 'sw' => 'sw-KE', _ => 'fr-FR' });
+        await tts.setSpeechRate(0.5);
+        await tts.speak(widget.title);
+      } catch (_) {
+        /* no speech engine (tests, desktop): listen anyway */
+      }
+    }
+    // Two tries: a word not understood the first time is asked again.
+    for (var attempt = 0; attempt < 2 && mounted && !_closed; attempt++) {
+      final answer = await _listenOnce();
+      if (answer != null) {
+        _close(answer);
+        return;
+      }
+    }
+  }
+
+  Future<bool?> _listenOnce() async {
+    try {
+      if (!await _speech.hasPermission) return null;
+      final done = Completer<bool?>();
+      final ok = await _speech.initialize(
+        onError: (_) {
+          if (!done.isCompleted) done.complete(null);
+        },
+        onStatus: (s) {
+          if ((s == SpeechToText.doneStatus || s == SpeechToText.notListeningStatus) && !done.isCompleted) {
+            Future<void>.delayed(const Duration(milliseconds: 400), () {
+              if (!done.isCompleted) done.complete(parseVoiceYesNo(_heard));
+            });
+          }
+        },
+      );
+      if (!ok || !mounted || _closed) return null;
+      _heard = '';
+      setState(() => _listening = true);
+      await _speech.listen(
+        localeId: voiceLocaleId(),
+        listenFor: const Duration(seconds: 6),
+        pauseFor: const Duration(seconds: 2),
+        onResult: (r) {
+          _heard = r.recognizedWords;
+          if (mounted) setState(() {});
+          final answer = parseVoiceYesNo(_heard);
+          if ((answer != null || r.finalResult) && !done.isCompleted) done.complete(answer);
+        },
+      );
+      final answer = await done.future.timeout(const Duration(seconds: 8), onTimeout: () => null);
+      await _speech.stop();
+      if (mounted) setState(() => _listening = false);
+      return answer;
+    } catch (_) {
+      if (mounted) setState(() => _listening = false);
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Row(
+        children: [
+          Icon(Icons.mic, color: _listening ? Colors.redAccent : MovaColors.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _heard.trim().isNotEmpty ? '« ${_heard.trim()} »' : tr('Dites « oui » ou « non »'),
+              style: const TextStyle(color: MovaColors.textSecondary),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => _close(false), child: Text(tr('Non'))),
+        FilledButton(onPressed: () => _close(true), child: Text(widget.yesLabel)),
+      ],
+    );
+  }
 }
 
 /// « Commande non reconnue » with the words that work on this screen.

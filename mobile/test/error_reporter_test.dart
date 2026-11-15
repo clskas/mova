@@ -1,4 +1,6 @@
+import 'package:flutter/painting.dart' show NetworkImageLoadException;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart' show LocationServiceDisabledException;
 import 'package:mova/core/monitoring/error_reporter.dart';
 
 void main() {
@@ -65,6 +67,17 @@ void main() {
         )),
         isTrue,
       );
+    });
+
+    test('real exception objects whose text has no class name (SENGA-MOBILE-6 / -A)', () {
+      expect(
+        ErrorReporter.shouldIgnore(NetworkImageLoadException(
+          statusCode: 400,
+          uri: Uri.parse('https://x.supabase.co/storage/v1/object/sign/kyc-docs/k.jpg?token=a'),
+        )),
+        isTrue,
+      );
+      expect(ErrorReporter.shouldIgnore(const LocationServiceDisabledException()), isTrue);
     });
 
     test('keeps real bugs and our own API failures', () {

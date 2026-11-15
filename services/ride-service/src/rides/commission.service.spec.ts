@@ -1,11 +1,14 @@
 import { CommissionServiceType } from '@prisma/client';
-import { CommissionService } from './commission.service';
+import { CommissionService, invalidateCommissionCache } from './commission.service';
 
 describe('CommissionService — driver / platform split', () => {
   const prisma = { platformCommission: { findUnique: jest.fn() } };
   const service = new CommissionService(prisma as never);
 
-  beforeEach(() => prisma.platformCommission.findUnique.mockReset());
+  beforeEach(() => {
+    prisma.platformCommission.findUnique.mockReset();
+    invalidateCommissionCache();
+  });
 
   it('platform fee + driver net always equal the fare (no franc lost or created)', () => {
     for (const gross of [0, 1, 99, 2300, 4999, 8500, 15000, 123457]) {
@@ -49,6 +52,7 @@ describe('CommissionService — driver / platform split', () => {
     await expect(service.splitForService(10000, 'RIDE' as CommissionServiceType)).resolves.toMatchObject({
       platformFeeCdf: 2000, driverNetCdf: 8000,
     });
+    invalidateCommissionCache(); // the admin switched the rule off
     prisma.platformCommission.findUnique.mockResolvedValueOnce({
       serviceType: 'RIDE', platformPercent: 20, driverPercent: 80, fixedFeeCdf: null,
       perItemFeeCdf: null, description: null, isActive: false,
@@ -56,5 +60,15 @@ describe('CommissionService — driver / platform split', () => {
     await expect(service.splitForService(10000, 'RIDE' as CommissionServiceType)).resolves.toMatchObject({
       platformFeeCdf: 1500, driverNetCdf: 8500,
     });
+  });
+
+  it('reads the rate once a minute, and again right after an admin change', async () => {
+    prisma.platformCommission.findUnique.mockResolvedValue(null);
+    await service.get('DELIVERY' as CommissionServiceType);
+    await service.get('DELIVERY' as CommissionServiceType);
+    expect(prisma.platformCommission.findUnique).toHaveBeenCalledTimes(1);
+    invalidateCommissionCache();
+    await service.get('DELIVERY' as CommissionServiceType);
+    expect(prisma.platformCommission.findUnique).toHaveBeenCalledTimes(2);
   });
 });

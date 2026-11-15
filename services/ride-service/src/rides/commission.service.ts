@@ -34,8 +34,18 @@ const DEFAULTS: Record<
   },
 };
 
+/** The rate is read on every list a driver opens: keep it 1 min in memory. */
+const CACHE_MS = 60_000;
+let cacheVersion = 0;
+/** Called when the admin changes a rate, so the new rate applies at once. */
+export function invalidateCommissionCache() {
+  cacheVersion += 1;
+}
+
 @Injectable()
 export class CommissionService implements OnModuleInit {
+  private cache = new Map<CommissionServiceType, { rule: CommissionRule; at: number; version: number }>();
+
   constructor(private prisma: PrismaService) {}
 
   onModuleInit() {
@@ -63,6 +73,15 @@ export class CommissionService implements OnModuleInit {
   }
 
   private async read(type: CommissionServiceType): Promise<CommissionRule> {
+    const hit = this.cache.get(type);
+    if (hit && hit.version === cacheVersion && Date.now() - hit.at < CACHE_MS) return hit.rule;
+    const version = cacheVersion;
+    const rule = await this.readFromDb(type);
+    this.cache.set(type, { rule, at: Date.now(), version });
+    return rule;
+  }
+
+  private async readFromDb(type: CommissionServiceType): Promise<CommissionRule> {
     const row = await this.prisma.platformCommission.findUnique({ where: { serviceType: type } });
     if (!row || !row.isActive) return this.fallback(type);
     return {

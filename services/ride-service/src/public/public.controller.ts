@@ -74,6 +74,7 @@ export class PublicController {
         tripInsurance: { enabled: a.tripInsurance.enabled, feeCdf: a.tripInsurance.feeCdf },
         driverDestination: { enabled: a.driverDestination.enabled },
         autoPayouts: { enabled: a.autoPayouts.enabled },
+        referral: { enabled: a.referral.enabled, refereeRewardCdf: a.referral.refereeRewardCdf, codeEntryDays: a.referral.codeEntryDays },
       },
     };
   }

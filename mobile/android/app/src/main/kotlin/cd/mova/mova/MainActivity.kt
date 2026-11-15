@@ -6,6 +6,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import com.android.installreferrer.api.InstallReferrerClient
+import com.android.installreferrer.api.InstallReferrerStateListener
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -35,6 +37,42 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        // Invitation link → Play Store « &referrer=ref%3DCODE » → referral code at sign-up.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "senga/install_referrer")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "get") readInstallReferrer(result) else result.notImplemented()
+            }
+    }
+
+    private fun readInstallReferrer(result: MethodChannel.Result) {
+        var answered = false
+        fun answer(value: String?) {
+            if (answered) return
+            answered = true
+            runOnUiThread { result.success(value) }
+        }
+        try {
+            val client = InstallReferrerClient.newBuilder(this).build()
+            client.startConnection(object : InstallReferrerStateListener {
+                override fun onInstallReferrerSetupFinished(code: Int) {
+                    val value = try {
+                        if (code == InstallReferrerClient.InstallReferrerResponse.OK) {
+                            client.installReferrer.installReferrer
+                        } else {
+                            null
+                        }
+                    } catch (_: Exception) {
+                        null
+                    }
+                    try { client.endConnection() } catch (_: Exception) {}
+                    answer(value)
+                }
+
+                override fun onInstallReferrerServiceDisconnected() = answer(null)
+            })
+        } catch (_: Exception) {
+            answer(null)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

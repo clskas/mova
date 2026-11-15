@@ -106,4 +106,6 @@ dependencies {
     // Même BOM que firebase_messaging : RemoteMessage n’est pas exporté vers :app.
     implementation(platform("com.google.firebase:firebase-bom:33.13.0"))
     implementation("com.google.firebase:firebase-messaging")
+    // Play install referrer: referral code carried by the invitation link.
+    implementation("com.android.installreferrer:installreferrer:2.2")
 }

@@ -2090,5 +2090,9 @@ export const UI_SOURCE_STRINGS: readonly string[] = [
  "Paiement automatique chaque semaine",
  "Votre solde (dès {v1}) est envoyé sur votre propre numéro Mobile Money.",
  "Vérifié par l’équipe SENGA sur votre pièce d’identité.",
- "Dites « oui » ou « non »"
+ "Dites « oui » ou « non »",
+ "Code de parrainage (facultatif)",
+ "J’ai un code de parrainage",
+ "Code de parrainage enregistré. Votre crédit arrivera après votre première course.",
+ "Rejoins SENGA avec mon code {code} : tu reçois un crédit après ta première course. Inscris-toi ici : {link}"
 ];

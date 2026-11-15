@@ -48,7 +48,7 @@ Les services **Wallet SENGA** et **Historique** sont en bas de la grille. Vous y
 
 **Noter le chauffeur** : en plus des étoiles, vous pouvez noter la propreté, la conduite, la ponctualité et l'amabilité (facultatif).
 
-**Parrainage** : Profil → Parrainage. Partagez votre code ; quand votre proche termine sa première course ou livraison, vous recevez tous les deux un crédit sur votre portefeuille (quand SENGA ouvre le parrainage). Si quelqu'un vous a invité, saisissez son code dans les premiers jours après l'inscription.
+**Parrainage** : Profil → Parrainage. Partagez votre code ou votre **lien d'invitation** (bouton Partager) ; quand votre proche termine sa première course ou livraison, vous recevez tous les deux un crédit sur votre portefeuille (quand SENGA ouvre le parrainage). Celui qui ouvre le lien voit votre code ; sur Android, le code est déjà rempli à l'inscription après l'installation ; sur iPhone et sur le site, il le saisit dans « J'ai un code de parrainage » à l'inscription. On peut aussi saisir le code plus tard dans Profil → Parrainage, dans les premiers jours après l'inscription.
 
 **Attente du chauffeur** : quand votre chauffeur est arrivé, les **5 premières minutes d'attente sont gratuites** (vous recevez un SMS). Au-delà, chaque minute est ajoutée au prix de la course, au tarif par minute de la gamme, avec un plafond (20 minutes facturées au plus). Soyez prêt quand le chauffeur arrive !
 

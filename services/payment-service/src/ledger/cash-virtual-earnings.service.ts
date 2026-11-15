@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { CashDebtCategory, PaymentMethod, PaymentStatus } from '@prisma/client';
 import { INTERNAL_API_KEY, MOVA_PLATFORM_USER_ID, serviceUrl } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { platformCreditsNotVoided } from './platform-income.util';
 
 type PayoutItem = {
   referenceType: string;
@@ -156,29 +157,15 @@ export class CashVirtualEarningsService {
       };
     }
 
-    const [deskAgg, prepaidAgg] = await Promise.all([
-      this.prisma.walletTransaction.aggregate({
-        where: {
-          walletId: platformWallet.id,
-          type: 'CREDIT',
-          reference: { startsWith: 'PLATFORM_FEE_CASH_COLLECT:' },
-        },
-        _sum: { amountCdf: true },
-      }),
-      this.prisma.walletTransaction.aggregate({
-        where: {
-          walletId: platformWallet.id,
-          type: 'CREDIT',
-          reference: { startsWith: 'PLATFORM_FEE:' },
-        },
-        _sum: { amountCdf: true },
-      }),
+    const [deskCdf, prepaidCdf] = await Promise.all([
+      platformCreditsNotVoided(this.prisma, platformWallet.id, 'PLATFORM_FEE_CASH_COLLECT:'),
+      platformCreditsNotVoided(this.prisma, platformWallet.id, 'PLATFORM_FEE:'),
     ]);
 
     return {
       platformBalanceCdf: platformWallet.balanceCdf,
-      deskCashCollectedCdf: deskAgg._sum.amountCdf ?? 0,
-      prepaidCommissionCdf: prepaidAgg._sum.amountCdf ?? 0,
+      deskCashCollectedCdf: deskCdf,
+      prepaidCommissionCdf: prepaidCdf,
       currency: 'CDF',
     };
   }

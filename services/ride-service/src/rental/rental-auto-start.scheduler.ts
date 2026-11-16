@@ -1,4 +1,5 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { runClusterTick, RedisService } from '@mova/shared';
 import { RentalService } from './rental.service';
 
 const AUTO_START_INTERVAL_MS = 5 * 60 * 1000;
@@ -8,10 +9,10 @@ export class RentalAutoStartScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RentalAutoStartScheduler.name);
   private timer?: NodeJS.Timeout;
 
-  constructor(private rental: RentalService) {}
+  constructor(private rental: RentalService, @Optional() private readonly clusterRedis?: RedisService) {}
 
   onModuleInit() {
-    this.timer = setInterval(() => void this.tick(), AUTO_START_INTERVAL_MS);
+    this.timer = setInterval(() => void runClusterTick(this.clusterRedis, 'rental-auto-start', AUTO_START_INTERVAL_MS, () => this.tick()), AUTO_START_INTERVAL_MS);
     this.logger.log(`Auto-démarrage location actif (toutes les ${AUTO_START_INTERVAL_MS / 60_000} min)`);
     void this.tick();
   }

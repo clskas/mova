@@ -12,6 +12,7 @@ import {
   postStaffAlert,
   serviceUrl,
   type PaymentReminderPayload,
+  runClusterTick,
 } from '@mova/shared';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -45,7 +46,7 @@ export class PaymentAutomationsService implements OnModuleInit, OnModuleDestroy 
 
   onModuleInit() {
     if (process.env.AUTOMATIONS_DISABLED === 'true' || process.env.NODE_ENV === 'test') return;
-    this.timer = setInterval(() => void this.tick(), 10 * MIN);
+    this.timer = setInterval(() => void runClusterTick(this.redis, 'payment-automations', 10 * MIN, () => this.tick()), 10 * MIN);
   }
 
   onModuleDestroy() {

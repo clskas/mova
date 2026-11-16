@@ -1,6 +1,6 @@
 import { Body, Controller, Injectable, Logger, OnModuleDestroy, OnModuleInit, Post, UseGuards } from '@nestjs/common';
 import { KycStatus } from '@prisma/client';
-import { fetchAutomations, kinshasaClock, MOVA_EVENTS, RedisService, type PaymentReminderPayload } from '@mova/shared';
+import { fetchAutomations, kinshasaClock, MOVA_EVENTS, RedisService, type PaymentReminderPayload, runClusterTick } from '@mova/shared';
 import { InternalApiGuard } from '../common/internal-api.guard';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -19,7 +19,7 @@ export class DriverGrowthService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     if (process.env.AUTOMATIONS_DISABLED === 'true' || process.env.NODE_ENV === 'test') return;
-    this.timer = setInterval(() => void this.onboardingReminders().catch((e: unknown) => this.logger.warn(String(e))), 60 * 60 * 1000);
+    this.timer = setInterval(() => void runClusterTick(this.redis, 'driver-onboarding-reminders', 60 * 60 * 1000, () => this.onboardingReminders().catch((e: unknown) => this.logger.warn(String(e)))), 60 * 60 * 1000);
   }
 
   onModuleDestroy() {

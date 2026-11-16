@@ -1,4 +1,5 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { runClusterTick, RedisService } from '@mova/shared';
 import { ScheduledRideStatus } from '@prisma/client';
 import { ScheduledRidesService } from './scheduled-rides.service';
 
@@ -9,10 +10,10 @@ export class ScheduledRidesScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ScheduledRidesScheduler.name);
   private timer?: NodeJS.Timeout;
 
-  constructor(private scheduled: ScheduledRidesService) {}
+  constructor(private scheduled: ScheduledRidesService, @Optional() private readonly clusterRedis?: RedisService) {}
 
   onModuleInit() {
-    this.timer = setInterval(() => void this.tick(), TICK_INTERVAL_MS);
+    this.timer = setInterval(() => void runClusterTick(this.clusterRedis, 'scheduled-rides', TICK_INTERVAL_MS, () => this.tick()), TICK_INTERVAL_MS);
     this.logger.log('Scheduler courses planifiées actif (rappels, auto-assignation)');
     void this.tick();
   }

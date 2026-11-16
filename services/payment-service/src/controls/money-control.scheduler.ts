@@ -1,4 +1,5 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { runClusterTick, RedisService } from '@mova/shared';
 import { MoneyControlService } from './money-control.service';
 
 const TICK_MS = 30 * 60 * 1000;
@@ -11,11 +12,11 @@ export class MoneyControlScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MoneyControlScheduler.name);
   private timer?: NodeJS.Timeout;
 
-  constructor(private control: MoneyControlService) {}
+  constructor(private control: MoneyControlService, @Optional() private readonly clusterRedis?: RedisService) {}
 
   onModuleInit() {
     if (process.env.NODE_ENV === 'test') return;
-    this.timer = setInterval(() => void this.tick(), TICK_MS);
+    this.timer = setInterval(() => void runClusterTick(this.clusterRedis, 'money-control', TICK_MS, () => this.tick()), TICK_MS);
   }
 
   onModuleDestroy() {

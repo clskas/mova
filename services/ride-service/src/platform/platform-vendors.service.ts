@@ -1,5 +1,5 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { INTERNAL_API_KEY, notifyAuthUser, serviceUrl } from '@mova/shared';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { INTERNAL_API_KEY, notifyAuthUser, serviceUrl, runClusterTick, RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { randomUUID } from 'crypto';
 
@@ -84,14 +84,14 @@ export class PlatformVendorsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PlatformVendorsService.name);
   private timer?: NodeJS.Timeout;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, @Optional() private readonly clusterRedis?: RedisService) {}
 
   onModuleInit() {
     void this.ensureDefaults().catch((e) =>
       this.logger.warn(`platform vendors seed: ${(e as Error).message}`),
     );
     // Toutes les 6 h — alertes Super Admin avant échéance.
-    this.timer = setInterval(() => void this.runExpiryAlerts(), 6 * 60 * 60 * 1000);
+    this.timer = setInterval(() => void runClusterTick(this.clusterRedis, 'vendor-expiry-alerts', 6 * 60 * 60 * 1000, () => this.runExpiryAlerts()), 6 * 60 * 60 * 1000);
     setTimeout(() => void this.runExpiryAlerts(), 45_000);
   }
 

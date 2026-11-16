@@ -1,6 +1,6 @@
 import { BadRequestException, HttpException, HttpStatus, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { IncidentType, Prisma } from '@prisma/client';
-import { INCIDENT_OUTCOMES, IncidentOutcome, MOVA_EVENTS, IncidentCreatedPayload, IncidentUpdatePayload } from '@mova/shared';
+import { INCIDENT_OUTCOMES, IncidentOutcome, MOVA_EVENTS, IncidentCreatedPayload, IncidentUpdatePayload, runClusterTick } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -54,7 +54,7 @@ export class IncidentsService implements OnModuleInit, OnModuleDestroy {
   constructor(private prisma: PrismaService, private redis: RedisService) {}
 
   onModuleInit() {
-    this.escalationTimer = setInterval(() => void this.escalateUnacknowledged(), 30_000);
+    this.escalationTimer = setInterval(() => void runClusterTick(this.redis, 'incident-escalation', 30_000, () => this.escalateUnacknowledged()), 30_000);
     this.escalationTimer.unref?.();
   }
 

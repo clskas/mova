@@ -85,6 +85,8 @@ model DriverProfile {
 
   vehicles Vehicle[]
 
+  /// Driver search by zone (available drivers inside a square around the pickup).
+  @@index([isAvailable, currentLat, currentLng])
   @@map("driver_profiles")
 }
 

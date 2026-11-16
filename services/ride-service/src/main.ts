@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
+import { RedisIoAdapter, socketRedisAdapterEnabled } from './websocket/redis-io.adapter';
 import {
   HttpExceptionFilter,
   appLanguageMiddleware,
@@ -40,7 +41,20 @@ async function bootstrap() {
   // Base64 parcel photos (~3 Mo fichier → ~4 Mo JSON) dépassent la limite Express par défaut (100 kb).
   app.useBodyParser('json', { limit: '8mb' });
   app.useBodyParser('urlencoded', { limit: '8mb', extended: true });
-  app.useWebSocketAdapter(new IoAdapter(app));
+  if (socketRedisAdapterEnabled()) {
+    // Several instances: real time shared through Redis. If Redis does not answer, one instance
+    // keeps working with the default adapter rather than not starting.
+    const adapter = new RedisIoAdapter(app);
+    try {
+      await adapter.connect(process.env.REDIS_URL as string);
+      app.useWebSocketAdapter(adapter);
+    } catch (e) {
+      console.warn('[ride-service] Redis socket adapter unavailable, single-instance mode', e);
+      app.useWebSocketAdapter(new IoAdapter(app));
+    }
+  } else {
+    app.useWebSocketAdapter(new IoAdapter(app));
+  }
   // Do NOT useStaticAssets for uploads: Render disk is ephemeral. Serving only via
   // UploadsService (Postgres → Supabase) prevents "works until next deploy" ghosts.
   // Caller's app language (x-app-language) for texts built during the request.

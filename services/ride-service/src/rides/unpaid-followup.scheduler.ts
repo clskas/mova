@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { RideStatus } from '@prisma/client';
-import { formatCdf, INTERNAL_API_KEY, MOVA_EVENTS, RedisService, serviceUrl, type PaymentReminderPayload } from '@mova/shared';
+import { formatCdf, INTERNAL_API_KEY, MOVA_EVENTS, RedisService, serviceUrl, type PaymentReminderPayload, runClusterTick } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { fetchRidePaymentStatuses } from '../common/payment-status.util';
 import { PlatformConfigService } from '../platform/platform-config.service';
@@ -56,7 +56,7 @@ export class UnpaidFollowupScheduler implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     if (process.env.UNPAID_FOLLOWUP_ENABLED === 'false') return;
-    this.timer = setInterval(() => void this.tick(), TICK_MS);
+    this.timer = setInterval(() => void runClusterTick(this.redis, 'unpaid-followup', TICK_MS, () => this.tick()), TICK_MS);
   }
 
   onModuleDestroy() {

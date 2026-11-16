@@ -236,13 +236,16 @@ export class DriversService {
     // Goods vehicles (utility van, truck, tripoteur) are found for parcels and moves too.
     const compatibleTypes = driverVehicleTypesForSearch(vehicleType) as VehicleType[];
     if (!compatibleTypes.length) return [];
+    // Only the drivers inside the search square (index isAvailable + position): the database
+    // no longer sends every available driver of the country for each order.
+    const box = searchBox(lat, lng, effectiveRadius);
     const drivers = await this.prisma.driverProfile.findMany({
       where: {
         isAvailable: true,
         kycStatus: KycStatus.APPROVED,
         activationPinVerifiedAt: { not: null },
-        currentLat: { not: null },
-        currentLng: { not: null },
+        currentLat: { gte: box.minLat, lte: box.maxLat },
+        currentLng: { gte: box.minLng, lte: box.maxLng },
         // Livraisons : livreurs (BOTH / DELIVERIES_ONLY). Courses : chauffeurs (BOTH / RIDES_ONLY).
         // Goods vehicles never take passenger rides: a move does not depend on « accepte les courses ».
         ...(opts?.forDelivery
@@ -2067,4 +2070,16 @@ export class DriversService {
     const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
+}
+
+/**
+ * Square around the pickup that contains the search circle (radius in km). The exact distance
+ * is still checked after; the square only lets the database skip far drivers (pure, tested).
+ */
+export function searchBox(lat: number, lng: number, radiusKm: number) {
+  const r = Math.max(0, radiusKm) * 1.05;
+  const dLat = r / 111.32;
+  const cos = Math.max(0.2, Math.cos((lat * Math.PI) / 180));
+  const dLng = r / (111.32 * cos);
+  return { minLat: lat - dLat, maxLat: lat + dLat, minLng: lng - dLng, maxLng: lng + dLng };
 }

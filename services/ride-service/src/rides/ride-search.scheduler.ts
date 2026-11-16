@@ -1,4 +1,5 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { runClusterTick, RedisService } from '@mova/shared';
 import { RideStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
@@ -13,11 +14,12 @@ export class RideSearchScheduler implements OnModuleInit, OnModuleDestroy {
     private prisma: PrismaService,
     private rides: RidesService,
     private platformConfig: PlatformConfigService,
+    @Optional() private readonly clusterRedis?: RedisService,
   ) {}
 
   onModuleInit() {
     // Tick toutes les 5s ; le filtre elapsed utilise la config live (admin peut changer l'intervalle).
-    this.timer = setInterval(() => void this.tick(), 5_000);
+    this.timer = setInterval(() => void runClusterTick(this.clusterRedis, 'ride-search', 5_000, () => this.tick()), 5_000);
     this.logger.log('Auto re-search actif (tick 5s, intervalle effectif via platform-config)');
   }
 

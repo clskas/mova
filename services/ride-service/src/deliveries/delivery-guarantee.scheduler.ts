@@ -1,4 +1,5 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { runClusterTick, RedisService } from '@mova/shared';
 import { DeliveriesService } from './deliveries.service';
 import { ErrandsService } from '../errands/errands.service';
 
@@ -12,10 +13,11 @@ export class DeliveryGuaranteeScheduler implements OnModuleInit, OnModuleDestroy
   constructor(
     private deliveries: DeliveriesService,
     private errands: ErrandsService,
+    @Optional() private readonly clusterRedis?: RedisService,
   ) {}
 
   onModuleInit() {
-    this.timer = setInterval(() => void this.tick(), TICK_MS);
+    this.timer = setInterval(() => void runClusterTick(this.clusterRedis, 'delivery-guarantee', TICK_MS, () => this.tick()), TICK_MS);
     this.logger.log('Gel PIN / timeouts repas (acceptation & paiement) actifs (toutes les 5 min)');
   }
 

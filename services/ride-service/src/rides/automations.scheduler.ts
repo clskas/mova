@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { GrowthAutomationsService } from './growth-automations.service';
 import { RideStatus } from '@prisma/client';
-import { formatCdf, kinshasaClock, postStaffAlert, RedisService, resolveCityFromCoords } from '@mova/shared';
+import { formatCdf, kinshasaClock, postStaffAlert, RedisService, resolveCityFromCoords, runClusterTick } from '@mova/shared';
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RidesService } from './rides.service';
@@ -47,9 +47,9 @@ export class AutomationsScheduler implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     if (process.env.AUTOMATIONS_DISABLED === 'true') return;
-    this.timer = setInterval(() => void this.tick(), TICK_MS);
+    this.timer = setInterval(() => void runClusterTick(this.redis, 'ride-automations', TICK_MS, () => this.tick()), TICK_MS);
     // Rides in progress are checked more often (long stop / detour).
-    this.safetyTimer = setInterval(() => void this.safety.checkRoutes().catch((e: unknown) => this.logger.warn(`routes: ${String(e)}`)), 3 * 60 * 1000);
+    this.safetyTimer = setInterval(() => void runClusterTick(this.redis, 'ride-safety-routes', 3 * 60 * 1000, () => this.safety.checkRoutes().catch((e: unknown) => this.logger.warn(`routes: ${String(e)}`))), 3 * 60 * 1000);
   }
 
   onModuleDestroy() {

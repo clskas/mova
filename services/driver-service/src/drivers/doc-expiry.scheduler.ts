@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { fetchAutomations, kinshasaClock, MOVA_EVENTS, RedisService, type PaymentReminderPayload } from '@mova/shared';
+import { fetchAutomations, kinshasaClock, MOVA_EVENTS, RedisService, type PaymentReminderPayload, runClusterTick } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 const TICK_MS = 30 * 60 * 1000;
@@ -29,7 +29,7 @@ export class DocExpiryScheduler implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     if (process.env.AUTOMATIONS_DISABLED === 'true') return;
-    this.timer = setInterval(() => void this.tick().catch((e: unknown) => this.logger.warn(String(e))), TICK_MS);
+    this.timer = setInterval(() => void runClusterTick(this.redis, 'driver-doc-expiry', TICK_MS, () => this.tick().catch((e: unknown) => this.logger.warn(String(e)))), TICK_MS);
   }
 
   onModuleDestroy() {

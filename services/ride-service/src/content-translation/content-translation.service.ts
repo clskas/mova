@@ -1,6 +1,6 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { GENERATED_LANGUAGES, UI_SOURCE_STRINGS, serverSourceTexts, type AppLanguage } from '@mova/shared';
+import { GENERATED_LANGUAGES, UI_SOURCE_STRINGS, serverSourceTexts, type AppLanguage, runClusterTick, RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { runAiText } from '../common/ai-vision.util';
 import { ClientAppsConfigService } from '../platform/client-apps-config.service';
@@ -44,11 +44,12 @@ export class ContentTranslationService implements OnModuleInit, OnModuleDestroy 
   constructor(
     private prisma: PrismaService,
     private appsConfig: ClientAppsConfigService,
+    @Optional() private readonly clusterRedis?: RedisService,
   ) {}
 
   onModuleInit() {
     if (process.env.CONTENT_TRANSLATION === 'false') return;
-    this.timer = setInterval(() => void this.flush(), WORKER_MS);
+    this.timer = setInterval(() => void runClusterTick(this.clusterRedis, 'content-translation', WORKER_MS, () => this.flush()), WORKER_MS);
     this.timer.unref?.();
     // Warm-up: queue the live catalogues and the missing dictionaries once.
     const warm = setTimeout(() => void this.warmUp(), 60_000);

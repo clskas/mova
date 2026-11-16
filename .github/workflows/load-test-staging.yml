@@ -18,6 +18,9 @@ on:
       duration:
         description: Duration at full load (e.g. 5m, 10m)
         default: '5m'
+      phone_offset:
+        description: Shift the test phone numbers (new test accounts), e.g. 10000
+        default: '0'
 
 permissions:
   contents: read
@@ -71,7 +74,7 @@ jobs:
             -e DRIVERS="${{ inputs.drivers }}" \
             -e PASSENGERS="${{ inputs.passengers }}" \
             -e SOCKETS="${{ inputs.sockets }}" \
-            -e DURATION="${{ inputs.duration }}" \
+            -e DURATION="${{ inputs.duration }}"             -e PHONE_OFFSET="${{ inputs.phone_offset }}" \
             --summary-export=summary.json \
             loadtest/senga-load.js
 

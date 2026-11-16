@@ -74,7 +74,8 @@ jobs:
             -e DRIVERS="${{ inputs.drivers }}" \
             -e PASSENGERS="${{ inputs.passengers }}" \
             -e SOCKETS="${{ inputs.sockets }}" \
-            -e DURATION="${{ inputs.duration }}"             -e PHONE_OFFSET="${{ inputs.phone_offset }}" \
+            -e DURATION="${{ inputs.duration }}" \
+            -e PHONE_OFFSET="${{ inputs.phone_offset }}" \
             --summary-export=summary.json \
             loadtest/senga-load.js
 

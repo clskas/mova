@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
+import { isAllowedLoadTest } from '../auth/gateway-throttler.guard';
 
 /**
  * Per-IP limit on OTP / PIN / social login endpoints.
@@ -52,6 +53,8 @@ export class AuthRateLimitMiddleware implements NestMiddleware {
     if (req.method !== 'POST') return next();
     const path = String(req.originalUrl ?? req.url ?? '').split('?')[0];
     if (!AUTH_SENSITIVE_PREFIXES.some((p) => path.startsWith(p))) return next();
+    // Staging load test (secret key, never in production): all its logins come from one IP.
+    if (isAllowedLoadTest(req.headers['x-senga-load-test'])) return next();
 
     const now = Date.now();
     const key = clientIp(req);

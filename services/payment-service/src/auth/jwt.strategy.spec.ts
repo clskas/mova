@@ -9,6 +9,7 @@ describe('Payment JwtStrategy fail-closed', () => {
   beforeEach(() => {
     process.env.NODE_ENV = 'test';
     process.env.AUTH_REVALIDATE_TIMEOUT_MS = '30';
+    process.env.AUTH_STALE_GRACE_MS = '60000';
     jest.clearAllMocks();
     strategy = new JwtStrategy(config as never);
   });
@@ -16,6 +17,50 @@ describe('Payment JwtStrategy fail-closed', () => {
   afterEach(() => {
     delete (global as { fetch?: unknown }).fetch;
     delete process.env.AUTH_REVALIDATE_TIMEOUT_MS;
+    delete process.env.AUTH_STALE_GRACE_MS;
+  });
+
+  const live = (status: string = UserStatus.ACTIVE) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ id: 'user-1', phone: '+243811111111', role: UserRole.DRIVER, status }),
+  });
+  const pax = { sub: 'user-1', role: UserRole.PASSENGER, status: UserStatus.ACTIVE };
+
+  it('retries a 5xx (auth-service restarting) and succeeds', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValueOnce(live()) as jest.Mock;
+    const result = await strategy.validate(pax);
+    expect(result).toMatchObject({ id: 'user-1', role: UserRole.DRIVER });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('accepts a user verified a moment ago while auth-service is down', async () => {
+    global.fetch = jest.fn().mockResolvedValue(live()) as jest.Mock;
+    await strategy.validate(pax);
+    global.fetch = jest.fn().mockRejectedValue(new Error('ECONNREFUSED')) as jest.Mock;
+    const result = await strategy.validate({ ...pax, jti: 'j2' });
+    expect(result).toMatchObject({ id: 'user-1', role: UserRole.DRIVER, jti: 'j2' });
+  });
+
+  it('refuses the grace once the verification is too old', async () => {
+    process.env.AUTH_STALE_GRACE_MS = '0';
+    global.fetch = jest.fn().mockResolvedValue(live()) as jest.Mock;
+    await strategy.validate(pax);
+    await new Promise((r) => setTimeout(r, 5));
+    global.fetch = jest.fn().mockRejectedValue(new Error('ECONNREFUSED')) as jest.Mock;
+    await expect(strategy.validate(pax)).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it('forgets a suspended user (no grace afterwards)', async () => {
+    global.fetch = jest.fn().mockResolvedValue(live()) as jest.Mock;
+    await strategy.validate(pax);
+    global.fetch = jest.fn().mockResolvedValue(live(UserStatus.SUSPENDED)) as jest.Mock;
+    await expect(strategy.validate(pax)).rejects.toBeInstanceOf(UnauthorizedException);
+    global.fetch = jest.fn().mockRejectedValue(new Error('ECONNREFUSED')) as jest.Mock;
+    await expect(strategy.validate(pax)).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
   it('returns live claims from auth-service', async () => {

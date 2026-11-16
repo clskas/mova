@@ -29,6 +29,7 @@ if (!/mova-stg-|localhost|127\.0\.0\.1/.test(GATEWAY)) {
 
 const API = `${GATEWAY}/api`;
 const loginFailures = new Counter('senga_login_failures');
+let loggedFailure = false;
 const locationTime = new Trend('senga_driver_location_ms', true);
 const estimateTime = new Trend('senga_estimate_ms', true);
 const nearbyTime = new Trend('senga_nearby_ms', true);
@@ -104,8 +105,14 @@ function login(role) {
     t = null;
   }
   if (!check(r2, { 'login ok': () => r1.status < 300 && Boolean(t) })) {
-    loginFailures.add(1);
-    sleep(5);
+    const failed = r1.status >= 300 ? r1 : r2;
+    loginFailures.add(1, { status: String(failed.status), step: r1.status >= 300 ? 'request' : 'verify' });
+    if (!loggedFailure) {
+      loggedFailure = true;
+      // First failure of this virtual user: status + short reason (never a token).
+      console.warn(`login ${role} ${failed.status} ${String(failed.body || '').replace(/"(access|refresh)Token":"[^"]+"/g, '').slice(0, 160)}`);
+    }
+    sleep(30); // back off: never burn the per-phone OTP quota
     return null;
   }
   token = t;

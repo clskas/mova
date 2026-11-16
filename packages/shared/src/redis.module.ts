@@ -1,12 +1,15 @@
 import { Global, Module, Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 
-function createRedisClient(url: string, label: string): Redis {
+function createRedisClient(url: string, label: string, opts: { queueUntilReady?: boolean } = {}): Redis {
   const logger = new Logger(`Redis:${label}`);
   const client = new Redis(url, {
-    maxRetriesPerRequest: 3,
-    // Fail fast on commands while disconnected; callers should catch.
-    enableOfflineQueue: false,
+    // Subscriber: SUBSCRIBE sent at start-up (onModuleInit) waits for the connection instead of
+    // failing with « Stream isn't writeable » — the live events (cash PIN, escrow dispatch,
+    // partner portals) were lost after each restart. ioredis re-subscribes after a reconnect.
+    maxRetriesPerRequest: opts.queueUntilReady ? null : 3,
+    // Commands client: fail fast while disconnected; callers should catch.
+    enableOfflineQueue: opts.queueUntilReady === true,
     // Never stop reconnecting — free-tier Redis may sleep and come back.
     retryStrategy: (times) => Math.min(times * 200, 5000),
     reconnectOnError: (err) => {
@@ -34,7 +37,7 @@ export class RedisService implements OnModuleDestroy {
   constructor() {
     const url = process.env.REDIS_URL ?? 'redis://localhost:6379';
     this.client = createRedisClient(url, 'client');
-    this.sub = createRedisClient(url, 'sub');
+    this.sub = createRedisClient(url, 'sub', { queueUntilReady: true });
   }
 
   async publish(channel: string, payload: object) {

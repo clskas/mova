@@ -12,6 +12,11 @@ export type ClusterTickRedis = {
   client: { set(key: string, value: string, px: 'PX', ms: number, nx: 'NX'): Promise<unknown> };
 };
 
+/** Staging and production may share one Redis: their locks must not block each other. */
+export function clusterTickEnv(env: NodeJS.ProcessEnv = process.env): string {
+  return (env.APP_ENV || env.NODE_ENV || 'default').toLowerCase();
+}
+
 export function clusterTickLockMs(periodMs: number): number {
   return Math.max(1000, Math.floor(periodMs * 0.9));
 }
@@ -31,7 +36,7 @@ export async function claimClusterTick(
       (timer as { unref?: () => void }).unref?.();
     });
     const res = await Promise.race([
-      redis.client.set(`tick:${name}`, String(process.pid), 'PX', clusterTickLockMs(periodMs), 'NX'),
+      redis.client.set(`tick:${clusterTickEnv()}:${name}`, String(process.pid), 'PX', clusterTickLockMs(periodMs), 'NX'),
       timeout,
     ]);
     if (timer) clearTimeout(timer);

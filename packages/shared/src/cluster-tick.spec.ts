@@ -1,4 +1,4 @@
-import { claimClusterTick, clusterTickLockMs, runClusterTick } from './cluster-tick';
+import { claimClusterTick, clusterTickEnv, clusterTickLockMs, runClusterTick } from './cluster-tick';
 
 /** In-memory Redis SET NX PX, shared by two "instances". */
 function fakeRedis() {
@@ -48,5 +48,17 @@ describe('cluster tick locks', () => {
   it('locks for 90 % of the period, at least 1 s', () => {
     expect(clusterTickLockMs(5000)).toBe(4500);
     expect(clusterTickLockMs(500)).toBe(1000);
+  });
+
+  it('keeps staging and production locks apart on a shared Redis', async () => {
+    const redis = fakeRedis();
+    const prev = process.env.APP_ENV;
+    process.env.APP_ENV = 'staging';
+    expect(await claimClusterTick(redis, 'ride-search', 5000)).toBe(true);
+    process.env.APP_ENV = 'production';
+    expect(await claimClusterTick(redis, 'ride-search', 5000)).toBe(true);
+    if (prev === undefined) delete process.env.APP_ENV;
+    else process.env.APP_ENV = prev;
+    expect(clusterTickEnv({ APP_ENV: 'Production' })).toBe('production');
   });
 });

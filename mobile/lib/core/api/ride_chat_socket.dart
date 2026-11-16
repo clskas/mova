@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../config/market_config.dart';
+import 'socket_transports.dart';
 
 final rideChatSocketProvider = Provider((ref) => RideChatSocket());
 
@@ -115,7 +116,7 @@ class RideChatSocket {
         '${MarketConfig.effectiveWsUrl}/tracking',
         io.OptionBuilder()
             .setPath('/socket.io')
-            .setTransports(['polling', 'websocket'])
+            .setTransports(SocketTransportPolicy.transports)
             .disableAutoConnect()
             .enableReconnection()
             .setReconnectionAttempts(_maxReconnectAttempts)
@@ -126,6 +127,7 @@ class RideChatSocket {
       );
       _socket!
         ..onConnect((_) {
+          SocketTransportPolicy.onConnected();
           connectionFailed = false;
           _reconnectAttempt = 0;
           if (_rideId != null) {
@@ -159,6 +161,7 @@ class RideChatSocket {
           }
         })
         ..onConnectError((_) {
+          SocketTransportPolicy.onConnectError();
           _scheduleReconnect();
         })
         ..onError((_) {})

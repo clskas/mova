@@ -108,7 +108,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       final connectivity = ref.read(connectivityServiceProvider);
       connectivity.prepareReconnect();
       ref.read(apiClientProvider).checkHealth(resetFailures: true);
-      ServiceAreaGps.sync(ref);
+      if (mounted) ServiceAreaGps.sync(ref);
       _loadUser(forceRefresh: true);
       _loadActiveRide();
       _loadActiveDelivery();

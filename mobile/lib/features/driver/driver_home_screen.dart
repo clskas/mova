@@ -259,12 +259,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> with Widget
   }
 
   Future<void> _bootstrap() async {
+    final container = ProviderScope.containerOf(context, listen: false);
     final api = ref.read(apiClientProvider);
     final connectivity = ref.read(connectivityServiceProvider);
     connectivity.prepareReconnect();
     await api.loadToken();
     await api.checkHealth(resetFailures: true);
-    await ServiceAreaGps.sync(ref);
+    await ServiceAreaGps.syncWith(container);
     await Future.wait([
       _loadProfile(clearCache: true),
       _loadEarnings(),

@@ -12,7 +12,10 @@ function getSocket(): Socket {
   const token = getToken();
   sharedSocket = io(`${WS_BASE}/tracking`, {
     path: "/socket.io",
-    transports: ["polling", "websocket"],
+    // WebSocket first (one server per connection, works with several ride-service instances);
+    // long-polling only if the network blocks WebSocket.
+    transports: ["websocket", "polling"],
+    tryAllTransports: true,
     auth: token ? { token } : undefined,
     reconnection: true,
     reconnectionAttempts: 10,

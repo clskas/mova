@@ -1,0 +1,84 @@
+name: Load Test Staging
+
+# Manual only. Simulates drivers, passengers and live connections against STAGING (never
+# production). Needs the repository secret LOAD_TEST_KEY, set to the same value as the
+# LOAD_TEST_KEY environment variable of mova-stg-gateway on Render (24+ characters).
+on:
+  workflow_dispatch:
+    inputs:
+      drivers:
+        description: Drivers sending their GPS position every 8 s
+        default: '200'
+      passengers:
+        description: Passengers looking at prices (1 in 10 books then cancels)
+        default: '50'
+      sockets:
+        description: Live connections on /tracking
+        default: '100'
+      duration:
+        description: Duration at full load (e.g. 5m, 10m)
+        default: '5m'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: load-test-staging
+  cancel-in-progress: false
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Staging gateway URL
+        id: cfg
+        run: |
+          if [ ! -f config/render-services.staging.json ]; then
+            echo "::error::config/render-services.staging.json missing — staging not provisioned"; exit 1
+          fi
+          url=$(jq -r '.gatewayUrl' config/render-services.staging.json)
+          case "$url" in *mova-stg-*) ;; *) echo "::error::Not a staging URL: $url"; exit 1 ;; esac
+          echo "gateway=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Check the key
+        env:
+          LOAD_TEST_KEY: ${{ secrets.LOAD_TEST_KEY }}
+        run: |
+          if [ ${#LOAD_TEST_KEY} -lt 24 ]; then
+            echo "::error::Repository secret LOAD_TEST_KEY missing or shorter than 24 characters"; exit 1
+          fi
+
+      - name: Wake staging up
+        run: |
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${{ steps.cfg.outputs.gateway }}/health" || true)
+            [ "$code" = 200 ] && break
+            sleep 15
+          done
+
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Run the load test
+        env:
+          LOAD_TEST_KEY: ${{ secrets.LOAD_TEST_KEY }}
+        run: |
+          k6 run \
+            -e GATEWAY_URL="${{ steps.cfg.outputs.gateway }}" \
+            -e LOAD_TEST_KEY="$LOAD_TEST_KEY" \
+            -e DRIVERS="${{ inputs.drivers }}" \
+            -e PASSENGERS="${{ inputs.passengers }}" \
+            -e SOCKETS="${{ inputs.sockets }}" \
+            -e DURATION="${{ inputs.duration }}" \
+            --summary-export=summary.json \
+            loadtest/senga-load.js
+
+      - name: Keep the summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-summary
+          path: summary.json
+          if-no-files-found: ignore

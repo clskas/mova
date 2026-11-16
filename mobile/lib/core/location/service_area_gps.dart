@@ -11,8 +11,16 @@ class ServiceAreaGps {
   ///
   /// Le conteneur Riverpod est lu avant toute attente : l'écran appelant peut
   /// être fermé pendant la recherche GPS (Sentry SENGA-MOBILE-2).
+  ///
+  /// Un écran déjà fermé n'a plus de ProviderScope au-dessus de lui
+  /// (Sentry SENGA-MOBILE-7) : on ne fait alors rien.
   static Future<ServiceArea?> sync(WidgetRef ref) async {
-    final container = ProviderScope.containerOf(ref.context, listen: false);
+    if (!ref.context.mounted) return null;
+    return syncWith(ProviderScope.containerOf(ref.context, listen: false));
+  }
+
+  /// Même chose avec le conteneur de l'app, lu par l'appelant avant ses propres attentes.
+  static Future<ServiceArea?> syncWith(ProviderContainer container) async {
     final location = await LocationService.getCurrentLocation();
     if (location == null) return null;
 

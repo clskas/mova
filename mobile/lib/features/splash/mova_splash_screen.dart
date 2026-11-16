@@ -93,8 +93,11 @@ class _MovaSplashScreenState extends ConsumerState<MovaSplashScreen>
   }
 
   Future<void> _runBootstrap() async {
+    // Conteneur lu tout de suite : l'écran de démarrage peut être fermé pendant
+    // l'initialisation réseau (Sentry SENGA-MOBILE-7).
+    final container = ProviderScope.containerOf(context, listen: false);
     await bootstrapMovaApp(ref);
-    await ServiceAreaGps.sync(ref);
+    await ServiceAreaGps.syncWith(container);
     if (!mounted) return;
     setState(() => _bootstrapDone = true);
     _maybeNavigate();

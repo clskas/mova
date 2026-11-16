@@ -17,7 +17,7 @@ class LanguagePickerCard extends StatelessWidget {
   const LanguagePickerCard({super.key});
 
   Future<void> _choose(BuildContext context, String code) async {
-    if (code == appLanguage.value) return;
+    if (code == appLanguage.value || !context.mounted) return;
     final api = ProviderScope.containerOf(context, listen: false).read(apiClientProvider);
     final messenger = ScaffoldMessenger.of(context);
     if (kDownloadedLanguages.contains(code)) {

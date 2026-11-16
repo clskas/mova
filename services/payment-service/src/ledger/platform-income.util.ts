@@ -22,3 +22,15 @@ export async function platformCreditsNotVoided(prisma: PrismaService, walletId: 
   });
   return agg._sum.amountCdf ?? 0;
 }
+
+/**
+ * « Encaissements guichet » and « Commissions prépayées » are parts of the treasury balance.
+ * When money left the treasury afterwards (reset of test data, withdrawal), they cannot be
+ * larger than what is still there: a treasury at 0 FC shows 0 FC in both cards.
+ */
+export function treasuryShares(balanceCdf: number, deskCdf: number, prepaidCdf: number) {
+  const left = Math.max(0, balanceCdf);
+  const desk = Math.max(0, Math.min(deskCdf, left));
+  const prepaid = Math.max(0, Math.min(prepaidCdf, left - desk));
+  return { deskCashCollectedCdf: desk, prepaidCommissionCdf: prepaid };
+}

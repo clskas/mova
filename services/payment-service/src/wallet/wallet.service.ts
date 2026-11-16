@@ -39,7 +39,7 @@ import {
   fetchDemoAccountIds,
   isProductionRuntime,
 } from '@mova/shared';
-import { platformCreditsNotVoided } from '../ledger/platform-income.util';
+import { platformCreditsNotVoided, treasuryShares } from '../ledger/platform-income.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { isPrismaUniqueViolation } from '../prisma/prisma-errors';
 import { initiateViaGateway } from '../payments/payment-providers';
@@ -1472,8 +1472,7 @@ export class WalletService {
       platformCreditsNotVoided(this.prisma, platformWallet.id, 'PLATFORM_FEE_CASH_COLLECT:'),
       platformCreditsNotVoided(this.prisma, platformWallet.id, 'PLATFORM_FEE:'),
     ]);
-      deskCashCollectedCdf = deskCdf;
-      prepaidCommissionCdf = prepaidCdf;
+      ({ deskCashCollectedCdf, prepaidCommissionCdf } = treasuryShares(platformBalanceCdf, deskCdf, prepaidCdf));
     }
 
     return {

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { CashDebtCategory, PaymentMethod, PaymentStatus } from '@prisma/client';
 import { INTERNAL_API_KEY, MOVA_PLATFORM_USER_ID, serviceUrl } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { platformCreditsNotVoided } from './platform-income.util';
+import { platformCreditsNotVoided, treasuryShares } from './platform-income.util';
 
 type PayoutItem = {
   referenceType: string;
@@ -164,8 +164,7 @@ export class CashVirtualEarningsService {
 
     return {
       platformBalanceCdf: platformWallet.balanceCdf,
-      deskCashCollectedCdf: deskCdf,
-      prepaidCommissionCdf: prepaidCdf,
+      ...treasuryShares(platformWallet.balanceCdf, deskCdf, prepaidCdf),
       currency: 'CDF',
     };
   }

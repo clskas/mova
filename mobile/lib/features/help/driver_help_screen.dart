@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/auth/session.dart';
 import '../../core/theme/mova_colors.dart';
 import '../../core/widgets/mova_screen.dart';
+import '../../core/update/app_version_label.dart';
 import 'contact_support_screen.dart';
 import 'faq_screen.dart';
 import 'help_config.dart';
@@ -127,6 +128,7 @@ class DriverHelpScreen extends ConsumerWidget {
             icon: const Icon(Icons.logout, color: MovaColors.orange),
             label: Text(tr('Se déconnecter'), style: TextStyle(color: MovaColors.orange)),
           ),
+          const AppVersionLabel(),
         ],
       ),
     );

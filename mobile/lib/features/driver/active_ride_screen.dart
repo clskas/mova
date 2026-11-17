@@ -164,6 +164,14 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
   }
 
   Future<void> _bootstrap() async {
+    // Open Google Maps right away with the ride returned by the accept: it already holds the
+    // pickup point. Waiting for the profile / ride / live-connection requests first meant a
+    // slow network (20 s+) left the driver on this screen, tapping « Navigation » by hand.
+    if (widget.autoOpenNavigation && _hasPickupPoint) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_maybeAutoOpenNavigation());
+      });
+    }
     final api = ref.read(apiClientProvider);
     final profile = await api.getDriverProfile();
     if (profile case Success(:final data)) {
@@ -189,6 +197,9 @@ class _ActiveRideScreenState extends ConsumerState<ActiveRideScreen> {
       unawaited(_refreshRide());
     });
   }
+
+  /// Simple ride with a known pickup point (shared rides wait for their waypoints).
+  bool get _hasPickupPoint => !_isSharedPool && _ride['pickupLat'] is num && _ride['pickupLng'] is num;
 
   Future<void> _maybeAutoOpenNavigation() async {
     if (_autoNavTriggered || !mounted || _passengerCancelled || _isCancelledStatus) return;

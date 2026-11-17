@@ -37,6 +37,12 @@ class RideOfferScreen extends ConsumerStatefulWidget {
 class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
   int _countdown = 30;
   bool _loading = false;
+  /// Set when this driver taps « Accepter » (cleared if the accept fails). The server tells
+  /// every driver « ride taken » — this one too — and the 1 s status poll sees the ride
+  /// assigned: either used to close the offer as « taken » before the accept answer arrived,
+  /// so the ride screen opened without the automatic Google Maps (WebSocket-first 1.0.78
+  /// made the live message beat the HTTP answer).
+  bool _accepting = false;
   String? _error;
   Timer? _timer;
   Timer? _statusPollTimer;
@@ -71,6 +77,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
       final matchesKey = ev.offerKey == DriverJobAlertService.offerKey('ride', _rideId);
       if (!matchesId && !matchesKey) return;
       if (ev.reason == 'taken') {
+        if (_accepting) return; // our own accept — wait for its answer
         _timer?.cancel();
         _statusPollTimer?.cancel();
         _closeOffer('taken');
@@ -104,10 +111,11 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
 
   /// Si le passager annule pendant l'affichage de l'offre, fermer immédiatement.
   Future<void> _pollRideStillOpen() async {
-    if (_closingForCancel || _loading || !mounted || _rideId.isEmpty) return;
+    if (_closingForCancel || _loading || _accepting || !mounted || _rideId.isEmpty) return;
     final api = ref.read(apiClientProvider);
     final result = await api.getRide(_rideId);
-    if (!mounted || _closingForCancel) return;
+    // A poll sent just before « Accepter » can come back after it: ignore it.
+    if (!mounted || _closingForCancel || _accepting) return;
     if (result case Success(:final data)) {
       if (data.containsKey('passengerRatingCount') &&
           (PassengerRatingBadge.countFrom(data) != _passengerRatingCount ||
@@ -196,6 +204,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
   }
 
   Future<void> _accept() async {
+    _accepting = true;
     setState(() {
       _loading = true;
       _error = null;
@@ -216,6 +225,7 @@ class _RideOfferScreenState extends ConsumerState<RideOfferScreen> {
         // puis ouvrir ActiveRideScreen (évite un écran fantôme si annulation).
         _closeOffer(data);
       case Failure(:final error):
+        _accepting = false;
         final msg = error.message;
         final looksInvalidStatus = msg.contains('Statut de course invalide') ||
             msg.contains('n’est plus à l’étape') ||

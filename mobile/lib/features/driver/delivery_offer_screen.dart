@@ -31,6 +31,8 @@ class DeliveryOfferScreen extends ConsumerStatefulWidget {
 class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
   int _countdown = 30;
   bool _loading = false;
+  /// Set while this driver's own accept is in flight (see RideOfferScreen._accepting).
+  bool _accepting = false;
   String? _error;
   Timer? _timer;
   Timer? _statusPollTimer;
@@ -97,16 +99,17 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
       final matchesKey =
           ev.offerKey == DriverJobAlertService.offerKey('delivery', _deliveryId);
       if (!matchesId && !matchesKey) return;
+      if (ev.reason == 'taken' && _accepting) return; // our own accept — wait for its answer
       _closeOffer(ev.reason == 'taken' ? 'taken' : 'cancelled');
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _pollStillOpen());
   }
 
   Future<void> _pollStillOpen() async {
-    if (_closing || _loading || !mounted || _deliveryId.isEmpty) return;
+    if (_closing || _loading || _accepting || !mounted || _deliveryId.isEmpty) return;
     final api = ref.read(apiClientProvider);
     final result = await api.get('/deliveries/$_deliveryId', skipCache: true);
-    if (!mounted || _closing) return;
+    if (!mounted || _closing || _accepting) return;
     if (result case Success(:final data)) {
       final status = (data['status']?.toString() ?? '').toUpperCase();
       if (status == 'CANCELLED' || status == 'CANCELED') {
@@ -229,6 +232,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
   }
 
   Future<void> _accept() async {
+    _accepting = true;
     setState(() {
       _loading = true;
       _error = null;
@@ -247,6 +251,7 @@ class _DeliveryOfferScreenState extends ConsumerState<DeliveryOfferScreen> {
           _popOffer(result.data);
         }
       case Failure(:final error):
+        _accepting = false;
         setState(() => _error = error.message);
     }
   }

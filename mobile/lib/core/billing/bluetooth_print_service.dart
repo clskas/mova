@@ -42,7 +42,7 @@ class BluetoothPrintService {
     if (!context.mounted) return;
 
     if (devices.isEmpty) {
-      throw StateError(tr('Aucune imprimante Bluetooth appairée. Appairez votre imprimante dans les réglages Android.'));
+      throw StateError(tr('Aucune imprimante Bluetooth appairée. Appairez votre imprimante dans les réglages Bluetooth du téléphone.'));
     }
 
     BluetoothDevice? selected = devices.length == 1 ? devices.first : await showDialog<BluetoothDevice>(

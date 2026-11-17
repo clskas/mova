@@ -180,7 +180,7 @@ The trace builds up as the trip goes on. With a weak network, the position may l
 
 ## 16. App updates
 
-When a new version is available for your phone, an **"Update" banner** appears at the top of the app. Tap it to install the update from the Play Store or the App Store. New versions are sometimes rolled out gradually: it is normal for someone close to you to get it before you.
+When a new version is available for your phone, an **"Update" banner** appears at the top of the app. Tap it to install the update from your phone's app store. New versions are sometimes rolled out gradually: it is normal for someone close to you to get it before you.
 
 ## Accepted payments
 

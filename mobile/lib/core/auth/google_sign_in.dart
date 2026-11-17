@@ -85,7 +85,7 @@ String googleSignInErrorMessage(Object error) {
         blob.contains('api_exception: 10') ||
         blob.contains('apiexception: 10') ||
         RegExp(r'\b10\b').hasMatch(blob)) {
-      return tr('Google refuse cette installation (empreinte SHA-1). Ce n\'est pas l\'API SENGA. Ajoutez le SHA-1 classique Play (Intégrité de l\'app) ET upload sur deux clients Android (même package). Sideload : SHA-1 debug 6A:4B:2A:B7:…. Utilisez le SMS en attendant.');
+      return tr('Connexion Google indisponible pour cette installation. Utilisez le SMS.');
     }
   }
   return tr('Impossible de se connecter avec Google. Réessayez ou utilisez le SMS.');

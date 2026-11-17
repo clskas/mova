@@ -181,7 +181,7 @@ La trace se construit au fur et à mesure du déplacement. En cas de faible rés
 
 ## 16. Mises à jour de l'application
 
-Quand une nouvelle version est disponible pour votre téléphone, un **bandeau « Mettre à jour »** s'affiche en haut de l'app. Appuyez dessus pour installer la mise à jour depuis le Play Store ou l'App Store. Les nouvelles versions sont parfois proposées progressivement : il est normal qu'un proche la reçoive avant vous.
+Quand une nouvelle version est disponible pour votre téléphone, un **bandeau « Mettre à jour »** s'affiche en haut de l'app. Appuyez dessus pour installer la mise à jour depuis la boutique d'applications de votre téléphone. Les nouvelles versions sont parfois proposées progressivement : il est normal qu'un proche la reçoive avant vous.
 
 ## Paiements acceptés
 

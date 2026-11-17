@@ -99,7 +99,7 @@ class _SixDigitPinFieldState extends State<SixDigitPinField> {
         ),
         counterText: '',
         helperText: forOtp
-            ? tr('Le code se remplit après réception du SMS (autorisez si Android le demande)')
+            ? tr('Le code peut se remplir tout seul à la réception du SMS')
             : null,
         helperMaxLines: 2,
       ),

@@ -1789,6 +1789,9 @@ export class AdminController {
     if (body?.driverVoice !== undefined && req.user.role !== 'SUPER_ADMIN') {
       throw new ForbiddenException('Seul le super administrateur peut régler l’écoute vocale de SENGA Driver.');
     }
+    if (body?.walletWithdraw !== undefined && req.user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Seul le super administrateur peut régler le plafond des retraits vers un autre numéro.');
+    }
     if (body?.ai !== undefined && req.user.role !== 'SUPER_ADMIN') {
       throw new ForbiddenException('Seul le super administrateur peut activer ou couper l’IA.');
     }

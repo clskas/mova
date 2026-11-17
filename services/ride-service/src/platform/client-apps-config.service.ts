@@ -79,6 +79,8 @@ export class ClientAppsConfigService implements OnModuleInit {
       sosEmergencyContacts: this.config.sosEmergencyContacts,
       sosSms: this.config.sosSms,
       ai: this.config.ai,
+      // Ceiling for withdrawals to another number (payment-service reads it here).
+      walletWithdraw: this.config.walletWithdraw,
     };
   }
 
@@ -115,6 +117,9 @@ export class ClientAppsConfigService implements OnModuleInit {
       seatLimits: patch.seatLimits ? { ...this.config.seatLimits, ...patch.seatLimits } : this.config.seatLimits,
       ai: patch.ai ? { ...this.config.ai, ...patch.ai } : this.config.ai,
       driverVoice: patch.driverVoice ? { ...this.config.driverVoice, ...patch.driverVoice } : this.config.driverVoice,
+      walletWithdraw: patch.walletWithdraw
+        ? { ...this.config.walletWithdraw, ...patch.walletWithdraw }
+        : this.config.walletWithdraw,
     });
 
     this.validate(next);

@@ -38,6 +38,10 @@ import {
   type MobileMoneyOperator,
   fetchDemoAccountIds,
   isProductionRuntime,
+  kinshasaClock,
+  MOVA_EVENTS,
+  normalizeWalletWithdrawConfig,
+  type PaymentReminderPayload,
 } from '@mova/shared';
 import { platformCreditsNotVoided, treasuryShares } from '../ledger/platform-income.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -55,6 +59,11 @@ const WITHDRAW_LOCK_TTL_SEC = 45;
 const WITHDRAW_OTP_PREFIX = 'wallet:withdraw-otp:';
 const WITHDRAW_OTP_CD_PREFIX = 'wallet:withdraw-otp-cd:';
 const WITHDRAW_OTP_PHONE_CD_PREFIX = 'wallet:withdraw-otp-phone-cd:';
+/** Withdrawals to another number: PIN failures (lock) and the amount already sent today. */
+const WITHDRAW_PIN_FAIL_PREFIX = 'wallet:withdraw-pin-fail:';
+const WITHDRAW_PIN_MAX_FAILS = 5;
+const WITHDRAW_PIN_LOCK_SEC = 30 * 60;
+const OTHER_NUMBER_DAY_PREFIX = 'wallet:withdraw-other-number:';
 const WITHDRAW_OTP_HOUR_PREFIX = 'wallet:withdraw-otp-hr:';
 const WITHDRAW_OTP_TTL_SEC = 10 * 60;
 const WITHDRAW_OTP_COOLDOWN_SEC = 45;
@@ -878,6 +887,25 @@ export class WalletService {
     );
 
     if (this.isWithdrawOtpSkipped()) {
+      if (this.isOtherNumber(normalizedPhone, accountPhone)) {
+        // No SMS: the account's PIN proves the owner agrees (typed in the same code box,
+        // so apps already installed work as they are).
+        await this.assertPinNotLocked(userId);
+        await this.assertOtherNumberQuota(userId, amount);
+        return {
+          success: true,
+          skipOtp: false,
+          otpRequired: true,
+          pinRequired: true,
+          message:
+            'Retrait vers un autre numéro : saisissez le code PIN de votre compte SENGA (6 chiffres) pour confirmer.',
+          channel: 'pin' as const,
+          phone: normalizedPhone,
+          amountCdf: amount,
+          provider: normalizedProvider,
+          expiresInSec: WITHDRAW_OTP_TTL_SEC,
+        };
+      }
       this.assertWithdrawToAccountPhone(normalizedPhone, accountPhone);
       const standing = this.getWithdrawStandingOtp() ?? '000000';
       const challenge: WithdrawOtpChallenge = {
@@ -1026,6 +1054,14 @@ export class WalletService {
     await this.assertMmOperatorAllowed(userId, normalizedProvider, 'withdraw');
     const standing = this.getWithdrawStandingOtp();
     const otpDigits = String(opts.otp ?? '').replace(/\s/g, '');
+    // End-user withdrawal to a number other than the account's: capped per day (admin), and
+    // without SMS codes the 6 digits are the account's PIN (never the shared standing code).
+    const toOtherNumber = !opts.skipOtp && this.isOtherNumber(normalizedPhone, opts.accountPhone);
+    let pinChecked = false;
+    if (toOtherNumber && this.isWithdrawOtpSkipped()) {
+      await this.verifyWithdrawPin(userId, otpDigits);
+      pinChecked = true;
+    }
     const ownNumberNoCode =
       Boolean(opts.ownNumberWithoutOtp) &&
       !otpDigits &&
@@ -1038,7 +1074,7 @@ export class WalletService {
       (standing != null && otpDigits === standing);
     // Server-side callers (opts.skipOtp) pick the destination themselves; end-user
     // withdrawals without a real OTP may only pay out to the account's own number.
-    if (skipOtp && !opts.skipOtp) {
+    if (skipOtp && !opts.skipOtp && !pinChecked) {
       this.assertWithdrawToAccountPhone(normalizedPhone, opts.accountPhone);
     }
     if (!skipOtp) {
@@ -1055,11 +1091,190 @@ export class WalletService {
       'Retrait déjà en cours — patientez quelques secondes.',
     );
     try {
-      return await this.executeWithdraw(userId, amount, normalizedProvider, normalizedPhone);
+      if (!toOtherNumber) {
+        return await this.executeWithdraw(userId, amount, normalizedProvider, normalizedPhone);
+      }
+      await this.reserveOtherNumberQuota(userId, amount);
+      let result: Awaited<ReturnType<WalletService['executeWithdraw']>>;
+      try {
+        result = await this.executeWithdraw(userId, amount, normalizedProvider, normalizedPhone);
+      } catch (e) {
+        await this.releaseOtherNumberQuota(userId, amount);
+        throw e;
+      }
+      this.notifyOtherNumberWithdraw(userId, amount, normalizedPhone);
+      return result;
     } finally {
       await this.releaseMoneyLock(lockKey);
     }
   }
+
+  private isOtherNumber(normalizedPhone: string, accountPhone?: string | null): boolean {
+    const account = accountPhone?.trim() ? normalizePhoneRdc(accountPhone) : '';
+    return Boolean(account) && account !== normalizedPhone;
+  }
+
+  private redisOrUnavailable() {
+    const client = this.redis?.client;
+    if (!client) {
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Retrait vers un autre numéro temporairement indisponible. Réessayez ou utilisez le numéro de votre compte.',
+      );
+    }
+    return client;
+  }
+
+  private async assertPinNotLocked(userId: string) {
+    const client = this.redisOrUnavailable();
+    const fails = Number((await client.get(`${WITHDRAW_PIN_FAIL_PREFIX}${userId}`).catch(() => null)) ?? 0);
+    if (fails >= WITHDRAW_PIN_MAX_FAILS) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.TOO_MANY_REQUESTS,
+        'Trop de codes PIN incorrects : retrait vers un autre numéro bloqué 30 minutes.',
+      );
+    }
+  }
+
+  /** Account PIN (auth-service), with a lock after 5 wrong codes. */
+  private async verifyWithdrawPin(userId: string, pin: string) {
+    await this.assertPinNotLocked(userId);
+    if (!/^\d{6}$/.test(pin)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_INVALID_PIN,
+        HttpStatus.UNAUTHORIZED,
+        'Saisissez le code PIN de votre compte SENGA (6 chiffres).',
+      );
+    }
+    let res: Response;
+    try {
+      res = await fetch(serviceUrl('auth', `/internal/users/${userId}/verify-login-pin`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-internal-api-key': INTERNAL_API_KEY },
+        body: JSON.stringify({ pin }),
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch {
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Vérification du code PIN indisponible. Réessayez.',
+      );
+    }
+    const key = `${WITHDRAW_PIN_FAIL_PREFIX}${userId}`;
+    const client = this.redisOrUnavailable();
+    if (res.ok) {
+      await client.del(key).catch(() => undefined);
+      return;
+    }
+    if (res.status === 400 || res.status === 401 || res.status === 403) {
+      const fails = await client.incr(key).catch(() => WITHDRAW_PIN_MAX_FAILS);
+      await client.expire(key, WITHDRAW_PIN_LOCK_SEC).catch(() => undefined);
+      const left = Math.max(0, WITHDRAW_PIN_MAX_FAILS - fails);
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_INVALID_PIN,
+        HttpStatus.UNAUTHORIZED,
+        left > 0
+          ? `Code PIN incorrect (${left} essai${left > 1 ? 's' : ''} restant${left > 1 ? 's' : ''}).`
+          : 'Trop de codes PIN incorrects : retrait vers un autre numéro bloqué 30 minutes.',
+      );
+    }
+    throw new MovaHttpException(
+      MovaErrorCode.INTERNAL_ERROR,
+      HttpStatus.SERVICE_UNAVAILABLE,
+      'Vérification du code PIN indisponible. Réessayez.',
+    );
+  }
+
+  /** Daily ceiling set by the super admin (Administration → Opérateurs Mobile Money). */
+  private async otherNumberDailyMaxCdf(): Promise<number> {
+    try {
+      const res = await fetch(serviceUrl('ride', '/internal/client-apps-config'), {
+        headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const cfg = (await res.json()) as { walletWithdraw?: unknown };
+      return normalizeWalletWithdrawConfig(cfg.walletWithdraw).otherNumberDailyMaxCdf;
+    } catch {
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Retrait vers un autre numéro temporairement indisponible. Réessayez ou utilisez le numéro de votre compte.',
+      );
+    }
+  }
+
+  private otherNumberDayKey(userId: string) {
+    return `${OTHER_NUMBER_DAY_PREFIX}${userId}:${kinshasaClock().day}`;
+  }
+
+  private quotaExceeded(max: number, used: number): MovaHttpException {
+    if (max <= 0) {
+      return new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Retrait possible uniquement vers le numéro de votre compte SENGA pour le moment.',
+      );
+    }
+    const left = Math.max(0, max - used);
+    return new MovaHttpException(
+      MovaErrorCode.VALIDATION_ERROR,
+      HttpStatus.BAD_REQUEST,
+      `Plafond journalier des retraits vers un autre numéro : ${formatCdf(max)}. Reste aujourd'hui : ${formatCdf(left)}.`,
+    );
+  }
+
+  private async assertOtherNumberQuota(userId: string, amount: number) {
+    const max = await this.otherNumberDailyMaxCdf();
+    const client = this.redisOrUnavailable();
+    const used = Number((await client.get(this.otherNumberDayKey(userId)).catch(() => null)) ?? 0);
+    if (max <= 0 || used + amount > max) throw this.quotaExceeded(max, used);
+  }
+
+  /** Counts the amount against today's ceiling atomically (two taps cannot both pass). */
+  private async reserveOtherNumberQuota(userId: string, amount: number) {
+    const max = await this.otherNumberDailyMaxCdf();
+    if (max <= 0) throw this.quotaExceeded(max, 0);
+    const client = this.redisOrUnavailable();
+    const key = this.otherNumberDayKey(userId);
+    let total: number;
+    try {
+      total = await client.incrby(key, amount);
+      await client.expire(key, 2 * 24 * 3600);
+    } catch {
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Retrait vers un autre numéro temporairement indisponible. Réessayez.',
+      );
+    }
+    if (total > max) {
+      await client.decrby(key, amount).catch(() => undefined);
+      throw this.quotaExceeded(max, total - amount);
+    }
+  }
+
+  private async releaseOtherNumberQuota(userId: string, amount: number) {
+    await this.redis?.client?.decrby(this.otherNumberDayKey(userId), amount).catch(() => undefined);
+  }
+
+  /** Push + in-app to the account holder (no SMS: no cost). */
+  private notifyOtherNumberWithdraw(userId: string, amount: number, phone: string) {
+    const masked = phone.length > 6 ? `${phone.slice(0, 6)}…${phone.slice(-2)}` : phone;
+    void this.redis
+      ?.publish(MOVA_EVENTS.PAYMENT_REMINDER, {
+        userId,
+        title: 'Retrait vers un autre numéro',
+        body: `Retrait de ${formatCdf(amount)} demandé vers le ${masked}. Si ce n'est pas vous, contactez le support SENGA et changez votre code PIN.`,
+        kind: 'WALLET_WITHDRAW_OTHER_NUMBER',
+        sms: false,
+      } satisfies PaymentReminderPayload)
+      .catch(() => undefined);
+  }
+
 
   /**
    * Without SMS OTP, possession of the session is the only proof — a stolen token must

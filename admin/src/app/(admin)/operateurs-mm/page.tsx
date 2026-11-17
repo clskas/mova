@@ -41,11 +41,15 @@ export default function OperateursMmPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [otherMax, setOtherMax] = useState("");
+  const [savingWithdraw, setSavingWithdraw] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      setConfig(await fetchClientAppsConfig());
+      const cfg = await fetchClientAppsConfig();
+      setConfig(cfg);
+      setOtherMax(String(cfg.walletWithdraw?.otherNumberDailyMaxCdf ?? 0));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Impossible de charger la config");
     } finally {
@@ -86,6 +90,28 @@ export default function OperateursMmPage() {
       setError(e instanceof Error ? e.message : "Enregistrement impossible");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveWithdraw() {
+    if (readOnly) return;
+    const n = Math.round(Number(otherMax.replace(/\s/g, "")));
+    if (!Number.isFinite(n) || n < 0 || n > 50_000_000) {
+      setError("Plafond invalide : un montant entre 0 et 50 000 000 FC.");
+      return;
+    }
+    setSavingWithdraw(true);
+    setError(null);
+    setOk(null);
+    try {
+      const next = await updateClientAppsConfig({ walletWithdraw: { otherNumberDailyMaxCdf: n } });
+      setConfig(next);
+      setOtherMax(String(next.walletWithdraw?.otherNumberDailyMaxCdf ?? n));
+      setOk(n > 0 ? "Plafond des retraits vers un autre numéro enregistré." : "Retraits vers un autre numéro désactivés.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Enregistrement impossible");
+    } finally {
+      setSavingWithdraw(false);
     }
   }
 
@@ -174,6 +200,33 @@ export default function OperateursMmPage() {
           {saving ? "Enregistrement…" : "Enregistrer"}
         </BtnPrimary>
       )}
+
+      <section className="rounded-lg border border-gray-200 p-4 space-y-3">
+        <h2 className="text-base font-semibold">Retraits vers un autre numéro</h2>
+        <p className="text-sm text-gray-600">
+          Montant maximum par jour et par utilisateur pour un retrait du portefeuille vers un numéro Mobile Money
+          différent de celui de son compte SENGA. L&apos;utilisateur confirme avec le code PIN de son compte et reçoit une
+          notification. <strong>0</strong> = retraits uniquement vers le numéro du compte.
+        </p>
+        <label className="flex items-center gap-2 text-sm">
+          <span>Plafond par jour (FC)</span>
+          <input
+            type="number"
+            min={0}
+            max={50000000}
+            step={1000}
+            value={otherMax}
+            disabled={readOnly}
+            onChange={(e) => setOtherMax(e.target.value)}
+            className="w-40 rounded border border-gray-300 px-2 py-1"
+          />
+        </label>
+        {!readOnly && (
+          <BtnPrimary disabled={savingWithdraw} onClick={() => void saveWithdraw()}>
+            {savingWithdraw ? "Enregistrement…" : "Enregistrer le plafond"}
+          </BtnPrimary>
+        )}
+      </section>
     </div>
   );
 }

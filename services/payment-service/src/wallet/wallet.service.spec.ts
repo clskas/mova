@@ -437,26 +437,143 @@ describe('WalletService', () => {
     expect(withStanding.success).toBe(true);
   });
 
-  it('WITHDRAW_SKIP_OTP=true refuse un numéro autre que celui du compte (jeton volé)', async () => {
-    configGet.mockImplementation((key: string) => {
-      if (key === 'MOCK_PAYMENTS') return 'true';
-      if (key === 'NODE_ENV') return 'test';
-      if (key === 'WITHDRAW_SKIP_OTP') return 'true';
-      return undefined;
+  describe('WITHDRAW_SKIP_OTP=true : retrait vers un autre numéro (PIN du compte + plafond admin)', () => {
+    const ACCOUNT = '+243890000001';
+    const OTHER = '+243890000009';
+    const GOOD_PIN = '135790';
+    let prevFetch: typeof fetch;
+    let dailyMax = 100_000;
+    let store: Map<string, string>;
+    let redis: { client: Record<string, jest.Mock>; publish: jest.Mock };
+    let svc: WalletService;
+
+    beforeEach(() => {
+      configGet.mockImplementation((key: string) => {
+        if (key === 'MOCK_PAYMENTS') return 'true';
+        if (key === 'NODE_ENV') return 'test';
+        if (key === 'WITHDRAW_SKIP_OTP') return 'true';
+        return undefined;
+      });
+      dailyMax = 100_000;
+      tx.$queryRaw.mockResolvedValue([{ id: 'w1', balanceCdf: 50_000, heldBalanceCdf: 0 }]);
+      tx.wallet.update.mockResolvedValue({ id: 'w1', userId: 'u1', balanceCdf: 47_700 });
+      store = new Map();
+      const num = (k: string) => Number(store.get(k) ?? 0);
+      redis = {
+        client: {
+          get: jest.fn(async (k: string) => store.get(k) ?? null),
+          set: jest.fn(async (k: string, v: string) => {
+            store.set(k, v);
+            return 'OK';
+          }),
+          del: jest.fn(async (k: string) => (store.delete(k) ? 1 : 0)),
+          incr: jest.fn(async (k: string) => {
+            store.set(k, String(num(k) + 1));
+            return num(k);
+          }),
+          incrby: jest.fn(async (k: string, n: number) => {
+            store.set(k, String(num(k) + n));
+            return num(k);
+          }),
+          decrby: jest.fn(async (k: string, n: number) => {
+            store.set(k, String(num(k) - n));
+            return num(k);
+          }),
+          expire: jest.fn(async () => 1),
+        },
+        publish: jest.fn().mockResolvedValue(undefined),
+      };
+      svc = new WalletService(prisma as never, config, redis as never);
+      prevFetch = global.fetch;
+      const fetchMock = jest.fn(async (url: string | URL, init?: { body?: string }) => {
+        const u = String(url);
+        if (u.includes('/verify-login-pin')) {
+          const pin = JSON.parse(init?.body ?? '{}').pin;
+          return { ok: pin === GOOD_PIN, status: pin === GOOD_PIN ? 200 : 401, json: async () => ({}) };
+        }
+        if (u.includes('/internal/client-apps-config')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              mobileMoney: { senga: { ORANGE_MONEY: { topup: true, withdraw: true } } },
+              walletWithdraw: { otherNumberDailyMaxCdf: dailyMax },
+            }),
+          };
+        }
+        return { ok: true, status: 200, json: async () => ({ role: 'PASSENGER' }) };
+      });
+      (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
     });
-    await expect(
-      service.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', '+243890000009', '+243890000001'),
-    ).rejects.toMatchObject({ status: 403 });
-    await expect(
-      service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000009', {
-        otp: '000000',
-        accountPhone: '+243890000001',
-      }),
-    ).rejects.toMatchObject({ status: 403 });
-    await expect(
-      service.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', '+243890000001'),
-    ).rejects.toMatchObject({ status: 403 });
-    expect(tx.wallet.update).not.toHaveBeenCalled();
+
+    afterEach(() => {
+      (global as unknown as { fetch: typeof fetch }).fetch = prevFetch;
+    });
+
+    it('plafond 0 : seul le numéro du compte (jeton volé)', async () => {
+      dailyMax = 0;
+      await expect(svc.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', OTHER, ACCOUNT)).rejects.toMatchObject({ status: 403 });
+      await expect(
+        svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', OTHER, { otp: GOOD_PIN, accountPhone: ACCOUNT }),
+      ).rejects.toMatchObject({ status: 403 });
+      // No account phone: no withdrawal without a code.
+      await expect(svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', ACCOUNT)).rejects.toMatchObject({ status: 403 });
+      expect(tx.wallet.update).not.toHaveBeenCalled();
+    });
+
+    it('demande le PIN du compte (dans la case du code) au lieu du SMS', async () => {
+      const res = await svc.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', OTHER, ACCOUNT);
+      expect(res).toMatchObject({ pinRequired: true, otpRequired: true, skipOtp: false });
+      expect(res.message).toMatch(/code PIN/);
+    });
+
+    it('le code de secours 000000 ne suffit jamais vers un autre numéro', async () => {
+      await expect(
+        svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', OTHER, { otp: '000000', accountPhone: ACCOUNT }),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(tx.wallet.update).not.toHaveBeenCalled();
+    });
+
+    it('bon PIN : retrait fait, compté dans le plafond, titulaire notifié', async () => {
+      const result = await svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', OTHER, {
+        otp: GOOD_PIN,
+        accountPhone: ACCOUNT,
+      });
+      expect(result.success).toBe(true);
+      expect(tx.wallet.update).toHaveBeenCalledTimes(1);
+      expect([...store.entries()].find(([k]) => k.startsWith('wallet:withdraw-other-number:u1:'))?.[1]).toBe('2300');
+      expect(redis.publish).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ userId: 'u1', kind: 'WALLET_WITHDRAW_OTHER_NUMBER', sms: false }),
+      );
+    });
+
+    it('au-delà du plafond du jour : refusé, rien n’est compté', async () => {
+      dailyMax = 3000;
+      await svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', OTHER, { otp: GOOD_PIN, accountPhone: ACCOUNT });
+      await expect(
+        svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', OTHER, { otp: GOOD_PIN, accountPhone: ACCOUNT }),
+      ).rejects.toMatchObject({ status: 400, response: { message: expect.stringMatching(/Plafond journalier/) } });
+      expect([...store.entries()].find(([k]) => k.startsWith('wallet:withdraw-other-number:u1:'))?.[1]).toBe('2300');
+    });
+
+    it('5 PIN faux : bloqué 30 minutes, même avec le bon PIN', async () => {
+      for (let i = 0; i < 5; i += 1) {
+        await expect(
+          svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', OTHER, { otp: '246813', accountPhone: ACCOUNT }),
+        ).rejects.toMatchObject({ status: 401 });
+      }
+      await expect(
+        svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', OTHER, { otp: GOOD_PIN, accountPhone: ACCOUNT }),
+      ).rejects.toMatchObject({ status: 429 });
+      expect(tx.wallet.update).not.toHaveBeenCalled();
+    });
+
+    it('son propre numéro : inchangé (sans PIN ni plafond)', async () => {
+      dailyMax = 0;
+      const result = await svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', ACCOUNT, { accountPhone: ACCOUNT });
+      expect(result.success).toBe(true);
+    });
   });
 
   it('refuse un retrait si l’OTP a été envoyé vers un autre numéro', async () => {

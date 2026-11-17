@@ -3109,6 +3109,8 @@ export type ClientAppsConfig = {
   driverVoice?: { autoListenEnabled: boolean; autoListenSeconds: number; passengerAutoListenEnabled?: boolean };
   /** Nombre de places par gamme (Admin / SuperAdmin). */
   seatLimits?: SeatLimits;
+  /** Retraits portefeuille vers un autre numéro que celui du compte (SuperAdmin). */
+  walletWithdraw?: { otherNumberDailyMaxCdf: number };
 };
 
 export type SeatLimits = {

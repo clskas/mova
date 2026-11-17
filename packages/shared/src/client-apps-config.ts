@@ -152,7 +152,33 @@ export type ClientAppsConfig = {
   ai: { enabled: boolean };
   /** SENGA Driver voice answers (super admin): micro opened by itself on offers. */
   driverVoice: DriverVoiceConfig;
+  /** Wallet withdrawals to a number other than the account's (super admin). */
+  walletWithdraw: WalletWithdrawConfig;
 };
+
+export type WalletWithdrawConfig = {
+  /**
+   * Most a user may send per day (Kinshasa time) to Mobile Money numbers other than the
+   * phone of their SENGA account, in CDF. 0 = only the account's own number.
+   */
+  otherNumberDailyMaxCdf: number;
+};
+
+/** Off until the super admin sets a ceiling (a stolen session must not empty a wallet). */
+export const DEFAULT_WALLET_WITHDRAW_CONFIG: WalletWithdrawConfig = { otherNumberDailyMaxCdf: 0 };
+
+export const WALLET_WITHDRAW_OTHER_NUMBER_MAX_CDF = 50_000_000;
+
+export function normalizeWalletWithdrawConfig(
+  raw: unknown,
+  fallback: WalletWithdrawConfig = DEFAULT_WALLET_WITHDRAW_CONFIG,
+): WalletWithdrawConfig {
+  const out = { ...fallback };
+  if (!raw || typeof raw !== 'object') return out;
+  const n = Math.round(Number((raw as Record<string, unknown>).otherNumberDailyMaxCdf));
+  if (Number.isFinite(n) && n >= 0 && n <= WALLET_WITHDRAW_OTHER_NUMBER_MAX_CDF) out.otherNumberDailyMaxCdf = n;
+  return out;
+}
 
 export type DriverVoiceConfig = {
   /** Micro opens by itself when an offer arrives (ride, delivery). */
@@ -232,6 +258,7 @@ export const DEFAULT_CLIENT_APPS_CONFIG: ClientAppsConfig = {
   seatLimits: { ...DEFAULT_SEAT_LIMITS },
   ai: { enabled: true },
   driverVoice: { ...DEFAULT_DRIVER_VOICE_CONFIG },
+  walletWithdraw: { ...DEFAULT_WALLET_WITHDRAW_CONFIG },
 };
 
 export const CLIENT_APP_LABELS_FR: Record<ClientAppId, string> = {
@@ -374,6 +401,10 @@ export function mergeClientAppsConfig(raw: unknown): ClientAppsConfig {
   const aiSrc = (src as { ai?: { enabled?: unknown } }).ai;
   base.ai = { enabled: typeof aiSrc?.enabled === 'boolean' ? aiSrc.enabled : base.ai.enabled };
   base.driverVoice = normalizeDriverVoiceConfig((src as { driverVoice?: unknown }).driverVoice, base.driverVoice);
+  base.walletWithdraw = normalizeWalletWithdrawConfig(
+    (src as { walletWithdraw?: unknown }).walletWithdraw,
+    base.walletWithdraw,
+  );
 
   return base;
 }

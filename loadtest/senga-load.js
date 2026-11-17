@@ -22,6 +22,8 @@ const PASSENGERS = Number(__ENV.PASSENGERS || 50);
 const SOCKETS = Number(__ENV.SOCKETS || 100);
 const DURATION = __ENV.DURATION || '5m';
 const RAMP = __ENV.RAMP || '1m';
+// Shift the test phones (new accounts) — e.g. after a run that hit the per-phone OTP quota.
+const PHONE_OFFSET = Number(__ENV.PHONE_OFFSET || 0);
 
 if (!/mova-stg-|localhost|127\.0\.0\.1/.test(GATEWAY)) {
   throw new Error(`Refusing to run the load test against "${GATEWAY}" (staging only).`);
@@ -29,6 +31,7 @@ if (!/mova-stg-|localhost|127\.0\.0\.1/.test(GATEWAY)) {
 
 const API = `${GATEWAY}/api`;
 const loginFailures = new Counter('senga_login_failures');
+let loggedFailure = false;
 const locationTime = new Trend('senga_driver_location_ms', true);
 const estimateTime = new Trend('senga_estimate_ms', true);
 const nearbyTime = new Trend('senga_nearby_ms', true);
@@ -81,7 +84,7 @@ const headers = (token) => ({
 
 // Unique test phone per virtual user and role: +243 98 1 xxxxxx (drivers) / 2 (passengers) / 3 (sockets).
 function phoneFor(role, vu) {
-  return `+243981${role}${String(vu).padStart(5, '0')}`;
+  return `+243981${role}${String((vu + PHONE_OFFSET) % 100000).padStart(5, '0')}`;
 }
 
 let token = null;
@@ -104,8 +107,14 @@ function login(role) {
     t = null;
   }
   if (!check(r2, { 'login ok': () => r1.status < 300 && Boolean(t) })) {
-    loginFailures.add(1);
-    sleep(5);
+    const failed = r1.status >= 300 ? r1 : r2;
+    loginFailures.add(1, { status: String(failed.status), step: r1.status >= 300 ? 'request' : 'verify' });
+    if (!loggedFailure) {
+      loggedFailure = true;
+      // First failure of this virtual user: status + short reason (never a token).
+      console.warn(`login ${role} ${failed.status} ${String(failed.body || '').replace(/"(access|refresh)Token":"[^"]+"/g, '').slice(0, 160)}`);
+    }
+    sleep(30); // back off: never burn the per-phone OTP quota
     return null;
   }
   token = t;

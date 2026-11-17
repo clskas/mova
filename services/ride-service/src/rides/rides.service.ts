@@ -34,6 +34,7 @@ import {
   favoriteDriversFirst,
   rideFitsDriverDestination,
   normalizePhoneRdc,
+  APP_REVIEW_DEMO_DRIVER_PHONE,
   validatePhoneRdc,
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
@@ -846,6 +847,53 @@ export class RidesService {
     }).catch(() => undefined);
     this.sendRideStatusSms(rideId, ride.passengerId, RideStatus.ACCEPTED);
     return this.formatRideDetail(updated);
+  }
+
+  /**
+   * App Review (Guideline 2.1): the Senga Driver demo account needs content. Creates three
+   * example completed rides for it, once, with the demo passenger. Refuses any account whose
+   * phone is not APP_REVIEW_DEMO_DRIVER_PHONE.
+   */
+  async ensureAppReviewDemoHistory(driverUserId: string) {
+    if (!driverUserId) return { created: 0 };
+    const driver = await fetchAuthUserBrief(driverUserId);
+    if (!driver?.phone || normalizePhoneRdc(driver.phone) !== APP_REVIEW_DEMO_DRIVER_PHONE) {
+      throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN);
+    }
+    const already = await this.prisma.ride.count({ where: { driverId: driverUserId, status: RideStatus.COMPLETED } });
+    if (already > 0) return { created: 0 };
+    // Same deterministic id as the auth demo seed (+243900000010).
+    const passengerId = '11111111-1111-1111-1111-000000000010';
+    const day = 24 * 3600 * 1000;
+    const examples = [
+      { pickupAddress: 'Gombe, Avenue Batetela', dropoffAddress: 'Limete, Marché Gambela', fare: 8500, km: 6.1, min: 22, daysAgo: 1 },
+      { pickupAddress: 'Kalamu, Kasa-Vubu', dropoffAddress: 'Ngaliema, Socimat', fare: 12000, km: 9.4, min: 31, daysAgo: 2 },
+      { pickupAddress: 'Lingwala, Isiro', dropoffAddress: 'Gombe, 30 Juin', fare: 6500, km: 4.2, min: 16, daysAgo: 3 },
+    ];
+    for (const e of examples) {
+      const completedAt = new Date(Date.now() - e.daysAgo * day);
+      await this.prisma.ride.create({
+        data: {
+          passengerId,
+          driverId: driverUserId,
+          status: RideStatus.COMPLETED,
+          vehicleType: VehicleType.STANDARD,
+          pickupAddress: e.pickupAddress,
+          dropoffAddress: e.dropoffAddress,
+          pickupLat: -4.31,
+          pickupLng: 15.3,
+          dropoffLat: -4.34,
+          dropoffLng: 15.32,
+          estimatedFareCdf: e.fare,
+          finalFareCdf: e.fare,
+          distanceKm: e.km,
+          durationMin: e.min,
+          acceptedAt: new Date(completedAt.getTime() - (e.min + 8) * 60000),
+          completedAt,
+        },
+      });
+    }
+    return { created: examples.length };
   }
 
   async rejectRide(rideId: string, driverUserId: string) {

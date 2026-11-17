@@ -15,6 +15,8 @@ export async function fetchAuthUserBrief(userId: string): Promise<UserBrief | nu
   try {
     const res = await fetch(serviceUrl('auth', `/internal/users/${userId}`), {
       headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      // Never hang a request on a slow auth-service (there was no limit).
+      signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
     const user = (await res.json()) as {

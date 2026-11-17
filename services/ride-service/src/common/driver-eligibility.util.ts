@@ -78,6 +78,8 @@ export async function fetchDriverProfileSnapshot(userId: string): Promise<Driver
   try {
     const res = await fetch(serviceUrl('driver', `/internal/drivers/${userId}`), {
       headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      // A slow driver-service must not hold « Accepter » indefinitely (there was no limit).
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return null;
     return (await res.json()) as DriverProfileSnapshot;

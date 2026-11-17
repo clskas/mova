@@ -10,6 +10,7 @@ import {
   translateResponseBody,
   type AppLanguage,
 } from '@mova/shared';
+import { agentFor } from './upstream-agent';
 
 const ROUTES: Record<string, keyof typeof SERVICE_PORTS> = {
   '/api/auth': 'auth',
@@ -98,6 +99,7 @@ export class ProxyMiddleware implements NestMiddleware {
         createProxyMiddleware({
           target,
           changeOrigin: true,
+          agent: agentFor(target),
           pathRewrite: (path) => path,
           on: { proxyReq: forwardRequestId },
         }),
@@ -107,6 +109,7 @@ export class ProxyMiddleware implements NestMiddleware {
         createProxyMiddleware({
           target,
           changeOrigin: true,
+          agent: agentFor(target),
           pathRewrite: (path) => path,
           selfHandleResponse: true,
           on: {

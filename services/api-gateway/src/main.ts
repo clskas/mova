@@ -11,6 +11,7 @@ import {
   resolveCorsOrigin,
 } from '@mova/shared';
 import { AppModule } from './app.module';
+import { agentFor } from './proxy/upstream-agent';
 
 async function bootstrap() {
   assertProductionSecurity('api-gateway');
@@ -32,7 +33,13 @@ async function bootstrap() {
   // Mounted at the root with pathFilter so the /socket.io prefix is kept: app.use('/socket.io', …)
   // stripped it from HTTP long-polling requests (ride-service answered 404), so clients that
   // start with polling — the SENGA apps do — never connected. WebSocket upgrades already kept it.
-  const socketProxy = createProxyMiddleware({ target: rideTarget, changeOrigin: true, ws: true, pathFilter: '/socket.io' });
+  const socketProxy = createProxyMiddleware({
+    target: rideTarget,
+    changeOrigin: true,
+    ws: true,
+    pathFilter: '/socket.io',
+    agent: agentFor(rideTarget),
+  });
   app.use(socketProxy);
 
   const server = app.getHttpServer();

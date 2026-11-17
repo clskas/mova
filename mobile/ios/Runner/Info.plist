@@ -53,9 +53,9 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>SENGA utilise le micro pour les appels vocaux entre client, livreur et partenaire.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>SENGA utilise la caméra pour photographier vos colis lors de l'envoi.</string>
+	<string>SENGA utilise la caméra pour prendre des photos que vous envoyez vous-même : pièces du dossier chauffeur (par exemple votre permis de conduire ou la carte grise du véhicule), selfie de vérification d'identité, ou photo d'un colis à l'envoi et à la livraison. Les photos servent uniquement à vérifier votre compte ou la course.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>SENGA accède à vos photos pour joindre une image au colis.</string>
+	<string>SENGA accède à vos photos pour joindre une image que vous choisissez, par exemple une photo de votre permis de conduire pour le dossier chauffeur ou d'un colis à envoyer.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SENGA utilise votre position pour définir le point de départ ou d'enlèvement, et pour suivre les courses en cours.</string>
 	<!-- Required by Apple (ITMS-90683) when location APIs / SDKs may request Always authorization. -->

@@ -16,11 +16,13 @@ void main() {
     expect(MarketConfig.googleIosClientId, isEmpty);
   });
 
-  test('maps Play Services DEVELOPER_ERROR 10 to SHA-1 copy, not a rebuild hint', () {
+  test('maps Play Services DEVELOPER_ERROR 10 to a plain message (no platform or signing jargon: App Review 2.3.10)', () {
     final msg = googleSignInErrorMessage(
       PlatformException(code: 'sign_in_failed', message: 'ApiException: 10', details: 'DEVELOPER_ERROR'),
     );
-    expect(msg.toLowerCase(), contains('sha-1'));
+    expect(msg, contains('Utilisez le SMS'));
+    expect(msg.toLowerCase(), isNot(contains('android')));
+    expect(msg.toLowerCase(), isNot(contains('sha-1')));
     expect(msg.toLowerCase(), isNot(contains('aab')));
     expect(msg.toLowerCase(), isNot(contains('rebuild')));
   });

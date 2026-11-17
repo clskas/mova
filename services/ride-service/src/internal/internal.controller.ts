@@ -600,6 +600,12 @@ export class InternalController {
     return this.translations.dictionary(code, 'server');
   }
 
+  /** Example history for the Senga Driver App Review demo account (only that number). */
+  @Post('app-review/demo-driver-history')
+  ensureAppReviewDemoHistory(@Body() body: { driverUserId?: string }) {
+    return this.rides.ensureAppReviewDemoHistory(String(body?.driverUserId ?? ''));
+  }
+
   @Get('client-apps-config')
   getClientAppsConfig() {
     return this.clientAppsConfig.getAdmin();

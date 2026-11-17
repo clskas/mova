@@ -12,6 +12,9 @@ import {
   MARKET_RDC,
   KYC_DOCUMENT_LABELS,
   REQUIRED_DRIVER_KYC_TYPES,
+  APP_REVIEW_DEMO_DRIVER_PHONE,
+  normalizePhoneRdc,
+  KYC_DOCUMENT_TYPES,
   OPTIONAL_DRIVER_KYC_TYPES,
   normalizeKycDocumentType,
   normalizeKycRejectNotes,
@@ -1010,7 +1013,72 @@ export class DriversService {
     return this.getProfileWithUser(userId);
   }
 
+  /** App Review demo driver: repaired at most once per process (cheap no-op afterwards). */
+  private readonly appReviewReady = new Set<string>();
+
+  /**
+   * Keeps the Senga Driver account given to Apple fully registered: KYC approved, activation
+   * done, selfie on file, documents valid, vehicles approved, plus example rides in its
+   * history. Only for APP_REVIEW_DEMO_DRIVER_PHONE (a reserved demo number).
+   */
+  private async ensureAppReviewDemoReady(userId: string, phone?: string | null) {
+    if (!phone || normalizePhoneRdc(phone) !== APP_REVIEW_DEMO_DRIVER_PHONE) return;
+    if (this.appReviewReady.has(userId)) return;
+    try {
+      const profile = await this.getOrCreateProfile(userId);
+      const now = new Date();
+      const inTwoYears = new Date(now.getTime() + 2 * 365 * 24 * 3600 * 1000);
+      const soon = new Date(now.getTime() + 60 * 24 * 3600 * 1000);
+      const valid = (d?: Date | null) => (d && d > soon ? d : inTwoYears);
+      await this.prisma.driverProfile.update({
+        where: { userId },
+        data: {
+          kycStatus: KycStatus.APPROVED,
+          activationPinVerifiedAt: profile.activationPinVerifiedAt ?? now,
+          onboardingCompleted: true,
+          documentsRenewalPending: false,
+          licenseExpiry: valid(profile.licenseExpiry),
+          insuranceExpiry: valid(profile.insuranceExpiry),
+          technicalInspectionExpiry: valid(profile.technicalInspectionExpiry),
+          fiscalStickerExpiry: valid(profile.fiscalStickerExpiry),
+        },
+      });
+      await this.prisma.vehicle.updateMany({
+        where: { driverProfileId: profile.id },
+        data: { typeApprovalStatus: KycStatus.APPROVED, isActive: true },
+      });
+      await this.prisma.kycDocument.updateMany({ where: { userId }, data: { status: KycStatus.APPROVED } });
+      const selfie = await this.prisma.kycDocument.findFirst({
+        where: { userId, type: KYC_DOCUMENT_TYPES.SELFIE },
+      });
+      if (!selfie) {
+        await this.prisma.kycDocument.create({
+          data: {
+            userId,
+            type: KYC_DOCUMENT_TYPES.SELFIE,
+            url: 'https://senga.afri-soft.com/app-review/demo-driver-selfie.png',
+            status: KycStatus.APPROVED,
+            notes: 'App Review demo account',
+          },
+        });
+      }
+      // Example completed rides (ride-service checks the number again).
+      await fetch(serviceUrl('ride', '/internal/app-review/demo-driver-history'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-internal-api-key': resolveInternalApiKey() },
+        body: JSON.stringify({ driverUserId: userId }),
+        signal: AbortSignal.timeout(8000),
+      }).catch(() => undefined);
+      this.appReviewReady.add(userId);
+      this.logger.log(`App Review demo driver kept ready (${userId})`);
+    } catch (e) {
+      this.logger.warn(`App Review demo driver repair failed: ${(e as Error).message}`);
+    }
+  }
+
   async getProfileWithUser(userId: string) {
+    const user = await this.fetchAuthUser(userId);
+    await this.ensureAppReviewDemoReady(userId, user?.phone);
     const profile = await this.getOrCreateProfile(userId);
     const kyc = await this.getKycStatus(userId);
     const documentsStatus = this.documentsStatusFor(profile, kyc.checklist);
@@ -1018,7 +1086,6 @@ export class DriversService {
       await this.prisma.driverProfile.update({ where: { userId }, data: { isAvailable: false } });
       profile.isAvailable = false;
     }
-    const user = await this.fetchAuthUser(userId);
     const pinVerified = !!profile?.activationPinVerifiedAt;
     const acceptsRides = profile?.acceptsRides !== false;
     const acceptsDeliveries = profile?.acceptsDeliveries !== false;

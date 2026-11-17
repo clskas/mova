@@ -374,3 +374,12 @@ export function assertProductionSecurity(serviceName = 'service'): void {
     console.warn(msg);
   }
 }
+
+/**
+ * The Senga Driver account given to Apple App Review (scripts/asc_update_review_and_submit.py).
+ * Kept fully registered (activation, selfie, valid documents) with an example history, because
+ * App Review rejected an unfinished registration (Guideline 2.1, 2026-11-17).
+ */
+export const APP_REVIEW_DEMO_DRIVER_PHONE = '+243900000023';
+/** Demo passenger of the App Review notes, used for the driver's example rides. */
+export const APP_REVIEW_DEMO_PASSENGER_PHONE = '+243900000010';

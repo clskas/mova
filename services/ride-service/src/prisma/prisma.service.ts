@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
+import { DB_POOL_DEFAULTS, prismaPoolOptions, withPoolSettings } from '@mova/shared';
 
 /** Exported for unit tests — Render cold-start / connection flap. */
 export function isTransientDbError(err: unknown): boolean {
@@ -26,25 +27,8 @@ export function isTransientDbError(err: unknown): boolean {
   );
 }
 
-/**
- * Adds connection_limit / pool_timeout to the database URL unless it already sets them.
- * Prisma's default is 9 connections and 10 s: the driver app asks 7 lists at once per
- * driver, so the pool filled up (Sentry SENGA-BACKEND-1D…1N, "Timed out fetching a new
- * connection"). The rides database is used by this service only and accepts far more.
- */
-export function withPoolSettings(url: string | undefined, limit: number, timeoutSec: number): string | undefined {
-  if (!url?.trim()) return url;
-  const add: string[] = [];
-  if (!/[?&]connection_limit=/.test(url)) add.push(`connection_limit=${limit}`);
-  if (!/[?&]pool_timeout=/.test(url)) add.push(`pool_timeout=${timeoutSec}`);
-  if (!add.length) return url;
-  return `${url}${url.includes('?') ? '&' : '?'}${add.join('&')}`;
-}
-
-const envInt = (name: string, fallback: number, min: number, max: number) => {
-  const n = Number.parseInt(process.env[name] ?? '', 10);
-  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
-};
+// Pool size: see DB_POOL_DEFAULTS in @mova/shared (one database shared by five services).
+export { withPoolSettings };
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -52,12 +36,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private connectPromise: Promise<void> | null = null;
 
   constructor() {
-    const url = withPoolSettings(
-      process.env.DATABASE_URL,
-      envInt('DB_CONNECTION_LIMIT', 20, 1, 60),
-      envInt('DB_POOL_TIMEOUT_SEC', 20, 5, 60),
-    );
-    super(url ? { datasourceUrl: url } : undefined);
+    super(prismaPoolOptions(DB_POOL_DEFAULTS.ride));
   }
 
   /**

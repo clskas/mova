@@ -737,6 +737,15 @@ export class RidesService {
     return { ...this.formatRideDetail(updated), proposedFareCdf: price };
   }
 
+  /**
+   * Passenger SMS in the background: the driver's app must not wait for the auth lookup.
+   * Awaited, it held « Accepter » 6–20 s in production (2026-11-17), so the ride screen and
+   * its automatic Google Maps opened late or not at all.
+   */
+  private sendRideStatusSms(rideId: string, userId: string, status: RideStatus): void {
+    void this.notifyRideStatusSms(rideId, userId, status).catch(() => undefined);
+  }
+
   private async notifyRideStatusSms(rideId: string, userId: string, status: RideStatus) {
     const user = await fetchAuthUserBrief(userId);
     if (!user?.phone) return;
@@ -835,7 +844,7 @@ export class RidesService {
       driverUserIds: notified,
       excludeUserIds: [driverUserId],
     }).catch(() => undefined);
-    await this.notifyRideStatusSms(rideId, ride.passengerId, RideStatus.ACCEPTED);
+    this.sendRideStatusSms(rideId, ride.passengerId, RideStatus.ACCEPTED);
     return this.formatRideDetail(updated);
   }
 
@@ -1004,11 +1013,7 @@ export class RidesService {
         data: { rideId, event: 'ROUND_TRIP_RETURN', metadata: { from: 'OUTBOUND', to: 'RETURN' } },
       });
       this.emitStatusChange(rideId, RideStatus.IN_PROGRESS);
-      await this.notifyRideStatusSms(
-        rideId,
-        ride.passengerId,
-        RideStatus.IN_PROGRESS,
-      );
+      this.sendRideStatusSms(rideId, ride.passengerId, RideStatus.IN_PROGRESS);
       const detail = this.formatRideDetail(updated);
       return { ...detail, paymentReady: false, roundTripReturnStarted: true };
     }
@@ -1055,7 +1060,7 @@ export class RidesService {
       });
     }
     this.emitStatusChange(rideId, status);
-    await this.notifyRideStatusSms(rideId, ride.passengerId, status);
+    this.sendRideStatusSms(rideId, ride.passengerId, status);
     if (status === RideStatus.COMPLETED) {
       await this.redis.publish(MOVA_EVENTS.RIDE_COMPLETED, {
         rideId,
@@ -3170,7 +3175,7 @@ export class RidesService {
         driverUserIds: notified,
         excludeUserIds: [driverId.trim()],
       }).catch(() => undefined);
-      await this.notifyRideStatusSms(rideId, ride.passengerId, RideStatus.ACCEPTED);
+      this.sendRideStatusSms(rideId, ride.passengerId, RideStatus.ACCEPTED);
     }
     await this.redis.publish(MOVA_EVENTS.SERVICE_ASSIGNED, {
       serviceType: 'RIDE',

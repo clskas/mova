@@ -15,8 +15,11 @@ export type AutomationsConfig = {
   cashDebt: { enabled: boolean; remindAfterHours: number; blockAfterDays: number };
   /** Daily bonus for drivers / couriers reaching N jobs (paid by SENGA the next night). */
   driverBonus: { enabled: boolean; minJobs: number; bonusCdf: number; minJobs2: number; bonus2Cdf: number };
-  /** Map of the demand for drivers (requests of the last N minutes). */
-  demandHeatmap: { enabled: boolean; windowMinutes: number };
+  /**
+   * Map of the demand for drivers (requests of the last N minutes), in a square of
+   * radiusKm on each side of the driver, cut into cells of cellMeters.
+   */
+  demandHeatmap: { enabled: boolean; windowMinutes: number; radiusKm: number; cellMeters: number };
   /** Referral: both get a credit when the new user finishes a first ride or delivery. */
   referral: { enabled: boolean; referrerRewardCdf: number; refereeRewardCdf: number; maxPerReferrer: number; codeEntryDays: number };
   /** SENGA Plus benefits applied automatically (discount, lower commission, priority, renewal). */
@@ -88,7 +91,8 @@ export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
   cashDebt: { enabled: true, remindAfterHours: 24, blockAfterDays: 0 },
   // Money paid by SENGA: off until the super admin turns them on.
   driverBonus: { enabled: false, minJobs: 10, bonusCdf: 5000, minJobs2: 20, bonus2Cdf: 12000 },
-  demandHeatmap: { enabled: true, windowMinutes: 30 },
+  // ~17 km each side and ~1.1 km cells: the values used before they became settings.
+  demandHeatmap: { enabled: true, windowMinutes: 30, radiusKm: 17, cellMeters: 1100 },
   referral: { enabled: false, referrerRewardCdf: 2000, refereeRewardCdf: 2000, maxPerReferrer: 20, codeEntryDays: 7 },
   subscriptions: { enabled: false, priorityBoost: 0.15, autoRenew: true, remindDaysBefore: 3 },
   corporate: { enabled: false },
@@ -181,6 +185,8 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
     demandHeatmap: {
       enabled: bool(hm.enabled, base.demandHeatmap.enabled),
       windowMinutes: int(hm.windowMinutes, base.demandHeatmap.windowMinutes, 5, 180),
+      radiusKm: int(hm.radiusKm, base.demandHeatmap.radiusKm, 1, 50),
+      cellMeters: int(hm.cellMeters, base.demandHeatmap.cellMeters, 200, 5000),
     },
     referral: {
       enabled: bool(rf.enabled, base.referral.enabled),

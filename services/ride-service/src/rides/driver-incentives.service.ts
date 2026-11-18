@@ -21,12 +21,15 @@ function dayRange(day: string): { from: Date; to: Date } {
 }
 
 /** Group requests into ~1 km cells (pure, tested). */
-export function heatCells(points: { lat: number; lng: number; waiting: boolean }[]) {
+/** About 111 km per degree (latitude; longitude near the equator, as in the DRC). */
+const KM_PER_DEG = 111;
+
+export function heatCells(points: { lat: number; lng: number; waiting: boolean }[], cellDeg = CELL_DEG) {
   const cells = new Map<string, { lat: number; lng: number; count: number; waiting: number }>();
   for (const p of points) {
-    const la = Math.round(p.lat / CELL_DEG) * CELL_DEG;
-    const ln = Math.round(p.lng / CELL_DEG) * CELL_DEG;
-    const key = `${la.toFixed(2)}:${ln.toFixed(2)}`;
+    const la = Math.round(p.lat / cellDeg) * cellDeg;
+    const ln = Math.round(p.lng / cellDeg) * cellDeg;
+    const key = `${la.toFixed(4)}:${ln.toFixed(4)}`;
     const c = cells.get(key) ?? { lat: Number(la.toFixed(4)), lng: Number(ln.toFixed(4)), count: 0, waiting: 0 };
     c.count++;
     if (p.waiting) c.waiting++;
@@ -128,7 +131,9 @@ export class DriverIncentivesService {
     const h = this.platformConfig.get().automations.demandHeatmap;
     if (!h.enabled || !Number.isFinite(lat) || !Number.isFinite(lng)) return { enabled: h.enabled, cells: [] };
     const since = new Date(Date.now() - h.windowMinutes * 60 * 1000);
-    const box = 0.15; // ~15 km
+    // Square of radiusKm on each side of the driver, cells of cellMeters (admin settings).
+    const box = h.radiusKm / KM_PER_DEG;
+    const cellDeg = h.cellMeters / 1000 / KM_PER_DEG;
     const [rides, deliveries] = await Promise.all([
       this.prisma.ride.findMany({
         where: { createdAt: { gte: since }, testVoidedAt: null, pickupLat: { gte: lat - box, lte: lat + box }, pickupLng: { gte: lng - box, lte: lng + box } },
@@ -145,7 +150,13 @@ export class DriverIncentivesService {
       ...rides.map((r) => ({ lat: r.pickupLat, lng: r.pickupLng, waiting: r.status === RideStatus.REQUESTED || r.status === RideStatus.SEARCHING })),
       ...deliveries.map((d) => ({ lat: d.pickupLat, lng: d.pickupLng, waiting: d.status === DeliveryStatus.PENDING })),
     ];
-    return { enabled: true, windowMinutes: h.windowMinutes, cells: heatCells(points).slice(0, 60) };
+    return {
+      enabled: true,
+      windowMinutes: h.windowMinutes,
+      radiusKm: h.radiusKm,
+      cellMeters: h.cellMeters,
+      cells: heatCells(points, cellDeg).slice(0, 60),
+    };
   }
 
   /** Pays the referral rewards whose new user finished a first ride or delivery. */

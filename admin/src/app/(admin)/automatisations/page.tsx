@@ -11,7 +11,7 @@ type Automations = {
   docExpiry: { enabled: boolean; daysBefore: number[] };
   cashDebt: { enabled: boolean; remindAfterHours: number; blockAfterDays: number };
   driverBonus: { enabled: boolean; minJobs: number; bonusCdf: number; minJobs2: number; bonus2Cdf: number };
-  demandHeatmap: { enabled: boolean; windowMinutes: number };
+  demandHeatmap: { enabled: boolean; windowMinutes: number; radiusKm: number; cellMeters: number };
   referral: { enabled: boolean; referrerRewardCdf: number; refereeRewardCdf: number; maxPerReferrer: number; codeEntryDays: number };
   subscriptions: { enabled: boolean; priorityBoost: number; autoRenew: boolean; remindDaysBefore: number };
   corporate: { enabled: boolean };
@@ -53,7 +53,7 @@ const DEFAULTS: Automations = {
   docExpiry: { enabled: true, daysBefore: [30, 7, 1] },
   cashDebt: { enabled: true, remindAfterHours: 24, blockAfterDays: 0 },
   driverBonus: { enabled: false, minJobs: 10, bonusCdf: 5000, minJobs2: 20, bonus2Cdf: 12000 },
-  demandHeatmap: { enabled: true, windowMinutes: 30 },
+  demandHeatmap: { enabled: true, windowMinutes: 30, radiusKm: 17, cellMeters: 1100 },
   referral: { enabled: false, referrerRewardCdf: 2000, refereeRewardCdf: 2000, maxPerReferrer: 20, codeEntryDays: 7 },
   subscriptions: { enabled: false, priorityBoost: 0.15, autoRenew: true, remindDaysBefore: 3 },
   corporate: { enabled: false },
@@ -322,6 +322,8 @@ export default function AutomatisationsPage() {
         </p>
         <Toggle label="Activé" checked={a.demandHeatmap.enabled} disabled={ro} onChange={(v) => set("demandHeatmap", { enabled: v })} />
         <Num label="Fenêtre (minutes, 5–180)" value={a.demandHeatmap.windowMinutes} disabled={ro} onChange={(v) => set("demandHeatmap", { windowMinutes: v })} />
+        <Num label="Distance de chaque côté du chauffeur (km, 1–50)" value={a.demandHeatmap.radiusKm} disabled={ro} onChange={(v) => set("demandHeatmap", { radiusKm: v })} />
+        <Num label="Taille d'une case (mètres, 200–5000)" value={a.demandHeatmap.cellMeters} disabled={ro} onChange={(v) => set("demandHeatmap", { cellMeters: v })} />
         {editable && (
           <BtnPrimary disabled={saving === "demandHeatmap"} onClick={() => void save("demandHeatmap", a.demandHeatmap)}>
             {saving === "demandHeatmap" ? "…" : "Enregistrer"}

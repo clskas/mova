@@ -1918,7 +1918,7 @@ export type WalletTransaction = {
   description?: string;
   reference?: string | null;
   createdAt?: string;
-  wallet?: { userId: string; userName?: string | null; balanceCdf?: number };
+  wallet?: { userId: string; userName?: string | null; userPhone?: string | null; balanceCdf?: number };
 };
 
 export type WalletTransactionsPage = {

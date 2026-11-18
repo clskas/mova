@@ -2355,6 +2355,28 @@ export class AdminService {
     const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
     return name || user.phone || user.publicId || '—';
   }
+  private async fetchUserNamesAndPhones(userIds: string[]) {
+    const map = new Map<string, { name: string; phone: string | null }>();
+    await Promise.all(
+      userIds.map(async (id) => {
+        try {
+          const user = await this.fetchJson<{
+            firstName?: string | null;
+            lastName?: string | null;
+            phone?: string | null;
+            publicId?: string;
+          }>('auth', `/internal/users/${id}`);
+          map.set(id, {
+            name: this.formatUserDisplayName({ ...user, phone: user.phone ?? undefined }),
+            phone: user.phone?.trim() || null,
+          });
+        } catch {
+          map.set(id, { name: `${id.slice(0, 8)}…`, phone: null });
+        }
+      }),
+    );
+    return map;
+  }
   private async fetchUserDisplayNames(userIds: string[]) {
     const map = new Map<string, string>();
     await Promise.all(
@@ -2391,7 +2413,7 @@ export class AdminService {
       currency?: string;
     }>('payment', `/internal/transactions?${params}`);
     const userIds = [...new Set(page.data.map((t) => t.wallet?.userId).filter((id): id is string => Boolean(id)))];
-    const names = await this.fetchUserDisplayNames(userIds);
+    const users = await this.fetchUserNamesAndPhones(userIds);
     return {
       ...page,
       data: page.data.map((t) => ({
@@ -2399,7 +2421,9 @@ export class AdminService {
         wallet: t.wallet
           ? {
               ...t.wallet,
-              userName: names.get(t.wallet.userId) ?? null,
+              userName: users.get(t.wallet.userId)?.name ?? null,
+              // Account phone: the admin flags withdrawals sent to another number.
+              userPhone: users.get(t.wallet.userId)?.phone ?? null,
             }
           : undefined,
       })),

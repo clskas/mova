@@ -35,7 +35,7 @@ import {
   type WalletTransaction,
 } from "@/lib/api";
 import { exportWalletTransactionsCsv, printWalletReport } from "@/lib/wallet-reports";
-import { isWalletRecharge, isWalletWithdraw, walletTxLabel } from "@/lib/wallet-movements";
+import { isOtherNumberWithdraw, isWalletRecharge, isWalletWithdraw, walletTxLabel } from "@/lib/wallet-movements";
 import { MOVA_PLATFORM_USER_ID, MOVA_PLATFORM_WALLET_LABEL } from "@/lib/platform-wallet";
 import { useAdmin } from "@/components/AdminProvider";
 import {
@@ -1264,12 +1264,25 @@ L'argent part réellement. Opération enregistrée à votre nom.`,
                       <tr key={t.id} className="border-b">
                         <td className="p-3 text-gray-500">{formatDate(t.createdAt)}</td>
                         <td className="p-3 font-medium">{t.wallet?.userName ?? "—"}</td>
-                        <td className="p-3 font-mono text-xs text-gray-500">{t.wallet?.userId ?? "—"}</td>
+                        <td className="p-3 font-mono text-xs text-gray-500">
+                          {t.wallet?.userId ?? "—"}
+                          {t.wallet?.userPhone ? <div className="text-gray-600">{t.wallet.userPhone}</div> : null}
+                        </td>
                         <td className="p-3">
                           <StatusBadge status={t.type} />
                         </td>
                         <td className="p-3">{formatCdf(Math.abs(t.amountCdf))}</td>
-                        <td className="p-3">{walletTxLabel(t)}</td>
+                        <td className="p-3">
+                          {walletTxLabel(t)}
+                          {isOtherNumberWithdraw(t) && (
+                            <span
+                              className="ml-2 inline-block rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800"
+                              title={t.wallet?.userPhone ? `Numéro du compte : ${t.wallet.userPhone}` : "Compte sans numéro de téléphone"}
+                            >
+                              Autre numéro
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     ))
                   )}

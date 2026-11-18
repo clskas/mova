@@ -30,6 +30,8 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("000000");
   const [otpSent, setOtpSent] = useState(false);
+  // Another number than the account's: confirm with the account PIN (never 000000).
+  const [pinMode, setPinMode] = useState(false);
   const [loading, setLoading] = useState<"withdraw" | "topup" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -144,10 +146,15 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
           setAmount("");
           setOtp("000000");
           setOtpSent(false);
+          setPinMode(false);
           onWithdrawn?.();
           return;
         }
         setOtpSent(true);
+        if (sent.pinRequired) {
+          setPinMode(true);
+          setOtp("");
+        }
         setSuccess(sent.message ?? "Code envoyé au numéro de versement.");
         return;
       }
@@ -166,6 +173,7 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
       setAmount("");
       setOtp("000000");
       setOtpSent(false);
+      setPinMode(false);
       onWithdrawn?.();
     } catch (e) {
       setError(toUserErrorMessage(e, "Retrait impossible"));
@@ -270,20 +278,27 @@ export function PartnerWithdrawPanel({ balanceCdf, walletAvailable = true, onWit
           onChange={(e) => setAmount(e.target.value)}
         />
         <label className="block text-xs text-gray-500">
-          Code à 6 chiffres
+          {pinMode ? "Code PIN de votre compte SENGA (6 chiffres)" : "Code à 6 chiffres"}
           <input
             className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
             inputMode="numeric"
             maxLength={6}
-            placeholder="000000"
+            placeholder={pinMode ? "Votre code PIN" : "000000"}
             value={otp}
             onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
           />
         </label>
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-          SMS temporairement indisponibles : tous les clients confirment avec{' '}
-          <strong>000000</strong> en attendant l&apos;achat des crédits SMS.
-        </p>
+        {pinMode ? (
+          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            Retrait vers un autre numéro que celui de votre compte : saisissez le{' '}
+            <strong>code PIN de votre compte SENGA</strong> (celui de la connexion).
+          </p>
+        ) : (
+          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            SMS temporairement indisponibles : tous les clients confirment avec{' '}
+            <strong>000000</strong> en attendant l&apos;achat des crédits SMS.
+          </p>
+        )}
         <button
           type="button"
           disabled={loading !== null || balanceCdf < 2300}

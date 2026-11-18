@@ -457,6 +457,8 @@ export type WalletWithdrawResult = {
   formattedBalance?: string;
   skipOtp?: boolean;
   otpRequired?: boolean;
+  /** Withdrawal to another number without SMS codes: the 6 digits are the account PIN. */
+  pinRequired?: boolean;
 };
 
 export function requestWithdrawOtp(data: { amountCdf: number; provider: string; phone: string }) {

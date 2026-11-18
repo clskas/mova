@@ -516,8 +516,8 @@ describe('WalletService', () => {
       await expect(
         svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', OTHER, { otp: GOOD_PIN, accountPhone: ACCOUNT }),
       ).rejects.toMatchObject({ status: 403 });
-      // No account phone: no withdrawal without a code.
-      await expect(svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', ACCOUNT)).rejects.toMatchObject({ status: 403 });
+      // No account phone: never without the PIN.
+      await expect(svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', ACCOUNT)).rejects.toMatchObject({ status: 401 });
       expect(tx.wallet.update).not.toHaveBeenCalled();
     });
 
@@ -567,6 +567,23 @@ describe('WalletService', () => {
         svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', OTHER, { otp: GOOD_PIN, accountPhone: ACCOUNT }),
       ).rejects.toMatchObject({ status: 429 });
       expect(tx.wallet.update).not.toHaveBeenCalled();
+    });
+
+    it('compte sans téléphone (inscrit par e-mail) : PIN + plafond, comme un autre numéro', async () => {
+      const res = await svc.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', OTHER, null);
+      expect(res).toMatchObject({ pinRequired: true, otpRequired: true });
+      expect(res.message).toMatch(/pas de numéro de téléphone/);
+      await expect(
+        svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', OTHER, { otp: '000000', accountPhone: null }),
+      ).rejects.toMatchObject({ status: 401 });
+      const ok = await svc.withdrawToMobileMoney('u1', 2300, 'ORANGE_MONEY', OTHER, {
+        otp: GOOD_PIN,
+        accountPhone: null,
+        ownNumberWithoutOtp: true,
+      });
+      expect(ok.success).toBe(true);
+      dailyMax = 0;
+      await expect(svc.requestWithdrawOtp('u1', 2300, 'ORANGE_MONEY', OTHER, null)).rejects.toMatchObject({ status: 403 });
     });
 
     it('son propre numéro : inchangé (sans PIN ni plafond)', async () => {

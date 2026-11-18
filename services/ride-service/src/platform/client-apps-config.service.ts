@@ -1,5 +1,5 @@
 import { applySeatLimits } from '@mova/shared';
-import { HttpStatus, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import {
   ClientAppsConfig,
   ClientAppId,
@@ -14,13 +14,15 @@ import {
   mergeClientAppsConfig,
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { startSettingsRefresh } from './settings-refresh';
 
 const CONFIG_ID = 'client-apps';
 
 @Injectable()
-export class ClientAppsConfigService implements OnModuleInit {
+export class ClientAppsConfigService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ClientAppsConfigService.name);
   private config: ClientAppsConfig = structuredClone(DEFAULT_CLIENT_APPS_CONFIG);
+  private refreshTimer?: ReturnType<typeof setInterval>;
 
   constructor(private prisma: PrismaService) {}
 
@@ -30,12 +32,24 @@ export class ClientAppsConfigService implements OnModuleInit {
         `Client apps config load skipped: ${err instanceof Error ? err.message : String(err)}`,
       );
     });
+    // Several instances: pick up changes saved through another one.
+    this.refreshTimer = startSettingsRefresh(() => this.reloadFromDb(), this.logger, 'Client apps config');
+  }
+
+  onModuleDestroy() {
+    if (this.refreshTimer) clearInterval(this.refreshTimer);
   }
 
   async refresh() {
     await this.ensureRow();
+    await this.reloadFromDb();
+  }
+
+  /** Read-only reload (no upsert): used every few seconds. */
+  async reloadFromDb() {
     const row = await this.prisma.platformConfig.findUnique({ where: { id: CONFIG_ID } });
-    this.config = mergeClientAppsConfig(row?.config);
+    if (!row) return;
+    this.config = mergeClientAppsConfig(row.config);
     applySeatLimits(this.config.seatLimits);
   }
 

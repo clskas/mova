@@ -1,6 +1,7 @@
-import { HttpStatus, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { MovaErrorCode, MovaHttpException, normalizeAutomations } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { startSettingsRefresh } from './settings-refresh';
 import {
   MergedPlatformConfig,
   PLATFORM_CONFIG_DEFAULTS,
@@ -60,10 +61,11 @@ export function assertNoNegativeSettings(value: unknown, path = ''): void {
 }
 
 @Injectable()
-export class PlatformConfigService implements OnModuleInit {
+export class PlatformConfigService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PlatformConfigService.name);
   private merged: MergedPlatformConfig = PLATFORM_CONFIG_DEFAULTS;
   private overrides: PlatformConfigOverrides = {};
+  private refreshTimer?: ReturnType<typeof setInterval>;
 
   constructor(private prisma: PrismaService) {}
 
@@ -72,12 +74,24 @@ export class PlatformConfigService implements OnModuleInit {
     void this.refresh().catch((err: unknown) => {
       this.logger.warn(`Platform config load skipped: ${err instanceof Error ? err.message : String(err)}`);
     });
+    // Several instances: pick up prices / rules saved through another one.
+    this.refreshTimer = startSettingsRefresh(() => this.reloadFromDb(), this.logger, 'Platform config');
+  }
+
+  onModuleDestroy() {
+    if (this.refreshTimer) clearInterval(this.refreshTimer);
   }
 
   async refresh() {
     await this.ensureRow();
+    await this.reloadFromDb();
+  }
+
+  /** Read-only reload (no upsert): used every few seconds. */
+  async reloadFromDb() {
     const row = await this.prisma.platformConfig.findUnique({ where: { id: 'default' } });
-    this.overrides = (row?.config as PlatformConfigOverrides) ?? {};
+    if (!row) return;
+    this.overrides = (row.config as PlatformConfigOverrides) ?? {};
     this.merged = mergeConfig(this.overrides);
   }
 

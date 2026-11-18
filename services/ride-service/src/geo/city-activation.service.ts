@@ -1,10 +1,12 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { DRC_SERVICE_AREAS, setCityActivationOverrides } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { startSettingsRefresh } from '../platform/settings-refresh';
 
 @Injectable()
-export class CityActivationService implements OnModuleInit {
+export class CityActivationService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CityActivationService.name);
+  private refreshTimer?: ReturnType<typeof setInterval>;
 
   constructor(private prisma: PrismaService) {}
 
@@ -12,6 +14,12 @@ export class CityActivationService implements OnModuleInit {
     void this.refresh().catch((err: unknown) => {
       this.logger.warn(`City activation cache skipped: ${err instanceof Error ? err.message : String(err)}`);
     });
+    // Several instances: pick up cities switched on / off through another one.
+    this.refreshTimer = startSettingsRefresh(() => this.refresh(), this.logger, 'City activation');
+  }
+
+  onModuleDestroy() {
+    if (this.refreshTimer) clearInterval(this.refreshTimer);
   }
 
   async refresh() {

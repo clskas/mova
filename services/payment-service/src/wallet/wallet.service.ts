@@ -887,7 +887,7 @@ export class WalletService {
     );
 
     if (this.isWithdrawOtpSkipped()) {
-      if (this.isOtherNumber(normalizedPhone, accountPhone)) {
+      if (this.needsPinWithoutSms(normalizedPhone, accountPhone)) {
         // No SMS: the account's PIN proves the owner agrees (typed in the same code box,
         // so apps already installed work as they are).
         await this.assertPinNotLocked(userId);
@@ -897,8 +897,9 @@ export class WalletService {
           skipOtp: false,
           otpRequired: true,
           pinRequired: true,
-          message:
-            'Retrait vers un autre numéro : saisissez le code PIN de votre compte SENGA (6 chiffres) pour confirmer.',
+          message: accountPhone?.trim()
+            ? 'Retrait vers un autre numéro : saisissez le code PIN de votre compte SENGA (6 chiffres) pour confirmer.'
+            : 'Votre compte n\'a pas de numéro de téléphone : saisissez le code PIN de votre compte SENGA (6 chiffres) pour confirmer le retrait.',
           channel: 'pin' as const,
           phone: normalizedPhone,
           amountCdf: amount,
@@ -1056,7 +1057,10 @@ export class WalletService {
     const otpDigits = String(opts.otp ?? '').replace(/\s/g, '');
     // End-user withdrawal to a number other than the account's: capped per day (admin), and
     // without SMS codes the 6 digits are the account's PIN (never the shared standing code).
-    const toOtherNumber = !opts.skipOtp && this.isOtherNumber(normalizedPhone, opts.accountPhone);
+    const toOtherNumber =
+      !opts.skipOtp &&
+      (this.isOtherNumber(normalizedPhone, opts.accountPhone) ||
+        this.needsPinWithoutSms(normalizedPhone, opts.accountPhone));
     let pinChecked = false;
     if (toOtherNumber && this.isWithdrawOtpSkipped()) {
       await this.verifyWithdrawPin(userId, otpDigits);
@@ -1112,6 +1116,15 @@ export class WalletService {
   private isOtherNumber(normalizedPhone: string, accountPhone?: string | null): boolean {
     const account = accountPhone?.trim() ? normalizePhoneRdc(accountPhone) : '';
     return Boolean(account) && account !== normalizedPhone;
+  }
+
+  /**
+   * Without SMS codes, the account PIN confirms the withdrawal when the payout number is
+   * not the account's phone — including accounts with no phone at all (signed up with an
+   * e-mail), which could not withdraw before. Daily ceiling and notification apply.
+   */
+  private needsPinWithoutSms(normalizedPhone: string, accountPhone?: string | null): boolean {
+    return this.isWithdrawOtpSkipped() && (!accountPhone?.trim() || this.isOtherNumber(normalizedPhone, accountPhone));
   }
 
   private redisOrUnavailable() {

@@ -2,6 +2,7 @@ import { createHmac } from 'crypto';
 import {
   afrisoftSmsHubSendOtp,
   afrisoftSmsHubSendSms,
+  isSerdiPayAcceptedReply,
   isAfrisoftSmsHubClientConfigured,
   mapSmsDeliveryFailureToUserMessage,
   SMS_CREDIT_USER_MESSAGE,
@@ -141,5 +142,18 @@ describe('afrisoft-sms-hub', () => {
     expect(result.otpId).toBe('otp_01');
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://sms.afri-soft.com/v1/otp/send');
+  });
+
+  it('hub reporting SerdiPay 202 « accepted for delivery » counts as sent', async () => {
+    const env: Record<string, string> = { AFRISOFT_HUB_API_KEY: 'k'.repeat(32), AFRISOFT_HUB_APP_ID: 'senga' };
+    const get = (k: string) => env[k];
+    (global as unknown as { fetch: typeof fetch }).fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => ({ message: 'Échec SMS SerdiPay (202): SMS accepted for delivery.' }),
+    }) as unknown as typeof fetch;
+    const r = await afrisoftSmsHubSendSms(get, { phone: '+243994972450', text: 'Code 123456', purpose: 'login' });
+    expect(r.success).toBe(true);
+    expect(isSerdiPayAcceptedReply('Échec SMS SerdiPay (400): An error occor')).toBe(false);
   });
 });

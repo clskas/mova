@@ -579,7 +579,10 @@ export async function serdiPaySendSms(
         senderId,
       });
       last = { status, data };
-      if (status === 200 && data.success !== false) {
+      // 2xx = accepted. SerdiPay now answers 202 « SMS accepted for delivery »: treating only
+      // 200 as success resent the SMS in the 0… format (users got it twice) and told the app
+      // « Impossible d'envoyer le code » although it arrived (auth logs, 2026-11-19/20).
+      if (status >= 200 && status < 300 && data.success !== false) {
         const upstream = serdiPaySmsUpstreamFailed(data);
         if (upstream.failed) {
           continue;

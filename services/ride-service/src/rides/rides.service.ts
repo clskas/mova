@@ -1125,6 +1125,8 @@ export class RidesService {
    * is still short, the ride is refused with the amount to top up.
    */
   async settleOwedCancelFees(passengerId: string) {
+    // Switched off by the super admin: fees still owed do not block a new order.
+    if (!this.platformConfig.get().automations.cancellationFees.enabled) return;
     const owed = await this.prisma.ride.findMany({
       where: { passengerId, cancelFeeStatus: 'OWED', cancellationFeeCdf: { gt: 0 } },
       select: { id: true, driverId: true, cancellationFeeCdf: true },
@@ -1204,7 +1206,11 @@ export class RidesService {
       );
     }
 
-    const policy = await this.prisma.cancellationPolicy.findUnique({ where: { vehicleType: ride.vehicleType } });
+    // Cancellation fees switched off (Administration → Automatisations): always free.
+    const feesOn = this.platformConfig.get().automations.cancellationFees.enabled;
+    const policy = feesOn
+      ? await this.prisma.cancellationPolicy.findUnique({ where: { vehicleType: ride.vehicleType } })
+      : null;
     let feeCdf = 0;
     let feeMessage =
       actor === 'driver'

@@ -16,6 +16,7 @@ type Automations = {
   subscriptions: { enabled: boolean; priorityBoost: number; autoRenew: boolean; remindDaysBefore: number };
   corporate: { enabled: boolean };
   faceCheck: { enabled: boolean; blockUntilChecked: boolean };
+  cancellationFees: { enabled: boolean };
   routeAnomaly: { enabled: boolean; stopMinutes: number; detourKm: number };
   ratingQuality: { enabled: boolean; minAvg: number; minRatings: number; autoBlock: boolean };
   sentryDigest: { enabled: boolean; hourKinshasa: number };
@@ -58,6 +59,7 @@ const DEFAULTS: Automations = {
   subscriptions: { enabled: false, priorityBoost: 0.15, autoRenew: true, remindDaysBefore: 3 },
   corporate: { enabled: false },
   faceCheck: { enabled: false, blockUntilChecked: true },
+  cancellationFees: { enabled: false },
   routeAnomaly: { enabled: true, stopMinutes: 10, detourKm: 3 },
   ratingQuality: { enabled: true, minAvg: 3.5, minRatings: 10, autoBlock: false },
   sentryDigest: { enabled: false, hourKinshasa: 8 },
@@ -137,6 +139,7 @@ export default function AutomatisationsPage() {
         subscriptions: { ...DEFAULTS.subscriptions, ...cfg.subscriptions },
         corporate: { ...DEFAULTS.corporate, ...cfg.corporate },
         faceCheck: { ...DEFAULTS.faceCheck, ...cfg.faceCheck },
+        cancellationFees: { ...DEFAULTS.cancellationFees, ...cfg.cancellationFees },
         routeAnomaly: { ...DEFAULTS.routeAnomaly, ...cfg.routeAnomaly },
         ratingQuality: { ...DEFAULTS.ratingQuality, ...cfg.ratingQuality },
         sentryDigest: { ...DEFAULTS.sentryDigest, ...cfg.sentryDigest },
@@ -392,6 +395,22 @@ export default function AutomatisationsPage() {
         {editable && (
           <BtnPrimary disabled={saving === "corporate"} onClick={() => void save("corporate", a.corporate)}>
             {saving === "corporate" ? "…" : "Enregistrer"}
+          </BtnPrimary>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <h2 className="font-semibold">Frais d&apos;annulation</h2>
+        <p className="text-sm text-slate-600">
+          Activé : le passager qui annule après le délai gratuit, ou qui ne se présente pas, paie les frais réglés par
+          gamme dans Règles plateforme (versés au chauffeur), ainsi que l&apos;annulation tardive d&apos;une course
+          planifiée. Sans solde suffisant, les frais sont dus et demandés avant la commande suivante.
+          Désactivé : toutes les annulations sont gratuites et les frais encore dus ne bloquent plus les commandes.
+        </p>
+        <Toggle label="Activé" checked={a.cancellationFees.enabled} disabled={ro} onChange={(v) => set("cancellationFees", { enabled: v })} />
+        {editable && (
+          <BtnPrimary disabled={saving === "cancellationFees"} onClick={() => void save("cancellationFees", a.cancellationFees)}>
+            {saving === "cancellationFees" ? "…" : "Enregistrer"}
           </BtnPrimary>
         )}
       </Card>

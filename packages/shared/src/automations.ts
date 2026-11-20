@@ -28,6 +28,11 @@ export type AutomationsConfig = {
   corporate: { enabled: boolean };
   /** Daily selfie compared with the validated photo before going online. */
   faceCheck: { enabled: boolean; blockUntilChecked: boolean };
+  /**
+   * Cancellation fees (late passenger cancel, passenger no-show, late cancel of a scheduled
+   * ride). Off: nothing is charged and fees still owed do not block a new order.
+   */
+  cancellationFees: { enabled: boolean };
   /** During a ride: long stop or big detour → the passenger and the team are alerted. */
   routeAnomaly: { enabled: boolean; stopMinutes: number; detourKm: number };
   /** Driver quality: alert (and optional block) under an average on the last N ratings. */
@@ -97,6 +102,8 @@ export const DEFAULT_AUTOMATIONS: AutomationsConfig = {
   subscriptions: { enabled: false, priorityBoost: 0.15, autoRenew: true, remindDaysBefore: 3 },
   corporate: { enabled: false },
   faceCheck: { enabled: false, blockUntilChecked: true },
+  // Off during the test phase: the super admin turns it on when SENGA launches.
+  cancellationFees: { enabled: false },
   routeAnomaly: { enabled: true, stopMinutes: 10, detourKm: 3 },
   ratingQuality: { enabled: true, minAvg: 3.5, minRatings: 10, autoBlock: false },
   sentryDigest: { enabled: false, hourKinshasa: 8 },
@@ -145,6 +152,7 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
   const sb = o.subscriptions ?? {};
   const co = o.corporate ?? {};
   const fc = o.faceCheck ?? {};
+  const cf = o.cancellationFees ?? {};
   const ra = o.routeAnomaly ?? {};
   const rq = o.ratingQuality ?? {};
   const sd = o.sentryDigest ?? {};
@@ -206,6 +214,7 @@ export function normalizeAutomations(raw: unknown, base: AutomationsConfig = DEF
       enabled: bool(fc.enabled, base.faceCheck.enabled),
       blockUntilChecked: bool(fc.blockUntilChecked, base.faceCheck.blockUntilChecked),
     },
+    cancellationFees: { enabled: bool(cf.enabled, base.cancellationFees.enabled) },
     routeAnomaly: {
       enabled: bool(ra.enabled, base.routeAnomaly.enabled),
       stopMinutes: int(ra.stopMinutes, base.routeAnomaly.stopMinutes, 3, 60),

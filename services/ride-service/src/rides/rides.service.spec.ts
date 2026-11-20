@@ -679,7 +679,20 @@ describe('RidesService', () => {
     await expect(service.driverPhotoSource('r1', 'stranger')).rejects.toThrow();
   });
 
-  it('owed cancellation fees: taken from the wallet before a new ride', async () => {
+  describe('owed cancellation fees', () => {
+    const cfg = () =>
+      (service as unknown as { platformConfig: { get: () => { automations: { cancellationFees: { enabled: boolean } } } } })
+        .platformConfig.get();
+    let saved: { enabled: boolean };
+    beforeEach(() => {
+      saved = cfg().automations.cancellationFees;
+      cfg().automations.cancellationFees = { enabled: true };
+    });
+    afterEach(() => {
+      cfg().automations.cancellationFees = saved;
+    });
+
+    it('owed cancellation fees: taken from the wallet before a new ride', async () => {
     prisma.ride.findMany.mockResolvedValueOnce([{ id: 'old', driverId: 'd1', cancellationFeeCdf: 2000 }]);
     cancelFeeUtil.collectCancelFee.mockResolvedValueOnce({ collected: true, amountCdf: 2000 });
     await service.settleOwedCancelFees('p1');
@@ -688,10 +701,17 @@ describe('RidesService', () => {
     );
   });
 
-  it('owed cancellation fees: not enough balance refuses the new ride with the amount', async () => {
+    it('owed cancellation fees: not enough balance refuses the new ride with the amount', async () => {
     prisma.ride.findMany.mockResolvedValueOnce([{ id: 'old', driverId: 'd1', cancellationFeeCdf: 2000 }]);
     cancelFeeUtil.collectCancelFee.mockResolvedValueOnce({ collected: false, amountCdf: 2000 });
     await expect(service.settleOwedCancelFees('p1')).rejects.toThrow('Frais d’annulation impayés');
+  });
+
+    it('switched off (default): nothing is taken and a new ride is never blocked', async () => {
+      cfg().automations.cancellationFees = { enabled: false };
+      await expect(service.settleOwedCancelFees('p1')).resolves.toBeUndefined();
+      expect(cancelFeeUtil.collectCancelFee).not.toHaveBeenCalled();
+    });
   });
 
   it('updateStatus: the passenger cannot advance the trip steps', async () => {

@@ -423,3 +423,35 @@ jobs:
           git archive --format=tar "$SHA" \
             | ssh -i ~/.ssh/hub -o BatchMode=yes -o ServerAliveInterval=30 "root@$HUB_HOST" "deploy $SHA"
           curl -sf -m 15 https://pay.afri-soft.com/health
+
+  deploy-sms-hub:
+    # Runs after the payment hub (same VPS: one image build at a time), even if that one failed.
+    needs: [deploy-render, deploy-hub]
+    if: ${{ always() && needs.deploy-render.result == 'success' && github.repository != 'afri-soft-com/mova' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit || github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Deploy SMS hub
+        env:
+          SMS_HUB_DEPLOY_SSH_KEY: ${{ secrets.SMS_HUB_DEPLOY_SSH_KEY }}
+          HUB_SSH_KNOWN_HOSTS: ${{ secrets.HUB_SSH_KNOWN_HOSTS }}
+          HUB_HOST: ${{ vars.HUB_HOST || '178.104.82.66' }}
+          SHA: ${{ inputs.commit || github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SMS_HUB_DEPLOY_SSH_KEY:-}" ] || [ -z "${HUB_SSH_KNOWN_HOSTS:-}" ]; then
+            echo "::warning::SMS_HUB_DEPLOY_SSH_KEY / HUB_SSH_KNOWN_HOSTS not set — SMS hub not deployed (see deploy/afrisoft-sms/README.md)"
+            exit 0
+          fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SMS_HUB_DEPLOY_SSH_KEY" > ~/.ssh/sms && chmod 600 ~/.ssh/sms
+          printf '%s\n' "$HUB_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          git archive --format=tar "$SHA" docker/sms.Dockerfile packages/shared services/sms-hub-service \
+            | ssh -i ~/.ssh/sms -o BatchMode=yes -o ServerAliveInterval=30 "root@$HUB_HOST" "deploy $SHA"
+          curl -sf -m 15 https://sms.afri-soft.com/health | grep -q '"redis":"connected"'

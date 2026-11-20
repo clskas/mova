@@ -177,6 +177,11 @@ function pickStr(obj: Record<string, unknown>, keys: string[]): string | undefin
  * Transactional SMS — SENGA OTP uses this so `mova-auth` keeps generating/verifying
  * the code (seed 123456 stays local). Hub `/v1/otp/send` would mint a second OTP.
  */
+/** « Échec SMS SerdiPay (202): SMS accepted for delivery » and the like: a 2xx is not a failure. */
+export function isSerdiPayAcceptedReply(message: string): boolean {
+  return /SerdiPay \(20\d\)/i.test(message) || /accepted for delivery/i.test(message);
+}
+
 export async function afrisoftSmsHubSendSms(
   get: EnvGetter,
   params: { phone: string; text: string; purpose?: string; reference?: string; idempotencyKey?: string },
@@ -200,9 +205,16 @@ export async function afrisoftSmsHubSendSms(
   };
   const { ok, json } = await smsHubFetch(get, '/v1/sms/send', body);
   if (!ok) {
+    const hubMessage = pickStr(json, ['message', 'error']);
+    // A hub still on the old SerdiPay client reports « Échec SMS SerdiPay (202): SMS accepted
+    // for delivery » although the SMS goes out: the app told users « Impossible d'envoyer le
+    // code » and they asked again (auth logs, 2026-11-19/20). Accepted = sent.
+    if (hubMessage && isSerdiPayAcceptedReply(hubMessage)) {
+      return { success: true, message: 'SMS envoyé', reference };
+    }
     return {
       success: false,
-      message: pickStr(json, ['message', 'error']) ?? SMS_UNAVAILABLE_USER_MESSAGE,
+      message: hubMessage ?? SMS_UNAVAILABLE_USER_MESSAGE,
     };
   }
   return {

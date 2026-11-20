@@ -586,6 +586,22 @@ describe('serdipay Public API', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('202 « SMS accepted for delivery » is a success, sent once (no second SMS)', async () => {
+    env.SERDIPAY_SMS_API_ID = 'APISMSDEMO';
+    env.SERDIPAY_SMS_API_KEY = 'test-sms-key';
+    env.SERDIPAY_SMS_SENDER_ID = 'SerdiPay';
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: async () => ({ message: 'SMS accepted for delivery.' }),
+    });
+    (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await serdiPaySendSms(get, { to: '+243994972450', message: 'Code SENGA 123456' });
+    expect(result.success).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('retries when SerdiPay 200 embeds DreamDigital Invalid Destination Address', async () => {
     env.SERDIPAY_SMS_API_ID = 'APISMSDEMO';
     env.SERDIPAY_SMS_API_KEY = 'test-sms-key';

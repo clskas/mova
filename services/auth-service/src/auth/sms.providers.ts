@@ -274,15 +274,24 @@ export class SmsService {
       };
     }
     this.logger.log(`SMS OTP attempting via ${provider.name} to ${maskPhoneRdc(phone)}`);
+    // How long the hand-off takes: a slow SMS with a fast hand-off is delayed after us
+    // (SerdiPay queue / operator), not by SENGA.
+    const startedAt = Date.now();
     try {
       const result = await provider.sendOtp(phone, code, sanitizeAndroidSmsHash(androidAppHash));
+      const ms = Date.now() - startedAt;
       if (!result.success) {
-        this.logger.error(`SMS OTP failed (${provider.name}): ${result.message}`);
+        this.logger.error(`SMS OTP failed (${provider.name}) after ${ms} ms: ${result.message}`);
         return { success: false, message: mapSmsDeliveryFailureToUserMessage(result.message) };
       }
+      this.logger.log(
+        `SMS OTP handed off via ${provider.name} to ${maskPhoneRdc(phone)} in ${ms} ms${result.message ? ` (${result.message})` : ''}`,
+      );
       return result;
     } catch (e) {
-      this.logger.error(`SMS OTP threw (${provider.name}): ${(e as Error).message}`);
+      this.logger.error(
+        `SMS OTP threw (${provider.name}) after ${Date.now() - startedAt} ms: ${(e as Error).message}`,
+      );
       return { success: false, message: mapSmsDeliveryFailureToUserMessage((e as Error).message) };
     }
   }
@@ -295,9 +304,12 @@ export class SmsService {
       return { success: true, message: 'SMS simulé (mode test)' };
     }
     if (isAfrisoftSmsHubClientConfigured(this.get)) {
+      const startedAt = Date.now();
       try {
         const result = await afrisoftSmsHubSendSms(this.get, { phone, text, purpose });
-        if (!result.success) this.logger.error(`SMS hub failed: ${result.message}`);
+        const ms = Date.now() - startedAt;
+        if (!result.success) this.logger.error(`SMS hub failed after ${ms} ms: ${result.message}`);
+        else this.logger.log(`SMS (${purpose}) handed off to ${maskPhoneRdc(phone)} in ${ms} ms`);
         return { success: result.success, message: result.message };
       } catch (e) {
         this.logger.error(`SMS hub threw: ${(e as Error).message}`);

@@ -73,6 +73,21 @@ export class ProviderService {
     }
   }
 
+  /** SerdiPay send with its duration in the log (proves where an SMS delay comes from). */
+  private async timedSerdiPay(phone: string, message: string, purpose: string) {
+    const startedAt = Date.now();
+    const result = await serdiPaySendSms(this.get, { to: phone, message });
+    const ms = Date.now() - startedAt;
+    if (result.success) {
+      this.logger.log(
+        `SerdiPay SMS accepted in ${ms} ms → ${this.maskPhone(phone)} purpose=${purpose}${result.message ? ` (${result.message})` : ''}`,
+      );
+    } else {
+      this.logger.warn(`SerdiPay SMS failed after ${ms} ms → ${this.maskPhone(phone)}: ${result.message}`);
+    }
+    return result;
+  }
+
   async sendOtpSms(appId: string, phone: string, code: string, locale = 'fr'): Promise<HubSmsResult> {
     if (isSeedDemoPhone(phone)) {
       this.logger.warn(`Skip OTP SMS for seed phone ${this.maskPhone(phone)} app=${appId}`);
@@ -98,8 +113,7 @@ export class ProviderService {
     }
 
     if (provider === 'serdipay') {
-      const result = await serdiPaySendSms(this.get, { to: phone, message });
-      if (!result.success) this.logger.warn(`SerdiPay SMS failed: ${result.message}`);
+      const result = await this.timedSerdiPay(phone, message, 'login');
       const out = { success: result.success, message: result.message, provider };
       await this.maybeRedundantSend(provider, phone, message, 'login', out);
       return out;
@@ -136,9 +150,8 @@ export class ProviderService {
       this.logger.log(
         `SMS send → ${this.maskPhone(phone)} purpose=${purpose || 'n/a'} text="${text.slice(0, 48)}"`,
       );
-      const result = await serdiPaySendSms(this.get, { to: phone, message: text });
+      const result = await this.timedSerdiPay(phone, text, purpose || 'n/a');
       const out = { success: result.success, message: result.message, provider };
-      if (!result.success) this.logger.warn(`SerdiPay SMS failed: ${result.message}`);
       await this.maybeRedundantSend(provider, phone, text, purpose, out);
       return out;
     }

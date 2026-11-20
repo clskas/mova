@@ -55,3 +55,35 @@ cp .env.example .env && chmod 600 .env
 docker compose --profile hub up -d
 curl -sS http://127.0.0.1:3001/health
 ```
+
+## Déploiement automatique (CI)
+
+Le job `deploy-sms-hub` de `.github/workflows/deploy.yml` déploie le hub SMS après chaque
+déploiement Render de `main`, juste après le hub de paiement :
+
+1. il ne fait **rien** si les sources du hub (`docker/sms.Dockerfile`, `packages/shared`,
+   `services/sms-hub-service`) n'ont pas changé depuis le dernier déploiement — le hub n'est
+   donc pas redémarré à chaque fusion ;
+2. il construit une image candidate (le conteneur en service n'est pas touché) ;
+3. il bascule, puis contrôle `/health` : Redis connecté **et** même fournisseur SMS qu'avant
+   (jamais de retour silencieux au mode `mock`) ;
+4. sinon, **retour automatique** à l'image précédente.
+
+Il utilise une clé SSH dédiée, **limitée à un seul script** sur le VPS (`command=` forcé). Elle ne
+donne pas de shell. Tant que le secret `SMS_HUB_DEPLOY_SSH_KEY` n'existe pas, le job ne fait
+qu'afficher un avertissement. Mise en place, une seule fois, depuis un poste qui a déjà
+`~/.ssh/afrisoft_pay`, à la racine du dépôt Mova :
+
+```bash
+scp -i ~/.ssh/afrisoft_pay deploy/afrisoft-sms/scripts/ci-deploy.sh root@178.104.82.66:/opt/afrisoft-sms/scripts/ci-deploy.sh
+ssh -i ~/.ssh/afrisoft_pay root@178.104.82.66 "chmod 700 /opt/afrisoft-sms/scripts/ci-deploy.sh"
+ssh-keygen -t ed25519 -N "" -C senga-ci-sms-deploy -f ~/.ssh/senga_ci_sms
+ssh -i ~/.ssh/afrisoft_pay root@178.104.82.66 "echo 'command=\"/opt/afrisoft-sms/scripts/ci-deploy.sh\",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding $(cat ~/.ssh/senga_ci_sms.pub)' >> /root/.ssh/authorized_keys"
+gh secret set SMS_HUB_DEPLOY_SSH_KEY --repo clskas/mova < ~/.ssh/senga_ci_sms
+```
+
+`HUB_SSH_KNOWN_HOSTS` (déjà créé pour le hub de paiement) est réutilisé.
+
+Le script installé sur le VPS (`/opt/afrisoft-sms/scripts/ci-deploy.sh`) est la copie de
+`deploy/afrisoft-sms/scripts/ci-deploy.sh` : recopiez-le après chaque modification.
+Retour arrière manuel : `docker images afrisoft-sms/hub` liste les images `pre-<date>`.

@@ -2,6 +2,7 @@ import { DeliveryStatus, DeliveryType, ErrandOrderStatus, RideStatus, RoundTripL
 import { MOVA_EVENTS } from '@mova/shared';
 import { RidesService } from './rides.service';
 import { mockPlatformConfig } from '../platform/platform-config.mock';
+import { __clearOffersLookupCache } from '../common/offers-lookup-cache';
 
 jest.mock('../common/cancel-fee.util', () => ({
   collectCancelFee: jest.fn().mockResolvedValue({ collected: true, amountCdf: 0 }),
@@ -1133,8 +1134,12 @@ describe('RidesService', () => {
       const small = await groupService.getDriverOffers('driver-1');
       expect(small.offers.map((o) => o.id)).toEqual(['ride-2']);
       driverWith(7);
+      __clearOffersLookupCache(); // the driver changed vehicle: past the 10 s memory
       const big = await groupService.getDriverOffers('driver-1');
       expect(big.offers.map((o) => o.id).sort()).toEqual(['ride-2', 'ride-g']);
     });
   });
 });
+
+// The offer lists keep driver lookups 10 s: never across tests.
+beforeEach(() => __clearOffersLookupCache());

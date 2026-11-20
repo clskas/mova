@@ -99,7 +99,10 @@ export function getPartnerAlertUi(): PartnerAlertUi {
   if (typeof window !== "undefined") restoreSoundPref();
   return {
     soundEnabled: sessionReady && !soundMuted,
-    needsUnlock: !soundMuted && !sessionReady,
+    // Once the partner has turned the sound on, the choice is kept across reloads: the
+    // first click anywhere re-arms audio silently. The banner only comes back when an
+    // alert really could not play (pendingChime) — never just because the page reloaded.
+    needsUnlock: !soundMuted && !sessionReady && (!prefWantsSound || pendingChime),
     soundMuted,
     soundStyle,
     toast,
@@ -204,6 +207,31 @@ function beginHtmlChime(): Promise<boolean> {
   } catch {
     return Promise.resolve(false);
   }
+}
+
+/** Re-arm audio on a user gesture without making any sound (choice already made). */
+async function silentAudioPrime(): Promise<boolean> {
+  const ctx = getAudioContext();
+  if (ctx?.state === "suspended") await ctx.resume().catch(() => undefined);
+  let primed = ctx?.state === "running";
+  const audio = getHtmlAudio();
+  if (audio) {
+    try {
+      audio.muted = true;
+      primed = (await audio.play().then(() => true).catch(() => false)) || primed;
+      audio.pause();
+      try {
+        audio.currentTime = 0;
+      } catch {
+        /* ignore */
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      audio.muted = false;
+    }
+  }
+  return primed;
 }
 
 async function playWebAudioChime(): Promise<boolean> {
@@ -342,7 +370,17 @@ export function initPartnerAudioUnlock(): () => void {
   const resumeOnGesture = () => {
     if (!armed || soundMuted) return;
     if (prefWantsSound && !sessionReady) {
-      void unlockPartnerAlerts({ fromBanner: true });
+      if (pendingChime) {
+        // An alert is waiting: play it now.
+        void unlockPartnerAlerts({ fromBanner: true });
+        return;
+      }
+      void silentAudioPrime().then((ok) => {
+        if (!ok) return;
+        sessionReady = true;
+        emitUi();
+        unlockListeners.forEach((fn) => fn());
+      });
       return;
     }
     const ctx = getAudioContext();

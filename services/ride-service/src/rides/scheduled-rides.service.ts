@@ -276,6 +276,7 @@ export class ScheduledRidesService {
     const hoursUntil = (ride.scheduledAt.getTime() - Date.now()) / MS_HOUR;
     let cancellationFeeCdf = 0;
     if (
+      this.platformConfig.get().automations.cancellationFees.enabled &&
       hoursUntil < this.schedCfg().lateCancelHoursBefore &&
       hoursUntil > 0 &&
       (ride.status === ScheduledRideStatus.CONFIRMED || ride.driverId)

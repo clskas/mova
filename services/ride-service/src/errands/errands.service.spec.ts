@@ -3,6 +3,7 @@ import { PricingService } from '../rides/pricing.service';
 import { CommissionService } from '../rides/commission.service';
 import { CommissionServiceType } from '@prisma/client';
 import { mockPlatformConfig } from '../platform/platform-config.mock';
+import { __clearOffersLookupCache } from '../common/offers-lookup-cache';
 
 jest.mock('../common/wallet-hold.util', () => ({
   holdWalletFunds: jest.fn().mockResolvedValue({ holdId: 'hold-1', amountCdf: 60500, status: 'ACTIVE' }),
@@ -133,3 +134,6 @@ describe('ErrandsService', () => {
     expect(offers.offers).toEqual([]);
   });
 });
+
+// The offer lists keep driver lookups 10 s: never across tests.
+beforeEach(() => __clearOffersLookupCache());

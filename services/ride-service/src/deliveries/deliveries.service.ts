@@ -75,6 +75,7 @@ import { RoutingService } from '../geo/routing.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { ParcelWeightBandService } from '../platform/parcel-weight-band.service';
 import { TrackingGateway } from '../websocket/tracking.gateway';
+import { offersDriverDebtStatus, offersDriverProfile } from '../common/offers-lookup-cache';
 
 type MenuSize = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
 type MenuOption = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
@@ -1451,8 +1452,8 @@ export class DeliveriesService {
   }
 
   async getDriverOffers(driverUserId: string) {
-    const profile = await fetchDriverProfileSnapshot(driverUserId);
-    const debtStatus = await fetchDriverDebtStatus(driverUserId);
+    const profile = await offersDriverProfile(driverUserId);
+    const debtStatus = await offersDriverDebtStatus(driverUserId);
     if (debtStatus.debtBlocked || debtStatus.walletBlocked || debtStatus.offersBlocked) {
       return {
         offers: [] as Record<string, unknown>[],

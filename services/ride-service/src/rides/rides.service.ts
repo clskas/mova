@@ -74,6 +74,7 @@ import { PromoService } from './surcharge.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { RidePoolService } from './ride-pool.service';
 import { ClientAppsConfigService } from '../platform/client-apps-config.service';
+import { offersDriverDebtStatus, offersDriverProfile } from '../common/offers-lookup-cache';
 
 const ACTIVE_STATUSES: RideStatus[] = [
   RideStatus.REQUESTED,
@@ -909,8 +910,8 @@ export class RidesService {
   }
 
   async getDriverOffers(driverUserId: string) {
-    const profile = await fetchDriverProfileSnapshot(driverUserId);
-    const debtStatus = await fetchDriverDebtStatus(driverUserId);
+    const profile = await offersDriverProfile(driverUserId);
+    const debtStatus = await offersDriverDebtStatus(driverUserId);
     if (debtStatus.debtBlocked || debtStatus.walletBlocked || debtStatus.offersBlocked) {
       return {
         offers: [] as Record<string, unknown>[],

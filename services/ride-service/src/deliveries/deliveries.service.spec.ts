@@ -5,6 +5,7 @@ import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { mockPlatformConfig } from '../platform/platform-config.mock';
 import { PARCEL_WEIGHT_BAND_DEFAULTS } from '../platform/parcel-weight-band.service';
 import { creditRestaurantEscrow, releaseEscrowPayout } from '../common/escrow.util';
+import { __clearOffersLookupCache } from '../common/offers-lookup-cache';
 
 jest.mock('../common/driver-eligibility.util', () => ({
   assertDriverEligibleForParcel: jest.fn().mockResolvedValue(undefined),
@@ -761,3 +762,6 @@ describe('DeliveriesService', () => {
     });
   });
 });
+
+// The offer lists keep driver lookups 10 s: never across tests.
+beforeEach(() => __clearOffersLookupCache());

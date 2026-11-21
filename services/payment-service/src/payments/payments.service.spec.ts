@@ -12,6 +12,7 @@ import {
   MpesaProvider,
   OrangeMoneyProvider,
 } from './payment-providers';
+import { __clearPendingCashLookupCache } from './pending-cash-lookup-cache';
 
 describe('PaymentsService', () => {
   const prisma = {
@@ -90,6 +91,7 @@ describe('PaymentsService', () => {
   );
 
   beforeEach(() => {
+    __clearPendingCashLookupCache();
     jest.clearAllMocks();
     prisma.servicePayment.findUnique.mockResolvedValue(null);
     prisma.payment.findUnique.mockResolvedValue(null);

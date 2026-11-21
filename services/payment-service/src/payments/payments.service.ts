@@ -22,6 +22,7 @@ import {
 } from '@mova/shared';
 import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { pendingCashLookup } from './pending-cash-lookup-cache';
 import { WalletService } from '../wallet/wallet.service';
 import { DriverPayoutService } from '../payouts/driver-payout.service';
 import { FoodDeliveryPayoutService } from '../payouts/food-delivery-payout.service';
@@ -1955,7 +1956,7 @@ export class PaymentsService {
       const rideId = payment.rideId;
       if (!rideId) continue;
       try {
-        const ride = await this.fetchRide(rideId);
+        const ride = await pendingCashLookup(`ride:${rideId}`, () => this.fetchRide(rideId));
         if (ride.driverId !== driverUserId) continue;
         if (this.resolveRideStatus(ride) !== 'COMPLETED') continue;
         return {
@@ -1987,7 +1988,9 @@ export class PaymentsService {
     });
     for (const payment of servicePending) {
       try {
-        const info = await this.fetchServicePaymentInfo(payment.referenceType, payment.referenceId);
+        const info = await pendingCashLookup(`svc:${payment.referenceType}:${payment.referenceId}`, () =>
+          this.fetchServicePaymentInfo(payment.referenceType, payment.referenceId),
+        );
         if (info.driverId !== driverUserId) continue;
         // Cancelled / return-to-sender / non-delivered must not prompt « Cash reçu ».
         const status = String(info.status ?? '').toUpperCase();

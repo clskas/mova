@@ -34,7 +34,6 @@ import {
 } from "@/lib/user-messages";
 import {
   AuthPayload,
-  GOOGLE_OPTIONAL_LABEL_FR,
   LOGIN_CLASSIC_LABEL_FR,
   LOGIN_IDENTITY_LABEL_FR,
   PartnerLoginHelp,
@@ -74,6 +73,8 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
   const [codeSent, setCodeSent] = useState(false);
   const [pinMode, setPinMode] = useState(forcePin);
   const [forgotPin, setForgotPin] = useState(false);
+  /** PIN window opened from « J'ai déjà un compte » : the number is typed above the pad. */
+  const [pinAskIdentity, setPinAskIdentity] = useState(false);
   const [setupToken, setSetupToken] = useState<string | null>(() =>
     typeof window !== "undefined" && isPinPending() ? getToken() : null,
   );
@@ -143,11 +144,35 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
   }, [setupToken, router, forcePin]);
 
   useEffect(() => {
-    if (pinOnly && pin.length === 6 && !loading && phone.trim()) {
+    const identity = normalizeLoginPhone(phone);
+    const identityReady = isEmailIdentity(identity) || /^\+243\d{9}$/.test(identity);
+    if (pinOnly && pin.length === 6 && !loading && identityReady) {
       void loginWithPin();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-submit when pad reaches 6 digits
   }, [pin, pinOnly, phone]);
+
+  // An existing partner goes straight to the PIN pad as soon as the number is complete —
+  // no need to press « Continuer » (which still works, and covers e-mail logins).
+  useEffect(() => {
+    if (pinMode || codeSent || googleChallenge || setupToken || forgotPin || loading) return;
+    const msisdn = normalizeLoginPhone(phone);
+    if (!/^\+243\d{9}$/.test(msisdn)) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void fetchPinEnabled(API_BASE, msisdn, INTENT).then((enabled) => {
+        if (cancelled || !enabled) return;
+        setPhone(msisdn);
+        setPin("");
+        setError(null);
+        setPinMode(true);
+      });
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [phone, pinMode, codeSent, googleChallenge, setupToken, forgotPin, loading]);
 
   function finishRestaurantSession(data: AuthPayload, source: "pin" | "google" | "otp") {
     if (!data.accessToken) {
@@ -330,6 +355,7 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
     setPhone("");
     setPin("");
     setPinMode(false);
+    setPinAskIdentity(false);
     setForgotPin(false);
     setCodeSent(false);
     setCode("");
@@ -356,7 +382,7 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
                     ? "Récupérez l'accès par SMS (vous pouvez changer de numéro) ou avec Google, puis définissez un nouveau PIN."
                     : googleChallenge
                       ? "Saisissez le code reçu par e-mail, puis votre PIN de connexion."
-                      : "Connectez-vous avec Google ou votre téléphone."}
+                      : "Déjà partenaire ? Entrez votre numéro ou e-mail, puis votre PIN."}
           </p>
         </div>
         {setupToken ? (
@@ -385,15 +411,34 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
               <div className="w-full max-w-sm space-y-5">
                 <div className="text-center">
                   <h1 className="text-2xl font-bold text-[#1A1A2E]">{CONNECTION_LOGIN_TITLE_FR}</h1>
-                  <p className="text-sm text-gray-500 mt-1">{connectionPinPrompt(phone)}</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {pinAskIdentity ? "Entrez votre numéro (ou e-mail), puis votre PIN." : connectionPinPrompt(phone)}
+                  </p>
                 </div>
+                {pinAskIdentity && (
+                  <input
+                    data-testid="login-pin-identity"
+                    className="w-full rounded-xl border border-gray-200 bg-white p-3 text-center"
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="+243 8XX XXX XXX ou e-mail"
+                    type="text"
+                    inputMode="text"
+                    autoComplete="username"
+                    autoFocus
+                    disabled={loading}
+                  />
+                )}
                 <PinDigitPad
                   value={pin}
                   onChange={setPin}
                   disabled={loading}
                   accentClass="bg-[#FF6B35]"
                   keypadOnly
-                  autoFocus
+                  autoFocus={!pinAskIdentity}
                 />
                 <PinForgotLink
                   disabled={loading}
@@ -405,7 +450,7 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
                   }}
                 />
                 <button type="button" className="w-full text-sm text-[#6C63FF] underline" onClick={useAnotherNumber}>
-                  Ce n&apos;est pas moi
+                  {pinAskIdentity ? "Retour" : "Ce n'est pas moi"}
                 </button>
                 {error && <p className="text-sm text-red-600 text-center">{error}</p>}
                 <p className="text-xs text-gray-400 text-center leading-relaxed">{CONNECTION_PIN_FOOTER_FR}</p>
@@ -414,9 +459,23 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
           </div>
         ) : (
           <>
+            {!codeSent && !googleChallenge && !forgotPin && (
+              <button
+                type="button"
+                data-testid="login-open-pin"
+                className="w-full rounded-xl border-2 border-current py-3 text-sm font-semibold text-[#FF6B35]"
+                onClick={() => {
+                  setPin("");
+                  setError(null);
+                  setPinAskIdentity(true);
+                  setPinMode(true);
+                }}
+              >
+                J&apos;ai déjà un compte — entrer mon PIN
+              </button>
+            )}
             {googleClientId() && !codeSent && !googleChallenge && (
               <div className="space-y-2">
-                <p className="text-center text-sm font-medium text-gray-600">{GOOGLE_OPTIONAL_LABEL_FR}</p>
                 <GoogleContinueButton onCredential={loginWithGoogle} disabled={loading} />
               </div>
             )}
@@ -436,6 +495,11 @@ export function LoginClient({ forcePin = false }: { forcePin?: boolean }) {
                 type="text"
                 inputMode="text"
                 autoComplete="username"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !loading && phone.trim() && !codeSent && !googleChallenge) {
+                    void requestOtp({ forceSms: forgotPin });
+                  }
+                }}
                 disabled={codeSent || Boolean(googleChallenge)}
               />
             </label>

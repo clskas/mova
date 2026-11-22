@@ -3,6 +3,7 @@ import { MOVA_EVENTS } from '@mova/shared';
 import { RidesService } from './rides.service';
 import { mockPlatformConfig } from '../platform/platform-config.mock';
 import { __clearOffersLookupCache } from '../common/offers-lookup-cache';
+import { __clearSharedOffersCache } from '../common/shared-offers-cache';
 
 jest.mock('../common/cancel-fee.util', () => ({
   collectCancelFee: jest.fn().mockResolvedValue({ collected: true, amountCdf: 0 }),
@@ -1135,6 +1136,7 @@ describe('RidesService', () => {
       expect(small.offers.map((o) => o.id)).toEqual(['ride-2']);
       driverWith(7);
       __clearOffersLookupCache(); // the driver changed vehicle: past the 10 s memory
+      __clearSharedOffersCache();
       const big = await groupService.getDriverOffers('driver-1');
       expect(big.offers.map((o) => o.id).sort()).toEqual(['ride-2', 'ride-g']);
     });
@@ -1142,4 +1144,7 @@ describe('RidesService', () => {
 });
 
 // The offer lists keep driver lookups 10 s: never across tests.
-beforeEach(() => __clearOffersLookupCache());
+beforeEach(() => {
+  __clearOffersLookupCache();
+  __clearSharedOffersCache();
+});

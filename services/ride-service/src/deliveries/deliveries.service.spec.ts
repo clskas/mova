@@ -6,6 +6,7 @@ import { mockPlatformConfig } from '../platform/platform-config.mock';
 import { PARCEL_WEIGHT_BAND_DEFAULTS } from '../platform/parcel-weight-band.service';
 import { creditRestaurantEscrow, releaseEscrowPayout } from '../common/escrow.util';
 import { __clearOffersLookupCache } from '../common/offers-lookup-cache';
+import { __clearSharedOffersCache } from '../common/shared-offers-cache';
 
 jest.mock('../common/driver-eligibility.util', () => ({
   assertDriverEligibleForParcel: jest.fn().mockResolvedValue(undefined),
@@ -764,4 +765,7 @@ describe('DeliveriesService', () => {
 });
 
 // The offer lists keep driver lookups 10 s: never across tests.
-beforeEach(() => __clearOffersLookupCache());
+beforeEach(() => {
+  __clearOffersLookupCache();
+  __clearSharedOffersCache();
+});

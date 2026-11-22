@@ -75,6 +75,7 @@ import { PlatformConfigService } from '../platform/platform-config.service';
 import { RidePoolService } from './ride-pool.service';
 import { ClientAppsConfigService } from '../platform/client-apps-config.service';
 import { offersDriverDebtStatus, offersDriverProfile } from '../common/offers-lookup-cache';
+import { sharedOffersQuery } from '../common/shared-offers-cache';
 
 const ACTIVE_STATUSES: RideStatus[] = [
   RideStatus.REQUESTED,
@@ -938,17 +939,23 @@ export class RidesService {
     }
     const serveableTypes = rideTypesDriverCanServe(vehicleTypes) as VehicleType[];
 
-    const rides = await this.prisma.ride.findMany({
-      where: { status: RideStatus.SEARCHING, vehicleType: { in: serveableTypes } },
-      orderBy: { createdAt: 'desc' },
-      take: 30,
-      include: { events: { where: { event: { in: ['SEARCH_ATTEMPT', 'DRIVER_REJECTED'] } } } },
-    });
+    // Same open rides for every driver of these vehicle types: read once, shared (2 s).
+    const typesKey = [...serveableTypes].sort().join(',');
+    const rides = await sharedOffersQuery(`rides:${typesKey}`, () =>
+      this.prisma.ride.findMany({
+        where: { status: RideStatus.SEARCHING, vehicleType: { in: serveableTypes } },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+        include: { events: { where: { event: { in: ['SEARCH_ATTEMPT', 'DRIVER_REJECTED'] } } } },
+      }),
+    );
 
     const rideRule = await this.commission.get(CommissionServiceType.RIDE);
-    const passengerNotes = await passengerRatingSummaries(
-      this.prisma,
-      rides.map((r) => r.passengerId),
+    const passengerNotes = await sharedOffersQuery(`ride-notes:${typesKey}`, () =>
+      passengerRatingSummaries(
+        this.prisma,
+        rides.map((r) => r.passengerId),
+      ),
     );
 
     const offers = rides

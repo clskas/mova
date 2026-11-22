@@ -76,6 +76,7 @@ import { PlatformConfigService } from '../platform/platform-config.service';
 import { ParcelWeightBandService } from '../platform/parcel-weight-band.service';
 import { TrackingGateway } from '../websocket/tracking.gateway';
 import { offersDriverDebtStatus, offersDriverProfile } from '../common/offers-lookup-cache';
+import { OWNER_BRIEF_TTL_MS, sharedOffersQuery } from '../common/shared-offers-cache';
 
 type MenuSize = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
 type MenuOption = { label?: string; name?: string; priceCdf?: number; unitPriceCdf?: number };
@@ -1475,7 +1476,8 @@ export class DeliveriesService {
     const hasGps = profile.currentLat != null && profile.currentLng != null;
     const operatingCity = (profile.operatingCity?.trim() || 'Kinshasa').toLowerCase();
 
-    const deliveries = await this.prisma.delivery.findMany({
+    // Same open deliveries for every driver: read once, shared (2 s).
+    const deliveries = await sharedOffersQuery('deliveries:open', () => this.prisma.delivery.findMany({
       where: {
         driverId: null,
         type: { in: [DeliveryType.PARCEL, DeliveryType.FOOD, DeliveryType.EXPRESS] },
@@ -1509,7 +1511,7 @@ export class DeliveriesService {
         },
         events: { where: { event: 'DRIVER_REJECTED' } },
       },
-    });
+    }));
 
     const radiusKm = this.platformConfig.get().matching.maxRadiusKm;
     const deliveryRule = await this.commission.get(CommissionServiceType.DELIVERY);
@@ -1554,7 +1556,7 @@ export class DeliveriesService {
     const ownerContacts = new Map<string, { phone?: string; email?: string }>();
     await Promise.all(
       ownerIds.map(async (id) => {
-        const brief = await this.fetchUserBrief(id);
+        const brief = await sharedOffersQuery(`owner:${id}`, () => this.fetchUserBrief(id), OWNER_BRIEF_TTL_MS);
         if (brief) ownerContacts.set(id, { phone: brief.phone, email: brief.email });
       }),
     );

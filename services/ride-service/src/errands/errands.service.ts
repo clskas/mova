@@ -50,6 +50,7 @@ import { RoutingService } from '../geo/routing.service';
 import { PlatformConfigService } from '../platform/platform-config.service';
 import { TrackingGateway } from '../websocket/tracking.gateway';
 import { offersDriverDebtStatus, offersDriverProfile } from '../common/offers-lookup-cache';
+import { sharedOffersQuery } from '../common/shared-offers-cache';
 
 export type ErrandItemRow = { label: string; qty?: number; estimatedCdf?: number };
 
@@ -606,16 +607,19 @@ export class ErrandsService {
     const hasGps = profile.currentLat != null && profile.currentLng != null;
 
     const [pendingErrands, assignedErrands] = await Promise.all([
-      this.prisma.errandOrder.findMany({
-        where: {
-          status: ErrandOrderStatus.PENDING,
-          driverId: null,
-          fundsFrozenAt: null,
-          OR: [{ guaranteed: false }, { escrowReady: true }],
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 30,
-      }),
+      // Same pending errands for every driver: read once, shared (2 s).
+      sharedOffersQuery('errands:open', () =>
+        this.prisma.errandOrder.findMany({
+          where: {
+            status: ErrandOrderStatus.PENDING,
+            driverId: null,
+            fundsFrozenAt: null,
+            OR: [{ guaranteed: false }, { escrowReady: true }],
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 30,
+        }),
+      ),
       this.prisma.errandOrder.findMany({
         where: {
           driverId: driverUserId,

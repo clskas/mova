@@ -9,6 +9,7 @@ import {
   DRC_SERVICE_AREAS,
   INTERNAL_API_KEY,
   MOVA_EVENTS,
+  type PaymentReminderPayload,
   MovaErrorCode,
   MovaHttpException,
   RideCreatedPayload,
@@ -84,6 +85,10 @@ const ACTIVE_STATUSES: RideStatus[] = [
   RideStatus.DRIVER_ARRIVED,
   RideStatus.IN_PROGRESS,
 ];
+
+/** A search with no driver stops after this long (ride cancelled for free, passenger told). */
+export const RIDE_SEARCH_MAX_MINUTES = 15;
+export const RIDE_SEARCH_EXPIRED_REASON = 'Aucun chauffeur trouvé — recherche arrêtée automatiquement.';
 
 const ALLOWED_TRANSITIONS: Record<RideStatus, RideStatus[]> = {
   [RideStatus.REQUESTED]: [RideStatus.SEARCHING, RideStatus.CANCELLED],
@@ -946,9 +951,12 @@ export class RidesService {
         where: { status: RideStatus.SEARCHING, vehicleType: { in: serveableTypes } },
         orderBy: { createdAt: 'desc' },
         take: 30,
-        include: { events: { where: { event: { in: ['SEARCH_ATTEMPT', 'DRIVER_REJECTED'] } } } },
       }),
     );
+    // Attempt counts and rejections only — never every SEARCH_ATTEMPT row: a ride left
+    // searching gains one every 30 s, and reading them all on each 3 s poll saturated
+    // ride-service on 2026-11-22 (memory and CPU at 100 %, instances restarted).
+    const searchMeta = await this.rideSearchMeta(rides.map((r) => r.id));
 
     const rideRule = await this.commission.get(CommissionServiceType.RIDE);
     const passengerNotes = await sharedOffersQuery(`ride-notes:${typesKey}`, () =>
@@ -960,15 +968,12 @@ export class RidesService {
 
     const offers = rides
       .filter((ride) => {
-        const rejected = ride.events.some(
-          (e) => e.event === 'DRIVER_REJECTED' && (e.metadata as { driverUserId?: string })?.driverUserId === driverUserId,
-        );
-        if (rejected) return false;
+        if (searchMeta.rejectedBy.get(ride.id)?.has(driverUserId)) return false;
         // Group rides only for vehicles with enough seats.
         return driverFitsRideGroup(profile, ride.vehicleType, this.dispatchGroupSize(ride));
       })
       .map((ride) => {
-        const attempts = ride.events.filter((e) => e.event === 'SEARCH_ATTEMPT').length;
+        const attempts = searchMeta.attempts.get(ride.id) ?? 0;
         const radiusKm = this.matching.computeRadiusKm(attempts > 0 ? attempts - 1 : 0);
         const tripKm = tripDistanceKm(
           ride.pickupLat,
@@ -1001,6 +1006,66 @@ export class RidesService {
       .sort((a, b) => a.distanceKm - b.distanceKm);
 
     return { offers };
+  }
+
+  /** SEARCH_ATTEMPT count and rejecting drivers per open ride (shared between drivers, 2 s). */
+  private rideSearchMeta(rideIds: string[]) {
+    return sharedOffersQuery(`ride-search-meta:${rideIds.join(',')}`, async () => {
+      const attempts = new Map<string, number>();
+      const rejectedBy = new Map<string, Set<string>>();
+      if (rideIds.length === 0) return { attempts, rejectedBy };
+      const [counts, rejections] = await Promise.all([
+        this.prisma.rideEvent.groupBy({
+          by: ['rideId'],
+          where: { rideId: { in: rideIds }, event: 'SEARCH_ATTEMPT' },
+          _count: { _all: true },
+        }),
+        this.prisma.rideEvent.findMany({
+          where: { rideId: { in: rideIds }, event: 'DRIVER_REJECTED' },
+          select: { rideId: true, metadata: true },
+        }),
+      ]);
+      for (const c of counts) attempts.set(c.rideId, c._count._all);
+      for (const r of rejections) {
+        const id = (r.metadata as { driverUserId?: string } | null)?.driverUserId;
+        if (!id) continue;
+        const set = rejectedBy.get(r.rideId) ?? new Set<string>();
+        set.add(id);
+        rejectedBy.set(r.rideId, set);
+      }
+      return { attempts, rejectedBy };
+    });
+  }
+
+  /**
+   * A ride nobody accepts used to stay SEARCHING for ever (one more SEARCH_ATTEMPT every
+   * 30 s). After RIDE_SEARCH_MAX_MINUTES the search stops: the ride is cancelled for free
+   * and the passenger is told no driver was found.
+   */
+  async expireStaleSearch(rideId: string): Promise<boolean> {
+    const ride = await this.prisma.ride.findUnique({
+      where: { id: rideId },
+      select: { id: true, status: true, driverId: true, passengerId: true, createdAt: true },
+    });
+    if (!ride || ride.status !== RideStatus.SEARCHING || ride.driverId) return false;
+    if (Date.now() - ride.createdAt.getTime() < RIDE_SEARCH_MAX_MINUTES * 60_000) return false;
+    await this.cancelRide(ride.id, ride.passengerId, RIDE_SEARCH_EXPIRED_REASON);
+    try {
+      await this.redis.publish(MOVA_EVENTS.PAYMENT_REMINDER, {
+        userId: ride.passengerId,
+        title: 'Aucun chauffeur disponible',
+        body: 'Aucun chauffeur n’a accepté votre course. La recherche est arrêtée, sans frais. Réessayez dans quelques minutes.',
+        kind: 'RIDE_NO_DRIVER',
+        rideId: ride.id,
+        referenceType: 'RIDE',
+        referenceId: ride.id,
+        sms: false,
+      } satisfies PaymentReminderPayload);
+    } catch {
+      /* the ride is cancelled anyway; the app shows it */
+    }
+    new Logger('RidesService').log(`Ride ${ride.id}: search stopped after ${RIDE_SEARCH_MAX_MINUTES} min without a driver`);
+    return true;
   }
 
   private async fetchDriverProfile(userId: string) {

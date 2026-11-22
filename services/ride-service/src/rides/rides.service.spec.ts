@@ -1,6 +1,6 @@
 import { DeliveryStatus, DeliveryType, ErrandOrderStatus, RideStatus, RoundTripLeg, VehicleType } from '@prisma/client';
 import { MOVA_EVENTS } from '@mova/shared';
-import { RidesService } from './rides.service';
+import { RIDE_SEARCH_EXPIRED_REASON, RIDE_SEARCH_MAX_MINUTES, RidesService } from './rides.service';
 import { mockPlatformConfig } from '../platform/platform-config.mock';
 import { __clearOffersLookupCache } from '../common/offers-lookup-cache';
 import { __clearSharedOffersCache } from '../common/shared-offers-cache';
@@ -30,7 +30,7 @@ describe('RidesService', () => {
       findFirst: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
     },
-    rideEvent: { create: jest.fn(), count: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
+    rideEvent: { create: jest.fn(), count: jest.fn(), findMany: jest.fn().mockResolvedValue([]), groupBy: jest.fn().mockResolvedValue([]) },
     cancellationPolicy: { findUnique: jest.fn() },
     delivery: { findMany: jest.fn().mockResolvedValue([]) },
     errandOrder: { findMany: jest.fn().mockResolvedValue([]) },
@@ -361,6 +361,39 @@ describe('RidesService', () => {
     };
     expect(result.id).toBe('ride-1');
     expect(String(result.status).toUpperCase()).toMatch(/CANCEL/);
+  });
+
+  describe('search with no driver', () => {
+    const searching = (minutesAgo: number) => ({
+      id: 'ride-s',
+      passengerId: 'p1',
+      driverId: null,
+      status: RideStatus.SEARCHING,
+      createdAt: new Date(Date.now() - minutesAgo * 60_000),
+    });
+
+    it(`stops after ${RIDE_SEARCH_MAX_MINUTES} min: free cancel and the passenger is told`, async () => {
+      prisma.ride.findUnique.mockResolvedValueOnce(searching(RIDE_SEARCH_MAX_MINUTES + 1));
+      const cancel = jest.spyOn(service, 'cancelRide').mockResolvedValue({} as never);
+      redis.publish.mockClear();
+      await expect(service.expireStaleSearch('ride-s')).resolves.toBe(true);
+      expect(cancel).toHaveBeenCalledWith('ride-s', 'p1', RIDE_SEARCH_EXPIRED_REASON);
+      expect(redis.publish).toHaveBeenCalledWith(
+        MOVA_EVENTS.PAYMENT_REMINDER,
+        expect.objectContaining({ userId: 'p1', kind: 'RIDE_NO_DRIVER', rideId: 'ride-s' }),
+      );
+      cancel.mockRestore();
+    });
+
+    it('keeps searching before the limit, and never touches an accepted ride', async () => {
+      const cancel = jest.spyOn(service, 'cancelRide').mockResolvedValue({} as never);
+      prisma.ride.findUnique.mockResolvedValueOnce(searching(RIDE_SEARCH_MAX_MINUTES - 1));
+      await expect(service.expireStaleSearch('ride-s')).resolves.toBe(false);
+      prisma.ride.findUnique.mockResolvedValueOnce({ ...searching(60), status: RideStatus.ACCEPTED, driverId: 'd1' });
+      await expect(service.expireStaleSearch('ride-s')).resolves.toBe(false);
+      expect(cancel).not.toHaveBeenCalled();
+      cancel.mockRestore();
+    });
   });
 
   it('cancels ride for passenger with reason', async () => {

@@ -35,6 +35,8 @@ export class RideSearchScheduler implements OnModuleInit, OnModuleDestroy {
     });
     for (const ride of rides) {
       try {
+        // No driver after RIDE_SEARCH_MAX_MINUTES: stop the search (free cancel, passenger told).
+        if (await this.rides.expireStaleSearch(ride.id)) continue;
         const lastAttempt = await this.prisma.rideEvent.findFirst({
           where: { rideId: ride.id, event: 'SEARCH_ATTEMPT' },
           orderBy: { createdAt: 'desc' },

@@ -2,6 +2,8 @@ import { SEED_DEMO_PHONE_RE } from '@mova/shared';
 import { HttpStatus, Injectable, Optional } from '@nestjs/common';
 import { UserRole, UserStatus } from '@prisma/client';
 import {
+  INTERNAL_API_KEY,
+  serviceUrl,
   MovaErrorCode,
   MovaHttpException,
   OWNER_SUPER_ADMIN_PHONE,
@@ -859,6 +861,78 @@ export class UsersService {
       }
       throw err;
     }
+  }
+
+  /**
+   * « Supprimer mon compte » from the apps (App Store 5.1.1(v)).
+   * Personal data is erased and the account closed for good: name, phone, e-mail, Google /
+   * Apple links, photo and PIN are removed, the driver file and KYC documents are deleted.
+   * Trip and payment records stay, anonymous, for the accounting the law requires. Refused
+   * while a ride or delivery is under way. The same phone can sign up again as a new account.
+   */
+  async deleteOwnAccount(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new MovaHttpException(MovaErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+    this.assertNotOwnerDelete(user.phone);
+    if (isAdminPanelRole(user.role)) {
+      throw new MovaHttpException(
+        MovaErrorCode.AUTH_FORBIDDEN,
+        HttpStatus.FORBIDDEN,
+        'Un compte d’administration ne peut pas être supprimé depuis l’application. Contactez le support.',
+      );
+    }
+    const jobs = await this.fetchActiveJobs(userId);
+    if (jobs.active) {
+      throw new MovaHttpException(
+        MovaErrorCode.VALIDATION_ERROR,
+        HttpStatus.CONFLICT,
+        'Une course ou une livraison est en cours. Terminez-la ou annulez-la, puis supprimez votre compte.',
+      );
+    }
+    await Promise.allSettled(
+      ['driver', 'notification'].map((svc) =>
+        fetch(serviceUrl(svc as 'driver' | 'notification', `/internal/users/${userId}/data`), {
+          method: 'DELETE',
+          headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+          signal: AbortSignal.timeout(8000),
+        }),
+      ),
+    );
+    if (user.phone) await this.prisma.otpCode.deleteMany({ where: { phone: user.phone } });
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        phone: null,
+        googleId: null,
+        appleId: null,
+        email: null,
+        firstName: 'Compte',
+        lastName: 'supprimé',
+        avatarUrl: null,
+        localPinHash: null,
+        localPinSetAt: null,
+        gender: null,
+        referralCode: null,
+        status: UserStatus.SUSPENDED,
+      },
+    });
+    await this.denySuspendedUser(userId);
+    return { deleted: true };
+  }
+
+  private async fetchActiveJobs(userId: string): Promise<{ active: boolean }> {
+    const res = await fetch(serviceUrl('ride', `/internal/users/${userId}/active-jobs`), {
+      headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      signal: AbortSignal.timeout(8000),
+    }).catch(() => null);
+    if (!res?.ok) {
+      throw new MovaHttpException(
+        MovaErrorCode.INTERNAL_ERROR,
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'Suppression momentanément impossible. Réessayez dans quelques minutes.',
+      );
+    }
+    return (await res.json()) as { active: boolean };
   }
 
   async deactivateUser(id: string) {

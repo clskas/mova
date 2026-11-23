@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsEmail, IsIn, IsOptional, IsString, ValidateIf } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
@@ -43,6 +43,11 @@ export class UsersController {
   @Get('me')
   @ApiOperation({ summary: 'Profil utilisateur' })
   me(@Request() req: { user: { id: string } }) { return this.usersService.findById(req.user.id); }
+  @Delete('me')
+  @ApiOperation({ summary: 'Supprimer mon compte (données personnelles effacées, compte fermé)' })
+  deleteMe(@Request() req: { user: { id: string } }) {
+    return this.usersService.deleteOwnAccount(req.user.id);
+  }
   @Patch('me')
   @ApiOperation({ summary: 'Mettre à jour profil' })
   update(@Request() req: { user: { id: string } }, @Body() dto: UpdateProfileDto) {

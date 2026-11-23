@@ -14,6 +14,7 @@ import '../../core/widgets/mova_widgets.dart';
 import '../../core/voice/voice_command_button.dart';
 import '../passenger/passenger_voice_announcer.dart';
 import 'account_link_card.dart';
+import 'delete_account_section.dart';
 import 'referral_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -429,6 +430,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   isLoading: _saving,
                   onPressed: _saving ? null : _save,
                 ),
+                const DeleteAccountSection(),
               ],
             ),
     );

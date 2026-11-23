@@ -114,7 +114,7 @@ const kFaqItems = <FaqItem>[
   FaqItem(
     question: 'Comment supprimer mon compte ?',
     answer:
-        'Envoyez une demande via Aide → Contacter le support. Votre historique sera traité conformément à la politique de conservation.',
+        'Ouvrez votre profil (Compte et connexion) puis touchez « Supprimer mon compte » en bas de l’écran. Vos données personnelles sont effacées et le compte fermé définitivement.',
   ),
   FaqItem(
     question: 'Le paiement mobile money a échoué, que faire ?',

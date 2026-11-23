@@ -1446,6 +1446,25 @@ class ApiClient {
   }
 
   /// Dettes espèces ouvertes (commission SENGA + parts restaurant/partenaire).
+  /// « Supprimer mon compte » : personal data erased, account closed (DELETE /users/me).
+  Future<Result<Map<String, dynamic>>> deleteAccount() async {
+    await ensureReady();
+    if (isMockMode) return const Success({'deleted': true});
+    try {
+      final response = await _client
+          .delete(Uri.parse('${MarketConfig.effectiveApiBaseUrl}/users/me'), headers: _headers)
+          .timeout(const Duration(seconds: 30));
+      final data = _decodeBody(response.body);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        await UserProfileCache.clear();
+        return Success(_normalizeSuccess(data));
+      }
+      return _failureFromResponse(response.statusCode, data);
+    } catch (_) {
+      return const Failure(NetworkFailure());
+    }
+  }
+
   Future<Result<Map<String, dynamic>>> getCashDebtSummary() async {
     if (isMockMode) {
       return const Success({

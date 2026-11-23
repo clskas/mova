@@ -1288,7 +1288,7 @@ export const UI_SOURCE_STRINGS: readonly string[] = [
  "Mes données personnelles sont-elles protégées ?",
  "Oui. Consultez la Politique de confidentialité dans Aide. SENGA ne vend pas vos données. Pour le DPO, utilisez Aide → Contacter le support.",
  "Comment supprimer mon compte ?",
- "Envoyez une demande via Aide → Contacter le support. Votre historique sera traité conformément à la politique de conservation.",
+ "Ouvrez votre profil (Compte et connexion) puis touchez « Supprimer mon compte » en bas de l’écran. Vos données personnelles sont effacées et le compte fermé définitivement.",
  "Le paiement mobile money a échoué, que faire ?",
  "Vérifiez votre solde et réessayez. Si le débit a eu lieu sans confirmation SENGA, contactez votre opérateur puis le support via Aide avec la référence transaction.",
  "Comment contacter le support ?",
@@ -2096,5 +2096,14 @@ export const UI_SOURCE_STRINGS: readonly string[] = [
  "Code de parrainage enregistré. Votre crédit arrivera après votre première course.",
  "Rejoins SENGA avec mon code {code} : tu reçois un crédit après ta première course. Inscris-toi ici : {link}",
  "Micro automatique",
- "Le micro s’ouvre seul quelques secondes pour commander, quand le chauffeur arrive et à la fin de la course : parlez sans toucher l’écran."
+ "Le micro s’ouvre seul quelques secondes pour commander, quand le chauffeur arrive et à la fin de la course : parlez sans toucher l’écran.",
+ "Supprimer mon compte ?",
+ "Vos données personnelles (nom, téléphone, e-mail, photo, documents) seront effacées et le compte fermé définitivement. Le solde éventuel de votre portefeuille sera perdu : utilisez-le ou retirez-le avant. L’historique des courses et paiements est conservé de façon anonyme, comme la loi l’exige.",
+ "Confirmer la suppression",
+ "Cette action est définitive et ne peut pas être annulée.",
+ "Supprimer définitivement",
+ "Compte supprimé",
+ "Votre compte SENGA a été supprimé. Merci d’avoir utilisé SENGA.",
+ "Supprimer mon compte",
+ "Efface vos données personnelles et ferme le compte définitivement."
 ];

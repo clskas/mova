@@ -249,6 +249,27 @@ export class RidesService {
   /**
    * Drivers currently on an active ride, delivery, or errand (for admin dutyStatus).
    */
+  /** Rides and deliveries not finished yet, as passenger/customer or as driver. */
+  async userActiveJobs(userId: string): Promise<{ active: boolean; rides: number; deliveries: number }> {
+    const openRide = [RideStatus.REQUESTED, RideStatus.SEARCHING, RideStatus.ACCEPTED, RideStatus.DRIVER_ARRIVED, RideStatus.IN_PROGRESS];
+    const openDelivery = [
+      DeliveryStatus.PENDING,
+      DeliveryStatus.RESTAURANT_CONFIRMED,
+      DeliveryStatus.READY_FOR_PICKUP,
+      DeliveryStatus.PICKED_UP,
+      DeliveryStatus.IN_TRANSIT,
+    ];
+    const [rides, deliveries] = await Promise.all([
+      this.prisma.ride.count({
+        where: { status: { in: openRide }, OR: [{ passengerId: userId }, { driverId: userId }] },
+      }),
+      this.prisma.delivery.count({
+        where: { status: { in: openDelivery }, OR: [{ userId }, { driverId: userId }] },
+      }),
+    ]);
+    return { active: rides + deliveries > 0, rides, deliveries };
+  }
+
   async listOnDutyDriverIds(): Promise<{ driverIds: string[] }> {
     const [rides, deliveries, errands] = await Promise.all([
       this.prisma.ride.findMany({

@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Suppression de compte — SENGA",
   description:
-    "Comment demander la suppression de votre compte SENGA et quelles données sont effacées ou conservées.",
+    "Comment supprimer votre compte SENGA depuis l'application et quelles données sont effacées ou conservées.",
   robots: { index: true, follow: true },
 };
 
@@ -14,6 +14,10 @@ export default function AccountDeletionPage() {
       <p className="mb-6 text-sm text-[var(--mova-violet)]">
         <Link href="/" className="hover:underline">
           ← SENGA
+        </Link>
+        {" · "}
+        <Link href="/support" className="hover:underline">
+          Support
         </Link>
         {" · "}
         <Link href="/privacy" className="hover:underline">
@@ -30,131 +34,89 @@ export default function AccountDeletionPage() {
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             Suppression de compte — SENGA
           </h1>
-          <p className="text-sm text-black/60">
-            Account deletion request — SENGA (RDC)
-          </p>
+          <p className="text-sm text-black/60">Account deletion — SENGA (DR Congo)</p>
         </header>
 
         {/* ——— Français ——— */}
         <section className="space-y-4" lang="fr">
-          <h2 className="text-xl font-semibold">Comment supprimer votre compte</h2>
-          <p>
-            Pour demander la suppression de votre compte SENGA (passager ou chauffeur),
-            envoyez un e-mail à{" "}
-            <a className="text-[var(--mova-violet)] underline" href="mailto:support@mova.cd">
-              support@mova.cd
-            </a>{" "}
-            (ou{" "}
-            <a className="text-[var(--mova-violet)] underline" href="mailto:privacy@mova.cd">
-              privacy@mova.cd
-            </a>
-            ) depuis le numéro ou l&apos;adresse associés à votre compte.
-          </p>
-          <p>
-            Vous pouvez aussi nous écrire via WhatsApp :{" "}
-            <strong>+243 900 000 000</strong> (Lun–Sam 8h–20h, Africa/Kinshasa).
-          </p>
-
-          <h3 className="text-lg font-medium">Étapes</h3>
+          <h2 className="text-xl font-semibold">Supprimer votre compte dans l&apos;application</h2>
           <ol className="list-decimal space-y-2 pl-5">
+            <li>Ouvrez SENGA ou SENGA Driver et connectez-vous.</li>
             <li>
-              Ouvrez un e-mail avec l&apos;objet :{" "}
-              <em>« Demande de suppression de compte SENGA »</em>.
+              Ouvrez votre profil : <strong>Mon profil</strong> (passager) ou{" "}
+              <strong>menu → Compte et connexion</strong> (chauffeur).
             </li>
             <li>
-              Indiquez votre numéro de téléphone au format <strong>+243…</strong> et précisez
-              si vous êtes passager ou chauffeur.
-            </li>
-            <li>
-              Nous vérifions votre identité, puis confirmons la suppression (généralement sous{" "}
-              <strong>7 jours ouvrés</strong>).
-            </li>
-            <li>
-              Après confirmation, vous ne pourrez plus vous connecter avec ce compte.
+              Touchez <strong>« Supprimer mon compte »</strong> en bas de l&apos;écran, puis
+              confirmez deux fois.
             </li>
           </ol>
-
-          <h3 className="text-lg font-medium">Dans l&apos;application</h3>
           <p>
-            Il n&apos;y a pas encore de bouton « Supprimer mon compte » dans le profil. Vous
-            pouvez aussi consulter{" "}
-            <strong>Aide → FAQ → « Comment supprimer mon compte ? »</strong>, qui renvoie vers
-            le même contact support / DPO.
+            La suppression est immédiate. Elle n&apos;est pas possible pendant une course ou une
+            livraison en cours : terminez-la ou annulez-la d&apos;abord. Le solde éventuel du
+            portefeuille est perdu : utilisez-le ou retirez-le avant.
+          </p>
+          <p>
+            Vous n&apos;avez plus accès à l&apos;application ? Contactez-nous depuis la page{" "}
+            <Link href="/support" className="text-[var(--mova-violet)] underline">
+              Support
+            </Link>{" "}
+            avec le numéro de téléphone du compte.
           </p>
 
           <h3 className="text-lg font-medium">Données effacées</h3>
           <ul className="list-disc space-y-1 pl-5">
-            <li>Compte et identifiants (numéro, profil, photo)</li>
-            <li>Accès à l&apos;application et au portefeuille lié au compte</li>
-            <li>Préférences et données non nécessaires après clôture</li>
+            <li>Nom, numéro de téléphone, e-mail, photo de profil et code PIN</li>
+            <li>Liens de connexion Google / Apple</li>
+            <li>Dossier chauffeur et documents (permis, carte grise, selfie de vérification)</li>
+            <li>Notifications et appareils enregistrés</li>
           </ul>
 
-          <h3 className="text-lg font-medium">Données pouvant être conservées</h3>
+          <h3 className="text-lg font-medium">Données conservées (anonymes)</h3>
           <p>
-            Conformément à notre{" "}
+            L&apos;historique des courses, livraisons et paiements est conservé sans nom ni numéro,
+            pour la comptabilité et les obligations légales (jusqu&apos;à 3 ans), comme le décrit la{" "}
             <Link href="/privacy" className="text-[var(--mova-violet)] underline">
               politique de confidentialité
             </Link>
-            , certaines données peuvent être retenues pour obligations légales ou litiges :
-          </p>
-          <ul className="list-disc space-y-1 pl-5">
-            <li>Historique des courses / transactions : jusqu&apos;à <strong>3 ans</strong></li>
-            <li>Documents KYC chauffeur : jusqu&apos;à <strong>5 ans</strong> après fin de collaboration</li>
-            <li>Journaux techniques anonymisés : jusqu&apos;à <strong>12 mois</strong></li>
-          </ul>
-
-          <h3 className="text-lg font-medium">Suppression partielle (sans fermer le compte)</h3>
-          <p>
-            Vous pouvez demander l&apos;effacement de certaines données (ex. photo de profil,
-            nom) sans supprimer le compte en écrivant à{" "}
-            <a className="text-[var(--mova-violet)] underline" href="mailto:support@mova.cd">
-              support@mova.cd
-            </a>{" "}
-            ou{" "}
-            <a className="text-[var(--mova-violet)] underline" href="mailto:privacy@mova.cd">
-              privacy@mova.cd
-            </a>
             .
           </p>
         </section>
 
         {/* ——— English ——— */}
-        <section
-          className="space-y-4 border-t border-black/10 pt-8"
-          lang="en"
-        >
-          <h2 className="text-xl font-semibold">How to request account deletion</h2>
+        <section className="space-y-4 border-t border-black/10 pt-8" lang="en">
+          <h2 className="text-xl font-semibold">Delete your account in the app</h2>
+          <ol className="list-decimal space-y-2 pl-5">
+            <li>Open SENGA or SENGA Driver and sign in.</li>
+            <li>
+              Open your profile: <strong>My profile</strong> (passenger) or{" "}
+              <strong>menu → Account and sign-in</strong> (driver).
+            </li>
+            <li>
+              Tap <strong>“Delete my account”</strong> at the bottom of the screen and confirm
+              twice.
+            </li>
+          </ol>
           <p>
-            To delete your SENGA account (passenger or driver), email{" "}
-            <a className="text-[var(--mova-violet)] underline" href="mailto:support@mova.cd">
-              support@mova.cd
-            </a>{" "}
-            or{" "}
-            <a className="text-[var(--mova-violet)] underline" href="mailto:privacy@mova.cd">
-              privacy@mova.cd
-            </a>
-            , or message WhatsApp <strong>+243 900 000 000</strong>. Include your{" "}
-            <strong>+243</strong> phone number and whether you are a passenger or driver.
+            Deletion is immediate. It is not possible while a ride or delivery is under way. Any
+            wallet balance is lost. No access to the app any more? Contact us from the{" "}
+            <Link href="/support" className="text-[var(--mova-violet)] underline">
+              Support
+            </Link>{" "}
+            page with the account&apos;s phone number.
           </p>
           <p>
-            There is currently <strong>no in-app delete button</strong> in Profile. Use Help →
-            FAQ → “How do I delete my account?” or contact support as above. We typically
-            process requests within <strong>7 business days</strong> after identity
-            verification.
-          </p>
-          <p>
-            <strong>Deleted:</strong> account, profile, and app access.{" "}
-            <strong>May be retained</strong> as required by law (e.g. ride/transaction history
-            up to 3 years; driver KYC up to 5 years). You may also request partial data
-            deletion without closing the account via the same contacts.
+            <strong>Erased:</strong> name, phone, e-mail, photo, PIN, Google/Apple links, driver
+            file and documents, notifications. <strong>Kept anonymously:</strong> ride, delivery
+            and payment history for accounting and legal duties (up to 3 years).
           </p>
         </section>
 
         <footer className="border-t border-black/10 pt-6 text-sm text-black/60">
-          SENGA SARL · Kinshasa, RDC ·{" "}
-          <a className="text-[var(--mova-violet)] underline" href="mailto:support@mova.cd">
-            support@mova.cd
-          </a>
+          SENGA · AfriSoft · Kinshasa, RDC ·{" "}
+          <Link href="/support" className="text-[var(--mova-violet)] underline">
+            Support
+          </Link>
         </footer>
       </article>
     </main>

@@ -142,6 +142,12 @@ export class InternalController {
     return this.rides.listOnDutyDriverIds();
   }
 
+  /** Account deletion (auth-service): is this user in a ride or delivery right now? */
+  @Get('users/:userId/active-jobs')
+  activeJobs(@Param('userId') userId: string) {
+    return this.rides.userActiveJobs(userId);
+  }
+
   @Delete('users/:userId/data')
   purgeUserData(@Param('userId') userId: string) {
     return this.rides.purgeUserData(userId);

@@ -348,3 +348,63 @@ describe('UsersService owner lock', () => {
     expect(user.email).toBe('afriri75@gmail.com');
   });
 });
+
+describe('UsersService « Supprimer mon compte »', () => {
+  const prisma = {
+    user: { findUnique: jest.fn(), update: jest.fn() },
+    otpCode: { deleteMany: jest.fn() },
+  };
+  const redis = { client: { set: jest.fn().mockResolvedValue('OK') } };
+  const service = new UsersService(prisma as never, redis as never);
+  const fetchMock = jest.fn();
+  const realFetch = global.fetch;
+  const driver = { id: 'd1', phone: '+243810000009', role: UserRole.DRIVER, status: UserStatus.ACTIVE };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = fetchMock as never;
+    prisma.user.findUnique.mockResolvedValue(driver);
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).includes('active-jobs')
+        ? { ok: true, json: async () => ({ active: false }) }
+        : { ok: true, json: async () => ({}) },
+    );
+  });
+  afterAll(() => {
+    global.fetch = realFetch;
+  });
+
+  it('erases personal data, closes the account and removes the driver file', async () => {
+    await expect(service.deleteOwnAccount('d1')).resolves.toEqual({ deleted: true });
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'd1' },
+      data: expect.objectContaining({
+        phone: null,
+        email: null,
+        googleId: null,
+        appleId: null,
+        avatarUrl: null,
+        localPinHash: null,
+        status: UserStatus.SUSPENDED,
+      }),
+    });
+    expect(prisma.otpCode.deleteMany).toHaveBeenCalledWith({ where: { phone: driver.phone } });
+    const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes('/internal/users/d1/data'))).toBe(true);
+    expect(redis.client.set).toHaveBeenCalled(); // tokens denied at once
+  });
+
+  it('refuses while a ride or delivery is under way', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ active: true }) });
+    await expect(service.deleteOwnAccount('d1')).rejects.toMatchObject({ status: 409 });
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses admin accounts and the owner', async () => {
+    prisma.user.findUnique.mockResolvedValueOnce({ ...driver, role: UserRole.ADMIN });
+    await expect(service.deleteOwnAccount('d1')).rejects.toMatchObject({ response: { code: MovaErrorCode.AUTH_FORBIDDEN } });
+    prisma.user.findUnique.mockResolvedValueOnce({ ...driver, phone: OWNER_SUPER_ADMIN_PHONE, role: UserRole.SUPER_ADMIN });
+    await expect(service.deleteOwnAccount('d1')).rejects.toMatchObject({ response: { code: MovaErrorCode.AUTH_FORBIDDEN } });
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+});

@@ -19,11 +19,13 @@ import {
   parseConfirmedAmountCdf,
   pickString,
 } from './provider-ref.util';
+import { callbackClientIp, parseAllowedIps, UNKNOWN_REF_LIMIT, UnsignedCallbackShield } from './unsigned-callback-shield';
 
 @ApiTags('payments-webhooks')
 @Controller('payments')
 export class PaymentsWebhookController {
   private readonly logger = new Logger(PaymentsWebhookController.name);
+  private readonly unsignedShield = new UnsignedCallbackShield();
 
   constructor(
     private payments: PaymentsService,
@@ -105,7 +107,7 @@ export class PaymentsWebhookController {
   async serdiPay(
     @Body() body: unknown,
     @Headers() headers: Record<string, string | string[] | undefined>,
-    @Req() req: { rawBody?: Buffer | string },
+    @Req() req: { rawBody?: Buffer | string; socket?: { remoteAddress?: string } },
   ) {
     if (!this.isHubProcess()) return this.rejectAggregatorOnSenga('SerdiPay');
     const raw = this.webhookRawBody(req, body);
@@ -137,6 +139,18 @@ export class PaymentsWebhookController {
     const failure = pickString(payload, ['message', 'description', 'failureReason']);
     const confirmedAmountCdf = this.extractConfirmedAmountCdf(payload);
     const unsigned = sig === 'unsigned';
+    const callerIp = callbackClientIp(headers, req.socket?.remoteAddress);
+    if (unsigned) {
+      const refusal = this.unsignedShield.refusal(
+        callerIp,
+        parseAllowedIps(this.config.get<string>('SERDIPAY_CALLBACK_IPS')),
+      );
+      if (refusal) {
+        // ACK 200 so nobody learns which addresses or ids are accepted; nothing is finalized.
+        this.logger.warn(`SerdiPay unsigned webhook ignored (${refusal}) ip=${callerIp} ref=${providerRef}`);
+        return { success: true, message: 'Transaction en cours' };
+      }
+    }
     if (this.hub.isEnabled()) {
       const hubResult = await this.hub.finalizeFromAggregator(
         providerRef,
@@ -148,6 +162,10 @@ export class PaymentsWebhookController {
       if (hubResult.found) return { success: true, ...hubResult };
     }
     if (unsigned) {
+      const unknownCount = this.unsignedShield.recordUnknown(callerIp);
+      if (unknownCount === UNKNOWN_REF_LIMIT) {
+        this.logger.error(`SerdiPay unsigned webhooks with unknown ids from ip=${callerIp}: now ignored for 15 min`);
+      }
       // Local payments are keyed on ids end users can see — never finalize them unsigned.
       this.logger.warn(`SerdiPay unsigned webhook: no hub row for aggregator ref=${providerRef} — ACK 200`);
       return { success: true, message: 'Référence inconnue (ack)' };

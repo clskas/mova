@@ -60,9 +60,19 @@ import {
   STAFF_ON_PARTNER_PORTAL_MESSAGE,
 } from './partner-auth.util';
 import { hashOtpCode } from './otp-code.util';
+import { LocalAttemptCounter } from './local-attempt-counter';
 import { GoogleIdentity, GoogleTokenVerifier } from './google-id-token';
 import { AppleIdentity, AppleNameHint, AppleTokenVerifier } from './apple-id-token';
 import { ModerationService } from '../moderation/moderation.service';
+
+/** Roles that the fixed demo code 123456 may open (store review accounts only). */
+export function demoCodeAllowedForRole(role: UserRole): boolean {
+  if (!isProductionRuntime()) return true;
+  return role === UserRole.PASSENGER || role === UserRole.DRIVER;
+}
+
+/** Fallback counters when Redis is down (one per instance). */
+const localAttempts = new LocalAttemptCounter();
 
 const PIN_FAIL_PREFIX = 'auth:pin:fail:';
 const PIN_FAIL_MAX = 5;
@@ -314,7 +324,7 @@ export class AuthService {
     // App Review (ASC): seed demos accept PIN 123456 when ALLOW_TEST_OTP=true,
     // same standing code as SMS OTP — reviewers type password into the PIN pad.
     const seedDemoPinOk =
-      Boolean(user.phone) && matchesSeedTestOtp(user.phone!, pin);
+      Boolean(user.phone) && matchesSeedTestOtp(user.phone!, pin) && demoCodeAllowedForRole(user.role);
     if (!seedDemoPinOk && !verifyLocalPin(pin, user.localPinHash)) {
       await this.registerPinFailure(found.lockKey);
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_PIN, HttpStatus.UNAUTHORIZED);
@@ -355,6 +365,8 @@ export class AuthService {
       return user;
     }
 
+    // Never turn a staff / partner account into the demo driver (security audit 2026-11-24).
+    if (!demoCodeAllowedForRole(user.role)) return null;
     const needsPin = !user.localPinHash;
     const needsActive = user.status !== UserStatus.ACTIVE;
     const needsRole = user.role !== UserRole.DRIVER;
@@ -577,6 +589,7 @@ export class AuthService {
         }
       }
     }
+    this.assertDemoPhoneRoleAllowed(user);
     this.assertRoleAccess(user, requestedRole);
     if (user.status === UserStatus.SUSPENDED) {
       throw new MovaHttpException(MovaErrorCode.AUTH_FORBIDDEN, HttpStatus.FORBIDDEN, 'Compte suspendu. Contactez le support SENGA.');
@@ -1717,6 +1730,22 @@ export class AuthService {
     };
   }
 
+  /**
+   * Security audit 2026-11-24: in production, +2439000000xx numbers sign in with the fixed
+   * code 123456 (App Review / Play demos). That code must never open a staff or partner
+   * account, even if one was given such a number by mistake.
+   */
+  private assertDemoPhoneRoleAllowed(user: User) {
+    if (!isProductionRuntime() || !user.phone || !isSeedDemoPhone(user.phone)) return;
+    if (demoCodeAllowedForRole(user.role)) return;
+    this.logger.warn(`Demo-number sign-in refused for role ${user.role} (${maskPhoneRdc(user.phone)})`);
+    throw new MovaHttpException(
+      MovaErrorCode.AUTH_FORBIDDEN,
+      HttpStatus.FORBIDDEN,
+      'Ce numéro de démonstration ne peut pas ouvrir ce compte.',
+    );
+  }
+
   private assertRoleAccess(
     user: User,
     role?: UserRole,
@@ -1927,12 +1956,20 @@ export class AuthService {
       }
     } catch (e) {
       if (e instanceof MovaHttpException) throw e;
-      // Redis down (free-tier sleep / closed client): fail-open so PIN login still works.
+      // Redis down: fall back to this instance's own count (never unlimited guesses).
       this.logger.warn(`assertPinNotLocked failed: ${(e as Error).message}`);
+      if (localAttempts.count(`${PIN_FAIL_PREFIX}${phone}`) >= PIN_FAIL_MAX) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_PIN_LOCKED,
+          HttpStatus.TOO_MANY_REQUESTS,
+          'Trop de tentatives PIN. Réessayez dans 15 minutes ou connectez-vous par SMS.',
+        );
+      }
     }
   }
 
   private async registerPinFailure(phone: string) {
+    localAttempts.hit(`${PIN_FAIL_PREFIX}${phone}`, PIN_FAIL_TTL_SEC);
     try {
       const key = `${PIN_FAIL_PREFIX}${phone}`;
       const raw = await this.redis.client.get(key);
@@ -1947,6 +1984,7 @@ export class AuthService {
   }
 
   private async clearPinFailures(phone: string) {
+    localAttempts.clear(`${PIN_FAIL_PREFIX}${phone}`);
     try {
       await this.redis.client.del(`${PIN_FAIL_PREFIX}${phone}`);
     } catch (e) {
@@ -1969,8 +2007,15 @@ export class AuthService {
       }
     } catch (e) {
       if (e instanceof MovaHttpException) throw e;
-      // Redis down (free-tier sleep / closed client): fail-open so SMS login still works.
+      // Redis down: fall back to this instance's own count (never unlimited guesses).
       this.logger.warn(`assertOtpNotLocked failed: ${(e as Error).message}`);
+      if (localAttempts.count(`${OTP_FAIL_PREFIX}${phone}`) >= OTP_FAIL_MAX) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.TOO_MANY_REQUESTS,
+          'Trop de tentatives OTP. Réessayez dans 15 minutes.',
+        );
+      }
     }
   }
 
@@ -1995,12 +2040,20 @@ export class AuthService {
       }
     } catch (e) {
       if (e instanceof MovaHttpException) throw e;
-      // Redis down (free-tier sleep / closed client): fail-open so SMS login still works.
+      // Redis down: fall back to this instance's own count (SMS cost protection).
       this.logger.warn(`consumeOtpSendQuota failed: ${(e as Error).message}`);
+      if (localAttempts.hit(`${OTP_SEND_PREFIX}${phone}`, OTP_SEND_TTL_SEC) > OTP_SEND_MAX) {
+        throw new MovaHttpException(
+          MovaErrorCode.AUTH_FORBIDDEN,
+          HttpStatus.TOO_MANY_REQUESTS,
+          'Trop de codes demandés pour ce numéro. Réessayez dans 15 minutes.',
+        );
+      }
     }
   }
 
   private async registerOtpFailure(phone: string) {
+    localAttempts.hit(`${OTP_FAIL_PREFIX}${phone}`, OTP_FAIL_TTL_SEC);
     try {
       const key = `${OTP_FAIL_PREFIX}${phone}`;
       const raw = await this.redis.client.get(key);
@@ -2015,6 +2068,7 @@ export class AuthService {
   }
 
   private async clearOtpFailures(phone: string) {
+    localAttempts.clear(`${OTP_FAIL_PREFIX}${phone}`);
     try {
       await this.redis.client.del(`${OTP_FAIL_PREFIX}${phone}`);
     } catch (e) {

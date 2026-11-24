@@ -1533,4 +1533,100 @@ describe('AuthService', () => {
       portal: undefined,
     });
   });
+
+  describe('security audit 2026-11-24', () => {
+    const savedEnv = { NODE_ENV: process.env.NODE_ENV, ALLOW_TEST_OTP: process.env.ALLOW_TEST_OTP };
+    afterEach(() => {
+      process.env.NODE_ENV = savedEnv.NODE_ENV;
+      if (savedEnv.ALLOW_TEST_OTP === undefined) delete process.env.ALLOW_TEST_OTP;
+      else process.env.ALLOW_TEST_OTP = savedEnv.ALLOW_TEST_OTP;
+    });
+    function productionWithDemos() {
+      process.env.NODE_ENV = 'production';
+      process.env.ALLOW_TEST_OTP = 'true';
+      prisma.otpCode.findFirst.mockResolvedValue(null);
+    }
+
+    it('refuses the demo code 123456 for a staff account on a demo number in production', async () => {
+      productionWithDemos();
+      prisma.user.findUnique.mockResolvedValue(makeUser({ phone: '+243900000001', role: UserRole.ADMIN }));
+      await expect(service.verifyOtp('+243900000001', TEST_OTP_CODE, UserRole.ADMIN)).rejects.toMatchObject({
+        response: { code: MovaErrorCode.AUTH_FORBIDDEN },
+      });
+      expect(jwt.sign).not.toHaveBeenCalled();
+    });
+
+    it('still accepts the demo code for the store-review passenger in production', async () => {
+      productionWithDemos();
+      prisma.user.findUnique.mockResolvedValue(makeUser({ phone: '+243900000010', role: UserRole.PASSENGER }));
+      const session = await service.verifyOtp('+243900000010', TEST_OTP_CODE, UserRole.PASSENGER);
+      expect(session.accessToken).toBe('jwt-token');
+    });
+
+    it('does not let PIN 123456 open a partner account on a demo number in production', async () => {
+      productionWithDemos();
+      const partner = makeUser({
+        phone: '+243900000030',
+        role: UserRole.RESTAURANT,
+        localPinHash: hashLocalPin('582914'),
+      });
+      prisma.user.findUnique.mockResolvedValue(partner);
+      await expect(service.loginWithPin('+243900000030', TEST_OTP_CODE, UserRole.RESTAURANT)).rejects.toMatchObject({
+        response: { code: MovaErrorCode.AUTH_INVALID_PIN },
+      });
+      const session = await service.loginWithPin('+243900000030', '582914', UserRole.RESTAURANT);
+      expect(session.accessToken).toBe('jwt-token');
+    });
+
+    it('keeps locking PIN guesses when Redis is down', async () => {
+      const down = new Error('Connection is closed.');
+      redis.client.get.mockRejectedValue(down);
+      redis.client.set.mockRejectedValue(down);
+      redis.client.del.mockRejectedValue(down);
+      const user = makeUser({ phone: '+243811119901', localPinHash: hashLocalPin('582914') });
+      prisma.user.findUnique.mockResolvedValue(user);
+      for (let i = 0; i < 5; i += 1) {
+        await expect(service.loginWithPin(user.phone, '111111', UserRole.PASSENGER)).rejects.toMatchObject({
+          response: { code: MovaErrorCode.AUTH_INVALID_PIN },
+        });
+      }
+      await expect(service.loginWithPin(user.phone, '582914', UserRole.PASSENGER)).rejects.toMatchObject({
+        response: { code: MovaErrorCode.AUTH_PIN_LOCKED },
+      });
+    });
+
+    it('lets the real owner unlock a PIN blocked by someone else with one SMS login', async () => {
+      const down = new Error('Connection is closed.');
+      redis.client.get.mockRejectedValue(down);
+      redis.client.set.mockRejectedValue(down);
+      redis.client.del.mockRejectedValue(down);
+      const user = makeUser({ phone: '+243811119903', localPinHash: hashLocalPin('582914') });
+      prisma.user.findUnique.mockResolvedValue(user);
+      for (let i = 0; i < 5; i += 1) {
+        await service.loginWithPin(user.phone, '111111', UserRole.PASSENGER).catch(() => undefined);
+      }
+      await expect(service.loginWithPin(user.phone, '582914', UserRole.PASSENGER)).rejects.toMatchObject({
+        response: { code: MovaErrorCode.AUTH_PIN_LOCKED },
+      });
+      await seedHashedOtp(user.phone);
+      await service.verifyOtp(user.phone, '847291', UserRole.PASSENGER);
+      const session = await service.loginWithPin(user.phone, '582914', UserRole.PASSENGER);
+      expect(session.accessToken).toBe('jwt-token');
+    });
+
+    it('keeps locking OTP guesses when Redis is down', async () => {
+      const down = new Error('Connection is closed.');
+      redis.client.get.mockRejectedValue(down);
+      redis.client.set.mockRejectedValue(down);
+      prisma.otpCode.findFirst.mockResolvedValue(null);
+      for (let i = 0; i < 5; i += 1) {
+        await expect(service.verifyOtp('+243811119902', '000000', UserRole.PASSENGER)).rejects.toMatchObject({
+          response: { code: MovaErrorCode.AUTH_INVALID_OTP },
+        });
+      }
+      await expect(service.verifyOtp('+243811119902', '000000', UserRole.PASSENGER)).rejects.toMatchObject({
+        status: 429,
+      });
+    });
+  });
 });

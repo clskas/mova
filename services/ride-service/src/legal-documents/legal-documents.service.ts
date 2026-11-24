@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { sanitizeLegalHtml } from './legal-html';
 import { Prisma } from '@prisma/client';
 import { MovaErrorCode, MovaHttpException } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -133,7 +134,8 @@ export class LegalDocumentsService implements OnModuleInit {
       slug: row.slug,
       version: row.version,
       title: row.title,
-      body: row.body,
+      // HTML is cleaned on the way out, so pages saved earlier are covered too.
+      body: row.format === 'html' ? sanitizeLegalHtml(row.body) : row.body,
       format: row.format,
       isPublished: row.isPublished,
       publishedAt: row.publishedAt?.toISOString() ?? null,

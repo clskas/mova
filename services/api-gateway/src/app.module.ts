@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module';
 import { ProxyMiddleware } from './proxy/proxy.middleware';
 import { MaintenanceMiddleware } from './proxy/maintenance.middleware';
 import { AuthRateLimitMiddleware } from './proxy/auth-rate-limit.middleware';
+import { GeneralRateLimitMiddleware } from './proxy/general-rate-limit.middleware';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { GatewayThrottlerGuard } from './auth/gateway-throttler.guard';
 
@@ -28,6 +29,7 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
     consumer.apply(MaintenanceMiddleware).forRoutes({ path: 'api/*', method: RequestMethod.ALL });
+    consumer.apply(GeneralRateLimitMiddleware).forRoutes({ path: 'api/*', method: RequestMethod.ALL });
     consumer.apply(AuthRateLimitMiddleware).forRoutes({ path: 'api/*', method: RequestMethod.ALL });
     consumer.apply(ProxyMiddleware).forRoutes({ path: 'api/*', method: RequestMethod.ALL });
   }

@@ -79,6 +79,26 @@ platform :ios do
     )
   end
 
+  desc "Remplace les captures App Store (fr-FR) de la version en cours par celles du dossier donné"
+  lane :upload_screenshots do |options|
+    app_id = options[:app_identifier] || DRIVER_ID
+    dir = File.expand_path(options[:screenshots_path] || "../../build/store-screenshots", __dir__)
+    UI.user_error!("Dossier de captures introuvable : #{dir}") unless Dir.exist?(File.join(dir, "fr-FR"))
+    deliver(
+      api_key: asc_api_key,
+      app_identifier: app_id,
+      app_version: options[:app_version],
+      screenshots_path: dir,
+      overwrite_screenshots: true,
+      skip_binary_upload: true,
+      skip_metadata: true,
+      skip_app_version_update: true,
+      submit_for_review: false,
+      run_precheck_before_submit: false,
+      force: true
+    )
+  end
+
   desc "TestFlight passager + chauffeur puis tentative soumission production"
   lane :release_both do |options|
     # Prefer env (safe with spaces in "Senga Driver.ipa"); CLI options as fallback.

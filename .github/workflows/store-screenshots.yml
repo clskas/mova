@@ -69,15 +69,14 @@ jobs:
           bash ios/ci_set_flavor.sh driver
           cd ios && pod install
 
-      - name: Install applesimutils (grants the iOS notification permission)
-        run: |
-          brew tap wix/brew >/dev/null
-          brew install applesimutils >/dev/null
-          applesimutils --version || true
-
       - name: Build the test app for the simulator
         working-directory: mobile
         run: |
+          # Screenshot build only (never committed, never shipped): skip the iOS
+          # notification prompt AppDelegate shows at launch, so it does not cover the
+          # screens. The Flutter UI and data are unchanged.
+          perl -0pi -e 's/UNUserNotificationCenter\.current\(\)\.requestAuthorization\(\s*options:[^)]*\)\s*\{[^}]*\}//' ios/Runner/AppDelegate.swift
+          if grep -q requestAuthorization ios/Runner/AppDelegate.swift; then echo "::error::prompt patch failed"; exit 1; fi
           flutter build ios --simulator --debug             -t integration_test/store_screenshots_test.dart             --dart-define=API_URL="$STAGING_API_URL" --dart-define=WS_URL="$STAGING_WS_URL" --dart-define=APP_BUILD=0
 
       - name: Pick simulators
@@ -120,10 +119,6 @@ jobs:
             echo "::group::$slug ($udid)"
             xcrun simctl boot "$udid" || true
             xcrun simctl bootstatus "$udid" -b
-            # The app (AppDelegate) asks for notifications at launch: install it once and
-            # allow notifications + location, so no iOS prompt covers the screenshots.
-            xcrun simctl install "$udid" build/ios/iphonesimulator/Runner.app
-            applesimutils --byId "$udid" --bundle cd.mova.mova.driver               --setPermissions notifications=YES,location=always || echo "::warning::applesimutils failed"
             xcrun simctl status_bar "$udid" override --time "9:41" --dataNetwork wifi --wifiMode active \
               --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
             python3 ../scripts/store_screenshots/shot_server.py "$udid" "$OUT/$slug" &

@@ -4,9 +4,6 @@
 name: Store screenshots
 
 on:
-  # TEMP (removed before merge): lets the capture job run from this branch.
-  push:
-    branches: [feat/store-screenshots]
   workflow_dispatch:
     inputs:
       upload:
@@ -165,8 +162,7 @@ jobs:
   upload:
     name: Replace screenshots in App Store Connect
     needs: capture
-    # TEMP push condition (removed before merge): a commit tagged [upload-screenshots] uploads.
-    if: inputs.upload == true || (github.event_name == 'push' && contains(github.event.head_commit.message, '[upload-screenshots]'))
+    if: inputs.upload == true
     runs-on: macos-26
     environment: production-mobile
     timeout-minutes: 30
@@ -195,5 +191,5 @@ jobs:
           ls -la ../build/store-screenshots/fr-FR
           bundle exec fastlane upload_screenshots \
             app_identifier:cd.mova.mova.driver \
-            app_version:"${{ inputs.app_version || '1.0.82' }}" \
+            app_version:"${{ inputs.app_version }}" \
             screenshots_path:../../build/store-screenshots

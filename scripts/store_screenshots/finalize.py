@@ -4,7 +4,7 @@
   iPhone 6.5" slot (APP_IPHONE_65): 1284 x 2778
   iPad 13"  slot (APP_IPAD_PRO_3GEN_129): 2064 x 2752 (or 2048 x 2732)
 
-Only the store screenshots (names starting with a digit 1-9) are kept; "00-diag-*"
+Only the store screenshots (01-…, 02-…) are kept; "00-diag-*"
 files stay in the raw artifact for debugging. The image is scaled to the slot width
 and cropped evenly top/bottom (a few pixels) — the content itself is untouched.
 Usage: finalize.py <raw_dir> <out_dir>   (raw_dir/iphone/*.png, raw_dir/ipad/*.png)
@@ -33,7 +33,9 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     count = 0
     for device, size in SIZES.items():
-        for src in sorted((raw / device).glob("[1-9]*.png")):
+        for src in sorted((raw / device).glob("[0-9][0-9]-*.png")):
+            if src.name.startswith("00-"):
+                continue
             img = Image.open(src).convert("RGB")
             print(f"{device}/{src.name}: {img.size} -> {size}")
             fit(img, size).save(out / f"{device}-{src.name}", optimize=True)

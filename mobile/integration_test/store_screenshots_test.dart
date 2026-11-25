@@ -244,7 +244,10 @@ void main() {
         'pickupAddress': 'Gombe, Boulevard du 30 Juin',
         'dropoffAddress': 'Limete, 7e Rue',
       });
-      debugPrint('[screens] ride ${ride['id'] ?? ride}');
+      final rideId = ride['id']?.toString() ?? '';
+      debugPrint('[screens] ride ${rideId.isEmpty ? ride : rideId}');
+      // Start the driver search (dispatch), like the passenger app does after booking.
+      if (rideId.isNotEmpty) await _call('POST', '/rides/$rideId/search', token: passengerToken, body: {});
       final offered = await _waitFor(tester, find.byType(RideOfferScreen), const Duration(seconds: 75));
       await _run(tester, const Duration(seconds: 2));
       await _shot(offered ? '02-nouvelle-course' : '00-diag-no-offer');

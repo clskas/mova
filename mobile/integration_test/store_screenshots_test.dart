@@ -118,6 +118,12 @@ Future<bool> _waitFor(WidgetTester tester, Finder finder, Duration timeout) asyn
   return false;
 }
 
+/// Prints the visible texts (error banners, labels) to the CI log for diagnosis.
+void _dumpTexts(String label) {
+  final texts = find.byType(Text).evaluate().map((e) => (e.widget as Text).data ?? '').where((t) => t.trim().isNotEmpty);
+  debugPrint('[screens] $label: ${texts.take(40).join(' | ')}');
+}
+
 void _answerNativePrompts(TestDefaultBinaryMessenger messenger) {
   messenger.setMockMethodCallHandler(const MethodChannel('flutter.baseflow.com/geolocator_apple'), (call) async {
     switch (call.method) {
@@ -211,11 +217,21 @@ void main() {
     await _shot('00-diag-start');
 
     try {
+      // The animated welcome screen waits for a tap (« Touchez l'écran pour continuer »).
+      for (var i = 0; i < 20 && find.text('Disponibilité').evaluate().isEmpty; i++) {
+        final splash = find.textContaining("Touchez l'écran");
+        if (splash.evaluate().isNotEmpty) await tester.tap(splash.first, warnIfMissed: false);
+        await _run(tester, const Duration(seconds: 2));
+      }
+      expect(find.text('Disponibilité'), findsWidgets, reason: 'driver home screen');
+      await _run(tester, const Duration(seconds: 3));
+
       // 1) Go online with the real availability switch.
-      final toggle = find.byType(Switch);
-      expect(await _waitFor(tester, toggle, const Duration(seconds: 30)), isTrue, reason: 'availability switch');
-      await tester.tap(toggle.first);
-      await _run(tester, const Duration(seconds: 6));
+      for (var i = 0; i < 3 && find.text('En ligne').evaluate().isEmpty; i++) {
+        await tester.tap(find.byType(Switch).first);
+        await _run(tester, const Duration(seconds: 6));
+      }
+      _dumpTexts('after going online');
       await _shot('00-diag-online');
 
       // 2) A seed passenger books a ride next to the driver → real offer screen.

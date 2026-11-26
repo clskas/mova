@@ -73,6 +73,8 @@ export const EMAIL_SMTP_ACCEPTED_ADMIN_MESSAGE =
 
 /** Resend is the only path we treat as able to reach Gmail. */
 export const EMAIL_RESEND_ADMIN_MESSAGE = 'E-mail envoyé via Resend.';
+/** SMTP (SmarterASP) failed or stalled, Resend delivered instead. */
+export const EMAIL_RESEND_FALLBACK_ADMIN_MESSAGE = 'E-mail envoyé via Resend (relais : SMTP indisponible).';
 
 /**
  * SMTP 250 is not Gmail delivery. Production NDRs on noreply@:
@@ -294,16 +296,30 @@ export class EmailOtpMailer {
     }
     const from = this.fromAddress();
     const safeHtml = html ?? `<p>${escapeHtml(text).replace(/\n/g, '<br/>')}</p>`;
+    const hasSmtp = this.smtpReady();
+    const hasResend = this.resendKey() !== '';
+    if (!hasSmtp) return this.sendResend(dest, from, subject, text, safeHtml);
+
+    // SMTP (SmarterASP) first. With Resend as relay, give up on a stalled SMTP server
+    // quickly so the relay still answers before the app's 30 s request timeout.
     try {
-      if (this.resendKey()) {
-        return await this.sendResend(dest, from, subject, text, safeHtml);
-      }
-      return await this.sendSmtp(dest, from, subject, text, safeHtml);
+      return await this.sendSmtp(dest, from, subject, text, safeHtml, this.smtpStepTimeoutMs(hasResend));
     } catch (e) {
       const detail = (e as Error).message;
-      this.logger.error(`EMAIL send failed for ${maskEmail(dest)}: ${detail}`);
+      this.logger.error(`EMAIL send failed for ${maskEmail(dest)} via SMTP: ${detail}`);
+      if (!hasResend) return { success: false, message: mapSmtpFailureToAdminMessage(detail) };
+      this.logger.warn(`EMAIL relay → Resend for ${maskEmail(dest)}`);
+      const relay = await this.sendResend(dest, from, subject, text, safeHtml);
+      if (relay.success) return { success: true, message: EMAIL_RESEND_FALLBACK_ADMIN_MESSAGE };
       return { success: false, message: mapSmtpFailureToAdminMessage(detail) };
     }
+  }
+
+  /** Per-step SMTP wait: short when Resend can take over, generous otherwise. */
+  private smtpStepTimeoutMs(hasRelay: boolean): number {
+    const configured = Number(this.config.get<string>('SMTP_STEP_TIMEOUT_MS') ?? '');
+    if (Number.isFinite(configured) && configured > 0) return configured;
+    return hasRelay ? SMTP_RELAY_STEP_TIMEOUT_MS : SMTP_TIMEOUT_MS;
   }
 
   async sendLoginPin(
@@ -358,8 +374,11 @@ export class EmailOtpMailer {
     text: string,
     html: string,
   ): Promise<EmailOtpSendResult> {
-    const res = await fetch('https://api.resend.com/emails', {
+    let res: Response;
+    try {
+      res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
+      signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
       headers: {
         Authorization: `Bearer ${this.resendKey()}`,
         'Content-Type': 'application/json',
@@ -372,6 +391,10 @@ export class EmailOtpMailer {
         html,
       }),
     });
+    } catch (e) {
+      this.logger.error(`EMAIL send failed for ${maskEmail(to)} via Resend: ${(e as Error).message}`);
+      return { success: false, message: "Resend injoignable. Réessayez plus tard." };
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       this.logger.error(`Resend HTTP ${res.status}: ${body.slice(0, 200)}`);
@@ -380,6 +403,7 @@ export class EmailOtpMailer {
         message: `Resend a refusé l'envoi (statut ${res.status}). Réessayez plus tard.`,
       };
     }
+    this.logger.log(`EMAIL sent via Resend for ${maskEmail(to)}`);
     return { success: true, message: EMAIL_RESEND_ADMIN_MESSAGE };
   }
 
@@ -389,6 +413,7 @@ export class EmailOtpMailer {
     subject: string,
     text: string,
     html?: string,
+    stepTimeoutMs = SMTP_TIMEOUT_MS,
   ): Promise<EmailOtpSendResult> {
     const user = this.smtpUser();
     const configuredHost = inferSmtpHost(user, this.config.get<string>('SMTP_HOST'))!;
@@ -446,6 +471,7 @@ export class EmailOtpMailer {
       to,
       message,
       ehloHostname,
+      timeoutMs: stepTimeoutMs,
     });
     this.logger.log(
       `SMTP accepted (250) for ${maskEmail(to)} from=${from} envelope=${envelopeFrom} ehlo=${ehloHostname} — not inbox proof. ${emailInboxHintFor(to)}`,
@@ -465,6 +491,8 @@ type SmtpOpts = {
   to: string;
   message: string;
   ehloHostname?: string;
+  /** Wait per SMTP step (greeting, EHLO, AUTH, DATA…). */
+  timeoutMs?: number;
 };
 
 function b64(value: string) {
@@ -506,6 +534,9 @@ export function smtpReplyComplete(buffer: string): boolean {
 }
 
 const SMTP_TIMEOUT_MS = 45_000;
+/** With Resend as relay: a healthy SmarterASP answers each step in < 3 s. */
+const SMTP_RELAY_STEP_TIMEOUT_MS = 8_000;
+const RESEND_TIMEOUT_MS = 10_000;
 
 async function smtpSend(opts: SmtpOpts): Promise<void> {
   const implicitTls = opts.port === 465;
@@ -524,7 +555,7 @@ async function smtpSend(opts: SmtpOpts): Promise<void> {
 
   const timed = <T>(p: Promise<T>, label: string): Promise<T> =>
     new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`SMTP timeout (${label})`)), SMTP_TIMEOUT_MS);
+      const timer = setTimeout(() => reject(new Error(`SMTP timeout (${label})`)), opts.timeoutMs ?? SMTP_TIMEOUT_MS);
       p.then(
         (v) => {
           clearTimeout(timer);
@@ -543,6 +574,9 @@ async function smtpSend(opts: SmtpOpts): Promise<void> {
   };
   const attach = (sock: net.Socket) => {
     sock.on('data', onData);
+    // A reset after we gave up (timeout / relay) must not become an uncaught 'error'
+    // event; errors during a step are still surfaced by read().
+    sock.on('error', () => undefined);
   };
   attach(state.socket);
 

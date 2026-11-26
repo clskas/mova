@@ -1,0 +1,195 @@
+# Real App Store screenshots of Senga Driver (Apple guideline 2.3.3).
+# Runs the app on iOS simulators against STAGING with the seed demo accounts,
+# takes the screenshots, and (only when asked) replaces them in App Store Connect.
+name: Store screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: 'Remplacer les captures fr-FR dans App Store Connect (sinon : artefact seulement)'
+        type: boolean
+        default: false
+      app_version:
+        description: 'Version App Store en cours (ex. 1.0.82)'
+        type: string
+        default: '1.0.82'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: store-screenshots
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: '3.32.6'
+  STAGING_API_URL: 'https://mova-stg-gateway.onrender.com/api'
+  STAGING_WS_URL: 'https://mova-stg-gateway.onrender.com'
+
+jobs:
+  capture:
+    name: Capture (iPhone 6.5" + iPad 13")
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          set -euo pipefail
+          for cand in /Applications/Xcode_26.6.app /Applications/Xcode_26.5.app /Applications/Xcode_26.4.1.app \
+              /Applications/Xcode_26.4.app /Applications/Xcode_26.3.app /Applications/Xcode_26.2.app \
+              /Applications/Xcode_26.app /Applications/Xcode.app; do
+            if [ -d "$cand" ]; then sudo xcode-select -s "$cand"; break; fi
+          done
+          xcodebuild -version
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Wake staging
+        run: |
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "${STAGING_WS_URL}/health" || true)
+            echo "staging health: $code"; [ "$code" = "200" ] && break; sleep 20
+          done
+
+      - name: Prepare app (driver flavor)
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          flutter pub get
+          bash ios/ci_set_flavor.sh driver
+          cd ios && pod install
+
+      - name: Build the test app for the simulator
+        working-directory: mobile
+        run: |
+          # Screenshot build only (never committed, never shipped): skip the iOS
+          # notification prompt AppDelegate shows at launch, so it does not cover the
+          # screens. The Flutter UI and data are unchanged.
+          perl -0pi -e 's/UNUserNotificationCenter\.current\(\)\.requestAuthorization\(\s*options:[^)]*\)\s*\{[^}]*\}//' ios/Runner/AppDelegate.swift
+          if grep -q requestAuthorization ios/Runner/AppDelegate.swift; then echo "::error::prompt patch failed"; exit 1; fi
+          flutter build ios --simulator --debug             -t integration_test/store_screenshots_test.dart             --dart-define=API_URL="$STAGING_API_URL" --dart-define=WS_URL="$STAGING_WS_URL" --dart-define=APP_BUILD=0
+
+      - name: Pick simulators
+        id: sims
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, re, subprocess
+          def sh(*a): return subprocess.run(a, check=True, capture_output=True, text=True).stdout
+          devices = json.loads(sh("xcrun", "simctl", "list", "devices", "available", "-j"))["devices"]
+          runtimes = [r for r in json.loads(sh("xcrun", "simctl", "list", "runtimes", "available", "-j"))["runtimes"]
+                      if r["identifier"].startswith("com.apple.CoreSimulator.SimRuntime.iOS")]
+          types = json.loads(sh("xcrun", "simctl", "list", "devicetypes", "-j"))["devicetypes"]
+          def pick(key, pattern):
+              ios = sorted((k for k in devices if ".iOS-" in k), reverse=True)
+              for rt in ios:
+                  for d in devices[rt]:
+                      if re.search(pattern, d["name"]):
+                          print(f"{key}={d['udid']}"); print(f"{key}_name={d['name']}"); return
+              t = next(t for t in types if re.search(pattern, t["name"]))
+              rt = runtimes[-1]["identifier"]
+              udid = sh("xcrun", "simctl", "create", f"SENGA {t['name']}", t["identifier"], rt).strip()
+              print(f"{key}={udid}"); print(f"{key}_name={t['name']}")
+          pick("iphone", r"^iPhone \d+ Pro Max$")
+          pick("ipad", r"^iPad Pro 13-inch")
+          PY
+          cat "$GITHUB_OUTPUT"
+
+      - name: Capture on each simulator
+        working-directory: mobile
+        timeout-minutes: 70
+        env:
+          IPHONE: ${{ steps.sims.outputs.iphone }}
+          IPAD: ${{ steps.sims.outputs.ipad }}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/raw-screens"
+          for pair in "iphone:$IPHONE" "ipad:$IPAD"; do
+            slug="${pair%%:*}"; udid="${pair#*:}"; status=0
+            echo "::group::$slug ($udid)"
+            xcrun simctl boot "$udid" || true
+            xcrun simctl bootstatus "$udid" -b
+            xcrun simctl status_bar "$udid" override --time "9:41" --dataNetwork wifi --wifiMode active \
+              --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
+            python3 ../scripts/store_screenshots/shot_server.py "$udid" "$OUT/$slug" &
+            SERVER=$!
+            sleep 2
+            flutter drive \
+              --driver=test_driver/integration_test.dart \
+              --target=integration_test/store_screenshots_test.dart \
+              -d "$udid" \
+              --dart-define=API_URL="$STAGING_API_URL" \
+              --dart-define=WS_URL="$STAGING_WS_URL" \
+              --dart-define=APP_BUILD=0 || status=$?
+            kill "$SERVER" || true
+            xcrun simctl shutdown "$udid" || true
+            echo "::endgroup::"
+            ls -la "$OUT/$slug" || true
+            if [ "${status:-0}" != "0" ]; then echo "::error::flutter drive failed on $slug"; exit "$status"; fi
+          done
+
+      - name: Resize to App Store sizes
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/pil && /tmp/pil/bin/pip install --quiet pillow
+          /tmp/pil/bin/python scripts/store_screenshots/finalize.py "$RUNNER_TEMP/raw-screens" "$RUNNER_TEMP/store-screenshots/fr-FR"
+          ls -la "$RUNNER_TEMP/store-screenshots/fr-FR"
+
+      - name: Upload raw screenshots (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-screens
+          path: ${{ runner.temp }}/raw-screens
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload store screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-screenshots
+          path: ${{ runner.temp }}/store-screenshots
+          retention-days: 30
+
+  upload:
+    name: Replace screenshots in App Store Connect
+    needs: capture
+    if: inputs.upload == true
+    runs-on: macos-26
+    environment: production-mobile
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: mobile/ios
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: store-screenshots
+          path: mobile/build/store-screenshots
+
+      - name: deliver (screenshots only, Senga Driver)
+        working-directory: mobile/ios
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          set -euo pipefail
+          ls -la ../build/store-screenshots/fr-FR
+          bundle exec fastlane upload_screenshots \
+            app_identifier:cd.mova.mova.driver \
+            app_version:"${{ inputs.app_version }}" \
+            screenshots_path:../../build/store-screenshots

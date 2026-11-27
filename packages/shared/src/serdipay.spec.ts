@@ -52,6 +52,15 @@ describe('serdipay Public API', () => {
     expect(serdiPaySanitizeSmsText('RECU Token Montant 50.00 USD No.Jeton 12')).toBe(
       'RECU Token Montant 50.00 USD No.Jeton 12',
     );
+    // 422 « only letters, digits, spaces and . , - : / ' are accepted » (Nouvelle course, dettes).
+    const ride = serdiPaySanitizeSmsText(
+      'SENGA Driver: Nouvelle course SENGA. Course disponible · Gombe · 5 000 FC (prix proposé) · +500 FC prime',
+    );
+    expect(ride).toBe('SENGA Driver Nouvelle course SENGA Course disponible - Gombe - 5 000 FC prix propose - 500 FC prime');
+    expect(ride).toMatch(/^[A-Za-z0-9 .,\-:/'\n]+$/);
+    const debt = serdiPaySanitizeSmsText('SENGA — Vous devez 5 111 FC à SENGA (commissions) – réglez-les aujourd’hui & merci');
+    expect(debt).toBe("SENGA - Vous devez 5 111 FC a SENGA commissions - reglez-les aujourd'hui et merci");
+    expect(serdiPaySanitizeSmsText('Volume constaté 12 m³')).toBe('Volume constate 12 m3');
     expect(serdiPayTelecomCode('AIRTEL_MONEY')).toBe('AM');
     expect(serdiPayTelecomCode('ORANGE_MONEY')).toBe('OM');
     expect(serdiPayTelecomCode('MPESA')).toBe('MP');

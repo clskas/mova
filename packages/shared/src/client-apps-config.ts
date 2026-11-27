@@ -95,6 +95,12 @@ export type SosSmsConfig = {
   escalationSms: boolean;
   /** Number the app offers to text when a SOS cannot be sent over the Internet ('' = none). */
   sosSmsNumber: string;
+  /**
+   * SMS for the other notifications (new ride for a driver whose app is closed, payment and
+   * cash-debt reminders, partner alerts, KYC refusal, delivery code…). Off by default: they go
+   * through the app only. Access codes (sign-up, login, activation PIN) always go by SMS.
+   */
+  notificationSms: boolean;
 };
 
 export const DEFAULT_SOS_SMS_CONFIG: SosSmsConfig = {
@@ -103,6 +109,7 @@ export const DEFAULT_SOS_SMS_CONFIG: SosSmsConfig = {
   toTrustedContacts: true,
   escalationSms: true,
   sosSmsNumber: '',
+  notificationSms: false,
 };
 
 /**
@@ -434,7 +441,7 @@ export function normalizeSosSmsConfig(raw: unknown, fallback: SosSmsConfig = DEF
   const out = { ...fallback };
   if (!raw || typeof raw !== 'object') return out;
   const o = raw as Record<string, unknown>;
-  for (const k of ['toStaffForSos', 'toStaffForIncidents', 'toTrustedContacts', 'escalationSms'] as const) {
+  for (const k of ['toStaffForSos', 'toStaffForIncidents', 'toTrustedContacts', 'escalationSms', 'notificationSms'] as const) {
     if (typeof o[k] === 'boolean') out[k] = o[k] as boolean;
   }
   if (typeof o.sosSmsNumber === 'string') {

@@ -9,9 +9,10 @@ const DEFAULTS: SosSmsConfig = {
   toTrustedContacts: true,
   escalationSms: true,
   sosSmsNumber: "",
+  notificationSms: false,
 };
 
-const SWITCHES: Array<{ key: keyof Omit<SosSmsConfig, "sosSmsNumber">; label: string; hint: string }> = [
+const SWITCHES: Array<{ key: keyof Omit<SosSmsConfig, "sosSmsNumber" | "notificationSms">; label: string; hint: string }> = [
   {
     key: "toStaffForSos",
     label: "SMS à l’équipe pour chaque SOS",
@@ -66,11 +67,31 @@ export function SosSmsSettings({
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 space-y-3" data-testid="sos-sms-settings">
       <div>
-        <p className="text-sm font-medium text-slate-800">SMS des alertes SOS et incidents</p>
+        <p className="text-sm font-medium text-slate-800">SMS payants</p>
         <p className="text-xs text-slate-500 mt-1">
-          Chaque SMS est payant. Les notifications dans l’app et l’admin restent toujours envoyées.
+          Chaque SMS est payant. Les notifications dans l’app et l’admin restent toujours envoyées. Les codes
+          d’accès (inscription, connexion, PIN oublié, PIN d’activation) partent toujours par SMS.
         </p>
       </div>
+      <label className="flex items-start gap-3 text-sm rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+        <input
+          type="checkbox"
+          className="mt-1"
+          data-testid="notification-sms-switch"
+          checked={value.notificationSms === true}
+          disabled={readOnly || saving}
+          onChange={(e) => setValue((v) => ({ ...v, notificationSms: e.target.checked }))}
+        />
+        <span>
+          <span className="font-medium text-slate-800">SMS de notification</span>
+          <span className="block text-xs text-slate-600">
+            Nouvelle course pour un chauffeur dont l’app est fermée, rappels de paiement et de dettes en espèces,
+            alertes restaurants / loueurs, refus KYC, code de réception d’un colis… Coupé : ces messages passent
+            seulement par l’application (aucun coût SMS). Prend effet en 1 minute environ.
+          </span>
+        </span>
+      </label>
+      <p className="text-xs font-medium text-slate-700 pt-1">Alertes SOS et incidents</p>
       {SWITCHES.map((s) => (
         <label key={s.key} className="flex items-start gap-3 text-sm">
           <input

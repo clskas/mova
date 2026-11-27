@@ -4,7 +4,9 @@ import {
   africasTalkingSendSms,
   afrisoftSmsHubSendSms,
   isAfrisoftSmsHubClientConfigured,
+  INTERNAL_API_KEY,
   isProductionRuntime,
+  serviceUrl,
   isTwilioSmsConfigured,
   resolveSmsBackend,
   serdiPaySendSms,
@@ -15,6 +17,40 @@ import {
 export interface SmsSendResult {
   success: boolean;
   message?: string;
+}
+
+const NOTIFICATION_SMS_SWITCH_TTL_MS = 60_000;
+let notificationSmsSwitch: { on: boolean; at: number } | null = null;
+
+/**
+ * Super admin switch « SMS de notification » (admin › Alertes SOS › SMS payants), read from the
+ * client-apps config (sosSms.notificationSms) and kept one minute. Off when unreachable.
+ */
+export async function isNotificationSmsSwitchOn(now = Date.now()): Promise<boolean> {
+  if (process.env.SMS_NOTIFICATIONS_ENABLED === 'true') return true;
+  if (notificationSmsSwitch && now - notificationSmsSwitch.at < NOTIFICATION_SMS_SWITCH_TTL_MS) {
+    return notificationSmsSwitch.on;
+  }
+  let on = false;
+  try {
+    const res = await fetch(serviceUrl('ride', '/internal/client-apps-config'), {
+      headers: { 'x-internal-api-key': INTERNAL_API_KEY },
+      signal: AbortSignal.timeout(3_000),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { sosSms?: { notificationSms?: unknown } };
+      on = data?.sosSms?.notificationSms === true;
+    }
+  } catch {
+    on = notificationSmsSwitch?.on ?? false;
+  }
+  notificationSmsSwitch = { on, at: now };
+  return on;
+}
+
+/** Tests only. */
+export function resetNotificationSmsSwitchCache() {
+  notificationSmsSwitch = null;
 }
 
 @Injectable()
@@ -36,11 +72,10 @@ export class SmsService {
     language?: AppLanguage,
     opts?: { sos?: boolean },
   ): Promise<SmsSendResult> {
-    // SMS cost money: notifications go through the app (push + in-app). Only SOS alerts (safety,
-    // switched on per type by the super admin) still go by SMS. SMS_NOTIFICATIONS_ENABLED=true
-    // sends every notification by SMS again.
-    if (opts?.sos !== true && process.env.SMS_NOTIFICATIONS_ENABLED !== 'true') {
-      this.logger.log('Notification SMS not sent: notifications go through the app only');
+    // SMS cost money: notifications go through the app (push + in-app) unless the super admin
+    // turns « SMS de notification » on. SOS alerts have their own switches (fetchSosSmsConfig).
+    if (opts?.sos !== true && !(await isNotificationSmsSwitchOn())) {
+      this.logger.log('Notification SMS not sent: switch « SMS de notification » is off');
       return { success: false, message: 'Notifications SMS désactivées (application uniquement).' };
     }
     if (language && language !== 'fr') body = translateServerText(body, language);

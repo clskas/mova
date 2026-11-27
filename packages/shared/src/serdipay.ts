@@ -217,8 +217,20 @@ export function serdiPaySmsUpstreamFailed(data: SerdiPaySmsJson): {
  * Keep decimals (`50.00`) and abbreviations (`No.Jeton`).
  */
 export function serdiPaySanitizeSmsText(text: string): string {
+  // SerdiPay answers 422 « only letters, digits, spaces and . , - : / ' are accepted »:
+  // `·` `—` `&` `(` `+` `€`… made every « Nouvelle course » SMS fail. Accents are removed too
+  // (« é » → « e »), since only plain letters are guaranteed.
+  const plain = text
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[‘’`´]/g, "'")
+    .replace(/[·•‒-―]/g, '-')
+    .replace(/&/g, ' et ')
+    .replace(/³/g, '3')
+    .replace(/²/g, '2')
+    .replace(/[^A-Za-z0-9 \n.,\-:/'!?;]/g, ' ');
   // Keep newlines (Android SMS Retriever needs the app hash on its own last line).
-  return text
+  return plain
     .replace(/\.(\s|$)/g, ' $1')
     .replace(/[:;!?]/g, ' ')
     .replace(/[^\S\n]+/g, ' ')

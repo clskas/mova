@@ -7,6 +7,8 @@ import {
   isAfrisoftSmsHubClientConfigured,
   isMockOtpAllowed,
   isProductionRuntime,
+  resolveInternalApiKey,
+  serviceUrl,
   isSerdiPaySmsConfigured,
   isTestOtpAllowedForPhone,
   isTwilioSmsConfigured,
@@ -29,11 +31,44 @@ import { PrismaService } from '../prisma/prisma.service';
  */
 export const ACCESS_CODE_SMS_PURPOSES = new Set(['login', 'login_pin', 'driver_activation']);
 export const NOTIFICATION_SMS_DISABLED_MESSAGE =
-  "Les notifications ne sont pas envoyées par SMS (seulement dans l'application).";
+  "Les notifications ne sont pas envoyées par SMS (interrupteur « SMS de notification » coupé dans l'admin).";
 
 export function isSmsPurposeAllowed(purpose: string | undefined, env: NodeJS.ProcessEnv = process.env): boolean {
   if (env.SMS_NOTIFICATIONS_ENABLED === 'true') return true;
   return ACCESS_CODE_SMS_PURPOSES.has(String(purpose ?? '').trim());
+}
+
+const NOTIFICATION_SMS_SWITCH_TTL_MS = 60_000;
+let notificationSmsSwitch: { on: boolean; at: number } | null = null;
+
+/**
+ * Super admin switch « SMS de notification » (admin › Alertes SOS › SMS payants), read from the
+ * client-apps config (sosSms.notificationSms) and kept one minute. Off when unreachable.
+ */
+export async function isNotificationSmsSwitchOn(now = Date.now()): Promise<boolean> {
+  if (notificationSmsSwitch && now - notificationSmsSwitch.at < NOTIFICATION_SMS_SWITCH_TTL_MS) {
+    return notificationSmsSwitch.on;
+  }
+  let on = false;
+  try {
+    const res = await fetch(serviceUrl('ride', '/internal/client-apps-config'), {
+      headers: { 'x-internal-api-key': resolveInternalApiKey() },
+      signal: AbortSignal.timeout(3_000),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { sosSms?: { notificationSms?: unknown } };
+      on = data?.sosSms?.notificationSms === true;
+    }
+  } catch {
+    on = notificationSmsSwitch?.on ?? false;
+  }
+  notificationSmsSwitch = { on, at: now };
+  return on;
+}
+
+/** Tests only. */
+export function resetNotificationSmsSwitchCache() {
+  notificationSmsSwitch = null;
 }
 
 export interface SmsSendResult {
@@ -312,7 +347,7 @@ export class SmsService {
 
   /** Transactional SMS (activation PIN, alerts) — same AfriSoft hub as OTP. */
   async sendSms(phone: string, text: string, purpose = 'notify'): Promise<SmsSendResult> {
-    if (!isSmsPurposeAllowed(purpose)) {
+    if (!isSmsPurposeAllowed(purpose) && !(await isNotificationSmsSwitchOn())) {
       this.logger.log(`SMS (${purpose}) not sent to ${maskPhoneRdc(phone)}: SMS are kept for access codes`);
       return { success: false, message: NOTIFICATION_SMS_DISABLED_MESSAGE };
     }

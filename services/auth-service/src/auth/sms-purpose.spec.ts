@@ -17,3 +17,22 @@ describe('isSmsPurposeAllowed', () => {
     expect(isSmsPurposeAllowed('notify', { SMS_NOTIFICATIONS_ENABLED: 'true' })).toBe(true);
   });
 });
+
+describe('isNotificationSmsSwitchOn (admin › SMS de notification)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { isNotificationSmsSwitchOn, resetNotificationSmsSwitchCache } = require('./sms.providers');
+  beforeEach(() => resetNotificationSmsSwitchCache());
+
+  it('lit le réglage du super admin', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ sosSms: { notificationSms: true } }) }) as never;
+    expect(await isNotificationSmsSwitchOn()).toBe(true);
+  });
+
+  it('coupé par défaut et quand les réglages sont injoignables', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ sosSms: {} }) }) as never;
+    expect(await isNotificationSmsSwitchOn()).toBe(false);
+    resetNotificationSmsSwitchCache();
+    global.fetch = jest.fn().mockRejectedValue(new Error('down')) as never;
+    expect(await isNotificationSmsSwitchOn()).toBe(false);
+  });
+});

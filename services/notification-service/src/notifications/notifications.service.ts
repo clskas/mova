@@ -19,7 +19,7 @@ import { incidentNotifiesReporter,
   ServiceAssignedPayload,
   ServiceStatusUpdatedPayload,
 } from '@mova/shared';
-import { RedisService } from '@mova/shared';
+import { RedisService, translateServerText } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../sms/sms.service';
 import { FcmPushService } from '../push/fcm-push.service';
@@ -629,15 +629,35 @@ export class NotificationsService implements OnModuleInit {
       );
     } else if (fcmReady) {
       this.logger.warn(
-        `driver.job.alert ${payload.jobKind} → ${userIds.length} chauffeur(s) (0 token FCM — pas de SMS, application uniquement)`,
+        `driver.job.alert ${payload.jobKind} → ${userIds.length} chauffeur(s) (0 token FCM — SMS secours si activé)`,
       );
     } else {
       this.logger.warn(
-        `driver.job.alert ${payload.jobKind} → ${userIds.length} chauffeur(s) (FCM non configuré — pas de SMS, application uniquement)`,
+        `driver.job.alert ${payload.jobKind} → ${userIds.length} chauffeur(s) (FCM non configuré — SMS secours si activé)`,
       );
     }
 
-    // No SMS fallback: ride / job alerts go through the app only (SMS kept for access codes).
+    // App fermée / sans token FCM : SMS si le super admin a allumé « SMS de notification »
+    // (sinon SmsService ne l'envoie pas).
+    const withToken = fcmReady && tokens.length > 0
+      ? new Set(await this.pushTokens.userIdsWithTokens(userIds))
+      : new Set<string>();
+    // Cap SMS blast (nearby matching can be large).
+    const smsCap = userIds.filter((id) => !withToken.has(id)).slice(0, 12);
+    let smsSent = 0;
+    for (const userId of smsCap) {
+      const brief = await fetchAuthUserBrief(userId);
+      const phone = brief?.phone?.trim();
+      if (!phone) continue;
+      const lang = brief?.language ?? 'fr';
+      const t = (v: string) => translateServerText(v, lang);
+      const smsBody = `SENGA Driver: ${t(payload.title)}. ${t(payload.body)}`.slice(0, 160);
+      const result = await this.sms.sendMessage(phone, smsBody);
+      if (result.success) smsSent++;
+    }
+    if (smsSent > 0) {
+      this.logger.log(`driver.job.alert SMS ${payload.jobKind} → ${smsSent} chauffeur(s)`);
+    }
   }
 
   /** Coupe la sonnerie native (app fermée) — acceptation concurrente / annulation. */

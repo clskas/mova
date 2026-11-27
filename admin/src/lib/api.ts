@@ -3137,6 +3137,8 @@ export type SosSmsConfig = {
   toTrustedContacts: boolean;
   escalationSms: boolean;
   sosSmsNumber: string;
+  /** SMS for the other notifications (rides, reminders…). Access codes always go by SMS. */
+  notificationSms?: boolean;
 };
 
 export async function fetchClientAppsConfig(): Promise<ClientAppsConfig> {

@@ -374,11 +374,12 @@ describe('AuthService', () => {
     );
   });
 
-  it('invalidates previous unused OTP codes on request', async () => {
+  it('keeps the 2 previous live OTP codes valid on request (late SMS), cancels older ones', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
+    prisma.otpCode.findMany.mockResolvedValueOnce([{ id: 'c3' }, { id: 'c2' }, { id: 'c1' }]);
     await service.requestOtp('+243812345678');
     expect(prisma.otpCode.updateMany).toHaveBeenCalledWith({
-      where: { phone: '+243812345678', used: false },
+      where: { phone: '+243812345678', used: false, id: { notIn: ['c3', 'c2'] } },
       data: { used: true },
     });
     const created = prisma.otpCode.create.mock.calls[0][0];

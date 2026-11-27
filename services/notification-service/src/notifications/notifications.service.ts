@@ -19,7 +19,7 @@ import { incidentNotifiesReporter,
   ServiceAssignedPayload,
   ServiceStatusUpdatedPayload,
 } from '@mova/shared';
-import { RedisService, translateServerText } from '@mova/shared';
+import { RedisService } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../sms/sms.service';
 import { FcmPushService } from '../push/fcm-push.service';
@@ -327,7 +327,7 @@ export class NotificationsService implements OnModuleInit {
           const smsText = isSos
             ? `SENGA SOS — ${payload.type}${payload.rideId ? ` course ${payload.rideId.slice(0, 8)}` : ''}.${maps}`
             : `SENGA incident ${payload.type}${payload.rideId ? ` course ${payload.rideId.slice(0, 8)}` : ''} — Litiges admin.`;
-          const smsResult = await this.sms.sendMessage(s.phone, smsText.slice(0, 160));
+          const smsResult = await this.sms.sendMessage(s.phone, smsText.slice(0, 160), undefined, { sos: isSos });
           if (smsResult?.success) smsSent += 1;
         }
       } else {
@@ -414,7 +414,7 @@ export class NotificationsService implements OnModuleInit {
       const text =
         `SENGA SOS : ${who} a déclenché une alerte et vous a désigné comme contact d'urgence.${maps ? ` Position :${maps}.` : ''}` +
         ` L'équipe SENGA est prévenue. En cas de danger, appelez le 112.`;
-      const res = await this.sms.sendMessage(c.phone, text);
+      const res = await this.sms.sendMessage(c.phone, text, undefined, { sos: true });
       if (res?.success) sent++;
     }
     return sent;
@@ -477,7 +477,12 @@ export class NotificationsService implements OnModuleInit {
     if (smsCfg.escalationSms) {
       for (const s of staff) {
         if (!s.phone) continue;
-        const res = await this.sms.sendMessage(s.phone, `SENGA SOS NON PRIS EN CHARGE depuis 2 min — Litiges admin.${maps}`.slice(0, 160));
+        const res = await this.sms.sendMessage(
+          s.phone,
+          `SENGA SOS NON PRIS EN CHARGE depuis 2 min — Litiges admin.${maps}`.slice(0, 160),
+          undefined,
+          { sos: true },
+        );
         if (res?.success) sms++;
       }
     }
@@ -624,34 +629,15 @@ export class NotificationsService implements OnModuleInit {
       );
     } else if (fcmReady) {
       this.logger.warn(
-        `driver.job.alert ${payload.jobKind} → ${userIds.length} chauffeur(s) (0 token FCM — SMS secours)`,
+        `driver.job.alert ${payload.jobKind} → ${userIds.length} chauffeur(s) (0 token FCM — pas de SMS, application uniquement)`,
       );
     } else {
       this.logger.warn(
-        `driver.job.alert ${payload.jobKind} → ${userIds.length} chauffeur(s) (FCM non configuré — SMS secours)`,
+        `driver.job.alert ${payload.jobKind} → ${userIds.length} chauffeur(s) (FCM non configuré — pas de SMS, application uniquement)`,
       );
     }
 
-    // App fermée / sans token FCM : SMS pour que le chauffeur soit quand même alerté.
-    const withToken = fcmReady && tokens.length > 0
-      ? new Set(await this.pushTokens.userIdsWithTokens(userIds))
-      : new Set<string>();
-    // Cap SMS blast (nearby matching can be large).
-    const smsCap = userIds.filter((id) => !withToken.has(id)).slice(0, 12);
-    let smsSent = 0;
-    for (const userId of smsCap) {
-      const brief = await fetchAuthUserBrief(userId);
-      const phone = brief?.phone?.trim();
-      if (!phone) continue;
-      const lang = brief?.language ?? 'fr';
-      const t = (v: string) => translateServerText(v, lang);
-      const smsBody = `SENGA Driver: ${t(payload.title)}. ${t(payload.body)}`.slice(0, 160);
-      const result = await this.sms.sendMessage(phone, smsBody);
-      if (result.success) smsSent++;
-    }
-    if (smsSent > 0) {
-      this.logger.log(`driver.job.alert SMS ${payload.jobKind} → ${smsSent} chauffeur(s)`);
-    }
+    // No SMS fallback: ride / job alerts go through the app only (SMS kept for access codes).
   }
 
   /** Coupe la sonnerie native (app fermée) — acceptation concurrente / annulation. */

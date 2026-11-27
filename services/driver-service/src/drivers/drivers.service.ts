@@ -65,6 +65,7 @@ export interface DriverCandidate {
 @Injectable()
 export class DriversService {
   private readonly logger = new Logger(DriversService.name);
+  private readonly kycApprovalsInFlight = new Map<string, ReturnType<DriversService['applyKycApproval']>>();
   constructor(
     private prisma: PrismaService,
     private ocrService: OcrService,
@@ -1284,11 +1285,34 @@ export class DriversService {
     };
   }
 
+  /**
+   * « Approuver le dossier » clicked twice (or twice in a row while SMS / e-mail are still
+   * being sent) must not issue a second PIN: the second one overwrote the first, so the
+   * driver received two codes and only the last one worked.
+   * - same request still running → share its result (no second SMS / e-mail);
+   * - dossier already approved with a PIN not used yet → send that same PIN again.
+   * Only « Renvoyer le PIN » (regenerateActivationPin) issues a new one on purpose.
+   */
+  private applyKycApprovalOnce(userId: string) {
+    const running = this.kycApprovalsInFlight.get(userId);
+    if (running) return running;
+    const task = this.applyKycApproval(userId).finally(() => this.kycApprovalsInFlight.delete(userId));
+    this.kycApprovalsInFlight.set(userId, task);
+    return task;
+  }
+
   private async applyKycApproval(userId: string) {
-    const pin = await this.resolveOnePin(userId);
+    const existing = await this.prisma.driverProfile.findUnique({ where: { userId } });
+    const unusedPin =
+      existing?.kycStatus === KycStatus.APPROVED &&
+      !existing.activationPinVerifiedAt &&
+      typeof existing.activationPin === 'string' &&
+      /^\d{6}$/.test(existing.activationPin)
+        ? existing.activationPin
+        : null;
+    const pin = unusedPin ?? (await this.resolveOnePin(userId));
     const defaultExpiry = new Date();
     defaultExpiry.setUTCFullYear(defaultExpiry.getUTCFullYear() + 2);
-    const existing = await this.prisma.driverProfile.findUnique({ where: { userId } });
     await this.prisma.driverProfile.upsert({
       where: { userId },
       create: {
@@ -1688,7 +1712,7 @@ export class DriversService {
       hasEmail: false,
     };
     if (approved) {
-      const issued = await this.applyKycApproval(userId);
+      const issued = await this.applyKycApprovalOnce(userId);
       activationPin = issued.pin;
       loginPin = issued.loginPin;
       notified = issued;

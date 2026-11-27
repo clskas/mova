@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   activationPinSmsCopy,
   kycApprovedPinAlert,
@@ -368,6 +368,10 @@ export default function KycPage() {
   const [includeHidden, setIncludeHidden] = useState(false);
   const [pinBanner, setPinBanner] = useState<{ title: string; pin?: string; notice: string } | null>(null);
   const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
+  // Dossier being approved / rejected: its buttons stay disabled until the PIN is sent,
+  // so a second click cannot issue a second PIN (only the last one would work).
+  const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const busyRef = useRef<string | null>(null);
   const [periodMode, setPeriodMode] = useState<PeriodMode>("preset");
   const [period, setPeriod] = useState<PeriodPresetDays>(30);
   const [customFrom, setCustomFrom] = useState(() => rangeForPresetDays(30).from);
@@ -494,6 +498,7 @@ export default function KycPage() {
   }
 
   async function reviewDriver(userId: string, approved: boolean) {
+    if (busyRef.current) return;
     try {
       let notes: string | undefined;
       if (!approved) {
@@ -504,6 +509,8 @@ export default function KycPage() {
         }
         notes = motif.trim();
       }
+      busyRef.current = userId;
+      setBusyUserId(userId);
       const result = await reviewDriverKyc(userId, approved, notes);
       if (approved && (result.activationPin || result.loginPin)) {
         window.alert(kycApprovedPinAlert(result));
@@ -514,6 +521,9 @@ export default function KycPage() {
       await load({ soft: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la validation");
+    } finally {
+      busyRef.current = null;
+      setBusyUserId(null);
     }
   }
 
@@ -554,6 +564,7 @@ export default function KycPage() {
   }
 
   async function reviewPartner(subject: "RESTAURANT" | "RENTAL_PARTNER", userId: string, approved: boolean) {
+    if (busyRef.current) return;
     try {
       let notes: string | undefined;
       if (!approved) {
@@ -579,6 +590,8 @@ export default function KycPage() {
           if (!ok) return;
         }
       }
+      busyRef.current = userId;
+      setBusyUserId(userId);
       const result = await reviewPartnerKycSubject(subject, userId, approved, notes);
       if (approved) {
         setPinBanner({
@@ -594,6 +607,9 @@ export default function KycPage() {
       await load({ soft: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Échec de la validation");
+    } finally {
+      busyRef.current = null;
+      setBusyUserId(null);
     }
   }
 
@@ -905,10 +921,19 @@ export default function KycPage() {
                     {showDossierActions && (
                       <div className="flex flex-col items-end gap-1">
                         <div className="flex gap-2">
-                          <BtnSuccess onClick={() => reviewDriver(dossier.userId, true)} disabled={waitingDocs > 0}>
-                            {docsApproved ? "Documents OK — Approuver le dossier" : "Approuver le dossier"}
+                          <BtnSuccess
+                            onClick={() => reviewDriver(dossier.userId, true)}
+                            disabled={waitingDocs > 0 || busyUserId !== null}
+                          >
+                            {busyUserId === dossier.userId
+                              ? "Validation en cours…"
+                              : docsApproved
+                                ? "Documents OK — Approuver le dossier"
+                                : "Approuver le dossier"}
                           </BtnSuccess>
-                          <BtnDanger onClick={() => reviewDriver(dossier.userId, false)}>Rejeter le dossier</BtnDanger>
+                          <BtnDanger onClick={() => reviewDriver(dossier.userId, false)} disabled={busyUserId !== null}>
+                            Rejeter le dossier
+                          </BtnDanger>
                         </div>
                         {waitingDocs > 0 && (
                           <p className="text-xs text-amber-800 max-w-xs text-right">{waitingDocsMessage(waitingDocs)}</p>
@@ -998,13 +1023,17 @@ export default function KycPage() {
                   {canWrite("kyc") && (
                     <div className="flex flex-col items-end gap-1">
                       <div className="flex gap-2">
-                        <BtnSuccess onClick={() => reviewDriver(d.userId, true)}>
-                          {d.kycAllJustificatifsApproved
-                            ? "Documents OK — Approuver le dossier"
-                            : "Approuver le dossier"}
+                        <BtnSuccess onClick={() => reviewDriver(d.userId, true)} disabled={busyUserId !== null}>
+                          {busyUserId === d.userId
+                            ? "Validation en cours…"
+                            : d.kycAllJustificatifsApproved
+                              ? "Documents OK — Approuver le dossier"
+                              : "Approuver le dossier"}
                         </BtnSuccess>
                         {d.kycStatus !== "REJECTED" && (
-                          <BtnDanger onClick={() => reviewDriver(d.userId, false)}>Rejeter</BtnDanger>
+                          <BtnDanger onClick={() => reviewDriver(d.userId, false)} disabled={busyUserId !== null}>
+                            Rejeter
+                          </BtnDanger>
                         )}
                       </div>
                     </div>
@@ -1058,11 +1087,20 @@ export default function KycPage() {
                           <div className="flex gap-2">
                             <BtnSuccess
                               onClick={() => reviewPartner("RESTAURANT", r.userId!, true)}
-                              disabled={unapprovedChecklistItems(checklist) > 0}
+                              disabled={unapprovedChecklistItems(checklist) > 0 || busyUserId !== null}
                             >
-                              {docsOk ? "Documents OK — Approuver le dossier" : "Approuver le dossier"}
+                              {busyUserId === r.userId
+                                ? "Validation en cours…"
+                                : docsOk
+                                  ? "Documents OK — Approuver le dossier"
+                                  : "Approuver le dossier"}
                             </BtnSuccess>
-                            <BtnDanger onClick={() => reviewPartner("RESTAURANT", r.userId!, false)}>Rejeter le dossier</BtnDanger>
+                            <BtnDanger
+                              onClick={() => reviewPartner("RESTAURANT", r.userId!, false)}
+                              disabled={busyUserId !== null}
+                            >
+                              Rejeter le dossier
+                            </BtnDanger>
                           </div>
                           {unapprovedChecklistItems(checklist) > 0 && (
                             <p className="text-xs text-amber-800 max-w-xs text-right">
@@ -1154,11 +1192,20 @@ export default function KycPage() {
                           <div className="flex gap-2">
                             <BtnSuccess
                               onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, true)}
-                              disabled={unapprovedChecklistItems(checklist) > 0}
+                              disabled={unapprovedChecklistItems(checklist) > 0 || busyUserId !== null}
                             >
-                              {docsOk ? "Documents OK — Approuver le dossier" : "Approuver le dossier"}
+                              {busyUserId === r.userId
+                                ? "Validation en cours…"
+                                : docsOk
+                                  ? "Documents OK — Approuver le dossier"
+                                  : "Approuver le dossier"}
                             </BtnSuccess>
-                            <BtnDanger onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, false)}>Rejeter le dossier</BtnDanger>
+                            <BtnDanger
+                              onClick={() => reviewPartner("RENTAL_PARTNER", r.userId!, false)}
+                              disabled={busyUserId !== null}
+                            >
+                              Rejeter le dossier
+                            </BtnDanger>
                           </div>
                           {unapprovedChecklistItems(checklist) > 0 && (
                             <p className="text-xs text-amber-800 max-w-xs text-right">

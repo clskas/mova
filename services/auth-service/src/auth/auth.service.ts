@@ -85,6 +85,8 @@ const OTP_FAIL_TTL_SEC = 15 * 60;
 /** SMS OTP sends per phone (SMS cost / pumping). Mobile resend timer is ≥ 30 s. */
 const OTP_SEND_PREFIX = 'auth:otp:send:';
 const OTP_SEND_MAX = 6;
+/** Codes still accepted for one number: the new one plus the 2 sent just before. */
+const OTP_LIVE_CODES = 3;
 const OTP_SEND_TTL_SEC = 15 * 60;
 
 const GOOGLE_CHALLENGE_PREFIX = 'auth:google:ch:';
@@ -219,10 +221,7 @@ export class AuthService {
     const liveCode = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     try {
-      await this.prisma.otpCode.updateMany({
-        where: { phone: normalized, used: false },
-        data: { used: true },
-      });
+      await this.retireOlderOtpCodes(normalized);
       for (const code of otpCodesToIssue(normalized, liveCode)) {
         await this.prisma.otpCode.create({
           data: { phone: normalized, code: hashOtpCode(code), expiresAt },
@@ -1308,10 +1307,7 @@ export class AuthService {
     const liveCode = useTestOtp ? TEST_OTP_CODE : crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     try {
-      await this.prisma.otpCode.updateMany({
-        where: { phone: destination, used: false },
-        data: { used: true },
-      });
+      await this.retireOlderOtpCodes(destination);
       for (const code of otpCodesToIssue(destination, liveCode)) {
         await this.prisma.otpCode.create({
           data: { phone: destination, code: hashOtpCode(code), expiresAt },
@@ -1529,7 +1525,8 @@ export class AuthService {
       throw new MovaHttpException(MovaErrorCode.AUTH_INVALID_OTP);
     }
     if (otp) {
-      await this.prisma.otpCode.update({ where: { id: otp.id }, data: { used: true } });
+      // Signed in: no code sent to this number may be used again.
+      await this.prisma.otpCode.updateMany({ where: { phone: normalized, used: false }, data: { used: true } });
     }
     await this.clearOtpFailures(normalized);
     return normalized;
@@ -2017,6 +2014,25 @@ export class AuthService {
         );
       }
     }
+  }
+
+  /**
+   * SMS can arrive minutes late (SerdiPay / operator). People then ask again, and the late SMS
+   * carried a code that the new request had already cancelled (« Code OTP invalide »). Keep the
+   * last OTP_LIVE_CODES codes valid until they expire (10 min) or one of them is used; older
+   * ones are cancelled. Guessing stays bounded by OTP_FAIL_MAX failures per number.
+   */
+  private async retireOlderOtpCodes(destination: string) {
+    const live = await this.prisma.otpCode.findMany({
+      where: { phone: destination, used: false, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    const keep = live.slice(0, OTP_LIVE_CODES - 1).map((c) => c.id);
+    await this.prisma.otpCode.updateMany({
+      where: { phone: destination, used: false, ...(keep.length ? { id: { notIn: keep } } : {}) },
+      data: { used: true },
+    });
   }
 
   private async consumeOtpSendQuota(phone: string) {

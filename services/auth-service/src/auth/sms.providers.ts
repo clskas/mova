@@ -22,6 +22,20 @@ import {
 } from '@mova/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
+/**
+ * SMS cost money: SENGA sends them only for access codes (sign-up / login codes, activation
+ * PIN of drivers and partners). Every other notification goes through the app (push + in-app).
+ * SMS_NOTIFICATIONS_ENABLED=true sends every purpose again.
+ */
+export const ACCESS_CODE_SMS_PURPOSES = new Set(['login', 'login_pin', 'driver_activation']);
+export const NOTIFICATION_SMS_DISABLED_MESSAGE =
+  "Les notifications ne sont pas envoyées par SMS (seulement dans l'application).";
+
+export function isSmsPurposeAllowed(purpose: string | undefined, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.SMS_NOTIFICATIONS_ENABLED === 'true') return true;
+  return ACCESS_CODE_SMS_PURPOSES.has(String(purpose ?? '').trim());
+}
+
 export interface SmsSendResult {
   success: boolean;
   message?: string;
@@ -298,6 +312,10 @@ export class SmsService {
 
   /** Transactional SMS (activation PIN, alerts) — same AfriSoft hub as OTP. */
   async sendSms(phone: string, text: string, purpose = 'notify'): Promise<SmsSendResult> {
+    if (!isSmsPurposeAllowed(purpose)) {
+      this.logger.log(`SMS (${purpose}) not sent to ${maskPhoneRdc(phone)}: SMS are kept for access codes`);
+      return { success: false, message: NOTIFICATION_SMS_DISABLED_MESSAGE };
+    }
     text = translateServerText(text, await this.recipientLanguage(phone));
     if (isTestOtpAllowedForPhone(phone)) {
       this.logger.warn(`Skip live SMS for seed/test phone ${maskPhoneRdc(phone)}`);

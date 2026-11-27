@@ -30,7 +30,19 @@ export class SmsService {
   }
 
   /** [language]: the recipient's app language; French texts are translated when it is not French. */
-  async sendMessage(phone: string, body: string, language?: AppLanguage): Promise<SmsSendResult> {
+  async sendMessage(
+    phone: string,
+    body: string,
+    language?: AppLanguage,
+    opts?: { sos?: boolean },
+  ): Promise<SmsSendResult> {
+    // SMS cost money: notifications go through the app (push + in-app). Only SOS alerts (safety,
+    // switched on per type by the super admin) still go by SMS. SMS_NOTIFICATIONS_ENABLED=true
+    // sends every notification by SMS again.
+    if (opts?.sos !== true && process.env.SMS_NOTIFICATIONS_ENABLED !== 'true') {
+      this.logger.log('Notification SMS not sent: notifications go through the app only');
+      return { success: false, message: 'Notifications SMS désactivées (application uniquement).' };
+    }
     if (language && language !== 'fr') body = translateServerText(body, language);
     if (this.isMock()) {
       if (isProductionRuntime()) {
